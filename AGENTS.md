@@ -1,0 +1,99 @@
+# Recruitment OS — working notes for agents
+
+Multi-tenant AI recruitment SaaS, built one module at a time against the spec in
+`docs/`. Read `docs/modules/<NN>-*.md` for the module you're building, plus the
+code of every module already built, BEFORE writing anything.
+
+## Commands
+
+```bash
+npm run dev          # dev server
+npm run build        # production build (also typechecks)
+npm run lint         # eslint — must be clean
+npx tsc --noEmit     # typecheck only
+```
+
+Bulma emits Sass deprecation warnings from its own internals during builds.
+They are not caused by project code; ignore them.
+
+## Architecture rules (inherited by every module)
+
+**Tenant isolation.** Every table has `organization_id` and RLS. Resolve the
+tenant from the session via `lib/tenant.ts` — never from a request body, query
+param, or header. Role checks are enforced in the API layer *and* in RLS.
+
+- **API routes**: `requireMembership()` / `requireRole()` /
+  `getCurrentOrganizationId()` — these throw `TenantError`, which
+  `handleRouteError()` turns into a JSON 401/403.
+- **Pages**: `requireMembershipOrRedirect()` — redirects to `/login` or
+  `/onboarding` instead of throwing.
+
+**RLS is the real boundary, not the route handler.** The browser holds an
+authenticated PostgREST client (`lib/supabase/client.ts`), so any signed-in user
+can write directly to the database and skip your API route entirely. A rule that
+exists only in a route handler is not enforced. When a rule constrains *what a
+row may become* — a role transition, a status change, an ownership transfer —
+encode it in the policy's `WITH CHECK` (new row) and `USING` (existing row), or
+in a trigger for cross-row invariants. Keep the API check too, for a friendly
+error message.
+
+Two traps already hit in Module 1, both worth remembering:
+
+- `organization_members`' SELECT policy intentionally exposes every member row
+  of an org the caller belongs to (the team list needs it). Any query asking
+  "what is *my* membership?" must filter `user_id` explicitly, or it picks up
+  teammates' rows — and their roles.
+- Check-then-write across two statements is a TOCTOU race. For invariants like
+  "always at least one Owner", lock the parent row inside a trigger instead.
+
+**AI Service Layer.** `lib/ai/` is the only place that talks to an LLM.
+`lib/ai/provider.ts` holds the single provider boundary; each feature gets a
+named function (`parseResume()`, `matchCandidateToJob()`, …). No generic
+`askAI()`. Functions take structured input only — never a database handle — and
+return `AiResult<T>` with validated output. AI failures are expected: the manual
+workflow must always remain usable.
+
+**AI never writes to trusted tables directly.** Raw Data → AI → Structured
+Output → Validation → Human Review → Business Action.
+
+**Integration adapters.** `lib/integrations/{bolna,calendar,email,llm,n8n}/`
+each expose `connect/test/getStatus/disconnect`. Later modules call the adapter;
+they never re-implement a provider call. (Created from Module 8 onward.)
+
+## Design system
+
+Tokens live in `app/globals.scss` as CSS custom properties. Use
+`var(--color-primary)` etc., never raw hex. Cards are flat: white, 1px
+`--color-border`, 12px radius, 24px padding (16px mobile). No drop shadows, no
+rainbow palettes, no 3D charts.
+
+Every data-bearing view needs loading (skeletons, never a full-page spinner),
+empty, and error states — use `components/states.tsx`. Config edits use an
+explicit Save, never silent auto-save.
+
+## Conventions
+
+- Route handlers return errors via `lib/api.ts` (`handleRouteError`,
+  `jsonError`) so error shapes stay consistent and internals never leak.
+- `proxy.ts` (Next 16's replacement for `middleware.ts`) refreshes the session
+  and enforces auth at the edge. Public paths are allowlisted there;
+  everything else is protected by default.
+- Migrations are plain SQL in `supabase/migrations/`, applied via the Supabase
+  SQL Editor or CLI. Keep them re-runnable (`if not exists`, `drop policy if
+  exists`).
+- Prefer loading data in server components and refreshing after mutations over
+  client-side fetch effects.
+
+## Where things are
+
+See the project layout table in `README.md`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

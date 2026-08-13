@@ -1,0 +1,276 @@
+MODULE 12
+Clients
+Purpose
+This module connects recruitment work to the hiring companies (clients) the agency serves, and tracks each client's engagement and responsiveness.
+Key Features / What This Module Manages
+	•	Client profiles: name, contacts, active jobs, submitted candidates, feedback SLA
+	•	AI-generated candidate submission summaries for client-facing sharing
+	•	AI-generated client activity summaries for account managers
+	•	Client feedback turnaround tracking
+Main Routes
+	•	/clients
+	•	/clients/[id]
+Core Data Model
+	•	clients (id, organization_id, name, contacts JSONB, feedback_sla_days, created_at)
+	•	client_feedback_events (id, application_id, client_id, requested_at, responded_at)
+UI / Operational Flow
+	•	Recruiter opens a client-ready candidate submission draft
+	•	AI generates the submission summary; recruiter reviews and sends
+	•	Client feedback events are logged when a client responds (or fails to)
+	•	Client detail page shows an AI activity summary alongside raw metrics
+How This Module Connects To The Others
+Depends on:
+	•	Module 3: jobs (this module must retrofit the FK constraint on jobs.client_id now that clients exists — see Module 3's forward-stub note)
+	•	Module 4: candidates
+	•	Module 5 & 9: applications and screening_reports (source data for the AI submission-summary draft)
+Provides for later modules:
+	•	clients, client_feedback_events — read by Module 3 (job.client_id), Module 16 (analytics 'Average Client Feedback Time')
+Retrofit required:
+Add the foreign-key constraint jobs.client_id -> clients.id now that this table exists, backfill/validate existing job rows, and re-run Module 3's job list/detail/filter tests to confirm nothing broke.
+How AI Is Used In This Module
+AI drafts the candidate submission message that would otherwise be typed manually every time - for example: "Rahul is a backend engineer with 5.4 years of Java/Spring Boot experience and production AWS exposure. He is based in Gurgaon, can work hybrid, has a 30-day notice period, and expects 19 LPA." The recruiter reviews before sending. AI also summarizes client activity for account managers: "ABC Tech currently has 4 active jobs, 11 submitted candidates, 4 awaiting feedback and 2 interviews scheduled this week." Sending itself remains a controlled, human-triggered action.
+Role Permissions
+Permission
+Owner
+Admin
+Recruiter
+Viewer
+Manage clients
+Yes
+Yes
+Yes (assigned)
+No
+Generate/send submission summary
+Yes
+Yes
+Yes
+No
+View client activity summary
+Yes
+Yes
+Yes (assigned)
+Yes
+Build Now (MVP)
+	•	Client CRUD
+	•	Feedback SLA tracking
+	•	AI submission-summary drafting
+	•	AI client-activity summary
+Build Later (Not MVP)
+	•	Client-facing self-serve portal
+Testing Checklist
+	•	Feedback turnaround calculation matches requested_at/responded_at exactly
+	•	AI submission summaries never state facts absent from the candidate/application record
+	•	Sending a submission requires an explicit recruiter action, never automatic
+	•	Tenant isolation
+Claude Implementation Prompt — Module 12: Clients
+Save this specification as /docs/modules/12-clients.md, then give Claude the prompt below:
+Build Module 12: Clients for my multi-tenant recruitment SaaS.
+ 
+Before writing any code, read: the global design system, /docs/modules/12-clients.md, and every previously built module's code/spec (earlier modules define tables, RLS conventions, and the AI Service Layer this module must reuse).
+ 
+=================================================================
+1. TECH STACK
+=================================================================
+- Next.js (App Router) + TypeScript
+- Bulma for base styling, project design tokens for color/spacing
+- Supabase (PostgreSQL + Auth + Storage) with Row-Level Security
+- n8n for workflow/automation orchestration
+- Bolna AI for outbound/inbound voice screening calls
+- An LLM provider (OpenAI, swappable later) behind an internal AI Service Layer
+ 
+=================================================================
+2. CONNECTIONS TO OTHER MODULES — READ THIS BEFORE WRITING CODE
+=================================================================
+This module does not exist in isolation. Get the following connections right or later modules will break.
+ 
+Depends on (must already exist / must be read from):
+- Module 3: jobs (this module must retrofit the FK constraint on jobs.client_id now that clients exists — see Module 3's forward-stub note)
+- Module 4: candidates
+- Module 5 & 9: applications and screening_reports (source data for the AI submission-summary draft)
+ 
+Provides for later modules (do not rename/remove once other modules depend on it):
+- clients, client_feedback_events — read by Module 3 (job.client_id), Module 16 (analytics 'Average Client Feedback Time')
+ 
+Retrofit required — go back and connect earlier/later modules, do not just build this module forward:
+Add the foreign-key constraint jobs.client_id -> clients.id now that this table exists, backfill/validate existing job rows, and re-run Module 3's job list/detail/filter tests to confirm nothing broke.
+ 
+=================================================================
+4. DESIGN SYSTEM — USE THESE EXACT VALUES, DO NOT INVENT NEW ONES
+=================================================================
+Color tokens (hex, and where each is used):
+- Primary: #4F46E5 — Buttons, links, active nav, primary chart series, funnel main color
+- Primary Hover: #4338CA — Hover/active state of primary buttons and links
+- Background (page): #F8FAFC — App shell / page background, never used on cards
+- Card: #FFFFFF — Every card/panel background
+- Border: #E2E8F0 — 1px card borders, table borders, dividers
+- Main Text: #0F172A — Headings and primary body text
+- Secondary Text: #64748B — Labels, captions, helper text, timestamps
+- Success: #16A34A — Positive trends, Connected status, success toasts
+- Warning: #F59E0B — SLA breach indicators, Needs Attention status
+- Error: #DC2626 — Negative trends, failed states, destructive actions
+- Info: #2563EB — Informational badges/callouts
+ 
+Card style (apply to every panel/card in this module):
+- Card background: #FFFFFF
+- Card border: 1px solid #E2E8F0
+- Card border radius: 12px
+- Card padding: 24px (16px on mobile)
+- Card shadow: none/flat (rely on border, not drop shadow) unless the frontend-design tokens already in use say otherwise
+ 
+Typography:
+- KPI/metric main value: 28-32px, bold, #0F172A
+- KPI/metric label: 13-14px, #64748B
+- Section headings: 18-20px, semibold, #0F172A
+- Body text: 14-15px, #0F172A
+- Helper/caption text: 12-13px, #64748B
+ 
+Do not use rainbow/decorative color palettes, 3D charts, drop-shadow-heavy cards, or any color not in the token list above.
+ 
+=================================================================
+5. BACKEND — DATABASE SCHEMA
+=================================================================
+Create/extend the following tables. Every table must include organization_id and be governed by Row-Level Security scoped to the authenticated user's organization — no query may accept an organization_id from client input.
+ 
+- clients (id, organization_id, name, contacts JSONB, feedback_sla_days, created_at)
+- client_feedback_events (id, application_id, client_id, requested_at, responded_at)
+ 
+Required indexes (at minimum):
+- index on organization_id
+- index on created_at
+- index on application_id
+- index on client_id
+- composite index on (organization_id, created_at) for any table queried by recent activity or date range
+ 
+RLS rules:
+- SELECT/INSERT/UPDATE/DELETE policies all filter on organization_id = auth resolved tenant
+- No database function in this module may accept an arbitrary organization_id/tenant parameter from the browser
+- Role checks (Owner/Admin/Recruiter/Viewer) are enforced both in RLS where feasible and again in the API layer
+ 
+=================================================================
+6. BACKEND — API ENDPOINTS
+=================================================================
+- GET /api/clients — list, organization-scoped, supports pagination + the module's standard filters
+- POST /api/clients — create a new record (validates payload server-side, ignores any client-supplied organization_id)
+- GET /api/clients/:id — fetch one record the caller's organization owns
+- PATCH /api/clients/:id — partial update, role-checked
+- DELETE /api/clients/:id — soft-delete/archive where applicable, role-checked
+- POST /api/clients/:id/ai-action — invokes the module's AI Service Layer function (see AI Integration section) and returns structured, unsaved suggestions for review
+- Every endpoint validates the caller's role against the permissions table in section 9 before executing
+- Every list endpoint supports the module's standard filters (see UI section) as query parameters, validated server-side
+- Never return another organization's data even if a valid-looking id is guessed/passed in
+ 
+=================================================================
+7. FUNCTIONALITY — WHAT THIS MODULE MUST DO
+=================================================================
+Purpose: This module connects recruitment work to the hiring companies (clients) the agency serves, and tracks each client's engagement and responsiveness.
+ 
+Features to implement, exactly as scoped:
+- Client profiles: name, contacts, active jobs, submitted candidates, feedback SLA
+- AI-generated candidate submission summaries for client-facing sharing
+- AI-generated client activity summaries for account managers
+- Client feedback turnaround tracking
+ 
+Pages/routes for this module:
+- /clients
+- /clients/[id]
+ 
+Step-by-step operational flow to implement:
+1. Recruiter opens a client-ready candidate submission draft
+2. AI generates the submission summary; recruiter reviews and sends
+3. Client feedback events are logged when a client responds (or fails to)
+4. Client detail page shows an AI activity summary alongside raw metrics
+ 
+=================================================================
+8. FRONTEND — UI REQUIREMENTS
+=================================================================
+Layout: reuse the project's existing shell (nav + content area). Content area background #F8FAFC, all content lives in #FFFFFF cards per section 4.
+Responsive behavior: single-column stacking on mobile widths; tables convert to stacked cards or scroll horizontally only where a table cannot reasonably collapse; filters move into a bottom-sheet/drawer on mobile.
+ 
+Required UI states for every data-bearing view in this module:
+- Loading: skeleton blocks matching the shape of the eventual content (KPI skeletons, table-row skeletons, chart-block skeletons) — never one full-page spinner
+- Empty state: a short plain-language message plus, where relevant, a single primary action button (e.g. 'Connect Bolna', 'Create your first job') — never a broken/blank chart or table
+- Error state: a short human-readable message in #DC2626 tones with a Retry action; one failing section must never crash the rest of the page
+- Insufficient-data state (analytics-style views only): 'Not enough data for a meaningful trend' instead of a misleading percentage
+ 
+Do not silently auto-save destructive or bulk changes — use an explicit Save action with an unsaved-changes indicator wherever this module allows editing configuration.
+ 
+=================================================================
+9. ROLE PERMISSIONS (ENFORCE IN UI AND API, NOT JUST UI)
+=================================================================
+Permission | Owner | Admin | Recruiter | Viewer
+Manage clients | Yes | Yes | Yes (assigned) | No
+Generate/send submission summary | Yes | Yes | Yes | No
+View client activity summary | Yes | Yes | Yes (assigned) | Yes
+Hide or disable (not just visually gray out without blocking) any action a role is not permitted to take — the API must reject it independently of the UI.
+ 
+=================================================================
+10. AI INTEGRATION — EXACT BEHAVIOR REQUIRED
+=================================================================
+AI drafts the candidate submission message that would otherwise be typed manually every time - for example: "Rahul is a backend engineer with 5.4 years of Java/Spring Boot experience and production AWS exposure. He is based in Gurgaon, can work hybrid, has a 30-day notice period, and expects 19 LPA." The recruiter reviews before sending. AI also summarizes client activity for account managers: "ABC Tech currently has 4 active jobs, 11 submitted candidates, 4 awaiting feedback and 2 interviews scheduled this week." Sending itself remains a controlled, human-triggered action.
+ 
+Implementation requirements:
+- Route this module's AI calls through a single, named function in the shared AI Service Layer (e.g. lib/ai/<moduleFunctionName>.ts) — never call the LLM provider directly from a React component or route handler.
+- The AI function must accept only the structured data it needs (never raw, unscoped database access) and must return a typed, validated structure — reject and surface an error on malformed AI output rather than rendering it.
+- Follow the platform-wide pattern strictly: Raw Data -> AI Processing -> Structured Output -> Validation -> Human Review (where the spec calls for it) -> Business Action. AI output must never write directly to a trusted table without the review step described in section 7/8 for this module.
+- Log every AI call's inputs/outputs at a summary level to the Activity & Audit module for traceability, without storing secrets or full raw provider payloads unnecessarily.
+ 
+=================================================================
+11. OUT OF SCOPE — DO NOT BUILD THESE NOW
+=================================================================
+- Client-facing self-serve portal
+- Anything from another module's spec that has not been built yet — stub/interface against it instead of re-implementing it here
+ 
+=================================================================
+12. MVP DEFINITION OF DONE
+=================================================================
+- Client CRUD
+- Feedback SLA tracking
+- AI submission-summary drafting
+- AI client-activity summary
+ 
+=================================================================
+13. TESTING — WRITE AND RUN ALL OF THESE BEFORE CALLING THE MODULE DONE
+=================================================================
+Functional tests (module-specific):
+- Feedback turnaround calculation matches requested_at/responded_at exactly
+- AI submission summaries never state facts absent from the candidate/application record
+- Sending a submission requires an explicit recruiter action, never automatic
+- Tenant isolation
+ 
+Edge cases (apply to this module even if not listed above):
+- Empty state: organization has zero records for this module's core entity
+- Single-record state: exactly one record — rates/averages must not be misleading (e.g. show 'Not enough data' rather than 100%/0% on a sample size of one where relevant)
+- Large dataset: pagination/virtualization does not degrade badly at 10,000+ rows
+- Concurrent edits: two users editing the same record do not silently overwrite each other without at least a last-write-wins acknowledgment
+- Malformed/partial AI output: UI shows a clear error and lets the user retry or proceed manually, and never crashes the page
+- Timezone boundaries: any 'today'/'this week' calculation uses the organization's configured timezone, not the server's or browser's
+ 
+Security & tenant isolation tests:
+- A user from Organization A can never read, list, update, or delete Organization B's records via this module's UI or API, including by guessing IDs
+- Every role listed in section 9 is tested against every restricted action in this module, both allowed and denied cases
+- No API response in this module ever includes another organization's data, another user's private notes (if applicable), or unmasked credentials/secrets
+ 
+Performance checks:
+- List/detail queries use the indexes defined in section 5 (verify with EXPLAIN or equivalent) rather than full table scans
+- Pages render a first meaningful paint using skeleton states in under ~1s on typical data volumes, with real data streamed in as it resolves
+ 
+Regression checks against dependent modules:
+- Confirm this module's changes do not break the modules that read from or write to the same tables (list them explicitly in your completion report)
+ 
+=================================================================
+14. COMPLETION REPORT — RETURN ALL OF THE FOLLOWING
+=================================================================
+- Files created
+- Files modified
+- Database migrations (schema + RLS policies + indexes)
+- API endpoints implemented, with request/response shapes
+- AI Service Layer function(s) added, with their exact input/output types
+- UI components created, and which design tokens/states from section 4 and 8 they use
+- Permissions matrix implemented (confirm it matches section 9 exactly)
+- Full list of tests written and their pass/fail result
+- Any remaining issues, known limitations, or follow-ups for the next module
+
+Simple UI Template — Module 12: Clients
+Wireframe only — a minimal reference for structure and color usage, not a pixel-perfect design. Build the real UI with the project's existing component library.
+
+
