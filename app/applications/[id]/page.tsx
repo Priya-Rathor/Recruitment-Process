@@ -50,7 +50,9 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
         </h1>
         <div className="is-flex is-align-items-center" style={{ gap: "0.5rem" }}>
           <StageBadge stage={application.stage} />
-          <MatchScore score={application.match_score} />
+          <Link href={`/applications/${application.id}/match`} title="See the match breakdown">
+            <MatchScore score={application.match_score} />
+          </Link>
           {application.archived_at && (
             <span className="tag is-light" style={{ fontSize: 12 }}>
               Archived
@@ -149,6 +151,12 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
               Match score and screening results belong to this application, not to the candidate
               generally — the same person can score differently against another job.
             </p>
+            <Link
+              className="button is-small is-fullwidth mt-3"
+              href={`/applications/${application.id}/match`}
+            >
+              {application.match_score === null ? "Calculate match" : "See match breakdown"}
+            </Link>
           </div>
         </div>
       </div>

@@ -64,6 +64,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/dashboard/` | Module 2's read-only aggregation layer |
 | `lib/applications/` | Module 5's stage model, timeline, and queries |
 | `lib/resumes/` | Module 6's extraction, review diff, and queries |
+| `lib/matching/` | Module 7's deterministic scorer and score combination |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
 | `proxy.ts` | Session refresh + auth enforcement at the edge |
@@ -112,7 +113,7 @@ project.
 - [x] **Module 4** — Candidates Management
 - [x] **Module 5** — Applications Management
 - [x] **Module 6** — Resume AI (Parsing)
-- [ ] Module 7 — AI Matching
+- [x] **Module 7** — AI Matching
 - [ ] Module 8 — Bolna AI Screening
 - [ ] Module 9 — AI Screening Report
 - [ ] Module 10 — Advanced Pipeline
