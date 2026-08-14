@@ -19,7 +19,7 @@ have seen a real non-zero number on `/dashboard` for it.
 | New candidates | `candidates.created_at` | 4 | `lib/dashboard/metrics.ts` | ☑ table exists; **verify against live data** |
 | Screenings completed | `screening_calls.ended_at` + `status='completed'` | 8 | same | ☐ |
 | Interviews today | `interviews.scheduled_at` | 11 | same | ☐ |
-| Overdue applications | `applications.updated_at` | 5 | same | ☐ |
+| Overdue applications | `applications.updated_at` | 5 | same | ☑ table exists; **verify against live data** |
 | Failed screening calls | `screening_calls.status in ('failed','no_answer')` | 8 | same | ☐ |
 | Failed automations | `automation_runs.status='failed'` | 13 | same | ☐ |
 
@@ -36,9 +36,10 @@ ships a different shape, fix the query **and** this file.
    join per tile is wasteful here) or rewrite these two queries as joins through
    `applications`.
 2. **`applications.assigned_recruiter_id`** references `public.users.id`, and is
-   what recruiter scoping filters on.
+   what recruiter scoping filters on. ☑ Module 5 ships exactly this.
 3. **`applications.updated_at`** is touched on every meaningful change, since
-   overdue detection depends on it.
+   overdue detection depends on it. ☑ Module 5 ships it `NOT NULL` with a
+   `touch_updated_at()` trigger.
 4. **Status vocabularies**: `screening_calls.status` includes `completed`,
    `failed`, `no_answer`; `automation_runs.status` includes `failed`. Adjust the
    `.in(...)` / `.eq(...)` filters if the real enums differ.
@@ -55,6 +56,9 @@ its own item type in `getAttentionQueue()` (`lib/dashboard/metrics.ts`):
 - ☐ **Module 11** — completed interviews with no feedback submitted
 - ☐ **Module 12** — clients past `feedback_sla_days` without responding
 - ☐ **Module 13** — failed automation runs
+- ☑ **Module 5** — stalled applications now populate the queue for real
+  (`applications` exists with `stage`, `updated_at`, `assigned_recruiter_id`).
+  Verify against live data once a database is connected.
 - ☐ **Module 10** — replace the fixed `OVERDUE_DAYS = 3` threshold with the
   per-stage SLA from `pipeline_sla_config`
 
@@ -64,14 +68,22 @@ Found by an independent review after Module 2 was built. Two were fixed
 (the repeated-midnight timezone bug and a `daysSince(null)` crash); these
 remain open, roughly in priority order.
 
-- ☐ **The attention queue lies on error.** `getAttentionQueue()` returns
-  `{items: [], pending: false}` for *any* real failure — timeout, RLS error,
-  an unexpected throw — and `AttentionQueue.tsx` then renders "Nothing is
-  waiting on a decision right now." A recruiter with 40 stalled applications
-  is told they have nothing to do. Fix: replace `attentionPending: boolean`
-  with `attentionStatus: "ok" | "pending" | "error"` and render the existing
-  `ErrorState` with a Retry.
-- ☐ **AI numeric guard has real holes** (`lib/ai/generateDailyBrief.ts`):
+- ☑ **FIXED (Module 5)** — the attention queue no longer reports "Nothing is
+  waiting" when the query actually failed. `attentionPending: boolean` became
+  `attentionStatus: "ok" | "pending" | "error"`, and `AttentionQueue.tsx`
+  renders `ErrorState` for the error case. The related
+  `daysSince(null)` crash was fixed earlier, and `applications.updated_at` is
+  now `NOT NULL` with a trigger maintaining it, so the null path cannot recur.
+- ☑ **FIXED (Module 5)** — the numeric guard moved to the shared
+  `lib/ai/numericGuard.ts`, closing the thousands-separator false positive,
+  spelled-out numbers, and coincidental percentages. Tests cover all three.
+  The one part NOT fixed is label binding (see the next item).
+- ☐ **AI numeric guard: label binding still missing.** The guard checks that
+  each number was supplied, not that it is attached to the right metric, so
+  "You received 18 candidates and completed 42 screenings" still passes with
+  both figures swapped. Fix: have the model return `cited: {label, value}[]`
+  alongside the prose and validate each pair against `counts`.
+  Original finding, for reference (`lib/ai/generateDailyBrief.ts`):
   - spelled-out numbers bypass it entirely — the spec's *own* example brief
     passes while inventing figures ("Five strong-match candidates…")
   - `"1,234"` splits into `[1, 234]` and is wrongly rejected, permanently

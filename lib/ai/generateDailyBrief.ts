@@ -13,6 +13,7 @@
 //      is rejected as invalid output rather than shown to a manager.
 // =============================================================================
 import { completeJson, type AiResult } from "@/lib/ai/provider";
+import { findUnsupportedNumbers as sharedFindUnsupportedNumbers } from "@/lib/ai/numericGuard";
 
 export type DailyBriefInput = {
   /** Metric label -> value. Only metrics that actually resolved are passed in. */
@@ -45,19 +46,15 @@ export function allowedNumbers(input: DailyBriefInput): Set<number> {
 }
 
 /**
- * Digit-runs in `text` that aren't in `allowed`. Exported for unit testing —
- * this is the guard that makes "the brief can't contradict the tiles" true.
+ * Figures in `text` that aren't in `allowed`. Exported for unit testing — this
+ * is the guard that makes "the brief can't contradict the tiles" true.
+ *
+ * Delegates to the shared guard, which closes three bypasses the first version
+ * had: "1,234" split into two false offenders, spelled-out numbers skipping the
+ * check entirely, and a computed "42%" passing because 42 was allowed elsewhere.
  */
-export function findUnsupportedNumbers(text: string, allowed: Set<number>): number[] {
-  const found = text.match(/\d+(?:\.\d+)?/g) ?? [];
-  const unsupported: number[] = [];
-  for (const raw of found) {
-    const value = Number(raw);
-    // Non-integers are never legitimate here: every figure the dashboard
-    // produces is a count.
-    if (!Number.isInteger(value) || !allowed.has(value)) unsupported.push(value);
-  }
-  return unsupported;
+export function findUnsupportedNumbers(text: string, allowed: Set<number>): string[] {
+  return sharedFindUnsupportedNumbers(text, allowed, { rejectUnlistedPercentages: true });
 }
 
 function validateShape(value: unknown): DailyBrief | null {

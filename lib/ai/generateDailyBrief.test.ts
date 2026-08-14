@@ -36,25 +36,47 @@ describe("findUnsupportedNumbers — the guard behind 'never contradicts the til
   });
 
   it("REJECTS an invented figure", () => {
-    // 37 was never supplied — this is the hallucination case that must not ship.
-    expect(findUnsupportedNumbers("You received 37 candidates.", allowed)).toEqual([37]);
+    // 37 was never supplied — the hallucination case that must not ship.
+    expect(findUnsupportedNumbers("You received 37 candidates.", allowed)).toEqual(["37"]);
   });
 
   it("REJECTS a number the model derived by doing arithmetic", () => {
-    // 42 + 18 = 60. Plausible, unsupplied, and wrong to display beside the tiles.
-    expect(findUnsupportedNumbers("That is 60 records in total.", allowed)).toEqual([60]);
+    // 42 + 18 = 60. Plausible, unsupplied, and wrong beside the tiles.
+    expect(findUnsupportedNumbers("That is 60 records in total.", allowed)).toEqual(["60"]);
   });
 
   it("REJECTS a percentage it computed itself", () => {
-    expect(findUnsupportedNumbers("Screening conversion was 43%.", allowed)).toEqual([43]);
+    expect(findUnsupportedNumbers("Screening conversion was 43%.", allowed)).toEqual(["43%"]);
+  });
+
+  it("REJECTS a percentage even when the digits happen to be allowed", () => {
+    // 42 is a real candidate count, but "42%" is a ratio the model computed —
+    // the value being in the allowed set is a coincidence, not permission.
+    expect(findUnsupportedNumbers("Screening conversion was 42%.", allowed)).toEqual(["42%"]);
+  });
+
+  it("REJECTS spelled-out numbers, which bypass a digit-only check", () => {
+    // The spec's own example brief spells figures out ("Five strong-match
+    // candidates"), and those figures were never computed.
+    expect(
+      findUnsupportedNumbers("Five strong-match candidates await review.", allowed)
+    ).toEqual(["five"]);
+    expect(findUnsupportedNumbers("Three screening calls failed.", allowed)).toEqual(["three"]);
   });
 
   it("REJECTS a non-integer even when the digits look familiar", () => {
-    expect(findUnsupportedNumbers("Average was 4.2 per recruiter.", allowed)).toEqual([4.2]);
+    expect(findUnsupportedNumbers("Average was 4.2 per recruiter.", allowed)).toEqual(["4.2"]);
+  });
+
+  it("does NOT split a thousands separator into false offenders", () => {
+    // "1,234" read as 1 and 234 would permanently break the brief for any
+    // organization with a four-digit metric.
+    const large = allowedNumbers({ ...input, counts: { newCandidates: 1234 } });
+    expect(findUnsupportedNumbers("You received 1,234 candidates.", large)).toEqual([]);
   });
 
   it("catches every offender, not just the first", () => {
-    expect(findUnsupportedNumbers("We saw 37 and 60 and 42.", allowed)).toEqual([37, 60]);
+    expect(findUnsupportedNumbers("We saw 37 and 60 and 42.", allowed)).toEqual(["37", "60"]);
   });
 
   it("ignores text with no numbers at all", () => {

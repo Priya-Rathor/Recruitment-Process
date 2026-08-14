@@ -174,6 +174,34 @@ export type CandidateDuplicate = {
   created_at: string;
 };
 
+// -----------------------------------------------------------------------------
+// Module 5 — Applications
+//
+// The stage vocabulary itself lives in lib/applications/stages.ts, next to the
+// transition rules that operate on it.
+// -----------------------------------------------------------------------------
+
+export type Application = {
+  id: string;
+  organization_id: string;
+  candidate_id: string;
+  job_id: string;
+  stage: import("@/lib/applications/stages").ApplicationStage;
+  match_score: number | null;
+  assigned_recruiter_id: string | null;
+  source: CandidateSource;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Application joined with the names needed to render a row. */
+export type ApplicationWithContext = Application & {
+  candidate_name: string;
+  job_title: string;
+  recruiter_name: string | null;
+};
+
 /** A membership joined with its organization — what the org switcher renders. */
 export type MembershipWithOrganization = {
   /** public.users.id of the member. Needed to scope a Recruiter to own work. */

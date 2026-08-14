@@ -56,6 +56,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/api.ts` | Shared route-handler helpers (errors, pagination) |
 | `lib/time.ts` | Organization-timezone date math (all "today" calculations) |
 | `lib/dashboard/` | Module 2's read-only aggregation layer |
+| `lib/applications/` | Module 5's stage model, timeline, and queries |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
 | `proxy.ts` | Session refresh + auth enforcement at the edge |
@@ -102,7 +103,7 @@ project.
       `docs/modules/02-dashboard-retrofit.md`)
 - [x] **Module 3** — Jobs Management
 - [x] **Module 4** — Candidates Management
-- [ ] Module 5 — Applications Management
+- [x] **Module 5** — Applications Management
 - [ ] Module 6 — Resume AI (Parsing)
 - [ ] Module 7 — AI Matching
 - [ ] Module 8 — Bolna AI Screening

@@ -5,7 +5,9 @@ import { AppShell } from "@/components/AppShell";
 import { SkeletonRows } from "@/components/states";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { getCandidate, getCandidateDuplicates } from "@/lib/candidates/queries";
+import { listApplications } from "@/lib/applications/queries";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/types";
+import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { CandidateForm } from "../CandidateForm";
 import { ArchiveCandidateButton } from "./CandidateActions";
 
@@ -42,10 +44,17 @@ async function CandidateDetailContent({
 
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
-  const duplicates = await getCandidateDuplicates({
-    organizationId: membership.organization.id,
-    candidateId,
-  });
+
+  const [duplicates, { applications }] = await Promise.all([
+    getCandidateDuplicates({ organizationId: membership.organization.id, candidateId }),
+    listApplications({
+      organizationId: membership.organization.id,
+      filters: { candidateId },
+      viewerRole: membership.role,
+      viewerId: membership.user_id,
+      limit: 25,
+    }),
+  ]);
 
   // Edit mode is a query param rather than a separate route: the spec lists
   // only /candidates/[id], and editing in place keeps the duplicate context
@@ -181,12 +190,51 @@ async function CandidateDetailContent({
         </div>
       </div>
 
-      {/* The spec's "full history across jobs/applications" needs Module 5. */}
+      {/* The spec's "full history across jobs/applications" (Module 5). */}
       <div className="card mb-4">
-        <h2 className="title is-5">Applications</h2>
-        <p className="has-text-secondary" style={{ fontSize: 14 }}>
-          This candidate&apos;s history across jobs appears here once Applications (Module 5) is
-          built. Resume parsing arrives with Module 6.
+        <div className="is-flex is-justify-content-space-between is-align-items-center mb-3">
+          <h2 className="title is-5 mb-0">Applications</h2>
+          {canEdit && !candidate.archived_at && (
+            <Link
+              className="button is-small"
+              href={`/applications/new?candidate_id=${candidate.id}`}
+            >
+              Apply to a job
+            </Link>
+          )}
+        </div>
+
+        {applications.length === 0 ? (
+          <p className="has-text-secondary" style={{ fontSize: 14 }}>
+            This candidate isn&apos;t in any pipeline yet.
+          </p>
+        ) : (
+          <ul>
+            {applications.map((application) => (
+              <li
+                key={application.id}
+                className="py-3 is-flex is-justify-content-space-between is-align-items-center"
+                style={{ borderTop: "1px solid var(--color-border)" }}
+              >
+                <div>
+                  <Link href={`/applications/${application.id}`} style={{ fontWeight: 600 }}>
+                    {application.job_title}
+                  </Link>
+                  <p className="has-text-secondary" style={{ fontSize: 12 }}>
+                    {application.recruiter_name ?? "Unassigned"}
+                  </p>
+                </div>
+                <div className="is-flex is-align-items-center" style={{ gap: "0.5rem" }}>
+                  <MatchScore score={application.match_score} />
+                  <StageBadge stage={application.stage} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <p className="has-text-secondary mt-3" style={{ fontSize: 12 }}>
+          Resume parsing arrives with Module 6.
         </p>
       </div>
 

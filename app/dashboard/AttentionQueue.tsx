@@ -1,6 +1,6 @@
 // Attention queue — "what needs a human decision right now", most urgent first.
 import Link from "next/link";
-import { EmptyState } from "@/components/states";
+import { EmptyState, ErrorState } from "@/components/states";
 import type { AttentionItem } from "@/lib/dashboard/metrics";
 
 const SEVERITY_COLOR: Record<AttentionItem["severity"], string> = {
@@ -11,16 +11,21 @@ const SEVERITY_COLOR: Record<AttentionItem["severity"], string> = {
 
 export function AttentionQueue({
   items,
-  pending,
+  status,
 }: {
   items: AttentionItem[];
-  pending: boolean;
+  status: "ok" | "pending" | "error";
 }) {
   return (
     <div className="card">
       <h2 className="title is-5">Needs attention</h2>
 
-      {pending ? (
+      {/* An empty queue and a failed query must never look the same: telling a
+          recruiter "nothing needs attention" when the query broke is a false
+          statement, not a degraded one. */}
+      {status === "error" ? (
+        <ErrorState message="Couldn't check what needs attention. This list may be incomplete — reload to try again." />
+      ) : status === "pending" ? (
         <EmptyState message="The attention queue starts working once Applications (Module 5) exists — that's where stalled work is detected." />
       ) : items.length === 0 ? (
         <EmptyState message="Nothing is waiting on a decision right now." />

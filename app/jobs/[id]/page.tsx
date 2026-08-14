@@ -6,6 +6,8 @@ import { SkeletonRows } from "@/components/states";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { getJobDetail } from "@/lib/jobs/queries";
 import { formatExperience, formatSalary } from "@/lib/jobs/format";
+import { listApplications } from "@/lib/applications/queries";
+import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { WORK_MODE_LABELS, type JobQuestion } from "@/lib/types";
 import { HealthBadge, HealthReasons, StatusBadge } from "../JobBadges";
 import { ArchiveJobButton } from "./JobActions";
@@ -66,6 +68,14 @@ async function JobDetailContent({ jobId }: { jobId: string }) {
 
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
+
+  const { applications } = await listApplications({
+    organizationId: membership.organization.id,
+    filters: { jobId },
+    viewerRole: membership.role,
+    viewerId: membership.user_id,
+    limit: 50,
+  });
 
   return (
     <>
@@ -178,6 +188,46 @@ async function JobDetailContent({ jobId }: { jobId: string }) {
         help="Suggested to the human interviewer (Module 11)."
         questions={job.interviewQuestions}
       />
+
+      <div className="card mb-4">
+        <div className="is-flex is-justify-content-space-between is-align-items-center mb-3">
+          <h2 className="title is-5 mb-0">Pipeline</h2>
+          {canEdit && !job.archived_at && (
+            <Link className="button is-small" href={`/applications/new?job_id=${job.id}`}>
+              Add a candidate
+            </Link>
+          )}
+        </div>
+
+        {applications.length === 0 ? (
+          <p className="has-text-secondary" style={{ fontSize: 14 }}>
+            No candidates in this job&apos;s pipeline yet.
+          </p>
+        ) : (
+          <ul>
+            {applications.map((application) => (
+              <li
+                key={application.id}
+                className="py-3 is-flex is-justify-content-space-between is-align-items-center"
+                style={{ borderTop: "1px solid var(--color-border)" }}
+              >
+                <div>
+                  <Link href={`/applications/${application.id}`} style={{ fontWeight: 600 }}>
+                    {application.candidate_name}
+                  </Link>
+                  <p className="has-text-secondary" style={{ fontSize: 12 }}>
+                    {application.recruiter_name ?? "Unassigned"}
+                  </p>
+                </div>
+                <div className="is-flex is-align-items-center" style={{ gap: "0.5rem" }}>
+                  <MatchScore score={application.match_score} />
+                  <StageBadge stage={application.stage} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {canArchive && !job.archived_at && (
         <div className="card" style={{ borderColor: "var(--color-error)" }}>

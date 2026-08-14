@@ -68,7 +68,7 @@ async function DashboardContent() {
       <KpiTiles metrics={data.metrics} />
       <div className="columns">
         <div className="column is-two-thirds">
-          <AttentionQueue items={data.attention} pending={data.attentionPending} />
+          <AttentionQueue items={data.attention} status={data.attentionStatus} />
         </div>
         <div className="column">
           <QuickLinks />

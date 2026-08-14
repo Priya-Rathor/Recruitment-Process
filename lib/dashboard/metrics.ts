@@ -80,8 +80,13 @@ export type DashboardData = {
   dayEnd: string;
   metrics: Record<MetricKey, MetricResult>;
   attention: AttentionItem[];
-  /** Set when the attention queue can't be built yet at all. */
-  attentionPending: boolean;
+  /**
+   * "pending" = the source table doesn't exist yet.
+   * "error"   = the query genuinely failed. MUST be distinguished from an empty
+   *             queue: telling a recruiter "nothing needs attention" when the
+   *             query broke is a false statement, not a degraded one.
+   */
+  attentionStatus: "ok" | "pending" | "error";
 };
 
 /**
@@ -331,7 +336,7 @@ export async function getDashboardData({
     dayEnd: endIso,
     metrics,
     attention: attention.items,
-    attentionPending: attention.pending,
+    attentionStatus: attention.status,
   };
 }
 
@@ -354,7 +359,7 @@ async function getAttentionQueue({
   scope: DashboardScope;
   recruiterUserId: string;
   now: Date;
-}): Promise<{ items: AttentionItem[]; pending: boolean }> {
+}): Promise<{ items: AttentionItem[]; status: "ok" | "pending" | "error" }> {
   try {
     let query = client
       .from("applications")
@@ -372,16 +377,16 @@ async function getAttentionQueue({
     const { data, error } = await query;
 
     if (error) {
-      if (isMissingRelation(error)) return { items: [], pending: true };
+      if (isMissingRelation(error)) return { items: [], status: "pending" };
       console.error("[dashboard] attention queue failed:", error.message);
-      return { items: [], pending: false };
+      return { items: [], status: "error" };
     }
 
     const items = buildAttentionItems((data ?? []) as AttentionSourceRow[], now);
-    return { items, pending: false };
+    return { items, status: "ok" };
   } catch (thrown) {
     console.error("[dashboard] attention queue threw:", thrown);
-    return { items: [], pending: false };
+    return { items: [], status: "error" };
   }
 }
 
