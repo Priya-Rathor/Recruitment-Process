@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/candidates", label: "Candidates" },
   { href: "/applications", label: "Applications" },
   { href: "/pipeline", label: "Pipeline" },
+  { href: "/interviews", label: "Interviews" },
 ];
 
 export async function AppShell({ children }: { children: ReactNode }) {

@@ -348,6 +348,10 @@ export async function getDashboardData({
     }),
 
     // Module 11 — interviews scheduled within today's org-local window.
+    //
+    // RETROFIT DONE (Module 11): cancelled interviews are excluded. The
+    // retrofit checklist flagged this specifically — counting a cancelled
+    // interview as happening today would overstate the day's workload.
     safeCount(client, {
       table: "interviews",
       module: 11,
@@ -356,6 +360,7 @@ export async function getDashboardData({
           .from("interviews")
           .select("id", { count: "exact", head: true })
           .eq("organization_id", organizationId)
+          .neq("status", "cancelled")
           .gte("scheduled_at", startIso)
           .lt("scheduled_at", endIso),
     }),

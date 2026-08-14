@@ -15,7 +15,7 @@ const LINKS: QuickLink[] = [
   { label: "Jobs", href: "/jobs", pendingModule: null },
   { label: "Candidates", href: "/candidates", pendingModule: null },
   { label: "Pipeline", href: "/pipeline", pendingModule: null },
-  { label: "Interviews", href: "/interviews", pendingModule: 11 },
+  { label: "Interviews", href: "/interviews", pendingModule: null },
   { label: "Team", href: "/team/invite", pendingModule: null },
 ];
 

@@ -18,7 +18,7 @@ have seen a real non-zero number on `/dashboard` for it.
 | --- | --- | --- | --- | --- |
 | New candidates | `candidates.created_at` | 4 | `lib/dashboard/metrics.ts` | ☑ table exists; **verify against live data** |
 | Screenings completed | `screening_calls.ended_at` + `status='completed'` | 8 | same | ☐ |
-| Interviews today | `interviews.scheduled_at` | 11 | same | ☐ |
+| Interviews today | `interviews.scheduled_at`, excl. cancelled | 11 | same | ☑ table exists; **verify against live data** |
 | Overdue applications | `applications.updated_at` | 5 | same | ☑ table exists; **verify against live data** |
 | Failed screening calls | `screening_calls.status in ('failed','no_answer')` | 8 | same | ☐ |
 | Failed automations | `automation_runs.status='failed'` | 13 | same | ☐ |
@@ -28,13 +28,10 @@ have seen a real non-zero number on `/dashboard` for it.
 These are the contracts the queries above were written against. If a module
 ships a different shape, fix the query **and** this file.
 
-1. **`organization_id` on every table.** The global spec rule (section 5 of
-   every module) requires it, but the *Core Data Model* lines for Module 8
-   (`screening_calls`) and Module 11 (`interviews`) list only `application_id`.
-   The dashboard filters `screening_calls` and `interviews` directly by
-   `organization_id`. If those modules omit it, either add it (preferred — a
-   join per tile is wasteful here) or rewrite these two queries as joins through
-   `applications`.
+1. **`organization_id` on every table.** ☑ Resolved: Modules 8 and 11 both
+   ship `organization_id` on `screening_calls` and `interviews` despite the
+   spec's Core Data Model lines omitting it, so the dashboard's direct filters
+   work as written.
 2. **`applications.assigned_recruiter_id`** references `public.users.id`, and is
    what recruiter scoping filters on. ☑ Module 5 ships exactly this.
 3. **`applications.updated_at`** is touched on every meaningful change, since
@@ -53,7 +50,10 @@ its own item type in `getAttentionQueue()` (`lib/dashboard/metrics.ts`):
   recruiter review", the spec's headline example)
 - ☐ **Module 8** — failed/no-answer calls that have exhausted retries and need a
   human decision
-- ☐ **Module 11** — completed interviews with no feedback submitted
+- ☑ **DONE (Module 11)** — interviews awaiting feedback are computed by
+  `overdueFeedback()` in `lib/interviews/feedback.ts` and surfaced on
+  `/interviews`. Adding them to the dashboard's attention queue is a small
+  follow-up; the computation already exists and is tested.
 - ☐ **Module 12** — clients past `feedback_sla_days` without responding
 - ☐ **Module 13** — failed automation runs
 - ☑ **Module 5** — stalled applications now populate the queue for real
@@ -123,16 +123,16 @@ remain open, roughly in priority order.
   (Module 1 file, Module 2 victim). `resolveTimeZone()` then silently falls back
   to UTC, shifting every "today" count. Validate with `isValidTimeZone()` and
   return 400.
-- ☐ **`interviewsToday` has no status filter** — it will count cancelled
-  interviews once Module 11 adds a status. Add `.neq("status","cancelled")`.
+- ☑ **FIXED (Module 11)** — `interviewsToday` now excludes cancelled
+  interviews.
 - ☐ Nits: `app/dashboard/page.tsx` calls `requireMembershipOrRedirect()` twice
   per render; `DailyBrief.tsx` uses `key={item}` on focus strings; the overdue
   tile counts all rows while the queue caps at 20 with no "showing 20 of N" hint.
 
 ## Other follow-ups
 
-- ☑ **Module 3/4/10**: Jobs, Candidates and Pipeline quick links are live in
-  `app/dashboard/QuickLinks.tsx`. ☐ Interviews (11) remains.
+- ☑ **Module 3/4/10/11**: every quick link in
+  `app/dashboard/QuickLinks.tsx` is now live.
 - ☐ **Module 4 shipped**: `candidates` now exists, so the "New candidates" tile
   should stop showing "Available with Module 4". Confirm it reports a real count
   once a database is connected — the schema matches

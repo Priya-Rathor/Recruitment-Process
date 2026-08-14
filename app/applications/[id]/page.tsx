@@ -7,6 +7,10 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { getApplicationDetail } from "@/lib/applications/queries";
 import { buildTimeline, daysInCurrentStage } from "@/lib/applications/timeline";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/types";
+import { listInterviews } from "@/lib/interviews/queries";
+import { listTeamMembers } from "@/lib/jobs/queries";
+import { InterviewStatusBadge } from "@/app/interviews/InterviewBadges";
+import { ScheduleInterview } from "./ScheduleInterview";
 import { daysSince } from "@/lib/time";
 import { MatchScore, StageBadge } from "../StageBadge";
 import { ApplicationSummary, NoteComposer, StageControl } from "./ApplicationDetailClient";
@@ -26,6 +30,15 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
   if (!application) notFound();
 
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
+
+  const [{ interviews }, members] = await Promise.all([
+    listInterviews({
+      organizationId: membership.organization.id,
+      applicationId: application.id,
+    }),
+    listTeamMembers(membership.organization.id),
+  ]);
+
   const timeline = buildTimeline({
     stages: application.stageHistory,
     notes: application.notes,
@@ -169,6 +182,44 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
             >
               Screening report
             </Link>
+            <Link
+              className="button is-small is-fullwidth mt-2"
+              href={`/applications/${application.id}/interview-brief`}
+            >
+              Interview brief
+            </Link>
+          </div>
+
+          <div className="card mb-4">
+            <h2 className="title is-5">Interviews</h2>
+            {interviews.length === 0 ? (
+              <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>
+                No interviews scheduled yet.
+              </p>
+            ) : (
+              <ul className="mb-3">
+                {interviews.map((interview) => (
+                  <li key={interview.id} className="py-2">
+                    <Link href={`/interviews/${interview.id}`} style={{ fontSize: 14 }}>
+                      {new Date(interview.scheduled_at).toLocaleString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Link>
+                    <div className="mt-1">
+                      <InterviewStatusBadge status={interview.status} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <ScheduleInterview
+              applicationId={application.id}
+              members={members}
+              canSchedule={canEdit}
+            />
           </div>
         </div>
       </div>

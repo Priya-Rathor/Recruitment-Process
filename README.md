@@ -67,6 +67,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/matching/` | Module 7's deterministic scorer and score combination |
 | `lib/screening/` | Modules 8-9's call script, retry policy, and reports |
 | `lib/pipeline/` | Module 10's SLA config and board queries |
+| `lib/interviews/` | Module 11's scheduling, feedback, and reminder queue |
 | `lib/integrations/` | Provider adapters (connect/test/getStatus/disconnect) |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
@@ -120,7 +121,7 @@ project.
 - [x] **Module 8** — Bolna AI Screening
 - [x] **Module 9** — AI Screening Report
 - [x] **Module 10** — Advanced Pipeline
-- [ ] Module 11 — Interviews
+- [x] **Module 11** — Interviews
 - [ ] Module 12 — Clients
 - [ ] Module 13 — Automation Engine
 - [ ] Module 14 — Activity & Audit

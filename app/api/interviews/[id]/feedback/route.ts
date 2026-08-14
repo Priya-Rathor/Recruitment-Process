@@ -1,0 +1,89 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { handleRouteError, jsonError } from "@/lib/api";
+import { requireCurrentUser, requireRole } from "@/lib/tenant";
+import { parseFeedback } from "@/lib/interviews/feedback";
+
+/**
+ * POST /api/interviews/:id/feedback — submit structured feedback.
+ *
+ * "Submit feedback" is Owner/Admin/Recruiter, with Recruiter scoped to the
+ * assigned interviewer. submitted_by comes from the session and RLS requires it
+ * to equal the caller, so an assessment cannot be attributed to someone else.
+ *
+ * A database trigger marks the interview completed, so status and feedback can
+ * never disagree — an interview with feedback but still "scheduled" would sit in
+ * the missing-feedback queue forever.
+ */
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const [membership, user] = await Promise.all([
+      requireRole(["owner", "admin", "recruiter"]),
+      requireCurrentUser(),
+    ]);
+
+    const supabase = await createClient();
+    const { data: interview } = await supabase
+      .from("interviews")
+      .select("id, interviewer_id, status")
+      .eq("id", id)
+      .eq("organization_id", membership.organization.id)
+      .maybeSingle();
+
+    if (!interview) return jsonError("Interview not found.", 404);
+
+    const row = interview as unknown as { interviewer_id: string | null; status: string };
+
+    // Spec section 9: a Recruiter may submit feedback for interviews they are
+    // the assigned interviewer on. Owner/Admin may record it on anyone's behalf.
+    if (
+      membership.role === "recruiter" &&
+      row.interviewer_id !== null &&
+      row.interviewer_id !== user.id
+    ) {
+      return jsonError("Only the assigned interviewer can submit feedback for this one.", 403);
+    }
+
+    if (row.status === "cancelled") {
+      return jsonError("This interview was cancelled, so there's nothing to give feedback on.", 409);
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError("Invalid JSON body.", 400);
+    }
+
+    const parsed = parseFeedback(body);
+    if (!parsed.ok) return jsonError(parsed.error, 400);
+
+    const { data, error } = await supabase
+      .from("interview_feedback")
+      .upsert(
+        {
+          organization_id: membership.organization.id,
+          interview_id: id,
+          rating: parsed.data.rating,
+          recommendation: parsed.data.recommendation,
+          notes: parsed.data.notes,
+          submitted_by: user.id,
+          submitted_at: new Date().toISOString(),
+        },
+        { onConflict: "interview_id,submitted_by" }
+      )
+      .select("id, rating, recommendation, submitted_at")
+      .single();
+
+    if (error) {
+      console.error("[api] feedback submit failed:", error);
+      return jsonError("Could not save that feedback.", 400);
+    }
+
+    // TODO(Module 14): log the feedback submission to activity_events.
+    return NextResponse.json({ data }, { status: 201 });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}

@@ -19,6 +19,7 @@
 //        field.
 // =============================================================================
 import { completeJson, type AiResult } from "@/lib/ai/provider";
+import { numbersInText } from "@/lib/ai/numericGuard";
 
 export type InterestLevel = "high" | "medium" | "low" | "unclear";
 export type LocationAcceptance = "accepted" | "rejected" | "unclear";
@@ -70,19 +71,11 @@ function cleanLocation(value: unknown): LocationAcceptance {
 }
 
 /**
- * Digits appearing anywhere in a string, normalised for thousands separators.
- * Used to ground the narrative in what was actually said.
+ * Digits appearing anywhere in a string, used to ground the narrative in what
+ * was actually said. Delegates to the shared guard so every module that checks
+ * figures against text uses the same parser.
  */
-export function numbersIn(text: string): Set<number> {
-  const found = new Set<number>();
-  const normalised = text.replace(/(\d),(?=\d{3}\b)/g, "$1");
-
-  for (const raw of normalised.match(/\d+(?:\.\d+)?/g) ?? []) {
-    const value = Number(raw);
-    if (Number.isFinite(value)) found.add(value);
-  }
-  return found;
-}
+export const numbersIn = numbersInText;
 
 /**
  * Figures in the summary that are supported by neither the transcript nor the

@@ -65,6 +65,21 @@ export function findUnsupportedNumbers(
   return offenders;
 }
 
+/**
+ * Every number appearing in a STRING, normalised for thousands separators.
+ * Distinct from numbersInValue(), which walks a structured payload.
+ */
+export function numbersInText(text: string): Set<number> {
+  const found = new Set<number>();
+  const normalised = text.replace(/(\d),(?=\d{3}\b)/g, "$1");
+
+  for (const raw of normalised.match(/\d+(?:\.\d+)?/g) ?? []) {
+    const value = Number(raw);
+    if (Number.isFinite(value)) found.add(value);
+  }
+  return found;
+}
+
 /** Collects every number appearing in a structured input payload. */
 export function numbersIn(value: unknown, into: Set<number> = new Set()): Set<number> {
   if (typeof value === "number" && Number.isFinite(value)) {
