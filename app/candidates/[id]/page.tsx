@@ -233,9 +233,22 @@ async function CandidateDetailContent({
           </ul>
         )}
 
-        <p className="has-text-secondary mt-3" style={{ fontSize: 12 }}>
-          Resume parsing arrives with Module 6.
-        </p>
+      </div>
+
+      <div className="card mb-4">
+        <div className="is-flex is-justify-content-space-between is-align-items-center">
+          <div>
+            <h2 className="title is-5 mb-1">Resume</h2>
+            <p className="has-text-secondary" style={{ fontSize: 13 }}>
+              {candidate.resume_url
+                ? "A reviewed resume is on file."
+                : "Upload a resume and AI will propose profile updates for you to review."}
+            </p>
+          </div>
+          <Link className="button is-small" href={`/candidates/${candidate.id}/resume`}>
+            {candidate.resume_url ? "Manage resumes" : "Upload a resume"}
+          </Link>
+        </div>
       </div>
 
       {canArchive && !candidate.archived_at && (

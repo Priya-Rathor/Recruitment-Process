@@ -38,6 +38,12 @@ retrofits (privacy/compliance, AI & calling cost tracking).
    "Continue with Google" button to work. Add
    `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 
+   Migration `0005` also creates a private **`resumes` storage bucket** with
+   tenant-scoped policies. If your project blocks `insert into storage.buckets`
+   from the SQL editor, create the bucket by hand (Storage → New bucket →
+   `resumes`, **not** public, 10 MB limit) and re-run just the policy statements
+   at the end of that file.
+
 5. Run the dev server:
 
    ```bash
@@ -57,6 +63,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/time.ts` | Organization-timezone date math (all "today" calculations) |
 | `lib/dashboard/` | Module 2's read-only aggregation layer |
 | `lib/applications/` | Module 5's stage model, timeline, and queries |
+| `lib/resumes/` | Module 6's extraction, review diff, and queries |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
 | `proxy.ts` | Session refresh + auth enforcement at the edge |
@@ -104,7 +111,7 @@ project.
 - [x] **Module 3** — Jobs Management
 - [x] **Module 4** — Candidates Management
 - [x] **Module 5** — Applications Management
-- [ ] Module 6 — Resume AI (Parsing)
+- [x] **Module 6** — Resume AI (Parsing)
 - [ ] Module 7 — AI Matching
 - [ ] Module 8 — Bolna AI Screening
 - [ ] Module 9 — AI Screening Report
