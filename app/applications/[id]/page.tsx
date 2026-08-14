@@ -163,6 +163,12 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
             >
               AI screening call
             </Link>
+            <Link
+              className="button is-small is-fullwidth mt-2"
+              href={`/applications/${application.id}/screening-report`}
+            >
+              Screening report
+            </Link>
           </div>
         </div>
       </div>

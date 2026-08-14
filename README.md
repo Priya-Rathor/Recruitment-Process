@@ -117,7 +117,7 @@ project.
 - [x] **Module 6** — Resume AI (Parsing)
 - [x] **Module 7** — AI Matching
 - [x] **Module 8** — Bolna AI Screening
-- [ ] Module 9 — AI Screening Report
+- [x] **Module 9** — AI Screening Report
 - [ ] Module 10 — Advanced Pipeline
 - [ ] Module 11 — Interviews
 - [ ] Module 12 — Clients
