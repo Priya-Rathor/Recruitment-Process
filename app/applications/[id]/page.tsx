@@ -157,6 +157,12 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
             >
               {application.match_score === null ? "Calculate match" : "See match breakdown"}
             </Link>
+            <Link
+              className="button is-small is-fullwidth mt-2"
+              href={`/applications/${application.id}/screening-call`}
+            >
+              AI screening call
+            </Link>
           </div>
         </div>
       </div>
