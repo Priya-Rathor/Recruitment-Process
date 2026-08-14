@@ -115,19 +115,55 @@ describe("buildAttentionItems", () => {
     expect(items.find((i) => i.id === "err")?.severity).toBe("error");
   });
 
-  it("pluralises the age wording correctly", () => {
-    const single = buildAttentionItems(
-      [{ id: "a", stage: "New", updated_at: daysAgo(1) }],
-      // Threshold of 1 day would exclude it, so check the 3-day case instead.
-      NOW
-    );
-    expect(single).toEqual([]);
-
+  it("explains WHY something is overdue, naming the stage's target", () => {
+    // More useful than raw age: 4 days is fine in Client Review and late in
+    // Recruiter Review, and the recruiter should be able to see which.
     const items = buildAttentionItems(
-      [{ id: "b", stage: "New", updated_at: daysAgo(4) }],
+      [{ id: "b", stage: "recruiter_review", updated_at: daysAgo(4) }],
+      NOW,
+      { recruiter_review: 2 }
+    );
+    expect(items[0].detail).toBe("2 days past the 2-day target for this stage");
+  });
+
+  it("falls back for an unrecognised stage rather than dropping the row", () => {
+    // A stage we don't know is still work that has been sitting.
+    const items = buildAttentionItems(
+      [{ id: "b", stage: "SomeOldStage", updated_at: daysAgo(4) }],
       NOW
     );
-    expect(items[0].detail).toBe("No movement for 4 days");
+    expect(items).toHaveLength(1);
+    expect(items[0].detail).toMatch(/past the 3-day target/);
+  });
+
+  it("RETROFIT: uses the per-stage SLA, so the same age differs by stage", () => {
+    const config = { client_review: 5, recruiter_review: 2 };
+    const rows = [
+      { id: "slow-stage", stage: "client_review", updated_at: daysAgo(4) },
+      { id: "fast-stage", stage: "recruiter_review", updated_at: daysAgo(4) },
+    ];
+
+    const items = buildAttentionItems(rows, NOW, config);
+
+    // 4 days in Client Review is within its 5-day target — not flagged.
+    expect(items.map((item) => item.id)).toEqual(["fast-stage"]);
+  });
+
+  it("RETROFIT: honours a configured target over the default", () => {
+    const rows = [{ id: "a", stage: "screening", updated_at: daysAgo(4) }];
+
+    // Default for screening is 3, so 4 days is overdue.
+    expect(buildAttentionItems(rows, NOW)).toHaveLength(1);
+    // Configured to 10, the same row is fine.
+    expect(buildAttentionItems(rows, NOW, { screening: 10 })).toEqual([]);
+  });
+
+  it("never flags a terminal stage as overdue", () => {
+    const rows = [
+      { id: "hired", stage: "hired", updated_at: daysAgo(400) },
+      { id: "rejected", stage: "rejected", updated_at: daysAgo(400) },
+    ];
+    expect(buildAttentionItems(rows, NOW)).toEqual([]);
   });
 
   it("labels a null stage as New rather than rendering 'null'", () => {

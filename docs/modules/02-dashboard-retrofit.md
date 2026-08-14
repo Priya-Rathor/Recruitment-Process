@@ -59,8 +59,11 @@ its own item type in `getAttentionQueue()` (`lib/dashboard/metrics.ts`):
 - ☑ **Module 5** — stalled applications now populate the queue for real
   (`applications` exists with `stage`, `updated_at`, `assigned_recruiter_id`).
   Verify against live data once a database is connected.
-- ☐ **Module 10** — replace the fixed `OVERDUE_DAYS = 3` threshold with the
-  per-stage SLA from `pipeline_sla_config`
+- ☑ **DONE (Module 10)** — the fixed `OVERDUE_DAYS = 3` threshold is replaced
+  by the per-stage SLA from `pipeline_sla_config`, for both the overdue tile and
+  the attention queue. "Overdue" now means the same thing on the dashboard as on
+  the pipeline board, and terminal stages are never flagged. The constant
+  survives only as a fallback for an unrecognised stage.
 
 ## Open defects from the Module 2 review
 
@@ -128,8 +131,8 @@ remain open, roughly in priority order.
 
 ## Other follow-ups
 
-- ☑ **Module 3/4**: Jobs and Candidates quick links are live in
-  `app/dashboard/QuickLinks.tsx`. ☐ Pipeline (10) and Interviews (11) remain.
+- ☑ **Module 3/4/10**: Jobs, Candidates and Pipeline quick links are live in
+  `app/dashboard/QuickLinks.tsx`. ☐ Interviews (11) remains.
 - ☐ **Module 4 shipped**: `candidates` now exists, so the "New candidates" tile
   should stop showing "Available with Module 4". Confirm it reports a real count
   once a database is connected — the schema matches

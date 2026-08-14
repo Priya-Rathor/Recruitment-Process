@@ -14,6 +14,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { dayRangeInZone, daysSince } from "@/lib/time";
+import { assessSla, targetDaysFor, type SlaConfig } from "@/lib/pipeline/sla";
+import {
+  APPLICATION_STAGES,
+  PIPELINE_STAGES,
+  STAGE_LABELS,
+  type ApplicationStage,
+} from "@/lib/applications/stages";
 import type { OrgRole } from "@/lib/types";
 
 /** Which module will make a currently-unavailable metric work. */
@@ -148,8 +155,11 @@ async function safeCount(
 }
 
 /**
- * How long an application may sit untouched before the dashboard flags it.
- * RETROFIT (Module 10): replace with the per-stage SLA from pipeline_sla_config.
+ * Fallback threshold, used only when a stage has no SLA at all.
+ *
+ * RETROFIT DONE (Module 10): the dashboard now reads pipeline_sla_config, so
+ * "overdue" means the same thing here as on the pipeline board. This constant
+ * survives as the last resort for an unrecognised stage.
  */
 export const OVERDUE_DAYS = 3;
 
@@ -161,31 +171,113 @@ export type AttentionSourceRow = {
 };
 
 /**
+ * Loads the organization's SLA targets, degrading to defaults.
+ *
+ * pipeline_sla_config is Module 10's table. If it is missing (an older database)
+ * the defaults still apply, so the dashboard keeps working rather than showing
+ * nothing as overdue — which would be a false "all clear".
+ */
+async function getSlaConfigSafely(
+  client: SupabaseClient,
+  organizationId: string
+): Promise<SlaConfig> {
+  try {
+    const { data, error } = await client
+      .from("pipeline_sla_config")
+      .select("stage, target_days")
+      .eq("organization_id", organizationId);
+
+    if (error || !data) return {};
+
+    const config: SlaConfig = {};
+    for (const row of data as { stage: string; target_days: number }[]) {
+      if ((PIPELINE_STAGES as readonly string[]).includes(row.stage)) {
+        config[row.stage as ApplicationStage] = row.target_days;
+      }
+    }
+    return config;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * A PostgREST `or` expression matching applications past their stage's SLA.
+ *
+ * One clause per stage because each has its own cutoff. Terminal stages are
+ * omitted entirely — a hired or rejected application is finished, not overdue.
+ */
+export function buildOverdueClause(config: SlaConfig, now: Date): string {
+  return PIPELINE_STAGES.map((stage) => {
+    const target = targetDaysFor(stage, config) ?? OVERDUE_DAYS;
+    const cutoff = new Date(now.getTime() - target * 24 * 60 * 60 * 1000).toISOString();
+    return `and(stage.eq.${stage},updated_at.lt.${cutoff})`;
+  }).join(",");
+}
+
+/**
  * Pure transform: stalled applications -> attention items, most urgent first.
- * Separated from the query so the urgency/severity/threshold rules can be tested
- * without a database.
+ *
+ * Uses the same per-stage SLA the pipeline board does, so an item flagged here
+ * is flagged there too. Urgency is days OVER the target rather than raw age —
+ * three days in Client Review (target 5) is fine, three days in Recruiter
+ * Review (target 2) is not.
  */
 export function buildAttentionItems(
   rows: AttentionSourceRow[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  config: SlaConfig = {}
 ): AttentionItem[] {
   return rows
     .map((row) => {
       const ageDays = daysSince(row.updated_at, now);
+      const stage = (row.stage ?? "new") as ApplicationStage;
+      // ALL stages, not just board columns: rejected/withdrawn are terminal
+      // and must reach assessSla so they come back as not_tracked.
+      const known = (APPLICATION_STAGES as readonly string[]).includes(stage);
+
+      const sla = known
+        ? assessSla({ stage, daysInStage: ageDays, config })
+        : // Unrecognised stage: fall back rather than silently exclude it.
+          {
+            status: ageDays >= OVERDUE_DAYS ? ("breached" as const) : ("ok" as const),
+            overdueDays: Math.max(0, ageDays - OVERDUE_DAYS),
+            targetDays: OVERDUE_DAYS,
+            daysInStage: ageDays,
+            label: "",
+          };
+
+      const stageLabel = known ? STAGE_LABELS[stage] : (row.stage ?? "New");
+
       return {
         id: row.id,
-        urgency: ageDays,
-        title: `Application in ${row.stage ?? "New"}`,
+        // Days past target, so stages with tight SLAs surface appropriately.
+        urgency: sla.overdueDays,
+        title: `Application in ${stageLabel}`,
         detail:
-          ageDays === 0 ? "Updated today" : `No movement for ${ageDays} day${ageDays === 1 ? "" : "s"}`,
+          sla.overdueDays === 0
+            ? `No movement for ${ageDays} day${ageDays === 1 ? "" : "s"}`
+            : `${sla.overdueDays} day${sla.overdueDays === 1 ? "" : "s"} past the ${sla.targetDays}-day target for this stage`,
         severity:
-          ageDays >= OVERDUE_DAYS * 2 ? "error" : ageDays >= OVERDUE_DAYS ? "warning" : "info",
+          sla.targetDays !== null && sla.overdueDays >= sla.targetDays
+            ? ("error" as const)
+            : ("warning" as const),
         href: `/applications/${row.id}`,
         ageDays,
-      } satisfies AttentionItem;
+        slaStatus: sla.status,
+      };
     })
-    // Only things actually past the threshold belong in a "needs attention" list.
-    .filter((item) => item.ageDays !== null && item.ageDays >= OVERDUE_DAYS)
+    // Only genuinely breached items belong in a "needs attention" list.
+    .filter((item) => item.slaStatus === "breached")
+    .map((item): AttentionItem => ({
+      id: item.id,
+      urgency: item.urgency,
+      title: item.title,
+      detail: item.detail,
+      severity: item.severity,
+      href: item.href,
+      ageDays: item.ageDays,
+    }))
     .sort((a, b) => b.urgency - a.urgency);
 }
 
@@ -214,7 +306,10 @@ export async function getDashboardData({
   const startIso = start.toISOString();
   const endIso = end.toISOString();
 
-  const overdueBefore = new Date(now.getTime() - OVERDUE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  // Per-stage SLA cutoffs (Module 10). Terminal stages are excluded — a hired
+  // or rejected application is finished, not overdue.
+  const slaConfig = await getSlaConfigSafely(client, organizationId);
+  const overdueClause = buildOverdueClause(slaConfig, now);
 
   const [
     newCandidates,
@@ -265,9 +360,12 @@ export async function getDashboardData({
           .lt("scheduled_at", endIso),
     }),
 
-    // Module 5 — applications untouched for longer than OVERDUE_DAYS. Uses a
-    // fixed threshold for now; Module 10 introduces pipeline_sla_config, and
-    // the retrofit switches this to the configured per-stage SLA.
+    // Module 5 — applications past their stage's SLA.
+    //
+    // RETROFIT DONE (Module 10): this used a single fixed 3-day threshold for
+    // every stage. It now uses the organization's configured per-stage target,
+    // so "overdue" means the same thing here as on the pipeline board. One OR
+    // clause per stage, because each has its own cutoff.
     safeCount(client, {
       table: "applications",
       module: 5,
@@ -276,7 +374,8 @@ export async function getDashboardData({
           .from("applications")
           .select("id", { count: "exact", head: true })
           .eq("organization_id", organizationId)
-          .lt("updated_at", overdueBefore);
+          .is("archived_at", null)
+          .or(overdueClause);
         // Recruiter scope: never count another recruiter's workload.
         if (scope === "own") query = query.eq("assigned_recruiter_id", recruiterUserId);
         return query;
@@ -327,6 +426,7 @@ export async function getDashboardData({
     scope,
     recruiterUserId,
     now,
+    config: slaConfig,
   });
 
   return {
@@ -353,18 +453,22 @@ async function getAttentionQueue({
   scope,
   recruiterUserId,
   now,
+  config,
 }: {
   client: SupabaseClient;
   organizationId: string;
   scope: DashboardScope;
   recruiterUserId: string;
   now: Date;
+  /** Per-stage SLA targets, so this agrees with the pipeline board. */
+  config: SlaConfig;
 }): Promise<{ items: AttentionItem[]; status: "ok" | "pending" | "error" }> {
   try {
     let query = client
       .from("applications")
       .select("id, stage, updated_at")
       .eq("organization_id", organizationId)
+      .is("archived_at", null)
       .order("updated_at", { ascending: true })
       // Bounded: the dashboard answers "what needs me now", not "everything".
       // Keeps the query cheap at 10k+ rows.
@@ -382,7 +486,7 @@ async function getAttentionQueue({
       return { items: [], status: "error" };
     }
 
-    const items = buildAttentionItems((data ?? []) as AttentionSourceRow[], now);
+    const items = buildAttentionItems((data ?? []) as AttentionSourceRow[], now, config);
     return { items, status: "ok" };
   } catch (thrown) {
     console.error("[dashboard] attention queue threw:", thrown);
