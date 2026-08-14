@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import { requireMembership, requireRole } from "@/lib/tenant";
+import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
+import { dispatch } from "@/lib/automations/engine";
 import { APPLICATION_COLUMNS, getApplicationDetail } from "@/lib/applications/queries";
 import {
   canTransition,
@@ -11,6 +12,10 @@ import {
 import type { Application } from "@/lib/types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// A stage change may now run automations, which can place a call or score a
+// match. Same budget as the other action-bearing routes.
+export const maxDuration = 60;
 
 /** GET /api/applications/:id — with stage history and notes. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -129,6 +134,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return jsonError("Could not update the application.", 400);
     }
     if (!data) return jsonError("Application not found.", 404);
+
+    // Module 13. Fires only on a real stage CHANGE, so re-saving the same stage
+    // cannot re-trigger a call — the dedupe key would catch it anyway, but not
+    // asking is cheaper than being refused.
+    //
+    // Awaited rather than fired-and-forgotten: a serverless function can be
+    // frozen the moment it responds, which would leave an automation half-run
+    // with its claim row already written and nothing to finish it. Deliberately
+    // wrapped so a failing automation cannot fail the stage change — the spec's
+    // test that the engine never blocks the manual action.
+    if (updates.stage && updates.stage !== current.stage) {
+      try {
+        const user = await requireCurrentUser();
+        await dispatch({
+          organizationId: membership.organization.id,
+          organizationName: membership.organization.name,
+          applicationId: id,
+          trigger: "application_stage_changed",
+          triggeredBy: user.id,
+          webhookUrl: `${request.nextUrl.origin}/api/webhooks/bolna`,
+        });
+      } catch (automationError) {
+        console.error("[api] automations after stage change failed:", automationError);
+      }
+    }
 
     return NextResponse.json({ data: data as unknown as Application });
   } catch (error) {

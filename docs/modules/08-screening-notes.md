@@ -93,9 +93,13 @@ body → 401.
 
 ## Retrofit obligations (from the spec)
 
-- ☐ **Module 13** — its "start Bolna screening" action **must call
-  `placeCall()`**, not re-implement the API call. The signature is stable; treat
-  it as the contract.
+- ☑ **DONE (Module 13)** — its `start_screening_call` action calls
+  `startScreeningCall()` in `lib/screening/queries.ts`, which is the only caller
+  of `placeCall()`. Going through the orchestration rather than the adapter
+  directly was deliberate: it inherits the retry cap, the consent disclosure, the
+  "candidate asked for a callback" refusal and the not-connected gate. An
+  automation must not have a weaker safety path than the manual button. No Bolna
+  request is re-implemented anywhere in Module 13.
 - ☐ **Module 17** — must **extend** `organization_integrations` (masked display,
   Test Connection UI, `last_tested_at`/`last_success_at`, error codes) rather
   than create a second table, and must not change `placeCall()`'s external

@@ -55,7 +55,11 @@ its own item type in `getAttentionQueue()` (`lib/dashboard/metrics.ts`):
   `/interviews`. Adding them to the dashboard's attention queue is a small
   follow-up; the computation already exists and is tested.
 - ☐ **Module 12** — clients past `feedback_sla_days` without responding
-- ☐ **Module 13** — failed automation runs
+- ☑ **DONE (Module 13)** — `automation_runs` now exists, with exactly the
+  columns this file's query already assumed (`organization_id`, `status`,
+  `started_at`). The `failedAutomations` tile therefore switches from "pending"
+  to a real count with no code change. Verified by reading the query against
+  migration 0012; not yet verified against a live database.
 - ☑ **Module 5** — stalled applications now populate the queue for real
   (`applications` exists with `stage`, `updated_at`, `assigned_recruiter_id`).
   Verify against live data once a database is connected.

@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { parseFeedback } from "@/lib/interviews/feedback";
+import { dispatch } from "@/lib/automations/engine";
+
+// Submitting feedback completes the interview, which may run automations.
+export const maxDuration = 60;
 
 /**
  * POST /api/interviews/:id/feedback — submit structured feedback.
@@ -26,14 +30,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const supabase = await createClient();
     const { data: interview } = await supabase
       .from("interviews")
-      .select("id, interviewer_id, status")
+      .select("id, interviewer_id, status, application_id")
       .eq("id", id)
       .eq("organization_id", membership.organization.id)
       .maybeSingle();
 
     if (!interview) return jsonError("Interview not found.", 404);
 
-    const row = interview as unknown as { interviewer_id: string | null; status: string };
+    const row = interview as unknown as {
+      interviewer_id: string | null;
+      status: string;
+      application_id: string | null;
+    };
 
     // Spec section 9: a Recruiter may submit feedback for interviews they are
     // the assigned interviewer on. Owner/Admin may record it on anyone's behalf.
@@ -79,6 +87,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error) {
       console.error("[api] feedback submit failed:", error);
       return jsonError("Could not save that feedback.", 400);
+    }
+
+    // Module 13. A database trigger marks the interview completed when feedback
+    // lands, so this is the moment "interview completed" is actually true.
+    // Wrapped so a failing rule never loses someone's written assessment.
+    if (row.application_id) {
+      try {
+        await dispatch({
+          organizationId: membership.organization.id,
+          organizationName: membership.organization.name,
+          applicationId: row.application_id,
+          trigger: "interview_completed",
+          triggeredBy: user.id,
+          webhookUrl: `${request.nextUrl.origin}/api/webhooks/bolna`,
+        });
+      } catch (automationError) {
+        console.error("[api] automations after interview feedback failed:", automationError);
+      }
     }
 
     // TODO(Module 14): log the feedback submission to activity_events.

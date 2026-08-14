@@ -9,8 +9,12 @@ import {
 } from "@/lib/applications/queries";
 import { isApplicationStage } from "@/lib/applications/stages";
 import { isCandidateSource, type Application } from "@/lib/types";
+import { dispatch } from "@/lib/automations/engine";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Creating an application may now run automations.
+export const maxDuration = 60;
 
 /**
  * GET /api/applications — organization-scoped list.
@@ -138,7 +142,25 @@ export async function POST(request: NextRequest) {
       return jsonError("Could not create the application.", 400);
     }
 
-    return NextResponse.json({ data: data as unknown as Application }, { status: 201 });
+    const created = data as unknown as Application;
+
+    // Module 13. Wrapped so a failing rule cannot fail the creation — the
+    // application exists either way, and a 500 here would make the caller retry
+    // and hit the duplicate constraint.
+    try {
+      await dispatch({
+        organizationId: membership.organization.id,
+        organizationName: membership.organization.name,
+        applicationId: created.id,
+        trigger: "application_created",
+        triggeredBy: membership.user_id,
+        webhookUrl: `${request.nextUrl.origin}/api/webhooks/bolna`,
+      });
+    } catch (automationError) {
+      console.error("[api] automations after application create failed:", automationError);
+    }
+
+    return NextResponse.json({ data: created }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);
   }
