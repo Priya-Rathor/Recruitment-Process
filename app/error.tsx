@@ -1,3 +1,4 @@
+
 "use client";
 
 // Route-level error boundary: a failing page shows a readable message with a

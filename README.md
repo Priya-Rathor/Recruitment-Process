@@ -54,6 +54,8 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/tenant.ts` | Tenant + role resolution. **Every** API route uses this |
 | `lib/ai/` | AI Service Layer — the only place an LLM is called |
 | `lib/api.ts` | Shared route-handler helpers (errors, pagination) |
+| `lib/time.ts` | Organization-timezone date math (all "today" calculations) |
+| `lib/dashboard/` | Module 2's read-only aggregation layer |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
 | `proxy.ts` | Session refresh + auth enforcement at the edge |
@@ -80,17 +82,25 @@ the AI safety model:
 ## Scripts
 
 ```bash
-npm run dev     # dev server
-npm run build   # production build (also typechecks)
-npm run lint    # eslint
-npx tsc --noEmit  # typecheck only
+npm run dev        # dev server
+npm run build      # production build (also typechecks)
+npm run lint       # eslint
+npm run typecheck  # tsc --noEmit
+npm test           # vitest (unit tests for pure logic)
 ```
+
+`npm test` covers the logic that can be verified without a database: timezone
+day boundaries across DST, the dashboard's degradation rules, role→scope
+mapping, and the AI brief's numeric-consistency guard. Anything needing real
+data (RLS, tenant isolation, live counts) has to be tested against a Supabase
+project.
 
 ## Build progress
 
 - [x] **Module 1** — Authentication & Organization
-- [ ] Module 2 — Dashboard
-- [ ] Module 3 — Jobs Management
+- [x] **Module 2** — Dashboard (thin by design — see
+      `docs/modules/02-dashboard-retrofit.md`)
+- [x] **Module 3** — Jobs Management
 - [ ] Module 4 — Candidates Management
 - [ ] Module 5 — Applications Management
 - [ ] Module 6 — Resume AI (Parsing)

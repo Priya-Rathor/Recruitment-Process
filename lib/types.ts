@@ -51,8 +51,70 @@ export type Invite = {
   created_at: string;
 };
 
+// -----------------------------------------------------------------------------
+// Module 3 — Jobs
+// -----------------------------------------------------------------------------
+
+export const JOB_STATUSES = ["draft", "open", "on_hold", "closed"] as const;
+export type JobStatus = (typeof JOB_STATUSES)[number];
+
+export function isJobStatus(value: unknown): value is JobStatus {
+  return typeof value === "string" && (JOB_STATUSES as readonly string[]).includes(value);
+}
+
+export const WORK_MODES = ["onsite", "hybrid", "remote"] as const;
+export type WorkMode = (typeof WORK_MODES)[number];
+
+export function isWorkMode(value: unknown): value is WorkMode {
+  return typeof value === "string" && (WORK_MODES as readonly string[]).includes(value);
+}
+
+export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
+  draft: "Draft",
+  open: "Open",
+  on_hold: "On hold",
+  closed: "Closed",
+};
+
+export const WORK_MODE_LABELS: Record<WorkMode, string> = {
+  onsite: "On-site",
+  hybrid: "Hybrid",
+  remote: "Remote",
+};
+
+export type Job = {
+  id: string;
+  organization_id: string;
+  /** Nullable with no FK until Module 12 (Clients) ships. */
+  client_id: string | null;
+  title: string;
+  description: string | null;
+  experience_min: number | null;
+  experience_max: number | null;
+  required_skills: string[];
+  preferred_skills: string[];
+  location: string | null;
+  work_mode: WorkMode | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  status: JobStatus;
+  owner_recruiter_id: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JobQuestion = {
+  id: string;
+  job_id: string;
+  question: string;
+  display_order: number;
+};
+
 /** A membership joined with its organization — what the org switcher renders. */
 export type MembershipWithOrganization = {
+  /** public.users.id of the member. Needed to scope a Recruiter to own work. */
+  user_id: string;
   role: OrgRole;
   status: "active" | "removed";
   organization: Organization;

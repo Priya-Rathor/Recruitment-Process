@@ -10,7 +10,8 @@ code of every module already built, BEFORE writing anything.
 npm run dev          # dev server
 npm run build        # production build (also typechecks)
 npm run lint         # eslint — must be clean
-npx tsc --noEmit     # typecheck only
+npm run typecheck    # tsc --noEmit
+npm test             # vitest — must be green
 ```
 
 Bulma emits Sass deprecation warnings from its own internals during builds.
@@ -59,6 +60,25 @@ Output → Validation → Human Review → Business Action.
 **Integration adapters.** `lib/integrations/{bolna,calendar,email,llm,n8n}/`
 each expose `connect/test/getStatus/disconnect`. Later modules call the adapter;
 they never re-implement a provider call. (Created from Module 8 onward.)
+
+**Time.** Every "today"/"this week" calculation uses `lib/time.ts` with the
+ORGANIZATION's configured timezone — never the server's or the browser's. Ranges
+are half-open `[start, end)`.
+
+**Building against unbuilt modules.** Modules 2 and 16 read tables that later
+modules own. Never let a missing table throw or report a fake `0` — a zero reads
+as "nothing happened", which is a false statement to a manager. Degrade to an
+explicit pending state and label it (see `lib/dashboard/metrics.ts`). Crucially,
+distinguish "table not built" from a real error: an RLS denial or timeout
+reported as "not built yet" would hide a genuine bug. Record every such
+deferral in a retrofit checklist (see
+`docs/modules/02-dashboard-retrofit.md`) — the spec requires the retrofit, and
+"added it going forward only" is explicitly not sufficient.
+
+**Tests.** Pure logic gets unit tests (`*.test.ts`, vitest). Where an AI output
+must satisfy a hard constraint the spec states — e.g. "the brief never states a
+number that contradicts the KPI tiles" — enforce it in code and test the
+enforcement, rather than relying on prompt wording.
 
 ## Design system
 

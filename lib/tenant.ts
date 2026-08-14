@@ -66,7 +66,7 @@ export async function getUserMemberships(): Promise<MembershipWithOrganization[]
   // memberships[0] from that would hand the caller someone else's role.
   const { data, error } = await supabase
     .from("organization_members")
-    .select("role, status, organization:organizations(*)")
+    .select("user_id, role, status, organization:organizations(*)")
     .eq("user_id", user.id)
     .eq("status", "active")
     .order("joined_at", { ascending: true });
