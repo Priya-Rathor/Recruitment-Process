@@ -59,7 +59,16 @@ Output → Validation → Human Review → Business Action.
 
 **Integration adapters.** `lib/integrations/{bolna,calendar,email,llm,n8n}/`
 each expose `connect/test/getStatus/disconnect`. Later modules call the adapter;
-they never re-implement a provider call. (Created from Module 8 onward.)
+they never re-implement a provider call. Credentials are AES-GCM encrypted
+(`lib/integrations/crypto.ts`) and protected by a column-level REVOKE, so they
+can only be read through `lib/supabase/admin.ts` — which BYPASSES RLS, so every
+query made with it must filter `organization_id` explicitly.
+
+**Anything that contacts a real person** (calls, emails, SMS) fails closed:
+disconnected by default, explicit confirmation in the UI, a hard attempt cap,
+and a consent disclosure that cannot be disabled. Recording someone without
+telling them is unlawful in many jurisdictions — treat that as a build
+constraint, not a later compliance task.
 
 **Time.** Every "today"/"this week" calculation uses `lib/time.ts` with the
 ORGANIZATION's configured timezone — never the server's or the browser's. Ranges
