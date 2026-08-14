@@ -101,7 +101,7 @@ project.
 - [x] **Module 2** — Dashboard (thin by design — see
       `docs/modules/02-dashboard-retrofit.md`)
 - [x] **Module 3** — Jobs Management
-- [ ] Module 4 — Candidates Management
+- [x] **Module 4** — Candidates Management
 - [ ] Module 5 — Applications Management
 - [ ] Module 6 — Resume AI (Parsing)
 - [ ] Module 7 — AI Matching

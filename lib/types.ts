@@ -111,6 +111,69 @@ export type JobQuestion = {
   display_order: number;
 };
 
+// -----------------------------------------------------------------------------
+// Module 4 — Candidates
+// -----------------------------------------------------------------------------
+
+export const CANDIDATE_SOURCES = [
+  "career_page",
+  "resume_upload",
+  "email",
+  "referral",
+  "job_board",
+  "agency_database",
+  "manual",
+] as const;
+export type CandidateSource = (typeof CANDIDATE_SOURCES)[number];
+
+export function isCandidateSource(value: unknown): value is CandidateSource {
+  return typeof value === "string" && (CANDIDATE_SOURCES as readonly string[]).includes(value);
+}
+
+export const CANDIDATE_SOURCE_LABELS: Record<CandidateSource, string> = {
+  career_page: "Career page",
+  resume_upload: "Resume upload",
+  email: "Email",
+  referral: "Referral",
+  job_board: "Job board",
+  agency_database: "Agency database",
+  manual: "Manual entry",
+};
+
+export type Candidate = {
+  id: string;
+  organization_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  email_normalized: string | null;
+  phone_normalized: string | null;
+  location: string | null;
+  current_company: string | null;
+  current_role: string | null;
+  total_experience_years: number | null;
+  skills: string[];
+  expected_salary: number | null;
+  notice_period_days: number | null;
+  source: CandidateSource;
+  resume_url: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const DUPLICATE_STATUSES = ["open", "confirmed", "dismissed"] as const;
+export type DuplicateStatus = (typeof DUPLICATE_STATUSES)[number];
+
+export type CandidateDuplicate = {
+  id: string;
+  candidate_id: string;
+  duplicate_of_id: string;
+  matched_on: string;
+  status: DuplicateStatus;
+  created_at: string;
+};
+
 /** A membership joined with its organization — what the org switcher renders. */
 export type MembershipWithOrganization = {
   /** public.users.id of the member. Needed to scope a Recruiter to own work. */

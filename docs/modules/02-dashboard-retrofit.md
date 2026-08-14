@@ -16,7 +16,7 @@ have seen a real non-zero number on `/dashboard` for it.
 
 | Tile | Source table | Owning module | Query location | Done |
 | --- | --- | --- | --- | --- |
-| New candidates | `candidates.created_at` | 4 | `lib/dashboard/metrics.ts` | ☐ |
+| New candidates | `candidates.created_at` | 4 | `lib/dashboard/metrics.ts` | ☑ table exists; **verify against live data** |
 | Screenings completed | `screening_calls.ended_at` + `status='completed'` | 8 | same | ☐ |
 | Interviews today | `interviews.scheduled_at` | 11 | same | ☐ |
 | Overdue applications | `applications.updated_at` | 5 | same | ☐ |
@@ -116,8 +116,12 @@ remain open, roughly in priority order.
 
 ## Other follow-ups
 
-- ☐ **Module 3/4/10/11**: flip `pendingModule` to `null` in
-  `app/dashboard/QuickLinks.tsx` as each route becomes real.
+- ☑ **Module 3/4**: Jobs and Candidates quick links are live in
+  `app/dashboard/QuickLinks.tsx`. ☐ Pipeline (10) and Interviews (11) remain.
+- ☐ **Module 4 shipped**: `candidates` now exists, so the "New candidates" tile
+  should stop showing "Available with Module 4". Confirm it reports a real count
+  once a database is connected — the schema matches
+  (`organization_id`, `created_at`), but that has never been executed.
 - ☐ **Module 14**: replace the `TODO(Module 14)` in
   `app/api/dashboard/ai-action/route.ts` with a real `logActivity()` call.
 - ☐ **Cost-tracking retrofit**: the in-process brief cache in that same route is

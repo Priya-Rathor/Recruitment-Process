@@ -13,7 +13,7 @@ type QuickLink = {
 
 const LINKS: QuickLink[] = [
   { label: "Jobs", href: "/jobs", pendingModule: null },
-  { label: "Candidates", href: "/candidates", pendingModule: 4 },
+  { label: "Candidates", href: "/candidates", pendingModule: null },
   { label: "Pipeline", href: "/pipeline", pendingModule: 10 },
   { label: "Interviews", href: "/interviews", pendingModule: 11 },
   { label: "Team", href: "/team/invite", pendingModule: null },

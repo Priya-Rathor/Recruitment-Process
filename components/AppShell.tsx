@@ -6,7 +6,11 @@ import { getCurrentMembership, getCurrentUser, getUserMemberships } from "@/lib/
 import { SignOutButton } from "@/components/SignOutButton";
 import type { ReactNode } from "react";
 
-const NAV_ITEMS = [{ href: "/dashboard", label: "Dashboard" }];
+const NAV_ITEMS = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/jobs", label: "Jobs" },
+  { href: "/candidates", label: "Candidates" },
+];
 
 export async function AppShell({ children }: { children: ReactNode }) {
   const [user, membership, memberships] = await Promise.all([
