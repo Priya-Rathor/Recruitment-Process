@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, requireCurrentUser, hasRole } from "@/lib/tenant";
 import { getJobDetail, listTeamMembers } from "@/lib/jobs/queries";
+import { listClients } from "@/lib/clients/queries";
 import { JobForm } from "../../JobForm";
 
 export const metadata = { title: "Edit job · Recruitment OS" };
@@ -32,9 +33,10 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const [job, members] = await Promise.all([
+  const [job, members, { clients }] = await Promise.all([
     getJobDetail({ organizationId: membership.organization.id, jobId: id }),
     listTeamMembers(membership.organization.id),
+    listClients({ organizationId: membership.organization.id }),
   ]);
 
   if (!job) notFound();
@@ -66,6 +68,7 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
         initialScreeningQuestions={job.screeningQuestions.map((question) => question.question)}
         initialInterviewQuestions={job.interviewQuestions.map((question) => question.question)}
         members={members}
+        clients={clients}
         currentUserId={user.id}
         canClose={canClose}
       />

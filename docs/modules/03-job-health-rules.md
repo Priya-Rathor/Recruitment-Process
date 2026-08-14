@@ -44,7 +44,8 @@ a recruiter always knows *why* — never a bare amber dot.
   moment it turned 7 days old. There is a test asserting the rule stays skipped.
 - ☐ **Module 10 (Pipeline)** — consider deriving rule 6's threshold from
   `pipeline_sla_config` instead of the fixed 30 days.
-- ☐ **Module 12 (Clients)** — a client past its `feedback_sla_days` on this job's
-  submissions is a candidate for a new rule.
+- ☐ **Module 12 (Clients)** — a client past its `feedback_sla_days` on this
+  job's submissions is a candidate for a new rule. ☑ The `jobs.client_id`
+  foreign key itself was added by Module 12's migration.
 - ☐ **Module 17 (Settings)** — `STALE_OPEN_JOB_DAYS` is currently a constant;
   it is a natural per-organization setting.

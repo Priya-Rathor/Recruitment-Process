@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, requireCurrentUser, hasRole } from "@/lib/tenant";
 import { listTeamMembers } from "@/lib/jobs/queries";
+import { listClients } from "@/lib/clients/queries";
 import { JobForm } from "../JobForm";
 
 export const metadata = { title: "New job · Recruitment OS" };
@@ -32,7 +33,10 @@ export default async function NewJobPage() {
     );
   }
 
-  const members = await listTeamMembers(membership.organization.id);
+  const [members, { clients }] = await Promise.all([
+    listTeamMembers(membership.organization.id),
+    listClients({ organizationId: membership.organization.id }),
+  ]);
 
   return (
     <AppShell>
@@ -49,6 +53,7 @@ export default async function NewJobPage() {
       <JobForm
         mode="create"
         members={members}
+        clients={clients}
         currentUserId={user.id}
         // The creator becomes the owner by default, so they may set any status.
         canClose

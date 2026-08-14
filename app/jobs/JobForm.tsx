@@ -37,6 +37,8 @@ type FormState = {
   salaryMax: number | null;
   status: JobStatus;
   ownerRecruiterId: string;
+  /** Module 12 retrofit: jobs can now be attached to a client. */
+  clientId: string;
   screeningQuestions: string[];
   interviewQuestions: string[];
 };
@@ -55,6 +57,7 @@ function emptyForm(): FormState {
     salaryMax: null,
     status: "draft",
     ownerRecruiterId: "",
+    clientId: "",
     screeningQuestions: [],
     interviewQuestions: [],
   };
@@ -74,6 +77,7 @@ function formFromJob(job: Job, screening: string[], interview: string[]): FormSt
     salaryMax: job.salary_max,
     status: job.status,
     ownerRecruiterId: job.owner_recruiter_id ?? "",
+    clientId: job.client_id ?? "",
     screeningQuestions: screening,
     interviewQuestions: interview,
   };
@@ -92,6 +96,7 @@ export function JobForm({
   initialScreeningQuestions = [],
   initialInterviewQuestions = [],
   members,
+  clients,
   currentUserId,
   canClose,
 }: {
@@ -100,6 +105,7 @@ export function JobForm({
   initialScreeningQuestions?: string[];
   initialInterviewQuestions?: string[];
   members: { id: string; name: string; role: string }[];
+  clients: { id: string; name: string }[];
   currentUserId: string;
   /** False for a Recruiter who doesn't own this job — they may edit, not close. */
   canClose: boolean;
@@ -216,6 +222,7 @@ export function JobForm({
       salary_max: form.salaryMax,
       status: form.status,
       owner_recruiter_id: form.ownerRecruiterId || null,
+      client_id: form.clientId || null,
       screening_questions: form.screeningQuestions,
       interview_questions: form.interviewQuestions,
     };
@@ -475,6 +482,29 @@ export function JobForm({
               </p>
             )}
           </div>
+          <div className="column">
+            <label className="label" htmlFor="client">
+              Client
+            </label>
+            <div className="select is-fullwidth">
+              <select
+                id="client"
+                value={form.clientId}
+                onChange={(event) => update("clientId", event.target.value)}
+              >
+                <option value="">No client</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="help has-text-secondary">
+              Needed before candidates can be submitted for this job.
+            </p>
+          </div>
+
           <div className="column">
             <label className="label" htmlFor="owner">
               Owner

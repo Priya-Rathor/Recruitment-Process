@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/states";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { listJobsWithHealth, listTeamMembers } from "@/lib/jobs/queries";
+import { listClients } from "@/lib/clients/queries";
 import { formatExperience } from "@/lib/jobs/format";
 import { isJobStatus, JOB_STATUS_LABELS, WORK_MODE_LABELS } from "@/lib/types";
 import { HealthBadge, StatusBadge } from "./JobBadges";
@@ -12,32 +13,44 @@ import { JobFilters } from "./JobFilters";
 export const metadata = { title: "Jobs · Recruitment OS" };
 export const dynamic = "force-dynamic";
 
-type SearchParams = { status?: string; recruiter_id?: string; q?: string; archived?: string };
+type SearchParams = {
+  status?: string;
+  recruiter_id?: string;
+  client_id?: string;
+  q?: string;
+  archived?: string;
+};
 
 async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
   const membership = await requireMembershipOrRedirect();
 
-  const [{ jobs, failed }, members] = await Promise.all([
+  const [{ jobs, failed }, members, { clients }] = await Promise.all([
     listJobsWithHealth({
       organizationId: membership.organization.id,
       filters: {
         // Filters are validated here, not trusted from the URL.
         status: isJobStatus(searchParams.status) ? searchParams.status : undefined,
         recruiterId: searchParams.recruiter_id || undefined,
+        clientId: searchParams.client_id || undefined,
         search: searchParams.q || undefined,
         includeArchived: searchParams.archived === "true",
       },
     }),
     listTeamMembers(membership.organization.id),
+    listClients({ organizationId: membership.organization.id }),
   ]);
 
   const hasFilters = Boolean(
-    searchParams.status || searchParams.recruiter_id || searchParams.q || searchParams.archived
+    searchParams.status ||
+      searchParams.recruiter_id ||
+      searchParams.client_id ||
+      searchParams.q ||
+      searchParams.archived
   );
 
   return (
     <>
-      <JobFilters members={members} />
+      <JobFilters members={members} clients={clients} />
 
       <div className="card">
         {failed ? (
@@ -71,6 +84,7 @@ async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
                   <th>Health</th>
                   <th>Experience</th>
                   <th>Location</th>
+                  <th>Client</th>
                   <th>Owner</th>
                 </tr>
               </thead>
@@ -107,6 +121,9 @@ async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
                       {job.work_mode && (
                         <span className="has-text-secondary"> · {WORK_MODE_LABELS[job.work_mode]}</span>
                       )}
+                    </td>
+                    <td className="has-text-secondary" style={{ fontSize: 13 }}>
+                      {job.clientName ?? "—"}
                     </td>
                     <td className="has-text-secondary" style={{ fontSize: 13 }}>
                       {job.ownerName ?? "Unassigned"}

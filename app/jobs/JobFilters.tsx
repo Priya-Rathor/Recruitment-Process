@@ -1,8 +1,7 @@
 "use client";
 
-// Filters by status, recruiter, and title (spec: "Job list with filters by
-// client, recruiter, status"). Client filtering arrives with Module 12 — see
-// the note below.
+// Filters by client, recruiter, status and title — the full set the spec asks
+// for. Client filtering landed with Module 12's retrofit.
 //
 // State lives in the URL so a filtered list is shareable and survives reload,
 // and so the server component re-runs the query rather than filtering in the
@@ -13,8 +12,10 @@ import { JOB_STATUSES, JOB_STATUS_LABELS } from "@/lib/types";
 
 export function JobFilters({
   members,
+  clients,
 }: {
   members: { id: string; name: string; role: string }[];
+  clients: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,8 +32,11 @@ export function JobFilters({
 
   const activeStatus = searchParams.get("status") ?? "";
   const activeRecruiter = searchParams.get("recruiter_id") ?? "";
+  const activeClient = searchParams.get("client_id") ?? "";
   const showArchived = searchParams.get("archived") === "true";
-  const hasFilters = Boolean(activeStatus || activeRecruiter || searchParams.get("q") || showArchived);
+  const hasFilters = Boolean(
+    activeStatus || activeRecruiter || activeClient || searchParams.get("q") || showArchived
+  );
 
   return (
     <div className="card mb-4">
@@ -98,6 +102,26 @@ export function JobFilters({
           </div>
         </div>
 
+        <div className="column is-one-quarter">
+          <label className="label" style={{ fontSize: 13 }} htmlFor="job-client">
+            Client
+          </label>
+          <div className="select is-fullwidth">
+            <select
+              id="job-client"
+              value={activeClient}
+              onChange={(event) => apply({ client_id: event.target.value || null })}
+            >
+              <option value="">All clients</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <div className="column is-flex is-align-items-flex-end">
           <label className="checkbox" style={{ fontSize: 13 }}>
             <input
@@ -110,12 +134,7 @@ export function JobFilters({
         </div>
       </div>
 
-      <div className="is-flex is-justify-content-space-between is-align-items-center">
-        {/* Client filtering needs Module 12's clients table to resolve names —
-            filtering by a raw UUID would be useless to a recruiter. */}
-        <p className="has-text-secondary" style={{ fontSize: 12 }}>
-          Filtering by client arrives with Module 12.
-        </p>
+      <div className="is-flex is-justify-content-flex-end is-align-items-center">
         {hasFilters && (
           <button
             type="button"

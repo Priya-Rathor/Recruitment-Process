@@ -14,11 +14,15 @@ export type JobWithHealth = Job & {
   health: JobHealth;
   screeningQuestionCount: number;
   ownerName: string | null;
+  /** Module 12 retrofit: resolved from jobs.client_id. */
+  clientName: string | null;
 };
 
 export type JobListFilters = {
   status?: JobStatus;
   recruiterId?: string;
+  /** Module 12 retrofit: filtering by client is now possible. */
+  clientId?: string;
   search?: string;
   includeArchived?: boolean;
 };
@@ -49,6 +53,7 @@ export async function listJobsWithHealth({
 
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.recruiterId) query = query.eq("owner_recruiter_id", filters.recruiterId);
+  if (filters.clientId) query = query.eq("client_id", filters.clientId);
   if (!filters.includeArchived) query = query.is("archived_at", null);
   if (filters.search) {
     const escaped = filters.search.replace(/[%_,()]/g, "").trim();
@@ -66,7 +71,7 @@ export async function listJobsWithHealth({
 
   const jobIds = jobs.map((job) => job.id);
 
-  const [questionRows, ownerRows] = await Promise.all([
+  const [questionRows, ownerRows, clientRows] = await Promise.all([
     supabase
       .from("job_screening_questions")
       .select("job_id")
@@ -78,6 +83,14 @@ export async function listJobsWithHealth({
       .in(
         "id",
         jobs.map((job) => job.owner_recruiter_id).filter((id): id is string => Boolean(id))
+      ),
+    // Module 12 retrofit: resolve client names in one query rather than per job.
+    supabase
+      .from("clients")
+      .select("id, name")
+      .in(
+        "id",
+        jobs.map((job) => job.client_id).filter((id): id is string => Boolean(id))
       ),
   ]);
 
@@ -91,6 +104,11 @@ export async function listJobsWithHealth({
     owners.set(row.id, row.name ?? row.email);
   }
 
+  const clientNames = new Map<string, string>();
+  for (const row of (clientRows.data ?? []) as { id: string; name: string }[]) {
+    clientNames.set(row.id, row.name);
+  }
+
   return {
     jobs: jobs.map((job) => {
       const screeningQuestionCount = questionCounts.get(job.id) ?? 0;
@@ -98,6 +116,7 @@ export async function listJobsWithHealth({
         ...job,
         screeningQuestionCount,
         ownerName: job.owner_recruiter_id ? owners.get(job.owner_recruiter_id) ?? null : null,
+        clientName: job.client_id ? clientNames.get(job.client_id) ?? null : null,
         health: evaluateJobHealth({
           status: job.status,
           createdAt: job.created_at,
@@ -141,7 +160,7 @@ export async function getJobDetail({
   if (error || !data) return null;
   const job = data as unknown as Job;
 
-  const [screening, interview, owner] = await Promise.all([
+  const [screening, interview, owner, client] = await Promise.all([
     supabase
       .from("job_screening_questions")
       .select("id, job_id, question, display_order")
@@ -159,6 +178,9 @@ export async function getJobDetail({
           .eq("id", job.owner_recruiter_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    job.client_id
+      ? supabase.from("clients").select("id, name").eq("id", job.client_id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const screeningQuestions = (screening.data ?? []) as unknown as JobQuestion[];
@@ -170,6 +192,7 @@ export async function getJobDetail({
     interviewQuestions: (interview.data ?? []) as unknown as JobQuestion[],
     screeningQuestionCount: screeningQuestions.length,
     ownerName: ownerRow ? ownerRow.name ?? ownerRow.email : null,
+    clientName: (client.data as { name: string } | null)?.name ?? null,
     health: evaluateJobHealth({
       status: job.status,
       createdAt: job.created_at,

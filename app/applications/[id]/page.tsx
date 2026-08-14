@@ -188,6 +188,12 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
             >
               Interview brief
             </Link>
+            <Link
+              className="button is-small is-fullwidth mt-2"
+              href={`/applications/${application.id}/submission`}
+            >
+              Submit to client
+            </Link>
           </div>
 
           <div className="card mb-4">
