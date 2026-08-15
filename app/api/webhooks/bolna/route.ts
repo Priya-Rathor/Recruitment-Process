@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logActivity } from "@/lib/activity/log";
+import { notify } from "@/lib/notifications/notify";
 import { isConsentRefusal } from "@/lib/screening/script";
 
 /**
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
   // Tenancy is resolved from OUR row, never from the payload.
   const { data: existing } = await admin
     .from("screening_calls")
-    .select("id, organization_id, status, consent_confirmed")
+    .select("id, organization_id, application_id, status, consent_confirmed")
     .eq("id", screeningCallId)
     .maybeSingle();
 
@@ -77,6 +78,7 @@ export async function POST(request: NextRequest) {
   const call = existing as unknown as {
     id: string;
     organization_id: string;
+    application_id: string;
     status: string;
     consent_confirmed: boolean;
   };
@@ -140,6 +142,43 @@ export async function POST(request: NextRequest) {
     },
     useAdminClient: true,
   });
+
+  // MODULE 15 RETROFIT — screening outcome notifications.
+  //
+  // useAdminClient throughout: a provider callback has no session. The
+  // organization and the recipient both come from OUR rows, never the payload.
+  //
+  // A CANCELLED call means the candidate declined and asked for a person. That
+  // is the spec's own worked example, and it is urgent in a way a completed call
+  // is not — Module 8's retry policy will never dial them again, so if nobody
+  // picks it up the candidate is simply dropped.
+  const { data: assignmentRow } = await admin
+    .from("applications")
+    .select("id, assigned_recruiter_id, candidate:candidates(name), job:jobs(title)")
+    .eq("id", call.application_id)
+    .eq("organization_id", call.organization_id)
+    .maybeSingle();
+
+  const assignment = assignmentRow as unknown as {
+    id: string;
+    assigned_recruiter_id: string | null;
+    candidate: { name: string } | null;
+    job: { title: string } | null;
+  } | null;
+
+  if (assignment?.assigned_recruiter_id) {
+    await notify({
+      organizationId: call.organization_id,
+      userId: assignment.assigned_recruiter_id,
+      type: status === "cancelled" ? "screening_callback_requested" : "screening_completed",
+      values: {
+        candidate_name: assignment.candidate?.name ?? null,
+        job_title: assignment.job?.title ?? null,
+      },
+      linkPath: `/applications/${assignment.id}/screening-call`,
+      useAdminClient: true,
+    });
+  }
 
   return NextResponse.json({ received: true, matched: true });
 }

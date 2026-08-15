@@ -135,8 +135,10 @@ export const ACTION_LABELS: Record<ActionType, string> = {
  */
 export const ACTION_INTEGRATIONS: Partial<Record<ActionType, string>> = {
   start_screening_call: "bolna",
-  // notify_recruiter will require "email" once Module 15 ships; today it writes
-  // to the internal log, which needs nothing.
+  // notify_recruiter deliberately requires NOTHING, even now that Module 15
+  // exists. It always creates an in-app notification, which needs no
+  // integration; email is an optional extra on top. Listing "email" here would
+  // block a rule from activating over a channel it does not depend on.
 };
 
 /**

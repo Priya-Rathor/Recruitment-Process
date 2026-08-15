@@ -179,7 +179,7 @@ export function SubmissionPanel({
             </button>
             <p className="has-text-secondary mt-2" style={{ fontSize: 12 }}>
               Records the submission and starts the feedback clock. Email delivery arrives with
-              Notifications (Module 15).
+              a Module 17 job, once each organization has a verified From address.
             </p>
           </>
         ) : (

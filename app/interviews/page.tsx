@@ -69,8 +69,9 @@ async function InterviewsTable({ status }: { status?: string }) {
           </h2>
           <p className="has-text-secondary mb-2" style={{ fontSize: 13 }}>
             {overdue.length} interview{overdue.length === 1 ? "" : "s"} finished more than{" "}
-            {FEEDBACK_DUE_HOURS} hours ago without feedback. Reminders are shown here for now —
-            sending them arrives with Notifications (Module 15).
+            {FEEDBACK_DUE_HOURS} hours ago without feedback. Send a reminder to each assigned
+            interviewer from{" "}
+            <Link href="/notifications">Notifications</Link>.
           </p>
           <ul>
             {overdue.slice(0, 5).map((entry) => {

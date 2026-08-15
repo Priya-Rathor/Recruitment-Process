@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { getCurrentMembership, getCurrentUser, getUserMemberships, hasRole } from "@/lib/tenant";
 import { SignOutButton } from "@/components/SignOutButton";
+import { countUnread } from "@/lib/notifications/queries";
 import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
@@ -29,6 +30,10 @@ export async function AppShell({ children }: { children: ReactNode }) {
     getCurrentMembership(),
     getUserMemberships(),
   ]);
+
+  // null means the count could not be read — rendered as a dot rather than a
+  // confident "0", which would hide exactly the alerts that matter most.
+  const unread = membership ? await countUnread(membership.organization.id) : null;
 
   return (
     <div className="app-shell">
@@ -70,6 +75,24 @@ export async function AppShell({ children }: { children: ReactNode }) {
                 Switch
               </Link>
             )}
+            <Link href="/notifications" className="app-nav__link">
+              Notifications
+              {unread !== null && unread > 0 && (
+                <span
+                  className="ml-1"
+                  style={{
+                    background: "var(--color-primary)",
+                    color: "#fff",
+                    borderRadius: 999,
+                    padding: "1px 7px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </Link>
             <Link href="/team/invite" className="app-nav__link">
               Team
             </Link>

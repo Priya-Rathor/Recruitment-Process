@@ -4,6 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { dispatch } from "@/lib/automations/engine";
 import { logActivityBatch } from "@/lib/activity/log";
+import { notify } from "@/lib/notifications/notify";
 import { APPLICATION_COLUMNS, getApplicationDetail } from "@/lib/applications/queries";
 import {
   canTransition,
@@ -169,6 +170,40 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           ]
         : []),
     ]);
+
+    // MODULE 15 RETROFIT — tell a recruiter when work lands on them.
+    //
+    // Only when the assignee actually CHANGES, and never when someone assigns
+    // work to themselves: "you assigned this to you" is not news.
+    if (
+      "assigned_recruiter_id" in updates &&
+      typeof updates.assigned_recruiter_id === "string" &&
+      updates.assigned_recruiter_id !== current.assigned_recruiter_id &&
+      updates.assigned_recruiter_id !== actor.id
+    ) {
+      const { data: context } = await supabase
+        .from("applications")
+        .select("candidate:candidates(name), job:jobs(title)")
+        .eq("id", id)
+        .eq("organization_id", membership.organization.id)
+        .maybeSingle();
+
+      const row = context as unknown as {
+        candidate: { name: string } | null;
+        job: { title: string } | null;
+      } | null;
+
+      await notify({
+        organizationId: membership.organization.id,
+        userId: updates.assigned_recruiter_id,
+        type: "assigned_to_application",
+        values: {
+          candidate_name: row?.candidate?.name ?? null,
+          job_title: row?.job?.title ?? null,
+        },
+        linkPath: `/applications/${id}`,
+      });
+    }
 
     // Module 13. Fires only on a real stage CHANGE, so re-saving the same stage
     // cannot re-trigger a call — the dedupe key would catch it anyway, but not

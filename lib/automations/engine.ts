@@ -36,6 +36,8 @@ import { calculateAndStoreMatch } from "@/lib/matching/queries";
 import { generateReportForApplication } from "@/lib/screening/reportQueries";
 import { canTransition, isApplicationStage, type ApplicationStage } from "@/lib/applications/stages";
 import { logActivity } from "@/lib/activity/log";
+import { notify, notifyMany } from "@/lib/notifications/notify";
+import { findOwnersAndAdmins } from "@/lib/notifications/queries";
 
 export type StoredAutomation = {
   id: string;
@@ -213,7 +215,6 @@ async function executeAction({
   applicationId,
   triggeredBy,
   webhookUrl,
-  automationId,
   automationName,
 }: {
   action: Action;
@@ -222,7 +223,6 @@ async function executeAction({
   applicationId: string;
   triggeredBy: string;
   webhookUrl: string;
-  automationId: string;
   automationName: string;
 }): Promise<ActionResult> {
   try {
@@ -401,17 +401,57 @@ async function executeAction({
       }
 
       case "notify_recruiter": {
-        // FORWARD STUB. Module 15 (Notifications) does not exist, so this writes
-        // to the run record rather than pretending to have sent anything. The UI
-        // labels it as such — reporting "notified" when nobody was notified is
-        // exactly the false statement the platform rules forbid.
-        console.info(
-          `[automation] notify_recruiter (pending Module 15) automation=${automationId} application=${applicationId}`
-        );
+        // MODULE 15 RETROFIT. This was a no-op that returned `skipped` and said
+        // so; it now actually notifies.
+        //
+        // The recipient is the application's ASSIGNED recruiter, not the person
+        // whose action triggered the rule — telling someone their own action
+        // happened is not a notification. Falls back to the triggering user only
+        // when nobody is assigned, so the alert reaches a human either way.
+        const supabase = await createClient();
+        const { data: assignment } = await supabase
+          .from("applications")
+          .select("assigned_recruiter_id, candidate:candidates(name), job:jobs(title)")
+          .eq("id", applicationId)
+          .eq("organization_id", organizationId)
+          .maybeSingle();
+
+        const row = assignment as unknown as {
+          assigned_recruiter_id: string | null;
+          candidate: { name: string } | null;
+          job: { title: string } | null;
+        } | null;
+
+        const recipient = row?.assigned_recruiter_id ?? triggeredBy;
+
+        const result = await notify({
+          organizationId,
+          userId: recipient,
+          type: "assigned_to_application",
+          values: {
+            candidate_name: row?.candidate?.name ?? null,
+            job_title: row?.job?.title ?? null,
+          },
+          linkPath: `/applications/${applicationId}`,
+        });
+
+        // A muted or unrenderable notification is a skip, not a failure — the
+        // rule did its part and nothing is broken.
+        if (!result.inAppCreated && result.emailStatus !== "sent") {
+          return {
+            action: action.type,
+            status: "skipped",
+            detail: result.detail ?? "Nothing was sent — check notification preferences.",
+          };
+        }
+
         return {
           action: action.type,
-          status: "skipped",
-          detail: "Recorded in the run log. Notifications are delivered from Module 15 onward.",
+          status: "success",
+          detail:
+            result.emailStatus === "sent"
+              ? "Recruiter notified in-app and by email."
+              : "Recruiter notified in-app.",
         };
       }
 
@@ -604,6 +644,31 @@ async function runOne({
       },
     });
 
+    // MODULE 15 RETROFIT — automation failure alerts.
+    //
+    // Only FAILURES, and only to Owners/Admins. Notifying on every run would
+    // make the notification centre useless within a day, and skips are normal
+    // operation. A failure means a rule someone activated is not doing what they
+    // think it is doing, which is worth interrupting them for.
+    //
+    // 'blocked' is included: a rule that cannot run because Bolna is
+    // disconnected looks identical to a working one from the automations list.
+    if (status === "failed" || status === "blocked") {
+      const admins = await findOwnersAndAdmins(input.organizationId);
+      await notifyMany(
+        admins.map((userId) => ({
+          organizationId: input.organizationId,
+          userId,
+          type: "automation_failed" as const,
+          values: {
+            automation_name: automation.name,
+            reason: reason ?? errorMessage ?? "no reason recorded",
+          },
+          linkPath: `/automations/${automation.id}`,
+        }))
+      );
+    }
+
     return {
       automationId: automation.id,
       automationName: automation.name,
@@ -637,7 +702,6 @@ async function runOne({
         applicationId: input.applicationId,
         triggeredBy: input.triggeredBy,
         webhookUrl: input.webhookUrl,
-        automationId: automation.id,
         automationName: automation.name,
       })
     );

@@ -451,8 +451,8 @@ export function AutomationForm({
             )}
 
             {action.type === "notify_recruiter" && (
-              <span style={{ fontSize: 12, color: "var(--status-attention-text, #B45309)" }}>
-                recorded in the run log only until Module 15
+              <span className="has-text-secondary" style={{ fontSize: 12 }}>
+                notifies the assigned recruiter
               </span>
             )}
 

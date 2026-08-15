@@ -8,6 +8,7 @@ import { getReportForApplication } from "@/lib/screening/reportQueries";
 import { getSubmissionForApplication } from "@/lib/clients/queries";
 import { generateClientSubmission } from "@/lib/ai/generateClientSubmission";
 import { logActivity, logAiCall } from "@/lib/activity/log";
+import { notify } from "@/lib/notifications/notify";
 
 export const maxDuration = 60;
 
@@ -187,18 +188,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       .from("applications")
       // The client NAME is fetched too, so the activity timeline can read
       // "Submitted to ABC Tech" rather than a UUID a human can't act on.
-      .select("job_id, job:jobs(client_id, client:clients(name))")
+      .select("job_id, candidate:candidates(name), job:jobs(client_id, client:clients(name))")
       .eq("id", id)
       .eq("organization_id", membership.organization.id)
       .maybeSingle();
 
-    const jobClient = (
-      jobRow as unknown as {
-        job: { client_id: string | null; client: { name: string } | null } | null;
-      } | null
-    )?.job;
+    const submissionRow = jobRow as unknown as {
+      candidate: { name: string } | null;
+      job: { client_id: string | null; client: { name: string } | null } | null;
+    } | null;
+    const jobClient = submissionRow?.job;
     const clientId = jobClient?.client_id;
     const sentToClientName = jobClient?.client?.name ?? null;
+    const submittedCandidateName = submissionRow?.candidate?.name ?? null;
 
     if (!clientId) {
       return jsonError("This job has no client attached, so there's nobody to submit to.", 409);
@@ -222,7 +224,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return jsonError("Could not record that submission.", 400);
     }
 
-    // TODO(Module 15): actually deliver the message.
+    // MODULE 15 RETROFIT.
+    //
+    // What this does NOT do is email the client the submission. That is a
+    // deliberate stop, not an omission: a submission describes a real person to
+    // a third party in our customer's name, and Module 12 built two explicit
+    // steps precisely so a human approves the wording. Auto-emailing it here
+    // would undo that. Sending to the client needs its own approved external
+    // template and a confirmation naming the recipient — a Module 17 job, once
+    // the email integration has a verified From address per organization.
+    //
+    // What it does do is confirm to the sender that the clock has started.
+    await notify({
+      organizationId: membership.organization.id,
+      userId: user.id,
+      type: "candidate_submitted",
+      values: {
+        candidate_name: submittedCandidateName,
+        client_name: sentToClientName,
+      },
+      linkPath: `/applications/${id}`,
+    });
+
 
     // Module 14. Recorded against the APPLICATION, not the client, because this
     // is the candidate's story: "was submitted to ABC Tech" is a line in their

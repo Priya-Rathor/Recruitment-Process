@@ -1,18 +1,16 @@
 // =============================================================================
 // Interview feedback rules and the missing-feedback queue.
 //
-// FORWARD STUB (spec, Module 11): "Missing-feedback reminders are normally
-// delivered by Module 15 (Notifications), which also doesn't exist yet — for
-// now, log the reminder as an Activity & Audit (Module 14) event or an internal
-// TODO queue instead of sending anything externally."
+// This file COMPUTES the overdue queue; it does not deliver anything, and that
+// separation is deliberate — the computation is pure and directly testable.
 //
-// Module 14 doesn't exist either, so this is the internal queue: overdue
-// feedback is COMPUTED on read rather than pushed anywhere. Nothing is sent
-// externally, and when Module 15 ships it can read the same computation and
-// actually deliver a reminder.
+// MODULE 15 RETROFIT: DONE. `overdueFeedback()` below is now read by
+// lib/notifications/reminders.ts, which sends a real reminder to the assigned
+// interviewer (deduped against the last 24 hours). The computation itself did
+// not change: it was already right, only delivery was missing.
 //
-// RETROFIT (spec): "When Module 15 ships, connect the missing-feedback reminder
-// to its real send pipeline."
+// The one caveat: there is no scheduler, so dispatch is triggered by a request
+// rather than a clock. See docs/modules/15-notifications-notes.md.
 // =============================================================================
 
 export const RECOMMENDATIONS = ["strong_yes", "yes", "no", "strong_no"] as const;
