@@ -1,7 +1,6 @@
 -- =============================================================================
 -- ALL MIGRATIONS, concatenated in order.
 -- Generated from supabase/migrations/. Paste into the Supabase SQL Editor.
--- Every migration is re-runnable (if not exists / drop policy if exists).
 -- =============================================================================
 
 
@@ -4934,166 +4933,194 @@ create policy job_hiring_stages_write_staff on public.job_hiring_stages
 --        -> Video Interview -> Written Assessment -> Director Round -> Hired
 --
 -- THE STAGE KEYS ARE DELIBERATELY IDENTICAL TO job_hiring_stages' keys
--- (ai_screening_call, phone_interview, video_interview, written_assessment).
--- The two features describe the same four steps, and a translation table
--- between "assessment" and "written_assessment" would be a bug waiting to
--- happen the first time someone added a stage to one list and not the other.
--- With identical keys, "is this stage enabled for this job?" is a lookup, not a
--- mapping.
+-- (ai_screening_call, phone_interview, video_interview, written_assessment), so
+-- "is this stage enabled for this job?" is a lookup rather than a translation
+-- table that would rot the first time someone added a stage to one list only.
 --
--- A FULL TYPE SWAP, not ALTER TYPE ... ADD VALUE. Postgres cannot remove an
--- enum value, so adding would leave 'new', 'recruiter_review', 'client_review',
--- 'interview' and 'offer' in the type forever — selectable in any tool that
--- reads the enum, and silently valid in a direct PostgREST write. Rebuilding
--- the type is more work here and leaves no way to write a stage that no longer
--- exists.
+-- =============================================================================
+-- WHY THIS DOES *NOT* SWAP THE COLUMN'S TYPE
+--
+-- The first three versions of this migration built a new enum and ran
+-- `ALTER TABLE ... ALTER COLUMN stage TYPE ...`. Postgres refused three times,
+-- reporting one blocker per attempt:
+--
+--   1. cannot alter type of a column used by a view or rule
+--   2. cannot alter type of a column used in a trigger definition
+--   3. operator does not exist: application_stage_next <> application_stage
+--
+-- The third ended the approach. Changing a column's type means every dependent
+-- object has to be torn down and rebuilt in the right order, and each attempt
+-- only reveals the next thing in the queue. That is a losing game against a
+-- schema this size.
+--
+-- ALTER TYPE ... RENAME VALUE changes a LABEL, not a type. No rewrite, no
+-- dependency teardown, no views or triggers to drop, and every existing row
+-- reads as the new name immediately because the underlying value never moved.
+-- Four of the six mappings are pure renames, so they happen for free:
+--
+--   new           -> applied
+--   screening     -> ai_screening_call
+--   client_review -> director_round
+--   interview     -> phone_interview
+--
+-- The other two COLLAPSE onto a label that already exists, so a rename would
+-- collide. Those are plain UPDATEs:
+--
+--   recruiter_review -> shortlisted      (the internal sift IS shortlisting)
+--   offer            -> director_round   (no Offer stage now; the last round)
+--
+-- Ambiguous cases resolved BACKWARDS on purpose. A generic "Interview" could
+-- have been phone or video, and "Offer" sits past every round in the new list;
+-- mapping either forwards would claim progress that did not happen. Moving
+-- someone forward again is one click, whereas an overstated pipeline is a lost
+-- afternoon.
+--
+-- THE COST: 'recruiter_review' and 'offer' stay in the enum as dead labels,
+-- because Postgres cannot remove an enum value. A CHECK constraint below
+-- forbids writing them, which gives the same guarantee the type swap was
+-- reaching for — no way to store a stage that no longer exists.
 -- =============================================================================
 
--- =============================================================================
--- EVERYTHING THAT DEPENDS ON THE COLUMN HAS TO GO FIRST.
+-- -----------------------------------------------------------------------------
+-- 1. The views come down first.
 --
--- Postgres refuses `ALTER TABLE ... ALTER COLUMN ... TYPE` while anything still
--- references that column, and it reports one blocker at a time — so this
--- migration failed twice, once per category:
---
---   ERROR: cannot alter type of a column used by a view or rule
---   ERROR: cannot alter type of a column used in a trigger definition
---
--- VIEWS. Four of Module 16's views read applications.stage or
--- application_stage_history.stage. All four are dropped here and recreated at
--- the bottom. (analytics_client_performance and analytics_screening_metrics
--- read neither, so they are left alone.)
---
--- TRIGGERS. A trigger declared `update OF <column>` depends on that column —
--- the column list is part of the definition, not just a filter. Only
--- trg_applications_stage_history qualifies: the other triggers on these tables
--- either name different columns (tenant integrity: candidate_id, job_id,
--- organization_id) or name none at all (touch_updated_at), and a trigger with
--- no column list has no column dependency.
--- =============================================================================
+-- Not because they block anything now — renaming a label needs no teardown —
+-- but because four of them contain the literal 'screening', 'client_review',
+-- 'interview' or 'offer'. The instant those labels are renamed, those views
+-- reference values that no longer exist and every read raises 22P02. They are
+-- recreated at the bottom against the new vocabulary.
+-- -----------------------------------------------------------------------------
 drop view if exists public.analytics_application_funnel;
 drop view if exists public.analytics_stage_durations;
 drop view if exists public.analytics_recruiter_performance;
 drop view if exists public.analytics_job_performance;
 
--- Recreated below, after the swap, with its function unchanged. The stage
--- history it maintains is untouched by this — only the column's TYPE changes,
--- and the rows keep their (remapped) values.
-drop trigger if exists trg_applications_stage_history on public.applications;
-
+-- -----------------------------------------------------------------------------
+-- 2. Rename the four labels that map one-to-one.
+--
+-- Guarded individually so a re-run is a no-op rather than an error.
+-- -----------------------------------------------------------------------------
 do $$
 declare
-  v_mapping text;
+  v_rename record;
 begin
-  -- Defensive: a previous failed attempt inside a DO block rolls back, but a
-  -- half-run script executed statement-by-statement could leave this behind,
-  -- and `create type` would then fail on a name clash.
-  drop type if exists public.application_stage_next;
+  for v_rename in
+    select * from (values
+      ('new',           'applied'),
+      ('screening',     'ai_screening_call'),
+      ('client_review', 'director_round'),
+      ('interview',     'phone_interview')
+    ) as t(old_label, new_label)
+  loop
+    if exists (
+      select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+      where t.typname = 'application_stage' and e.enumlabel = v_rename.old_label
+    ) and not exists (
+      select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+      where t.typname = 'application_stage' and e.enumlabel = v_rename.new_label
+    ) then
+      execute format(
+        'alter type public.application_stage rename value %L to %L',
+        v_rename.old_label, v_rename.new_label
+      );
+      raise notice 'renamed stage % -> %', v_rename.old_label, v_rename.new_label;
+    end if;
+  end loop;
+end $$;
 
-  -- Idempotent: only runs while the OLD shape is still in place.
-  if not exists (
-    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
-    where t.typname = 'application_stage' and e.enumlabel = 'new'
-  ) then
-    raise notice 'application_stage already migrated; skipping.';
-    return;
-  end if;
+-- -----------------------------------------------------------------------------
+-- 3. Add the two stages that genuinely did not exist before.
+--
+-- `if not exists` makes a re-run safe. Positioned after phone_interview so the
+-- enum's own sort order matches the board; nothing depends on that — the board,
+-- the list and the funnel all order by PIPELINE_STAGES in TypeScript — but an
+-- enum whose order contradicts the product is a trap for whoever writes the
+-- next `order by stage`.
+--
+-- NOTE: these two are ADDED here and deliberately used nowhere else in this
+-- file. Postgres forbids using a newly added enum value in the same
+-- transaction that added it, and every UPDATE below assigns a label that
+-- already existed.
+-- -----------------------------------------------------------------------------
+alter type public.application_stage add value if not exists 'video_interview' after 'phone_interview';
+alter type public.application_stage add value if not exists 'written_assessment' after 'video_interview';
 
-  -- ---------------------------------------------------------------------------
-  -- The mapping, applied to every column that carries a stage.
-  --
-  --   new             -> applied            (same thing, renamed)
-  --   screening       -> ai_screening_call  (screening is now explicitly the call)
-  --   recruiter_review-> shortlisted        (the internal sift IS shortlisting)
-  --   shortlisted     -> shortlisted        (unchanged)
-  --   client_review   -> director_round     (the final human review before hire)
-  --   interview       -> phone_interview    (the EARLIEST interview stage)
-  --   offer           -> director_round     (no Offer stage now; the last round)
-  --   hired/rejected/withdrawn              (unchanged)
-  --
-  -- Ambiguous cases resolve BACKWARDS on purpose. A generic "Interview" could be
-  -- a phone or a video round, and "Offer" sits past every round in the new list;
-  -- mapping either one forwards would claim progress that did not happen, and a
-  -- recruiter moving someone forward again is a click, whereas discovering that
-  -- the pipeline overstated ten candidates is a lost afternoon.
-  -- ---------------------------------------------------------------------------
-  v_mapping := $map$
-    case %1$s::text
-      when 'new'              then 'applied'
-      when 'screening'        then 'ai_screening_call'
-      when 'recruiter_review' then 'shortlisted'
-      when 'client_review'    then 'director_round'
-      when 'interview'        then 'phone_interview'
-      when 'offer'            then 'director_round'
-      else %1$s::text
-    end::public.application_stage_next
-  $map$;
+-- -----------------------------------------------------------------------------
+-- 4. Collapse the two stages that map onto an existing label.
+--
+-- pipeline_sla_config has unique (organization_id, stage), so a row whose
+-- target already exists would violate it. The loser is deleted first — the
+-- survivor is the row that was already using the destination stage.
+-- -----------------------------------------------------------------------------
+delete from public.pipeline_sla_config a
+where a.stage = 'recruiter_review'
+  and exists (
+    select 1 from public.pipeline_sla_config b
+    where b.organization_id = a.organization_id and b.stage = 'shortlisted'
+  );
 
-  execute $ddl$
-    create type public.application_stage_next as enum (
-      'applied',
-      'shortlisted',
-      'ai_screening_call',
-      'phone_interview',
-      'video_interview',
-      'written_assessment',
-      'director_round',
-      'hired',
-      'rejected',
-      'withdrawn'
-    )
-  $ddl$;
+delete from public.pipeline_sla_config a
+where a.stage = 'offer'
+  and exists (
+    select 1 from public.pipeline_sla_config b
+    where b.organization_id = a.organization_id and b.stage = 'director_round'
+  );
 
-  -- Defaults reference the old type, so they have to go before the swap.
-  execute 'alter table public.applications alter column stage drop default';
-  if to_regclass('public.organization_settings') is not null then
-    execute 'alter table public.organization_settings '
-         || 'alter column default_application_stage drop default';
-  end if;
+update public.pipeline_sla_config set stage = 'shortlisted'    where stage = 'recruiter_review';
+update public.pipeline_sla_config set stage = 'director_round' where stage = 'offer';
 
-  execute format(
-    'alter table public.applications alter column stage type public.application_stage_next using '
-    || v_mapping, 'stage');
+update public.applications set stage = 'shortlisted'    where stage = 'recruiter_review';
+update public.applications set stage = 'director_round' where stage = 'offer';
 
-  execute format(
-    'alter table public.application_stage_history alter column stage '
-    || 'type public.application_stage_next using ' || v_mapping, 'stage');
+update public.application_stage_history set stage = 'shortlisted'    where stage = 'recruiter_review';
+update public.application_stage_history set stage = 'director_round' where stage = 'offer';
 
-  if to_regclass('public.pipeline_sla_config') is not null then
-    -- Two old stages can collapse onto one new one (client_review and offer
-    -- both become director_round), and this table has a unique
-    -- (organization_id, stage). Drop the loser before converting, or the type
-    -- change fails on a duplicate key.
-    execute $dedupe$
-      delete from public.pipeline_sla_config a
-      using public.pipeline_sla_config b
-      where a.organization_id = b.organization_id
-        and a.stage::text = 'offer'
-        and b.stage::text = 'client_review'
-    $dedupe$;
+update public.organization_settings
+set default_application_stage = 'shortlisted'
+where default_application_stage = 'recruiter_review';
 
-    execute format(
-      'alter table public.pipeline_sla_config alter column stage '
-      || 'type public.application_stage_next using ' || v_mapping, 'stage');
-  end if;
+update public.organization_settings
+set default_application_stage = 'director_round'
+where default_application_stage = 'offer';
 
-  if to_regclass('public.organization_settings') is not null then
-    execute format(
-      'alter table public.organization_settings alter column default_application_stage '
-      || 'type public.application_stage_next using ' || v_mapping,
-      'default_application_stage');
-  end if;
+-- -----------------------------------------------------------------------------
+-- 5. Forbid the two dead labels.
+--
+-- Postgres cannot remove an enum value, so 'recruiter_review' and 'offer'
+-- remain selectable in any tool that reads the type. This is what stops them
+-- being WRITTEN — including by a direct PostgREST call from the browser, which
+-- is the path a route handler cannot police.
+--
+-- Written as a NEGATIVE list on purpose: an `in (...)` listing every valid
+-- stage would name 'video_interview' and 'written_assessment', and Postgres
+-- forbids using an enum value in the same transaction that added it.
+-- -----------------------------------------------------------------------------
+alter table public.applications drop constraint if exists applications_stage_not_retired;
+alter table public.applications
+  add constraint applications_stage_not_retired
+  check (stage not in ('recruiter_review', 'offer'));
 
-  execute 'drop type public.application_stage';
-  execute 'alter type public.application_stage_next rename to application_stage';
+alter table public.application_stage_history
+  drop constraint if exists stage_history_stage_not_retired;
+alter table public.application_stage_history
+  add constraint stage_history_stage_not_retired
+  check (stage not in ('recruiter_review', 'offer'));
 
-  execute 'alter table public.applications alter column stage set default ''applied''';
+-- -----------------------------------------------------------------------------
+-- 6. Defaults.
+--
+-- 'new' was renamed to 'applied', and a stored default holds the value's
+-- identity rather than its spelling — so the default already reads 'applied'.
+-- These statements are belt and braces for a database where it did not.
+-- -----------------------------------------------------------------------------
+alter table public.applications alter column stage set default 'applied';
+
+do $$
+begin
   if to_regclass('public.organization_settings') is not null then
     execute 'alter table public.organization_settings '
          || 'alter column default_application_stage set default ''applied''';
   end if;
-
-  raise notice 'application_stage migrated to the eight-stage pipeline.';
 end $$;
 
 -- =============================================================================
@@ -5115,57 +5142,23 @@ create index if not exists idx_applications_rejected_at_stage
   where rejected_at_stage is not null;
 
 -- =============================================================================
--- Stage history + rejection provenance, maintained by the database.
+-- Rejection provenance, maintained by the database.
 --
--- Extends the Module 5 trigger rather than replacing it: the history behaviour
--- is unchanged (close the open row, open a new one), and the only addition is
--- stamping rejected_at_stage on the way into 'rejected'.
---
--- In the trigger, not the API, for the reason Module 5 gave originally: the
+-- In a trigger, not the API, for the reason Module 5 gave originally: the
 -- browser holds an authenticated PostgREST client and can update `stage`
--- directly. A rule that lives only in a route handler is not enforced.
+-- directly, so a rule that lives only in a route handler is not enforced.
+--
+-- BEFORE, not AFTER: this writes to the row itself, and an AFTER trigger would
+-- need a second UPDATE, re-firing every trigger on the table.
 -- =============================================================================
-create or replace function public.record_application_stage_change()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if tg_op = 'INSERT' then
-    insert into public.application_stage_history
-      (organization_id, application_id, stage, entered_at, changed_by)
-    values
-      (new.organization_id, new.id, new.stage, now(), public.current_app_user_id());
-    return new;
-  end if;
-
-  -- UPDATE: only act on an actual stage change.
-  if new.stage is distinct from old.stage then
-    update public.application_stage_history
-      set exited_at = now()
-      where application_id = new.id and exited_at is null;
-
-    insert into public.application_stage_history
-      (organization_id, application_id, stage, entered_at, changed_by)
-    values
-      (new.organization_id, new.id, new.stage, now(), public.current_app_user_id());
-  end if;
-
-  return new;
-end;
-$$;
-
--- BEFORE, not AFTER: this one writes to the row itself, and an AFTER trigger
--- would need a second UPDATE (re-firing every trigger on the table).
 create or replace function public.stamp_rejected_at_stage()
 returns trigger
 language plpgsql
 as $$
 begin
   if new.stage = 'rejected' and old.stage is distinct from 'rejected' then
-    -- Only when the caller has not set it explicitly, so a correction can
-    -- still say "actually they were rejected after the phone interview".
+    -- Only when the caller has not set it explicitly, so a correction can still
+    -- say "actually they were rejected after the phone interview".
     if new.rejected_at_stage is null then
       new.rejected_at_stage := old.stage;
     end if;
@@ -5178,14 +5171,6 @@ begin
   return new;
 end;
 $$;
-
--- Recreated now the column has its new type. Identical to migration 0004's
--- definition; it was dropped at the top only because `update of stage` made it
--- a dependency of the column.
-drop trigger if exists trg_applications_stage_history on public.applications;
-create trigger trg_applications_stage_history
-  after insert or update of stage on public.applications
-  for each row execute function public.record_application_stage_change();
 
 drop trigger if exists trg_applications_stamp_rejected_stage on public.applications;
 create trigger trg_applications_stamp_rejected_stage
@@ -5211,21 +5196,14 @@ where a.id = previous.application_id
 -- =============================================================================
 -- Module 16's analytics views, rebuilt on the new stages.
 --
--- The views are `create or replace`, so re-running them here is the whole fix —
--- but the COLUMN SET changes (reached_screening / reached_client_review /
--- reached_interview / reached_offer are gone, four new flags take their place),
--- and Postgres refuses to replace a view whose columns changed. They are
--- dropped first.
---
--- Renamed rather than aliased on purpose: keeping `reached_interview` as an
--- alias for `reached_phone_interview` would have left the funnel quietly
--- counting one interview type as all of them.
---
 -- security_invoker stays ON. Without it a view runs as its owner and bypasses
 -- RLS entirely, which on an analytics view means one tenant reading another's
 -- funnel.
+--
+-- The `reached_*` flags are RENAMED with the pipeline. Keeping the old names as
+-- aliases would have left the funnel quietly counting one interview type as all
+-- of them.
 -- =============================================================================
-
 create view public.analytics_application_funnel
 with (security_invoker = true) as
 select
@@ -5243,17 +5221,24 @@ select
   j.title                    as job_title,
   j.work_mode,
 
-  -- Ever-reached flags, from the immutable history. One per board stage.
   exists (select 1 from public.application_stage_history h
           where h.application_id = a.id and h.stage = 'shortlisted') as reached_shortlisted,
   exists (select 1 from public.application_stage_history h
           where h.application_id = a.id and h.stage = 'ai_screening_call') as reached_ai_screening_call,
   exists (select 1 from public.application_stage_history h
           where h.application_id = a.id and h.stage = 'phone_interview') as reached_phone_interview,
+  -- ::text on these two ONLY.
+  --
+  -- video_interview and written_assessment are added by this same migration,
+  -- and Postgres refuses to USE a newly added enum value in the transaction
+  -- that added it — which creating a view referencing the literal would do.
+  -- Comparing the label as text needs no enum lookup, so it is safe here and
+  -- means the same thing. The other flags keep the enum comparison so
+  -- idx_stage_history_stage stays usable.
   exists (select 1 from public.application_stage_history h
-          where h.application_id = a.id and h.stage = 'video_interview') as reached_video_interview,
+          where h.application_id = a.id and h.stage::text = 'video_interview') as reached_video_interview,
   exists (select 1 from public.application_stage_history h
-          where h.application_id = a.id and h.stage = 'written_assessment') as reached_written_assessment,
+          where h.application_id = a.id and h.stage::text = 'written_assessment') as reached_written_assessment,
   exists (select 1 from public.application_stage_history h
           where h.application_id = a.id and h.stage = 'director_round') as reached_director_round,
   exists (select 1 from public.application_stage_history h
@@ -5285,9 +5270,11 @@ select
   count(a.id)                                            as applications,
   count(a.id) filter (where a.stage = 'hired')           as hires,
   -- "Interview or beyond" now spans three rounds plus the director round.
+  -- ::text for the same reason as the funnel's two flags: this list names both
+  -- values this migration adds.
   count(a.id) filter (
-    where a.stage in ('phone_interview', 'video_interview', 'written_assessment',
-                      'director_round', 'hired')
+    where a.stage::text in ('phone_interview', 'video_interview', 'written_assessment',
+                            'director_round', 'hired')
   ) as reached_interview_or_beyond,
   avg(a.match_score) filter (where a.match_score is not null) as average_match_score,
   (select count(*) from public.job_screening_questions q where q.job_id = j.id)
@@ -5297,12 +5284,11 @@ left join public.applications a on a.job_id = j.id
 group by j.id;
 
 -- -----------------------------------------------------------------------------
--- The two views this migration does not change, recreated verbatim.
+-- The two views this migration does not change, recreated verbatim from 0015.
 --
--- They were dropped at the top only because they reference a stage column and
--- would otherwise have blocked the type swap. Their definitions are unchanged
--- from migration 0015 — 'hired', 'rejected' and 'withdrawn' all survive the
--- rename, so nothing in them needed rewriting.
+-- They were dropped at the top only because they sit alongside the others;
+-- 'hired', 'rejected' and 'withdrawn' all survive the rename, so nothing in
+-- them needed rewriting.
 -- -----------------------------------------------------------------------------
 create view public.analytics_stage_durations
 with (security_invoker = true) as
