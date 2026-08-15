@@ -112,11 +112,14 @@ export async function connect({
   apiKey,
   agentId,
   settings,
+  connectedBy,
 }: {
   organizationId: string;
   apiKey: string;
   agentId: string;
   settings?: Record<string, unknown>;
+  /** MODULE 17: recorded for the audit trail. Optional, so no caller broke. */
+  connectedBy?: string | null;
 }): Promise<AdapterResult<{ credentialHint: string }>> {
   const admin = createAdminClient();
   if (!admin) {
@@ -146,7 +149,9 @@ export async function connect({
       encrypted_credentials: encrypted.value,
       credential_hint: credentialHint,
       settings: settings ?? {},
+      error_code: null,
       error_message: null,
+      connected_by: connectedBy ?? null,
     },
     { onConflict: "organization_id,provider" }
   );
@@ -194,7 +199,14 @@ export async function test(organizationId: string): Promise<AdapterResult<{ stat
 
       await admin
         .from("organization_integrations")
-        .update({ status, last_tested_at: now, error_message: message })
+        .update({
+          status,
+          last_tested_at: now,
+          // MODULE 17: machine-readable, so the settings card offers
+          // "reconnect" rather than "try again" for a rejected key.
+          error_code: response.status === 401 ? "invalid_credentials" : "provider_error",
+          error_message: message,
+        })
         .eq("id", integration.id);
 
       // Plain message; the raw provider body is never shown to a user.
@@ -207,6 +219,7 @@ export async function test(organizationId: string): Promise<AdapterResult<{ stat
         status: "connected" as IntegrationStatus,
         last_tested_at: now,
         last_success_at: now,
+        error_code: null,
         error_message: null,
       })
       .eq("id", integration.id);
@@ -219,6 +232,7 @@ export async function test(organizationId: string): Promise<AdapterResult<{ stat
       .update({
         status: "error" as IntegrationStatus,
         last_tested_at: now,
+        error_code: "provider_unreachable",
         error_message: "Could not reach Bolna.",
       })
       .eq("id", integration.id);
@@ -238,7 +252,9 @@ export async function disconnect(organizationId: string): Promise<AdapterResult<
       status: "disconnected" as IntegrationStatus,
       encrypted_credentials: null,
       credential_hint: null,
+      error_code: null,
       error_message: null,
+      connected_by: null,
     })
     .eq("organization_id", organizationId)
     .eq("provider", BOLNA_PROVIDER);

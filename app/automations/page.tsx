@@ -48,19 +48,6 @@ async function AutomationsList() {
         </div>
       )}
 
-      {/*
-        The spec's forward stub, stated rather than hidden: integrations without
-        a real getStatus() are assumed connected, and an admin has to know that
-        before trusting a rule that depends on one.
-      */}
-      <div className="card mb-4">
-        <p className="has-text-secondary" style={{ fontSize: 13 }}>
-          Only the Bolna connection is health-checked today. Other integrations are assumed
-          connected, so a rule depending on one may fail at run time rather than being blocked in
-          advance. Real checks arrive with Settings &amp; Integrations (Module 17).
-        </p>
-      </div>
-
       <div className="card">
         {automations.length === 0 ? (
           <EmptyState

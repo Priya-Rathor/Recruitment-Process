@@ -31,6 +31,10 @@ import {
 } from "@/lib/automations/catalog";
 import { buildDedupeKey, evaluateConditions, type EvaluationContext } from "@/lib/automations/evaluate";
 import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
+import { getStatus as getEmailStatus } from "@/lib/integrations/email";
+import { getStatus as getCalendarStatus } from "@/lib/integrations/calendar";
+import { getStatus as getLlmStatus } from "@/lib/integrations/llm";
+import { getStatus as getN8nStatus } from "@/lib/integrations/n8n";
 import { startScreeningCall } from "@/lib/screening/queries";
 import { calculateAndStoreMatch } from "@/lib/matching/queries";
 import { generateReportForApplication } from "@/lib/screening/reportQueries";
@@ -178,14 +182,42 @@ export async function buildContext({
 /**
  * Integration health for a rule's requirements.
  *
- * The spec's forward-stub: "For integration health, call getStatus() where it
- * exists (Bolna); otherwise default to 'unknown — assume connected' and label it
- * as temporary in the UI."
+ * MODULE 17 RETROFIT. This used to carry the spec's forward stub — "for
+ * integrations without a real getStatus() yet, default to 'unknown — assume
+ * connected'" — because only Bolna had a real check.
  *
- * An unknown integration therefore does NOT block. That is the spec's
- * instruction, and it is safe for the integrations it currently covers because
- * none of them contact a person — the one that does, Bolna, has a real check.
+ * All five adapters now expose getStatus(), so the fallback is GONE and an
+ * unrecognised provider BLOCKS. That is the safe direction and the right one:
+ * assume-connected means a rule activates, appears healthy, and fails at run
+ * time against a candidate; blocking means an admin is told at activation, when
+ * they are looking at the screen and can fix it.
+ *
+ * Each provider gets a genuine health read, and the reason names the provider
+ * so the message is actionable rather than "an integration is missing".
  */
+const HEALTH_CHECKS: Record<
+  string,
+  { read: (organizationId: string) => Promise<{ status: string }>; label: string; why: string }
+> = {
+  bolna: {
+    read: getBolnaStatus,
+    label: "Bolna",
+    why: "this rule can't place screening calls",
+  },
+  email: {
+    read: getEmailStatus,
+    label: "Email",
+    why: "this rule can't send external messages",
+  },
+  calendar: {
+    read: getCalendarStatus,
+    label: "Google Calendar",
+    why: "this rule can't create calendar invites",
+  },
+  llm: { read: getLlmStatus, label: "the AI provider", why: "this rule can't run AI actions" },
+  n8n: { read: getN8nStatus, label: "n8n", why: "this rule can't reach the workflow engine" },
+};
+
 export async function checkIntegrations({
   organizationId,
   required,
@@ -194,20 +226,27 @@ export async function checkIntegrations({
   required: string[];
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
   for (const provider of required) {
-    if (provider === "bolna") {
-      const status = await getBolnaStatus(organizationId);
-      if (status.status !== "connected") {
-        return {
-          ok: false,
-          reason:
-            "Bolna isn't connected, so this rule can't place screening calls. Connect it in Settings.",
-        };
-      }
-      continue;
+    const check = HEALTH_CHECKS[provider];
+
+    if (!check) {
+      // No assume-connected fallback. An action declaring a requirement nobody
+      // can verify is a bug in the catalogue, and blocking surfaces it now
+      // rather than at run time against a real candidate.
+      return {
+        ok: false,
+        reason: `This rule needs an integration this version can't check ("${provider}"), so it can't be activated.`,
+      };
     }
-    // TODO(Module 17): once every adapter exposes getStatus(), remove this
-    // assume-connected fallback and treat unknown as blocked.
+
+    const status = await check.read(organizationId);
+    if (status.status !== "connected") {
+      return {
+        ok: false,
+        reason: `${check.label} isn't connected, so ${check.why}. Connect it in Settings.`,
+      };
+    }
   }
+
   return { ok: true };
 }
 

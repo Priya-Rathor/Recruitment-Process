@@ -23,7 +23,10 @@ const NAV_ITEMS = [
  * Owner/Admin only, so it is not in NAV_ITEMS — the spec requires a restricted
  * action to be hidden rather than shown-and-refused.
  */
-const ADMIN_NAV_ITEMS = [{ href: "/audit-log", label: "Audit log" }];
+const ADMIN_NAV_ITEMS = [
+  { href: "/audit-log", label: "Audit log" },
+  { href: "/settings", label: "Settings" },
+];
 
 export async function AppShell({ children }: { children: ReactNode }) {
   const [user, membership, memberships] = await Promise.all([
