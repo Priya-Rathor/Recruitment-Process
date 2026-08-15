@@ -18,8 +18,8 @@ export function AttentionQueue({
   status: "ok" | "pending" | "error";
 }) {
   return (
-    <div className="card">
-      <h2 className="title is-5">Needs attention</h2>
+    <div className="card dash-card">
+      <h2 className="dash-card__title">Needs attention</h2>
 
       {/* An empty queue and a failed query must never look the same: telling a
           recruiter "nothing needs attention" when the query broke is a false
@@ -29,9 +29,12 @@ export function AttentionQueue({
       ) : status === "pending" ? (
         <EmptyState message="The attention queue starts working once Applications (Module 5) exists — that's where stalled work is detected." />
       ) : items.length === 0 ? (
-        <EmptyState headline="Nothing needs you"
-            message="Applications waiting too long in a stage will appear here."
-            icon={CheckCircle2} />
+        <EmptyState
+          headline="Nothing needs you"
+          message="You're all caught up — check back after your team adds candidates or jobs."
+          icon={CheckCircle2}
+          compact
+        />
       ) : (
         <ul>
           {items.map((item) => (

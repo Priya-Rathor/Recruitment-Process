@@ -1,49 +1,58 @@
-// Quick links into the modules the spec names: Jobs, Candidates, Pipeline,
-// Interviews. Those routes belong to Modules 3, 4, 10 and 11 — until each ships,
-// its link is shown disabled with the module noted, rather than as a live link
-// that would 404.
+// =============================================================================
+// Quick links.
+//
+// Was a stack of plain text links with nothing but line-spacing between them —
+// no icons, no hover, no signal that they navigate. It read as an afterthought.
+//
+// Now: 40px rows, leading icons taken from the NAV BAR so an icon means the same
+// thing in both places, a hairline divider between rows, a hover tint, and a
+// trailing chevron so it is obvious each row goes somewhere.
+//
+// Renamed "Go to" -> "Jump to". "Go to" on its own is a sentence fragment
+// waiting for an object; as a card heading it reads unfinished.
+// =============================================================================
 import Link from "next/link";
+import {
+  Briefcase,
+  Calendar,
+  ChevronRight,
+  Kanban,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
 type QuickLink = {
   label: string;
   href: string;
-  /** Set while the owning module doesn't exist; flip to false on retrofit. */
-  pendingModule: number | null;
+  icon: LucideIcon;
 };
 
+/** Same icons as the nav bar, deliberately — one icon, one meaning. */
 const LINKS: QuickLink[] = [
-  { label: "Jobs", href: "/jobs", pendingModule: null },
-  { label: "Candidates", href: "/candidates", pendingModule: null },
-  { label: "Pipeline", href: "/pipeline", pendingModule: null },
-  { label: "Interviews", href: "/interviews", pendingModule: null },
-  { label: "Team", href: "/team/invite", pendingModule: null },
+  { label: "Jobs", href: "/jobs", icon: Briefcase },
+  { label: "Candidates", href: "/candidates", icon: Users },
+  { label: "Pipeline", href: "/pipeline", icon: Kanban },
+  { label: "Interviews", href: "/interviews", icon: Calendar },
 ];
 
 export function QuickLinks() {
   return (
-    <div className="card">
-      <h2 className="title is-5">Go to</h2>
-      <ul>
-        {LINKS.map((link) => (
-          <li key={link.href} className="py-2">
-            {link.pendingModule === null ? (
-              <Link href={link.href} style={{ fontSize: 14, fontWeight: 600 }}>
-                {link.label}
-              </Link>
-            ) : (
-              <span
-                className="is-flex is-justify-content-space-between is-align-items-center"
-                style={{ fontSize: 14 }}
-              >
-                <span className="has-text-secondary">{link.label}</span>
-                <span className="tag is-light" style={{ fontSize: 11 }}>
-                  Module {link.pendingModule}
-                </span>
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
+    <div className="card dash-card">
+      <h2 className="dash-card__title">Jump to</h2>
+
+      <nav className="quick-links" aria-label="Quick links">
+        {LINKS.map((link) => {
+          const Icon = link.icon;
+
+          return (
+            <Link key={link.href} href={link.href} className="quick-links__row">
+              <Icon size={16} aria-hidden="true" className="quick-links__icon" />
+              <span className="quick-links__label">{link.label}</span>
+              <ChevronRight size={16} aria-hidden="true" className="quick-links__chevron" />
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

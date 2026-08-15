@@ -75,6 +75,7 @@ export function EmptyState({
   message,
   action,
   icon: Icon = Inbox,
+  compact = false,
 }: {
   /** A short fragment: "No jobs yet". Not a sentence. */
   headline?: string;
@@ -82,24 +83,33 @@ export function EmptyState({
   message: string;
   action?: ReactNode;
   icon?: ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>;
+  /**
+   * Sizes the block to its content rather than to a full page-height void.
+   *
+   * For an empty state sharing a row with another card, the generous version
+   * stretched its card far taller than its neighbour and left an icon floating
+   * in white space. Compact keeps the same anatomy at 48px vertical padding.
+   */
+  compact?: boolean;
 }) {
   return (
     <div
       className="fade-in"
       style={{
         textAlign: "center",
-        padding: "var(--space-12) var(--space-6)",
+        padding: compact ? "48px var(--space-6)" : "var(--space-12) var(--space-6)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        justifyContent: "center",
         gap: "var(--space-2)",
       }}
     >
       <div
         aria-hidden="true"
         style={{
-          width: 44,
-          height: 44,
+          width: compact ? 40 : 44,
+          height: compact ? 40 : 44,
           borderRadius: "50%",
           background: "var(--color-background)",
           border: "1px solid var(--color-border)",
@@ -109,7 +119,7 @@ export function EmptyState({
           marginBottom: "var(--space-2)",
         }}
       >
-        <Icon size={20} strokeWidth={1.75} aria-hidden />
+        <Icon size={compact ? 18 : 20} strokeWidth={1.75} aria-hidden />
       </div>
 
       {headline && (

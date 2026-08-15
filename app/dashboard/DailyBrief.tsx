@@ -8,6 +8,7 @@
 // chapter warns against AI calls a user can trigger repeatedly, so it is not
 // fetched automatically on page load.
 import { useState } from "react";
+import { Sparkles } from "lucide-react";
 import type { DailyBrief as DailyBriefData } from "@/lib/ai/generateDailyBrief";
 
 export function DailyBrief({ hasAnyData }: { hasAnyData: boolean }) {
@@ -38,14 +39,26 @@ export function DailyBrief({ hasAnyData }: { hasAnyData: boolean }) {
   }
 
   return (
-    <div className="ai-panel mb-5">
+    /*
+      `is-waiting` drops the blue tint when there is nothing to summarise, so an
+      idle brief reads as waiting rather than looking identical to one holding
+      real content.
+    */
+    <div className={`ai-panel dash-section ${!brief && !error ? "is-waiting" : ""}`}>
       <div className="is-flex is-justify-content-space-between is-align-items-center">
-        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--color-info)" }}>
+        <p className="ai-panel__title">
+          <Sparkles size={16} aria-hidden="true" />
           AI daily brief
         </p>
+        {/*
+          Outline, not filled. This is a SECONDARY action next to "Invite your
+          team" in the page header, so it should read lighter than that button,
+          not heavier. It was previously a solid dark button — the visually
+          loudest thing on the page, for an optional action.
+        */}
         <button
           type="button"
-          className={`button is-small ${busy ? "is-loading" : ""}`}
+          className={`button is-small is-outlined-primary ${busy ? "is-loading" : ""}`}
           onClick={generate}
           disabled={busy}
         >

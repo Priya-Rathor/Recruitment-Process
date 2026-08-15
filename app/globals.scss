@@ -371,178 +371,433 @@ th {
   background-color: var(--color-background);
 }
 
-.app-nav {
+// =============================================================================
+// TOP NAVIGATION
+//
+// One bar, three zones. Every value here is from the redesign spec; where a
+// number looks arbitrary it is because it was specified, not guessed.
+//
+// NO BLACK ANYWHERE in this component — the previous bar's solid black "Sign
+// out" button was the only black element in the product and read as a different
+// design system bolted on.
+// =============================================================================
+.topnav {
   background-color: var(--color-card);
+  // ONE border for the whole bar, not one per row.
   border-bottom: 1px solid var(--color-border);
+  // Border only. No drop shadow, matching the product's flat card style.
+  box-shadow: none;
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 40;
 }
 
-// Tier 1 — identity and account controls.
-.app-nav__bar {
+.topnav__inner {
+  height: 60px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-6);
-  min-height: 56px;
+  gap: var(--space-8);
+  // 32px desktop, 16px mobile — content never touches the viewport edge.
+  padding: 0 32px;
 }
 
-.app-nav__brand {
+@media (max-width: 767px) {
+  .topnav__inner {
+    padding: 0 16px;
+    gap: var(--space-3);
+  }
+}
+
+// ---- Left zone --------------------------------------------------------------
+.topnav__brand {
   font-family: var(--font-heading);
+  font-size: 17px;
   font-weight: var(--weight-bold);
-  font-size: var(--text-body-lg);
   letter-spacing: -0.02em;
-  color: var(--color-text);
+  color: var(--color-primary);
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-.app-nav__account {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-// The organization name TRUNCATES rather than reflowing the bar. Before this
-// it wrapped onto three lines and pushed everything else out of the viewport.
-.app-nav__org {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  padding-right: var(--space-2);
-  border-right: 1px solid var(--color-border);
-}
-
-.app-nav__org-name {
-  font-size: var(--text-label);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-}
-
-.app-nav__role {
-  font-size: var(--text-caption);
-  font-weight: var(--weight-semibold);
-  text-transform: capitalize;
-  color: var(--color-text-secondary);
-  background-color: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 1px var(--space-2);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.app-nav__icon-link {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  position: relative;
-  color: var(--color-text-secondary);
-  font-size: var(--text-label);
-  padding: var(--space-2);
-  border-radius: var(--control-radius);
-  white-space: nowrap;
-  transition:
-    color var(--transition-fast) var(--ease),
-    background-color var(--transition-fast) var(--ease);
 
   &:hover {
-    color: var(--color-text);
-    background-color: var(--color-background);
+    color: var(--color-primary-hover);
   }
 }
 
-// Icon-only below 1280px: the labels are the first thing that can go, because
-// the icons carry the same meaning and the title attribute keeps it accessible.
-@media (max-width: 1280px) {
-  .app-nav__icon-label {
-    display: none;
-  }
-}
-
-.app-nav__badge {
-  background: var(--color-primary);
-  color: #fff;
-  border-radius: 999px;
-  padding: 1px 6px;
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  line-height: 1.5;
-}
-
-// The email is the least load-bearing item in the bar, so it is the first to
-// be dropped rather than being clipped mid-word as it was before.
-.app-nav__email {
-  font-size: var(--text-label);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 220px;
-}
-
-@media (max-width: 1024px) {
-  .app-nav__email {
-    display: none;
-  }
-}
-
-// Tier 2 — module links. Scrolls horizontally instead of wrapping.
-.app-nav__modules {
+// ---- Centre-left zone -------------------------------------------------------
+.topnav__links {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: 0 var(--space-6) var(--space-2);
+  // The gap between GROUPS. Items inside a group carry their own 24px.
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 
-  &::-webkit-scrollbar {
-    display: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.topnav__group {
+  display: flex;
+  align-items: center;
+  // 24px between items, constant — icon presence and label width do not
+  // change it, which is what made the old spacing look uneven.
+  gap: 24px;
+}
+
+// The 24px gap is the design value and holds from 1536px up. Below that,
+// nine icon+label items plus a 223px account cluster measurably do not fit
+// (1020px needed in 962px at 1440px), so the gap tightens to 16px.
+//
+// It stays PERFECTLY EVEN at every width — which was the actual complaint. A
+// uniform 16px reads as deliberate; the original bar's problem was gaps that
+// varied item to item, not gaps that were small.
+@media (max-width: 1535px) {
+  .topnav__group {
+    gap: 16px;
+  }
+
+  .topnav__divider {
+    margin: 0 6px;
   }
 }
 
-.app-nav__link {
+.topnav__divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--color-border);
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+.topnav__link {
+  display: inline-flex;
+  align-items: center;
+  // 6px between icon and label.
+  gap: 6px;
+  position: relative;
+  height: 60px;
   color: var(--color-text-secondary);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--control-radius);
   font-size: var(--text-body);
   font-weight: var(--weight-medium);
   white-space: nowrap;
   flex-shrink: 0;
+  // No background fill on hover — flat and minimal, not button-like.
+  transition: color var(--transition-fast) var(--ease);
+
+  &:hover {
+    color: var(--color-text);
+  }
+
+  // Active: primary text and icon, plus a 2px underline. No background pill —
+  // the underline alone is the signal.
+  &.is-active {
+    color: var(--color-primary);
+    font-weight: var(--weight-semibold);
+
+    &::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2px;
+      background-color: var(--color-primary);
+      border-radius: 2px 2px 0 0;
+    }
+  }
+}
+
+// ---- Right zone -------------------------------------------------------------
+.topnav__account {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.topnav__account-compact { display: none; }
+
+.account-menu {
+  position: relative;
+}
+
+.account-menu__trigger {
+  display: flex;
+  align-items: center;
+  // 10px between the avatar and the org/role block.
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  border-radius: var(--control-radius);
+  cursor: pointer;
+  // Signals the whole cluster is one clickable unit.
+  transition: background-color var(--transition-fast) var(--ease);
+
+  &:hover {
+    background-color: #f1f5f9;
+  }
+}
+
+.account-menu__avatar {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  // Primary at ~13% opacity, with primary-coloured initials.
+  background-color: rgba(79, 70, 229, 0.13);
+  color: var(--color-primary);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.account-menu__dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: var(--color-error);
+  border: 2px solid var(--color-card);
+}
+
+.account-menu__identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.3;
+  min-width: 0;
+  // 6px between the text block and the chevron.
+  margin-right: 6px;
+}
+
+.account-menu__org {
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu__role {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+}
+
+.account-menu__chevron {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+// ---- Dropdown ---------------------------------------------------------------
+.account-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 244px;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px;
+  z-index: 50;
+  // Subtle elevation on the MENU only — the bar itself stays flat.
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  animation: menu-in var(--transition-fast) var(--ease);
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.account-menu__header {
+  padding: 6px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-menu__header-name {
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+// The email's only home in the whole shell.
+.account-menu__header-email {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu__divider {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: 6px 0;
+}
+
+.account-menu__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--ease);
+
+  &:hover {
+    background-color: var(--color-background);
+  }
+
+  svg { color: var(--color-text-secondary); flex-shrink: 0; }
+}
+
+.account-menu__row--danger {
+  color: var(--color-error);
+
+  svg { color: var(--color-error); }
+
+  &:hover {
+    // Error background at 40% opacity.
+    background-color: rgba(254, 226, 226, 0.4);
+  }
+
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.account-menu__badge {
+  margin-left: auto;
+  background-color: var(--color-error);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  line-height: 1.6;
+}
+
+// ---- Mobile -----------------------------------------------------------------
+.topnav__hamburger,
+.topnav__drawer-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: var(--control-radius);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--ease);
+
+  &:hover { background-color: var(--color-background); color: var(--color-text); }
+}
+
+@media (max-width: 767px) {
+  // Eleven items are never squeezed horizontally on a phone — they move into
+  // the drawer wholesale.
+  .topnav__links { display: none; }
+  .topnav__hamburger { display: inline-flex; margin-left: auto; }
+  .topnav__account > .account-menu { display: none; }
+  .topnav__account-compact { display: inline-flex; }
+  .topnav__drawer-close { display: inline-flex; }
+}
+
+.topnav__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 45;
+  animation: fade-in var(--transition-fast) var(--ease);
+}
+
+.topnav__drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(320px, 88vw);
+  background-color: var(--color-card);
+  border-left: 1px solid var(--color-border);
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px;
+  animation: drawer-in var(--transition-base) var(--ease);
+}
+
+@keyframes drawer-in {
+  from { transform: translateX(12px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+.topnav__drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.topnav__drawer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topnav__drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--control-radius);
+  color: var(--color-text-secondary);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
   transition:
     color var(--transition-fast) var(--ease),
     background-color var(--transition-fast) var(--ease);
 
-  &:hover {
-    color: var(--color-text);
-    background-color: var(--color-background);
-  }
+  &:hover { color: var(--color-text); background-color: var(--color-background); }
 
+  // Same active treatment as desktop, adapted: a left rule rather than an
+  // underline, because these stack vertically.
   &.is-active {
     color: var(--color-primary);
-    background-color: rgba(79, 70, 229, 0.08);
     font-weight: var(--weight-semibold);
+    box-shadow: inset 2px 0 0 var(--color-primary);
   }
 }
 
-
-// Auth pages sit on the page background with a single centred card.
-.auth-layout {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background-color: var(--color-background);
+.topnav__drawer-divider {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: 16px 0;
 }
+
+.topnav__drawer-account {
+  margin-top: auto;
+}
+
 
 .auth-card {
   width: 100%;
@@ -835,5 +1090,260 @@ a {
   &:hover:not(:disabled) {
     background-color: var(--color-background);
     color: var(--color-text);
+  }
+}
+
+// =============================================================================
+// DASHBOARD
+//
+// One vertical rhythm value for every gap between major sections, replacing the
+// mb-4/mb-5 mix that made the spacing read as uneven.
+// =============================================================================
+.dash-section {
+  margin-bottom: 24px;
+}
+
+.dash-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+// The eyebrow: what anchors this page as "the Dashboard" separately from whose
+// dashboard it is. The org name alone read like an org-settings heading.
+.dash-header__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-1);
+}
+
+.dash-header__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-page);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dash-header__meta {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin: var(--space-1) 0 0;
+}
+
+// -----------------------------------------------------------------------------
+// KPI GRID — 3 x 2.
+//
+// Six tiles in four columns left two dangling with a hole beside them. Three
+// columns fills both rows exactly, and auto-fit keeps it sensible on the way
+// down to one column on a phone.
+// -----------------------------------------------------------------------------
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  // 16px, equal horizontally and vertically.
+  gap: 16px;
+}
+
+@media (max-width: 1023px) {
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 599px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+}
+
+.kpi-tile {
+  // 24px on every tile regardless of content length.
+  padding: var(--card-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.kpi-tile__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.kpi-tile__label {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}
+
+.kpi-tile__value {
+  font-family: var(--font-heading);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  color: var(--color-text);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-tile__note {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.kpi-grid__caption {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: var(--space-3) 0 0;
+}
+
+// -----------------------------------------------------------------------------
+// BOTTOM ROW — the two cards match height.
+//
+// `align-items: stretch` (grid's default) is what makes them equal; the old
+// Bulma columns let each card size to its own content, so an oversized empty
+// state towered over the links beside it.
+// -----------------------------------------------------------------------------
+.dash-bottom {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+@media (max-width: 899px) {
+  .dash-bottom { grid-template-columns: 1fr; }
+}
+
+// Bulma ships `.card:not(:last-child) { margin-bottom: 1.5rem }`, which is
+// specificity (0,2,0) and beat a plain `.dash-card` rule. Inside a grid that
+// margin is doubly wrong: the gap is the grid's job, and it made every card
+// except the last 24px shorter than its neighbours — which is exactly the
+// "one card taller than the other" mismatch this pass set out to fix.
+//
+// Matched specificity, not !important, so the intent stays readable.
+.kpi-grid .card,
+.dash-bottom .card {
+  margin-bottom: 0;
+}
+
+.dash-card {
+  // Identical internal padding on both cards in the row.
+  padding: var(--card-padding);
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-card__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-section);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin: 0 0 var(--space-4);
+}
+
+// The empty state inside a dash-card centres in whatever height the row gives
+// it, rather than sitting at the top of a tall box.
+.dash-card > div:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+// -----------------------------------------------------------------------------
+// QUICK LINKS
+// -----------------------------------------------------------------------------
+.quick-links {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.quick-links__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 40px;
+  padding: 0 var(--space-2);
+  border-radius: var(--control-radius);
+  color: var(--color-text);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  // A hairline between rows, rather than relying on line-spacing alone.
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color var(--transition-fast) var(--ease);
+
+  &:last-child { border-bottom: none; }
+
+  &:hover {
+    background-color: #f1f5f9;
+    color: var(--color-primary);
+
+    .quick-links__chevron { color: var(--color-primary); transform: translateX(2px); }
+    .quick-links__icon { color: var(--color-primary); }
+  }
+}
+
+.quick-links__icon {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  transition: color var(--transition-fast) var(--ease);
+}
+
+.quick-links__label { flex: 1; min-width: 0; }
+
+// Signals the row navigates.
+.quick-links__chevron {
+  color: var(--color-border);
+  flex-shrink: 0;
+  transition:
+    color var(--transition-fast) var(--ease),
+    transform var(--transition-fast) var(--ease);
+}
+
+// -----------------------------------------------------------------------------
+// AI PANEL
+// -----------------------------------------------------------------------------
+.ai-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-info);
+  margin: 0;
+}
+
+// Waiting: the blue tint drops back so an idle brief does not look identical to
+// one holding real content.
+.ai-panel.is-waiting {
+  background-color: #f8fafc;
+  border-color: var(--color-border);
+
+  .ai-panel__title { color: var(--color-text-secondary); }
+}
+
+// Outline primary — a secondary action that reads lighter than a filled button.
+// Replaces the dark fill that made the least-used control the loudest element
+// on the page.
+.button.is-outlined-primary {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+
+  &:hover:not(:disabled) {
+    background-color: rgba(79, 70, 229, 0.06);
+    border-color: var(--color-primary-hover);
+    color: var(--color-primary-hover);
   }
 }
