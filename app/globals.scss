@@ -27,6 +27,14 @@
 :root {
   --color-primary: #4f46e5;
   --color-primary-hover: #4338ca;
+  // The brand hue at ~10% — the one tint allowed for icon wells and soft
+  // surfaces. Written as a literal rather than an alpha layer so it composites
+  // identically over the page background and over a white card.
+  --color-primary-tint: #eef2ff;
+  // The disabled fill for a primary button. NOT a lighter default state: this
+  // colour is reserved for "this control genuinely cannot run yet", which is
+  // why the ready state stays full-strength #4f46e5.
+  --color-primary-muted: #c7d2fe;
   --color-background: #f8fafc;
   --color-card: #ffffff;
   --color-border: #e2e8f0;
@@ -1346,4 +1354,155 @@ a {
     border-color: var(--color-primary-hover);
     color: var(--color-primary-hover);
   }
+}
+
+// =============================================================================
+// TEXT LINK — a control that navigates or reveals, with no box around it.
+//
+// Shared, not Candidates-only. The pattern the audit kept finding was a
+// secondary action rendered as `button is-small`, which Bulma paints as a
+// bordered grey-white block. Two of those beside a filled primary read as three
+// equal choices. This is the demoted form: label, small leading icon, secondary
+// ink, nothing else.
+// =============================================================================
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast) var(--ease);
+
+  &:hover {
+    color: var(--color-primary);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+}
+
+// =============================================================================
+// NATURAL-LANGUAGE SEARCH (Candidates)
+//
+// Three fixes, all visual:
+//   1. The field carries a sparkle so it reads as "write a sentence", not "type
+//      a keyword" — the input was indistinguishable from a literal filter.
+//   2. Search is full-strength primary whenever it can run. It previously spent
+//      most of its life disabled-at-55%-opacity, which looked like a broken
+//      button rather than a waiting one.
+//   3. The disabled state is a distinct muted FILL, not a faded version of the
+//      ready state, so the two are told apart at a glance.
+// =============================================================================
+.nl-search {
+  // Bulma's `.card:not(:last-child)` sets 1.5rem at specificity (0,2,0); this
+  // matches it so the gap to the list card is the token, not Bulma's guess.
+  margin-bottom: var(--space-6);
+}
+
+.nl-search__row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.nl-search__field {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nl-search__spark {
+  position: absolute;
+  left: var(--control-padding-x);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-primary);
+  pointer-events: none;
+
+  // Bulma sets `position: relative` on `.input`. Two positioned siblings at the
+  // same z-index paint in DOM order, so the field — which comes second — covered
+  // the sparkle completely. It was present, correctly placed, and invisible.
+  z-index: 1;
+}
+
+.nl-search__input {
+  // 12px gutter + 16px icon + 10px breathing room.
+  padding-left: 38px;
+
+  // The spec asks for a visible 2px ring on this field specifically, so it is
+  // legible as an interactive control and not a decorative placeholder. :focus,
+  // not :focus-visible — a click into a search box should show it too.
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.25);
+    outline: none;
+  }
+
+  // Safari draws its own clear button inside type="search".
+  &::-webkit-search-cancel-button {
+    cursor: pointer;
+  }
+}
+
+.nl-search__submit {
+  flex: 0 0 auto;
+  padding-inline: var(--space-6);
+}
+
+// Muted FILL rather than opacity — an opacity fade reads as "this whole area is
+// off", a flatter fill reads as "not yet".
+//
+// Written as three classes on purpose. Bulma emits `.button.is-primary[disabled]`
+// at specificity (0,3,0); `.nl-search__submit:disabled` is (0,2,0) and lost
+// silently, leaving the disabled button full-strength indigo — indistinguishable
+// from the ready one, which is the opposite of the fix.
+.nl-search .button.is-primary:disabled,
+.nl-search .button.is-primary[disabled] {
+  background-color: var(--color-primary-muted);
+  border-color: var(--color-primary-muted);
+  // Indigo ink, not white. White on #c7d2fe is ~1.6:1 — the label would be the
+  // washed-out thing the user complained about, just moved from the fill to the
+  // text. #4338ca on that fill is ~4.9:1: plainly readable, plainly not the
+  // ready state (which is white on solid indigo).
+  color: var(--color-primary-hover);
+  opacity: 1;
+}
+
+.nl-search__error {
+  margin-top: var(--space-3);
+  font-size: var(--text-body);
+  color: var(--color-error);
+}
+
+.nl-search__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  // Sits directly under the field, per spec.
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 768px) {
+  .nl-search__row {
+    flex-direction: column;
+  }
+
+  .nl-search__submit {
+    width: 100%;
+  }
+}
+
+// A card whose entire content is an empty/error state. The state already ships
+// its own vertical padding; the card's adds a second helping, and the two
+// together left a short block of content floating in a tall white box.
+.card.is-state-host {
+  padding-block: 0;
 }

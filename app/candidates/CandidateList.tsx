@@ -5,6 +5,7 @@
 // "Clear" restores it without a round trip.
 import { useState } from "react";
 import Link from "next/link";
+import { SearchX, UserRoundPlus } from "lucide-react";
 import { EmptyState } from "@/components/states";
 import { CANDIDATE_SOURCE_LABELS, type Candidate } from "@/lib/types";
 import { CandidateSearch, SearchInterpretation, type SearchResult } from "./CandidateSearch";
@@ -36,6 +37,10 @@ export function CandidateList({
   const rows = search ? search.candidates : candidates;
   const shownTotal = search ? search.total : total;
 
+  // "Nobody has been added" vs "nothing matched" — same zero rows, different
+  // message and different call to action.
+  const noCandidatesAtAll = !search && !hasFilters;
+
   return (
     <>
       <CandidateSearch onResults={setSearch} />
@@ -48,24 +53,60 @@ export function CandidateList({
         />
       )}
 
-      <div className="card">
+      {/*
+        `is-state-host` drops the card's own 24px top/bottom padding while it
+        holds an empty state, because the state brings its own 48px. Stacked,
+        the two made 72px of dead space above and below three short elements —
+        the "much taller than its content needs" box in the brief.
+      */}
+      <div className={`card${rows.length === 0 ? " is-state-host" : ""}`}>
         {rows.length === 0 ? (
-          <EmptyState
-            message={
-              search
-                ? "No candidates match that search."
-                : hasFilters
-                  ? "No candidates match these filters."
-                  : "No candidates yet. Add one manually, or paste their details and let AI structure them."
-            }
-            action={
-              !search && !hasFilters && canCreate ? (
-                <Link className="button is-primary" href="/candidates/new">
-                  Add a candidate
-                </Link>
-              ) : undefined
-            }
-          />
+          /*
+            Three different empty states, not one.
+
+            "Nothing here yet" and "your search found nothing" are different
+            facts and want different pictures: a person icon in a brand tint is
+            an invitation to add someone; a struck-through magnifier for a
+            fruitless search, in neutral grey, because nothing is wrong.
+
+            The no-results cases are `compact` — there is no action to frame, so
+            the tall version left an icon adrift in white space.
+          */
+          noCandidatesAtAll ? (
+            <EmptyState
+              icon={UserRoundPlus}
+              accent="primary"
+              compact
+              /*
+                The copy is yours, word for word — only the sentence break moved.
+                "No candidates yet." is the headline it already was; the rest is
+                the helper line. Repeating "No candidates yet" in both slots was
+                the alternative, and it read as a stutter.
+              */
+              headline="No candidates yet"
+              message="Add one manually, or paste their details and let AI structure them."
+              action={
+                canCreate ? (
+                  /* Identical copy, casing and style to the header button —
+                     one action, shown twice, not two similar ones. */
+                  <Link className="button is-primary" href="/candidates/new">
+                    Add candidate
+                  </Link>
+                ) : undefined
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={SearchX}
+              compact
+              headline={search ? "No matches" : "No candidates match these filters"}
+              message={
+                search
+                  ? "No candidates match that search. Try describing it differently, or use the filters."
+                  : "Nothing matches this combination. Clear a filter to widen the results."
+              }
+            />
+          )
         ) : (
           <>
             <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>

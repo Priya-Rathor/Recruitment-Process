@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { ChevronUp, Sparkles, SlidersHorizontal, X } from "lucide-react";
 import { CANDIDATE_SOURCES, CANDIDATE_SOURCE_LABELS, type Candidate } from "@/lib/types";
 import type { CandidateFilters } from "@/lib/candidates/filters";
 
@@ -83,58 +84,91 @@ export function CandidateSearch({
 
   const hasManualFilters = Array.from(searchParams.keys()).length > 0;
 
+  // The submit guard is unchanged — under three characters there is nothing to
+  // infer from. What changed is that the button now LOOKS disabled only in that
+  // case, instead of looking permanently half-off.
+  const canSearch = query.trim().length >= 3;
+
   return (
-    <div className="card mb-4">
+    <div className="card nl-search">
       <form onSubmit={runSearch}>
         <label className="label" htmlFor="nl-search">
           Search in plain language
         </label>
-        <div className="field has-addons">
-          <div className="control is-expanded">
+
+        <div className="nl-search__row">
+          {/*
+            The sparkle sits INSIDE the field, before the caret. A badge beside
+            the label would say "this feature is AI"; an icon in the field says
+            "type a sentence here", which is the thing people get wrong — they
+            type "Java" and get literal-keyword expectations.
+          */}
+          <div className="nl-search__field">
+            <Sparkles
+              size={16}
+              strokeWidth={2}
+              aria-hidden="true"
+              className="nl-search__spark"
+            />
             <input
               id="nl-search"
-              className="input"
+              className="input nl-search__input"
               type="search"
               placeholder="e.g. Java candidates in Gurgaon with 4-7 years and less than 45 days notice"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <div className="control">
-            <button
-              type="submit"
-              className={`button is-primary ${busy ? "is-loading" : ""}`}
-              disabled={busy || query.trim().length < 3}
-            >
-              Search
-            </button>
-          </div>
+
+          <button
+            type="submit"
+            className={`button is-primary nl-search__submit ${busy ? "is-loading" : ""}`}
+            disabled={busy || !canSearch}
+            // Says why it is dimmed, rather than leaving the user to guess that
+            // search is broken.
+            title={canSearch ? undefined : "Describe who you're looking for to search"}
+          >
+            Search
+          </button>
         </div>
       </form>
 
       {error && (
-        <p className="mb-3" style={{ fontSize: 14, color: "var(--color-error)" }} role="alert">
+        <p className="nl-search__error" role="alert">
           {error}
         </p>
       )}
 
-      <div className="is-flex is-justify-content-space-between is-align-items-center">
+      {/*
+        Secondary route to the same results, so it reads as one: a text link
+        under the field, not a filled block competing with Search.
+      */}
+      <div className="nl-search__actions">
         <button
           type="button"
-          className="button is-small"
+          className="text-link"
           onClick={() => setShowFilters((current) => !current)}
+          aria-expanded={showFilters}
+          aria-controls="candidate-filters"
         >
+          {showFilters ? (
+            <ChevronUp size={14} aria-hidden="true" />
+          ) : (
+            <SlidersHorizontal size={14} aria-hidden="true" />
+          )}
           {showFilters ? "Hide filters" : "Use filters instead"}
         </button>
+
         {hasManualFilters && (
-          <Link className="button is-small" href="/candidates">
+          <Link className="text-link" href="/candidates">
+            <X size={14} aria-hidden="true" />
             Clear filters
           </Link>
         )}
       </div>
 
       {showFilters && (
-        <div className="columns is-multiline is-variable is-2 mt-3">
+        <div id="candidate-filters" className="columns is-multiline is-variable is-2 mt-3">
           <div className="column is-one-third">
             <label className="label" style={{ fontSize: 13 }} htmlFor="f-skills">
               Skills (comma separated)

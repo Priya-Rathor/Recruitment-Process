@@ -76,6 +76,7 @@ export function EmptyState({
   action,
   icon: Icon = Inbox,
   compact = false,
+  accent = "neutral",
 }: {
   /** A short fragment: "No jobs yet". Not a sentence. */
   headline?: string;
@@ -91,7 +92,18 @@ export function EmptyState({
    * in white space. Compact keeps the same anatomy at 48px vertical padding.
    */
   compact?: boolean;
+  /**
+   * Tints the icon well.
+   *
+   * "neutral" is the grey default every existing page already renders — changing
+   * it here would repaint 17 modules. "primary" is opt-in, for the empty states
+   * whose icon carries real meaning (people, jobs) rather than "nothing here":
+   * a grey ring around a person icon reads as absence, a tinted one reads as an
+   * invitation.
+   */
+  accent?: "neutral" | "primary";
 }) {
+  const isPrimary = accent === "primary";
   return (
     <div
       className="fade-in"
@@ -108,18 +120,21 @@ export function EmptyState({
       <div
         aria-hidden="true"
         style={{
-          width: compact ? 40 : 44,
-          height: compact ? 40 : 44,
+          // The tinted well carries an illustration rather than a marker, so it
+          // gets a little more room. Neutral keeps the size every other page
+          // already renders — this pass is scoped to Candidates.
+          width: isPrimary ? 52 : compact ? 40 : 44,
+          height: isPrimary ? 52 : compact ? 40 : 44,
           borderRadius: "50%",
-          background: "var(--color-background)",
-          border: "1px solid var(--color-border)",
+          background: isPrimary ? "var(--color-primary-tint)" : "var(--color-background)",
+          border: isPrimary ? "none" : "1px solid var(--color-border)",
           display: "grid",
           placeItems: "center",
-          color: "var(--color-text-secondary)",
+          color: isPrimary ? "var(--color-primary)" : "var(--color-text-secondary)",
           marginBottom: "var(--space-2)",
         }}
       >
-        <Icon size={compact ? 18 : 20} strokeWidth={1.75} aria-hidden />
+        <Icon size={isPrimary ? 24 : compact ? 18 : 20} strokeWidth={1.75} aria-hidden />
       </div>
 
       {headline && (
