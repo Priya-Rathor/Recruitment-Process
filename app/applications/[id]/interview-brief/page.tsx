@@ -5,7 +5,7 @@ import { requireMembershipOrRedirect } from "@/lib/tenant";
 import { getApplicationDetail } from "@/lib/applications/queries";
 import { BriefPanel } from "./BriefPanel";
 
-export const metadata = { title: "Interview brief · Recruitment OS" };
+export const metadata = { title: "Interview brief" };
 export const dynamic = "force-dynamic";
 
 export default async function InterviewBriefPage({

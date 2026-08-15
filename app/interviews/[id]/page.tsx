@@ -13,7 +13,7 @@ import { CalendarBadge, InterviewStatusBadge, ModeBadge } from "../InterviewBadg
 import { CancelInterview, FeedbackForm } from "./FeedbackForm";
 import { MessageSquare } from "lucide-react";
 
-export const metadata = { title: "Interview · Recruitment OS" };
+export const metadata = { title: "Interview" };
 export const dynamic = "force-dynamic";
 
 export default async function InterviewDetailPage({

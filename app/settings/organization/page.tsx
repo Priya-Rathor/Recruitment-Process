@@ -3,7 +3,7 @@ import { getOrganizationSettings } from "@/lib/settings/queries";
 import { RestrictedPanel, SettingsShell } from "../SettingsShell";
 import { OrganizationForm } from "./OrganizationForm";
 
-export const metadata = { title: "Organization settings · Recruitment OS" };
+export const metadata = { title: "Organization settings" };
 export const dynamic = "force-dynamic";
 
 export default async function OrganizationSettingsPage() {

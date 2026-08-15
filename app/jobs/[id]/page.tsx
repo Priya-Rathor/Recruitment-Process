@@ -14,7 +14,7 @@ import { HealthBadge, HealthReasons, StatusBadge } from "../JobBadges";
 import { ArchiveJobButton } from "./JobActions";
 import { IntakeModal } from "./IntakeModal";
 
-export const metadata = { title: "Job · Recruitment OS" };
+export const metadata = { title: "Job" };
 export const dynamic = "force-dynamic";
 
 function Field({ label, value }: { label: string; value: string }) {

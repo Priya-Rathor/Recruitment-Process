@@ -12,7 +12,7 @@ import { isJobStatus, WORK_MODE_LABELS } from "@/lib/types";
 import { HealthBadge, StatusBadge } from "./JobBadges";
 import { JobFilters } from "./JobFilters";
 
-export const metadata = { title: "Jobs · Recruitment OS" };
+export const metadata = { title: "Jobs" };
 export const dynamic = "force-dynamic";
 
 type SearchParams = {

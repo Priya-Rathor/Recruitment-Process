@@ -4,7 +4,7 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { getLinkableOptions } from "@/lib/applications/queries";
 import { NewApplicationForm } from "./NewApplicationForm";
 
-export const metadata = { title: "New application · Recruitment OS" };
+export const metadata = { title: "New application" };
 export const dynamic = "force-dynamic";
 
 export default async function NewApplicationPage({

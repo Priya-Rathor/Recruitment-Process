@@ -11,7 +11,7 @@ import {
 import type { OrgRole } from "@/lib/types";
 import { TeamManager } from "./TeamManager";
 
-export const metadata = { title: "Team · Recruitment OS" };
+export const metadata = { title: "Team" };
 
 export type Member = {
   id: string;

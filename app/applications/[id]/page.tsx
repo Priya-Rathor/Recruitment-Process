@@ -16,7 +16,7 @@ import { MatchScore, StageBadge } from "../StageBadge";
 import { ApplicationSummary, NoteComposer, StageControl } from "./ApplicationDetailClient";
 import { Activity } from "lucide-react";
 
-export const metadata = { title: "Application · Recruitment OS" };
+export const metadata = { title: "Application" };
 export const dynamic = "force-dynamic";
 
 async function ApplicationDetailContent({ applicationId }: { applicationId: string }) {

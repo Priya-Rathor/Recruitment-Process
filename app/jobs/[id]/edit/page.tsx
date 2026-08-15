@@ -6,7 +6,7 @@ import { getJobDetail, listTeamMembers } from "@/lib/jobs/queries";
 import { listClients } from "@/lib/clients/queries";
 import { JobForm } from "../../JobForm";
 
-export const metadata = { title: "Edit job · Recruitment OS" };
+export const metadata = { title: "Edit job" };
 export const dynamic = "force-dynamic";
 
 export default async function EditJobPage({ params }: { params: Promise<{ id: string }> }) {

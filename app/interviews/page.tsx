@@ -19,7 +19,7 @@ import {
   ModeBadge,
 } from "./InterviewBadges";
 
-export const metadata = { title: "Interviews · Recruitment OS" };
+export const metadata = { title: "Interviews" };
 export const dynamic = "force-dynamic";
 
 async function InterviewsTable({ status }: { status?: string }) {

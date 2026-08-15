@@ -5,7 +5,7 @@ import { ErrorState } from "@/components/states";
 import { RestrictedPanel, SettingsShell } from "../SettingsShell";
 import { ScreeningForm } from "./ScreeningForm";
 
-export const metadata = { title: "Screening settings · Recruitment OS" };
+export const metadata = { title: "Screening settings" };
 export const dynamic = "force-dynamic";
 
 export default async function ScreeningSettingsPage() {

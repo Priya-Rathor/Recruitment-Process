@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, getUserMemberships } from "@/lib/tenant";
+import { Logo } from "@/components/Logo";
 import { OnboardingFlow } from "./OnboardingFlow";
 
-export const metadata = { title: "Set up your workspace · Recruitment OS" };
+export const metadata = { title: "Set up your workspace" };
 
 export default async function OnboardingPage() {
   const user = await getCurrentUser();
@@ -19,6 +20,10 @@ export default async function OnboardingPage() {
   return (
     <div className="auth-layout" style={{ alignItems: "flex-start", paddingTop: "3rem" }}>
       <div className="auth-card" style={{ maxWidth: 640 }}>
+        <div className="auth-brand">
+          <Logo variant="full" height={52} priority />
+        </div>
+
         <OnboardingFlow
           existingOrganization={existing?.organization ?? null}
           // Only Owner/Admin may accept AI suggestions (spec section 9). A user

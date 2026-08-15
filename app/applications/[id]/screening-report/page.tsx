@@ -8,7 +8,7 @@ import { getReportForApplication } from "@/lib/screening/reportQueries";
 import { checkReportEligibility, isPendingReview } from "@/lib/screening/report";
 import { GenerateReportButton, ReportEditor } from "./ReportEditor";
 
-export const metadata = { title: "Screening report · Recruitment OS" };
+export const metadata = { title: "Screening report" };
 export const dynamic = "force-dynamic";
 
 export default async function ScreeningReportPage({

@@ -8,7 +8,7 @@ import { getStatus as getEmailStatus } from "@/lib/integrations/email";
 import { NotificationList } from "./NotificationList";
 import { ReminderButton } from "./ReminderButton";
 
-export const metadata = { title: "Notifications · Recruitment OS" };
+export const metadata = { title: "Notifications" };
 export const dynamic = "force-dynamic";
 
 async function Notifications({ unreadOnly }: { unreadOnly: boolean }) {

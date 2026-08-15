@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/tenant";
 import { AcceptInvite } from "./AcceptInvite";
 
-export const metadata = { title: "Join a workspace · Recruitment OS" };
+export const metadata = { title: "Join a workspace" };
 
 export default async function AcceptInvitePage({
   params,

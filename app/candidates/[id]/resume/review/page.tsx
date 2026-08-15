@@ -7,7 +7,7 @@ import { getLatestParsedResume } from "@/lib/resumes/queries";
 import { buildFieldComparisons, countConflicts } from "@/lib/resumes/review";
 import { ReviewForm } from "./ReviewForm";
 
-export const metadata = { title: "Review resume · Recruitment OS" };
+export const metadata = { title: "Review resume" };
 export const dynamic = "force-dynamic";
 
 export default async function ResumeReviewPage({

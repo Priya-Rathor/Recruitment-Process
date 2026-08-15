@@ -9,7 +9,7 @@ import { daysSince } from "@/lib/time";
 import { MatchScore, StageBadge } from "./StageBadge";
 import { ApplicationFilters } from "./ApplicationFilters";
 
-export const metadata = { title: "Applications · Recruitment OS" };
+export const metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
 
 async function ApplicationsTable({ searchParams }: { searchParams: Record<string, string> }) {

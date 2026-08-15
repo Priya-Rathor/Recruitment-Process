@@ -7,7 +7,7 @@ import { listCandidates } from "@/lib/candidates/queries";
 import { filtersFromSearchParams, isEmptyFilters } from "@/lib/candidates/filters";
 import { CandidateList } from "./CandidateList";
 
-export const metadata = { title: "Candidates · Recruitment OS" };
+export const metadata = { title: "Candidates" };
 export const dynamic = "force-dynamic";
 
 async function CandidatesContent({ searchParams }: { searchParams: Record<string, string> }) {

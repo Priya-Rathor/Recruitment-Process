@@ -9,7 +9,7 @@ import { PipelineBoard } from "./PipelineBoard";
 import { AskPipelineAI } from "./AskPipelineAI";
 import { SlaSettings } from "./SlaSettings";
 
-export const metadata = { title: "Pipeline · Recruitment OS" };
+export const metadata = { title: "Pipeline" };
 export const dynamic = "force-dynamic";
 
 export async function PipelineContent({ jobId }: { jobId?: string | null }) {

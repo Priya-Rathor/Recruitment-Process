@@ -1,5 +1,5 @@
 // =============================================================================
-// Global design tokens — Recruitment OS
+// Global design tokens — MyRecruiter Partner
 // Source of truth: docs/design/00-design-tokens.md (mirrors the spec doc's
 // "Color Legend" table). Every module must reuse these tokens; never invent
 // new ones inline.
@@ -417,18 +417,59 @@ th {
 }
 
 // ---- Left zone --------------------------------------------------------------
+// The logo slot. Was a text wordmark; now an image, so the type rules are gone
+// and only the layout ones remain.
 .topnav__brand {
-  font-family: var(--font-heading);
-  font-size: 17px;
-  font-weight: var(--weight-bold);
-  letter-spacing: -0.02em;
-  color: var(--color-primary);
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  // The logo is the one place a hover tint would look like a rendering fault
+  // rather than affordance, so it gets a subtle lift instead of a colour change.
+  opacity: 1;
+  transition: opacity var(--transition-fast) var(--ease);
 
   &:hover {
-    color: var(--color-primary-hover);
+    opacity: 0.85;
   }
+
+  &:focus-visible {
+    box-shadow: var(--focus-ring);
+    border-radius: var(--control-radius);
+  }
+
+  img {
+    display: block;
+  }
+}
+
+// Two lockups, swapped by CSS. Both are in the DOM and one is hidden, rather
+// than measuring the viewport in JS — a width-measuring hook cannot know the
+// answer until after first paint, so the logo would visibly change size on load.
+.topnav__logo-wide { display: inline-flex; }
+.topnav__logo-narrow { display: none; }
+
+@media (max-width: 1120px) {
+  .topnav__logo-wide { display: none; }
+  .topnav__logo-narrow { display: inline-flex; }
+}
+
+// In the mobile drawer there is a whole row to spare, so the full lockup fits.
+.topnav__drawer-head .topnav__logo-wide { display: inline-flex; }
+.topnav__drawer-head .topnav__logo-narrow { display: none; }
+
+// The signed-out pages: logo above the card, centred. It identifies the product
+// before the form asks for a password, which is the one moment a visitor who
+// followed a link needs to know whose login screen this is.
+.auth-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-6);
+}
+
+.auth-brand img {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 // ---- Centre-left zone -------------------------------------------------------
@@ -806,6 +847,25 @@ th {
   margin-top: auto;
 }
 
+
+// The signed-out shell: sign in, sign up, reset password, onboarding.
+//
+// `.auth-layout` had NO rules at all — the class was written in four pages and
+// never defined, so the card sat flush against the top-left of an otherwise
+// empty viewport. Nobody noticed while the page opened with a plain "Sign in"
+// heading; putting a logo above it made the misalignment obvious.
+//
+// The intent was always centring: app/onboarding/page.tsx overrides
+// `align-items: flex-start` inline, which only means something if the default
+// is `center`.
+.auth-layout {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  background-color: var(--color-background);
+}
 
 .auth-card {
   width: 100%;

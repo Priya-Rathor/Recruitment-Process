@@ -33,8 +33,17 @@ const display = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Recruitment OS",
-  description: "AI-Powered Recruitment Operating System",
+  // A template, so every page appends the product name instead of each one
+  // spelling it out. The 20-odd pages that hardcoded "· Recruitment OS" have
+  // been renamed, but new pages now only need their own title.
+  title: {
+    default: "MyRecruiter Partner — Your AI Hiring Manager",
+    template: "%s · MyRecruiter Partner",
+  },
+  description: "Your AI hiring manager: sourcing, screening and scheduling in one workspace.",
+  // app/icon.png and app/apple-icon.png are picked up automatically by the App
+  // Router; declared here only so the manifest name matches the brand.
+  applicationName: "MyRecruiter Partner",
 };
 
 // Explicit props type rather than Next's generated `LayoutProps` global, so

@@ -5,7 +5,7 @@ import { listTeamMembers } from "@/lib/jobs/queries";
 import { listClients } from "@/lib/clients/queries";
 import { JobForm } from "../JobForm";
 
-export const metadata = { title: "New job · Recruitment OS" };
+export const metadata = { title: "New job" };
 export const dynamic = "force-dynamic";
 
 export default async function NewJobPage() {

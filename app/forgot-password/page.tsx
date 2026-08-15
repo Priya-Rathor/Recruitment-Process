@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
-export const metadata = { title: "Reset your password · Recruitment OS" };
+export const metadata = { title: "Reset your password" };
 
 export default function ForgotPasswordPage() {
   return (

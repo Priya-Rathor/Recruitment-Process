@@ -5,7 +5,7 @@ import { editableSlaRows } from "@/lib/pipeline/sla";
 import { RestrictedPanel, SettingsShell } from "../SettingsShell";
 import { SlaSettings } from "@/app/pipeline/SlaSettings";
 
-export const metadata = { title: "Pipeline settings · Recruitment OS" };
+export const metadata = { title: "Pipeline settings" };
 export const dynamic = "force-dynamic";
 
 /**

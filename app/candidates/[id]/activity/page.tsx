@@ -10,7 +10,7 @@ import { candidateTimelineTargets, getEntityTimeline } from "@/lib/activity/quer
 import { NarrativePanel } from "./NarrativePanel";
 import { Activity } from "lucide-react";
 
-export const metadata = { title: "Candidate activity · Recruitment OS" };
+export const metadata = { title: "Candidate activity" };
 export const dynamic = "force-dynamic";
 
 async function Timeline({ candidateId, candidateName }: { candidateId: string; candidateName: string }) {

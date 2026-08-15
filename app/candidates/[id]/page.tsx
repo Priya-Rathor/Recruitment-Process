@@ -14,7 +14,7 @@ import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { CandidateForm } from "../CandidateForm";
 import { ArchiveCandidateButton } from "./CandidateActions";
 
-export const metadata = { title: "Candidate · Recruitment OS" };
+export const metadata = { title: "Candidate" };
 export const dynamic = "force-dynamic";
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -289,7 +289,12 @@ async function CandidateDetailContent({
         could not answer the question a recruiter actually has — which version
         is this, and where did it come from.
       */}
-      <ResumesCard candidateId={candidate.id} resumes={resumes} canUpload={canEdit} />
+      <ResumesCard
+        candidateId={candidate.id}
+        resumes={resumes}
+        canUpload={canEdit}
+        timeZone={membership.organization.timezone}
+      />
 
       {canArchive && !candidate.archived_at && (
         <div className="card" style={{ borderColor: "var(--color-error)" }}>

@@ -8,7 +8,7 @@ import { getStatus } from "@/lib/integrations/bolna";
 import type { CallStatus } from "@/lib/screening/retry";
 import { CallStatusBadge, ConsentBadge } from "./CallStatusBadge";
 
-export const metadata = { title: "Screening calls · Recruitment OS" };
+export const metadata = { title: "Screening calls" };
 export const dynamic = "force-dynamic";
 
 const FILTERABLE: CallStatus[] = [

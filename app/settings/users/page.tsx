@@ -3,7 +3,7 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { SettingsShell } from "../SettingsShell";
 import { ORG_ROLES, type OrgRole } from "@/lib/types";
 
-export const metadata = { title: "Team & permissions · Recruitment OS" };
+export const metadata = { title: "Team & permissions" };
 export const dynamic = "force-dynamic";
 
 /**

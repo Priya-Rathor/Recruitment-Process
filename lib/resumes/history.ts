@@ -13,6 +13,7 @@
 // own upload route would have to remember to set, and would eventually forget.
 // =============================================================================
 import { createClient } from "@/lib/supabase/server";
+import { isMissingRelation } from "@/lib/dashboard/metrics";
 import { listResumes, type Resume } from "@/lib/resumes/queries";
 
 export type ResumeHistoryEntry = Resume & {
@@ -80,6 +81,9 @@ async function loadIntakeOrigins({
     .in("resume_id", resumeIds);
 
   if (error) {
+    // Before migration 0018 there is no intake table, so nothing came through
+    // bulk upload and every resume is correctly labelled "Uploaded directly".
+    if (isMissingRelation(error)) return origins;
     console.error("[resumes] intake origin lookup failed:", error);
     return origins;
   }
@@ -107,15 +111,6 @@ export function describeResumeSource(entry: ResumeHistoryEntry): string {
   if (entry.viaJobTitle) return `Uploaded via ${entry.viaJobTitle} job`;
   if (entry.viaJobId) return "Uploaded via a job that has since been removed";
   return "Uploaded directly";
-}
-
-/** "12 August 2026" — the same long form the rest of the product uses. */
-export function formatUploadDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
 }
 
 /** "1.2 MB". Null size renders as an em dash rather than "0 B". */

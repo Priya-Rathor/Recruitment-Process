@@ -9,7 +9,7 @@ import { describeRule } from "@/lib/automations/catalog";
 import { RunStatusBadge, StatusBadge } from "./AutomationBadges";
 import { Zap } from "lucide-react";
 
-export const metadata = { title: "Automations · Recruitment OS" };
+export const metadata = { title: "Automations" };
 export const dynamic = "force-dynamic";
 
 function formatWhen(value: string) {

@@ -12,7 +12,7 @@ import { CallStatusBadge, ConsentBadge } from "@/app/screening-calls/CallStatusB
 import { StartCallPanel } from "./StartCallPanel";
 import { Phone } from "lucide-react";
 
-export const metadata = { title: "Screening call · Recruitment OS" };
+export const metadata = { title: "Screening call" };
 export const dynamic = "force-dynamic";
 
 export default async function ScreeningCallPage({

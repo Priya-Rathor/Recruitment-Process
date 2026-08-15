@@ -11,7 +11,7 @@ import { AttentionQueue } from "./AttentionQueue";
 import { DailyBrief } from "./DailyBrief";
 import { QuickLinks } from "./QuickLinks";
 
-export const metadata = { title: "Dashboard · Recruitment OS" };
+export const metadata = { title: "Dashboard" };
 
 // The snapshot must be current on every visit — never served from a static or
 // cached render, or "today" silently goes stale.

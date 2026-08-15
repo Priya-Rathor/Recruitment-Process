@@ -6,7 +6,7 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { listClients } from "@/lib/clients/queries";
 import { NewClientForm } from "./NewClientForm";
 
-export const metadata = { title: "Clients · Recruitment OS" };
+export const metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
 
 async function ClientsTable() {

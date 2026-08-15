@@ -7,7 +7,7 @@ import { getPreferences } from "@/lib/notifications/queries";
 import { getStatus as getEmailStatus } from "@/lib/integrations/email";
 import { PreferenceEditor } from "./PreferenceEditor";
 
-export const metadata = { title: "Notification settings · Recruitment OS" };
+export const metadata = { title: "Notification settings" };
 export const dynamic = "force-dynamic";
 
 async function Preferences() {

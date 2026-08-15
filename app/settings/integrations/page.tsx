@@ -5,7 +5,7 @@ import { getAllIntegrationHealth } from "@/lib/settings/integrations";
 import { RestrictedPanel, SettingsShell } from "../SettingsShell";
 import { IntegrationCard } from "./IntegrationCard";
 
-export const metadata = { title: "Integrations · Recruitment OS" };
+export const metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";
 
 export default async function IntegrationsSettingsPage({

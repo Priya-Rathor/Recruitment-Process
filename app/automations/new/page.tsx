@@ -3,7 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { AutomationForm } from "../AutomationForm";
 
-export const metadata = { title: "New automation · Recruitment OS" };
+export const metadata = { title: "New automation" };
 export const dynamic = "force-dynamic";
 
 export default async function NewAutomationPage() {

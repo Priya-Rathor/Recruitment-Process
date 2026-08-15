@@ -3,7 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { SkeletonRows } from "@/components/states";
 import { PipelineContent } from "../page";
 
-export const metadata = { title: "Pipeline · Recruitment OS" };
+export const metadata = { title: "Pipeline" };
 export const dynamic = "force-dynamic";
 
 /** The board filtered to one job. Same component, scoped by jobId. */

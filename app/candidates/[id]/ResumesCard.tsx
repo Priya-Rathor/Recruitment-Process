@@ -13,10 +13,10 @@
 import Link from "next/link";
 import { Download, FileText, Upload } from "lucide-react";
 import { EmptyState } from "@/components/states";
+import { formatDateInZone } from "@/lib/time";
 import {
   describeResumeSource,
   formatFileSize,
-  formatUploadDate,
   type ResumeHistoryEntry,
 } from "@/lib/resumes/history";
 
@@ -24,11 +24,22 @@ export function ResumesCard({
   candidateId,
   resumes,
   canUpload,
+  timeZone,
 }: {
   candidateId: string;
   resumes: ResumeHistoryEntry[];
   /** Owner/Admin/Recruiter. A Viewer still sees and downloads the list. */
   canUpload: boolean;
+  /**
+   * The ORGANIZATION's timezone, never the server's and never the browser's.
+   *
+   * An upload at 23:40 in Gurgaon is a UTC timestamp on 21 August. Formatted
+   * with the server's zone it reads "21 August"; formatted with the team's, it
+   * reads "22 August" — the day they actually did it. formatDateInZone also
+   * pins the locale, so the string is identical on server and client and cannot
+   * produce a hydration mismatch.
+   */
+  timeZone: string;
 }) {
   return (
     <div className="card mb-4">
@@ -83,7 +94,8 @@ export function ResumesCard({
                   {resume.isMostRecent && <span className="resume-row__tag">Most recent</span>}
                 </p>
                 <p className="resume-row__detail">
-                  {formatUploadDate(resume.uploaded_at)} · {formatFileSize(resume.file_size_bytes)}
+                  {formatDateInZone(resume.uploaded_at, timeZone)} ·{" "}
+                  {formatFileSize(resume.file_size_bytes)}
                 </p>
                 <p className="resume-row__detail">
                   {/* Where it came from. Links to the job when it arrived

@@ -8,7 +8,7 @@ import { getApplicationDetail } from "@/lib/applications/queries";
 import { getOrCalculateMatch } from "@/lib/matching/queries";
 import { MatchView } from "./MatchView";
 
-export const metadata = { title: "Match · Recruitment OS" };
+export const metadata = { title: "Match" };
 export const dynamic = "force-dynamic";
 
 async function MatchContent({ applicationId }: { applicationId: string }) {

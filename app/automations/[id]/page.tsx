@@ -18,7 +18,7 @@ import { ActivationPanel } from "./ActivationPanel";
 import { AutomationForm } from "../AutomationForm";
 import { Zap } from "lucide-react";
 
-export const metadata = { title: "Automation · Recruitment OS" };
+export const metadata = { title: "Automation" };
 export const dynamic = "force-dynamic";
 
 function formatWhen(value: string) {

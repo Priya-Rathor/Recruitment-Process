@@ -5,7 +5,7 @@ import { ErrorState } from "@/components/states";
 import { RestrictedPanel, SettingsShell } from "../SettingsShell";
 import { RecruitmentForm } from "./RecruitmentForm";
 
-export const metadata = { title: "Recruitment settings · Recruitment OS" };
+export const metadata = { title: "Recruitment settings" };
 export const dynamic = "force-dynamic";
 
 export default async function RecruitmentSettingsPage() {

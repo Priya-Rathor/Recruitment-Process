@@ -2,13 +2,18 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { LoginForm } from "./LoginForm";
 import { SkeletonRows } from "@/components/states";
+import { Logo } from "@/components/Logo";
 
-export const metadata = { title: "Sign in · Recruitment OS" };
+export const metadata = { title: "Sign in" };
 
 export default function LoginPage() {
   return (
     <div className="auth-layout">
       <div className="auth-card">
+        <div className="auth-brand">
+          <Logo variant="full" height={56} priority />
+        </div>
+
         <div className="card">
           <h1 className="title is-4">Sign in</h1>
           <p className="subtitle is-6 has-text-secondary">

@@ -7,7 +7,7 @@ import { getCandidate } from "@/lib/candidates/queries";
 import { listResumes, type Resume, type ResumeParseStatus } from "@/lib/resumes/queries";
 import { ReparseButton, ResumeUploader } from "./ResumeUploader";
 
-export const metadata = { title: "Resume · Recruitment OS" };
+export const metadata = { title: "Resume" };
 export const dynamic = "force-dynamic";
 
 const STATUS_STYLE: Record<ResumeParseStatus, { background: string; color: string; label: string }> =

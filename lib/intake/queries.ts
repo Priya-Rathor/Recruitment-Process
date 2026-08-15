@@ -1,5 +1,6 @@
 // Read side for bulk intake. One tenant-scoped place for pages and routes.
 import { createClient } from "@/lib/supabase/server";
+import { isMissingRelation } from "@/lib/dashboard/metrics";
 import type { IntakeStatus } from "@/lib/intake/status";
 import type { IntakeConflictReason } from "@/lib/intake/match";
 
@@ -44,6 +45,13 @@ export async function listBatchItems({
     .order("created_at", { ascending: true });
 
   if (error) {
+    // Migration 0018 not applied yet. Not an error — a build state. Logging it
+    // as one raised the dev overlay's issue count on every job page and taught
+    // the reader that a red badge means nothing.
+    if (isMissingRelation(error)) {
+      console.info("[intake] resume_intake_items not created yet — run migration 0018.");
+      return [];
+    }
     console.error("[intake] batch list failed:", error);
     return [];
   }
@@ -78,6 +86,13 @@ export async function listUnresolvedConflicts({
     .limit(25);
 
   if (error) {
+    if (isMissingRelation(error)) {
+      console.info("[intake] resume_intake_items not created yet — run migration 0018.");
+      return [];
+    }
+    // A real failure — an RLS denial, a timeout. Reported loudly, because
+    // reporting it as "not built yet" would hide a genuine bug behind a
+    // reassuring message. That distinction is the whole point of the split.
     console.error("[intake] conflict list failed:", error);
     return [];
   }

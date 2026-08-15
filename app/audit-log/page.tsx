@@ -8,7 +8,7 @@ import { listActivity } from "@/lib/activity/queries";
 import { SENSITIVE_EVENT_TYPES } from "@/lib/activity/events";
 import { eventLabel } from "@/lib/activity/events";
 
-export const metadata = { title: "Audit log · Recruitment OS" };
+export const metadata = { title: "Audit log" };
 export const dynamic = "force-dynamic";
 
 async function AuditEntries({ eventType }: { eventType?: string }) {

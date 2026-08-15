@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentMembership, getCurrentUser, getUserMemberships } from "@/lib/tenant";
 import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
-export const metadata = { title: "Switch organization · Recruitment OS" };
+export const metadata = { title: "Switch organization" };
 
 export default async function SwitchOrganizationPage() {
   const user = await getCurrentUser();

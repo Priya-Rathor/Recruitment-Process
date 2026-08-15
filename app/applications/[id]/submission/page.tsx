@@ -6,7 +6,7 @@ import { getApplicationDetail } from "@/lib/applications/queries";
 import { getSubmissionForApplication } from "@/lib/clients/queries";
 import { SubmissionPanel } from "./SubmissionPanel";
 
-export const metadata = { title: "Client submission · Recruitment OS" };
+export const metadata = { title: "Client submission" };
 export const dynamic = "force-dynamic";
 
 export default async function SubmissionPage({

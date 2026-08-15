@@ -29,7 +29,7 @@ import { AskAnalytics } from "./AskAnalytics";
 import { BarChart, ChartCard, FunnelChart, KpiTile } from "./charts";
 import { Briefcase, Building2, CheckCircle2, Inbox, Users } from "lucide-react";
 
-export const metadata = { title: "Analytics · Recruitment OS" };
+export const metadata = { title: "Analytics" };
 export const dynamic = "force-dynamic";
 
 const TABS = [

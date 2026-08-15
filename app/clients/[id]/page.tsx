@@ -8,7 +8,7 @@ import { computeTurnaround, describeTurnaround } from "@/lib/clients/sla";
 import { ClientActivityPanel } from "./ClientActivityPanel";
 import { Send } from "lucide-react";
 
-export const metadata = { title: "Client · Recruitment OS" };
+export const metadata = { title: "Client" };
 export const dynamic = "force-dynamic";
 
 function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {

@@ -6,7 +6,7 @@ import { ErrorState } from "@/components/states";
 import { RestrictedPanel, SettingsShell } from "../SettingsShell";
 import { RetentionForm } from "./RetentionForm";
 
-export const metadata = { title: "Security & data · Recruitment OS" };
+export const metadata = { title: "Security & data" };
 export const dynamic = "force-dynamic";
 
 export default async function SecuritySettingsPage() {

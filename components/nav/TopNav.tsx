@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { AccountMenu, type AccountMenuProps } from "./AccountMenu";
 import { AccountRows } from "./AccountRows";
 import { isActiveHref, NAV_GROUPS } from "./navItems";
@@ -47,9 +48,22 @@ export function TopNav({
   return (
     <header className="topnav">
       <div className="topnav__inner">
-        {/* ---- Left zone: wordmark only. ---------------------------------- */}
-        <Link href="/dashboard" className="topnav__brand">
-          Recruitment OS
+        {/* ---- Left zone: the logo. ---------------------------------------
+            Two lockups, swapped by CSS rather than by JS: rendering both and
+            hiding one avoids a layout shift on first paint, which a
+            width-measuring hook would cause every time.
+
+            The compact lockup is 4.22:1, so at 30px it occupies ~127px — a
+            little NARROWER than the "Recruitment OS" text wordmark it replaces,
+            which matters because this bar was already measured to overflow at
+            1440px before two items moved into the account menu. ------------ */}
+        <Link href="/dashboard" className="topnav__brand" aria-label="MyRecruiter Partner — dashboard">
+          <span className="topnav__logo-wide">
+            <Logo variant="compact" height={30} priority />
+          </span>
+          <span className="topnav__logo-narrow">
+            <Logo variant="mark" height={30} priority />
+          </span>
         </Link>
 
         {/* ---- Mobile: hamburger between the wordmark and the avatar. ----- */}
@@ -107,7 +121,9 @@ export function TopNav({
           />
           <div className="topnav__drawer" role="dialog" aria-label="Navigation">
             <div className="topnav__drawer-head">
-              <span className="topnav__brand">Recruitment OS</span>
+              <span className="topnav__brand">
+                <Logo variant="compact" height={28} />
+              </span>
               <button
                 type="button"
                 className="topnav__drawer-close"
