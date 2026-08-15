@@ -18,17 +18,19 @@
 // to "not configured" instead of crashing.
 // =============================================================================
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { supabaseSecretKey, supabaseUrl } from "./env";
 
 let cached: SupabaseClient | null = null;
 
 export function createAdminClient(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = supabaseUrl();
+  // Accepts both the current sb_secret_... key and the legacy service_role JWT.
+  const secretKey = supabaseSecretKey();
 
-  if (!url || !serviceRoleKey) return null;
+  if (!url || !secretKey) return null;
   if (cached) return cached;
 
-  cached = createClient(url, serviceRoleKey, {
+  cached = createClient(url, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -36,5 +38,5 @@ export function createAdminClient(): SupabaseClient | null {
 }
 
 export function isAdminClientConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(supabaseUrl() && supabaseSecretKey());
 }

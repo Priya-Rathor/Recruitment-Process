@@ -213,10 +213,10 @@ describe("parseSettingsPayload", () => {
 // OAuth state — CSRF and tenant integrity
 // -----------------------------------------------------------------------------
 describe("OAuth state signing", () => {
-  const ORIGINAL = process.env.WEBHOOK_SECRET;
+  const ORIGINAL = process.env.INTEGRATION_ENCRYPTION_KEY;
 
   beforeAll(() => {
-    process.env.WEBHOOK_SECRET = "test-secret-for-state-signing";
+    process.env.INTEGRATION_ENCRYPTION_KEY = "test-secret-for-state-signing";
   });
 
   it("round-trips a signed payload", () => {
@@ -253,15 +253,14 @@ describe("OAuth state signing", () => {
   });
 
   it("returns null when no signing secret is configured", () => {
-    process.env.WEBHOOK_SECRET = "";
-    const previousKey = process.env.CREDENTIALS_ENCRYPTION_KEY;
-    process.env.CREDENTIALS_ENCRYPTION_KEY = "";
+    // Fails closed: without a secret, nothing is signed and nothing verifies —
+    // rather than falling back to an empty key that would verify anything.
+    process.env.INTEGRATION_ENCRYPTION_KEY = "";
 
     expect(signState("org-1:nonce")).toBe("");
     expect(verifyState("org-1:nonce.abc")).toBeNull();
 
-    process.env.WEBHOOK_SECRET = ORIGINAL ?? "test-secret-for-state-signing";
-    process.env.CREDENTIALS_ENCRYPTION_KEY = previousKey;
+    process.env.INTEGRATION_ENCRYPTION_KEY = ORIGINAL ?? "test-secret-for-state-signing";
   });
 });
 

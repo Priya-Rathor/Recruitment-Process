@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     if (!isStateSigningConfigured() || !state) {
       return jsonError(
-        "This server can't sign the OAuth request securely. Set WEBHOOK_SECRET before connecting Calendar.",
+        "This server can't sign the OAuth request securely. Set INTEGRATION_ENCRYPTION_KEY before connecting Calendar.",
         503
       );
     }

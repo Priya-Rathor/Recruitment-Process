@@ -14,8 +14,18 @@ export function calendarRedirectUri(origin: string): string {
   return `${origin}/api/settings/integrations/calendar/callback`;
 }
 
+/**
+ * The secret used to sign OAuth state.
+ *
+ * Reuses INTEGRATION_ENCRYPTION_KEY — the deployment-level secret that already
+ * exists for exactly this class of purpose. An earlier version of this file
+ * invented two variable names (WEBHOOK_SECRET, CREDENTIALS_ENCRYPTION_KEY) that
+ * appear nowhere else in the project or in .env.local.example, so signing would
+ * have silently found nothing and the error message would have told an operator
+ * to set a variable that does not exist.
+ */
 function stateSecret(): string {
-  return process.env.WEBHOOK_SECRET ?? process.env.CREDENTIALS_ENCRYPTION_KEY ?? "";
+  return process.env.INTEGRATION_ENCRYPTION_KEY ?? "";
 }
 
 /**
