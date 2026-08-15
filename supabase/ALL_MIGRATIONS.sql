@@ -1,17 +1,14 @@
 -- =============================================================================
--- Recruitment OS — all migrations, concatenated in dependency order.
---
--- GENERATED FILE. Do not edit; edit the individual files in
--- supabase/migrations/ and regenerate.
---
--- Every statement is re-runnable (if not exists / drop policy if exists),
--- so running this twice is harmless.
+-- ALL MIGRATIONS, concatenated in order.
+-- Generated from supabase/migrations/. Paste into the Supabase SQL Editor.
+-- Every migration is re-runnable (if not exists / drop policy if exists).
 -- =============================================================================
 
 
--- =============================================================================
--- BEGIN 0001_module1_authentication_organization.sql
--- =============================================================================
+-- ############################################################################
+-- ## 0001_module1_authentication_organization.sql
+-- ############################################################################
+
 -- =============================================================================
 -- Module 1: Authentication & Organization
 -- Foundation schema. Every later module's tables reference organizations(id)
@@ -462,12 +459,11 @@ create policy invites_update_owner_admin on public.invites
     and (role <> 'owner' or public.has_org_role(organization_id, array['owner']::public.org_role[]))
   );
 
--- END 0001_module1_authentication_organization.sql
 
+-- ############################################################################
+-- ## 0002_module3_jobs_management.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0002_module3_jobs_management.sql
--- =============================================================================
 -- =============================================================================
 -- Module 3: Jobs Management
 --
@@ -714,12 +710,11 @@ create policy job_interview_questions_write_staff on public.job_interview_questi
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
 
--- END 0002_module3_jobs_management.sql
 
+-- ############################################################################
+-- ## 0003_module4_candidates_management.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0003_module4_candidates_management.sql
--- =============================================================================
 -- =============================================================================
 -- Module 4: Candidates Management
 --
@@ -966,12 +961,11 @@ create policy candidate_duplicates_write_staff on public.candidate_duplicates
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
 
--- END 0003_module4_candidates_management.sql
 
+-- ############################################################################
+-- ## 0004_module5_applications_management.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0004_module5_applications_management.sql
--- =============================================================================
 -- =============================================================================
 -- Module 5: Applications Management
 --
@@ -1279,12 +1273,11 @@ drop policy if exists application_notes_delete_author on public.application_note
 create policy application_notes_delete_author on public.application_notes
   for delete using (author_id = public.current_app_user_id());
 
--- END 0004_module5_applications_management.sql
 
+-- ############################################################################
+-- ## 0005_module6_resume_ai.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0005_module6_resume_ai.sql
--- =============================================================================
 -- =============================================================================
 -- Module 6: Resume AI (Parsing)
 --
@@ -1530,12 +1523,11 @@ create policy resumes_storage_delete on storage.objects
     )
   );
 
--- END 0005_module6_resume_ai.sql
 
+-- ############################################################################
+-- ## 0006_module7_ai_matching.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0006_module7_ai_matching.sql
--- =============================================================================
 -- =============================================================================
 -- Module 7: AI Matching (Candidate-to-Job)
 --
@@ -1764,12 +1756,11 @@ create policy application_matches_write_staff on public.application_matches
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
 
--- END 0006_module7_ai_matching.sql
 
+-- ############################################################################
+-- ## 0007_module8_bolna_screening.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0007_module8_bolna_screening.sql
--- =============================================================================
 -- =============================================================================
 -- Module 8: Bolna AI Screening (Calling)
 --
@@ -2042,12 +2033,11 @@ create policy screening_calls_update_staff on public.screening_calls
 -- and of the consent given. Erasure belongs to the Privacy retrofit's audited
 -- flow, not to a stray delete.
 
--- END 0007_module8_bolna_screening.sql
 
+-- ############################################################################
+-- ## 0008_module9_screening_reports.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0008_module9_screening_reports.sql
--- =============================================================================
 -- =============================================================================
 -- Module 9: AI Screening Report (Summarization)
 --
@@ -2260,12 +2250,11 @@ create policy screening_reports_delete_owner_admin on public.screening_reports
     public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
   );
 
--- END 0008_module9_screening_reports.sql
 
+-- ############################################################################
+-- ## 0009_module10_pipeline.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0009_module10_pipeline.sql
--- =============================================================================
 -- =============================================================================
 -- Module 10: Advanced Pipeline
 --
@@ -2346,12 +2335,11 @@ create index if not exists idx_applications_open_board
   where archived_at is null
     and stage not in ('hired', 'rejected', 'withdrawn');
 
--- END 0009_module10_pipeline.sql
 
+-- ############################################################################
+-- ## 0010_module11_interviews.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0010_module11_interviews.sql
--- =============================================================================
 -- =============================================================================
 -- Module 11: Interviews
 --
@@ -2635,12 +2623,11 @@ create policy interview_feedback_update_author on public.interview_feedback
   using (submitted_by = public.current_app_user_id())
   with check (submitted_by = public.current_app_user_id());
 
--- END 0010_module11_interviews.sql
 
+-- ############################################################################
+-- ## 0011_module12_clients.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0011_module12_clients.sql
--- =============================================================================
 -- =============================================================================
 -- Module 12: Clients
 --
@@ -2914,12 +2901,11 @@ create trigger trg_jobs_client_tenant_integrity
   before insert or update of client_id, organization_id on public.jobs
   for each row execute function public.enforce_job_client_tenant_integrity();
 
--- END 0011_module12_clients.sql
 
+-- ############################################################################
+-- ## 0012_module13_automations.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0012_module13_automations.sql
--- =============================================================================
 -- =============================================================================
 -- Module 13: Automation Engine
 --
@@ -3180,12 +3166,11 @@ drop policy if exists automation_runs_insert_member on public.automation_runs;
 create policy automation_runs_insert_member on public.automation_runs
   for insert with check (public.is_org_member(organization_id));
 
--- END 0012_module13_automations.sql
 
+-- ############################################################################
+-- ## 0013_module14_activity_audit.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0013_module14_activity_audit.sql
--- =============================================================================
 -- =============================================================================
 -- Module 14: Activity & Audit
 --
@@ -3404,12 +3389,11 @@ create policy activity_events_insert_member on public.activity_events
 
 -- No UPDATE policy. No DELETE policy. See the header.
 
--- END 0013_module14_activity_audit.sql
 
+-- ############################################################################
+-- ## 0014_module15_notifications.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0014_module15_notifications.sql
--- =============================================================================
 -- =============================================================================
 -- Module 15: Notifications & Communication
 --
@@ -3762,12 +3746,11 @@ create policy notification_preferences_write on public.notification_preferences
     )
   );
 
--- END 0014_module15_notifications.sql
 
+-- ############################################################################
+-- ## 0015_module16_analytics.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0015_module16_analytics.sql
--- =============================================================================
 -- =============================================================================
 -- Module 16: Analytics & Reporting
 --
@@ -4072,12 +4055,11 @@ grant select on public.analytics_job_performance     to authenticated;
 grant select on public.analytics_client_performance  to authenticated;
 grant select on public.analytics_screening_metrics   to authenticated;
 
--- END 0015_module16_analytics.sql
 
+-- ############################################################################
+-- ## 0016_module17_settings.sql
+-- ############################################################################
 
--- =============================================================================
--- BEGIN 0016_module17_settings.sql
--- =============================================================================
 -- =============================================================================
 -- Module 17: Settings & Integrations
 --
@@ -4368,5 +4350,320 @@ create trigger trg_user_preferences_tenant_integrity
 revoke select (encrypted_credentials) on public.organization_integrations from authenticated;
 revoke select (encrypted_credentials) on public.organization_integrations from anon;
 
--- END 0016_module17_settings.sql
 
+-- ############################################################################
+-- ## 0017_fix_missing_user_profile.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Fix: an authenticated session with no public.users row causes an infinite
+-- redirect loop.
+--
+-- HOW IT HAPPENS
+--
+-- public.users rows are created by the on_auth_user_created trigger in
+-- migration 0001. Anyone who signed up BEFORE that migration was applied — or
+-- during any window where the trigger was absent or failed — has a row in
+-- auth.users and none in public.users.
+--
+-- The application then loops:
+--
+--   proxy.ts sees a valid Supabase session   -> allows /dashboard
+--   /dashboard: getCurrentUser() is null     -> redirect /login
+--   proxy.ts sees a valid session on /login  -> redirect /dashboard
+--   ...
+--
+-- The browser gives up with ERR_TOO_MANY_REDIRECTS. Clearing cookies works
+-- around it, but the same trap catches the next person it happens to, and the
+-- symptom points nowhere near the cause.
+--
+-- THE FIX
+--
+-- A security-definer function that backfills the caller's own profile. This is
+-- the same defensive upsert create_organization_and_owner() and accept_invite()
+-- already perform ("in case the auth.users trigger has not fired yet"); it just
+-- needed to be reachable on its own, before either of those is ever called.
+--
+-- WHY THIS IS SAFE TO EXPOSE
+--
+--   * It takes NO arguments. There is nothing to tamper with.
+--   * It reads auth.uid() only, so a caller can only ever create their OWN row.
+--     They cannot name another user, and cannot pass an organization id.
+--   * on conflict (auth_id) do nothing — it can never overwrite an existing
+--     profile, so it is not a way to change your own name or email.
+--   * It grants no membership. A backfilled user has zero organizations and
+--     lands on /onboarding, exactly like any new signup.
+--
+-- The `users` table deliberately has no client-facing INSERT policy, and that
+-- stays true: this function runs as its owner, which is why it can insert at
+-- all, and why it is written to do exactly one narrow thing.
+-- =============================================================================
+
+create or replace function public.ensure_current_user_profile()
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+begin
+  -- No session, nothing to do. Returning null rather than raising keeps this
+  -- callable from a page that has not yet established whether anyone is signed
+  -- in.
+  if auth.uid() is null then
+    return null;
+  end if;
+
+  select id into v_user_id from public.users where auth_id = auth.uid();
+  if v_user_id is not null then
+    return v_user_id;
+  end if;
+
+  -- Same shape as the on_auth_user_created trigger, so a backfilled profile is
+  -- indistinguishable from one created normally.
+  insert into public.users (auth_id, name, email, avatar_url)
+  select
+    au.id,
+    coalesce(
+      au.raw_user_meta_data ->> 'name',
+      au.raw_user_meta_data ->> 'full_name',
+      split_part(au.email, '@', 1)
+    ),
+    au.email,
+    au.raw_user_meta_data ->> 'avatar_url'
+  from auth.users au
+  where au.id = auth.uid()
+  on conflict (auth_id) do nothing;
+
+  select id into v_user_id from public.users where auth_id = auth.uid();
+  return v_user_id;
+end;
+$$;
+
+revoke all on function public.ensure_current_user_profile() from public, anon;
+grant execute on function public.ensure_current_user_profile() to authenticated;
+
+-- =============================================================================
+-- Backfill anyone already stranded.
+--
+-- Runs once, as the migration author, for every auth user with no profile. A
+-- deployment that applies 0001 and 0017 together will match nothing here; a
+-- database where people signed up first — which is exactly how this was found —
+-- gets them unstuck without each of them having to clear cookies.
+-- =============================================================================
+insert into public.users (auth_id, name, email, avatar_url)
+select
+  au.id,
+  coalesce(
+    au.raw_user_meta_data ->> 'name',
+    au.raw_user_meta_data ->> 'full_name',
+    split_part(au.email, '@', 1)
+  ),
+  au.email,
+  au.raw_user_meta_data ->> 'avatar_url'
+from auth.users au
+left join public.users u on u.auth_id = au.id
+where u.id is null
+  and au.email is not null
+on conflict (auth_id) do nothing;
+
+
+-- ############################################################################
+-- ## 0018_bulk_resume_intake.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Bulk resume intake — "drop N resumes on a job, get N applications"
+--
+-- Connects Module 3 (Jobs), 4 (Candidates), 5 (Applications) and 6 (Resume AI).
+-- Each uploaded file resolves INDEPENDENTLY to one of six outcomes, recorded
+-- here so the batch survives the browser tab that started it.
+--
+-- WHY A TABLE AND NOT CLIENT STATE
+--
+-- Five of the six outcomes create a durable row somewhere else (a candidate, an
+-- application, a resume, a parse result). The sixth — 'match_conflict', where a
+-- resume's email points at one candidate and its phone at another — creates
+-- NOTHING, by design: the spec forbids guessing. Without this table that file's
+-- existence would live only in React state, and closing the modal would destroy
+-- the one record that a human still has to act on.
+--
+-- Storing every outcome rather than only the conflicts also buys the thing the
+-- spec asks for directly: "let users close and check back".
+-- =============================================================================
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'resume_intake_status') then
+    create type public.resume_intake_status as enum (
+      'queued',              -- accepted, nothing done yet
+      'processing',          -- extracting or parsing right now
+      'candidate_created',   -- no existing match; new candidate + application
+      'candidate_matched',   -- matched an existing candidate; application added
+      'already_applied',     -- matched, but this candidate+job pair already existed
+      'match_conflict',      -- email matches one candidate, phone another — NOT resolved
+      'failed'               -- extraction or parsing failed; see error_message
+    );
+  end if;
+end $$;
+
+-- =============================================================================
+-- resume_intake_items
+--
+-- One row per uploaded file. `batch_id` groups the files a recruiter dropped in
+-- together; it is a plain grouping key rather than a foreign key to a batches
+-- table, because a batch has no attributes of its own — every question about it
+-- ("how many succeeded?") is an aggregate over these rows.
+-- =============================================================================
+create table if not exists public.resume_intake_items (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+  batch_id uuid not null,
+  job_id uuid not null references public.jobs (id) on delete cascade,
+
+  file_name text not null,
+  file_size_bytes integer check (file_size_bytes is null or file_size_bytes >= 0),
+  file_hash text,
+
+  -- Set only for 'match_conflict'. Every other outcome either attaches the file
+  -- to a candidate (and so stores it via public.resumes) or never stores it at
+  -- all. A conflicted file is parked at <organization_id>/_intake/... so the
+  -- recruiter can still download and read it while deciding.
+  storage_path text,
+
+  status public.resume_intake_status not null default 'queued',
+
+  -- The resolved records. Nullable because which ones exist depends on the
+  -- outcome: a failure has none, a conflict has none, 'already_applied' has a
+  -- candidate and the PRE-EXISTING application.
+  candidate_id uuid references public.candidates (id) on delete set null,
+  application_id uuid references public.applications (id) on delete set null,
+  resume_id uuid references public.resumes (id) on delete set null,
+
+  -- 'match_conflict' only: the two (or more) candidates the file pointed at.
+  -- Deliberately NOT foreign keys — this is evidence about a decision that was
+  -- refused, and it must survive one of those candidates being archived.
+  conflict_candidate_ids uuid[] not null default '{}',
+
+  -- 'match_conflict' only: the validated parse output, kept so resolving the
+  -- conflict later does not mean paying for the AI call twice.
+  parsed_json jsonb,
+
+  -- How many profile fields the resume disagreed with on a MATCHED candidate.
+  -- These are queued as an unreviewed resume_parse_results row (Module 6's
+  -- existing pattern); this column is the count, so the modal and the profile
+  -- banner can say "3 profile updates need your review" without recomputing the
+  -- whole comparison.
+  queued_conflict_count integer not null default 0 check (queued_conflict_count >= 0),
+
+  error_message text,
+
+  created_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  processed_at timestamptz
+);
+
+create index if not exists idx_resume_intake_items_org
+  on public.resume_intake_items (organization_id);
+create index if not exists idx_resume_intake_items_batch
+  on public.resume_intake_items (organization_id, batch_id, created_at);
+create index if not exists idx_resume_intake_items_job
+  on public.resume_intake_items (organization_id, job_id, created_at desc);
+
+-- Backs the job-page "unresolved conflicts" banner. Partial, because conflicts
+-- are the rare case and a full index would be almost entirely dead weight.
+create index if not exists idx_resume_intake_items_conflicts
+  on public.resume_intake_items (organization_id, job_id)
+  where status = 'match_conflict';
+
+-- =============================================================================
+-- Cross-tenant integrity
+--
+-- Same reasoning as Modules 5 and 6: a foreign key proves the row exists, not
+-- that it belongs to this tenant. Without this, a caller could point an intake
+-- item at another organization's job and the FK would happily accept it.
+-- =============================================================================
+create or replace function public.enforce_resume_intake_tenant_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_org uuid;
+begin
+  select organization_id into v_org from public.jobs where id = new.job_id;
+  if v_org is null or v_org <> new.organization_id then
+    raise exception 'Job does not belong to this organization';
+  end if;
+
+  if new.candidate_id is not null then
+    select organization_id into v_org from public.candidates where id = new.candidate_id;
+    if v_org is null or v_org <> new.organization_id then
+      raise exception 'Candidate does not belong to this organization';
+    end if;
+  end if;
+
+  if new.application_id is not null then
+    select organization_id into v_org from public.applications where id = new.application_id;
+    if v_org is null or v_org <> new.organization_id then
+      raise exception 'Application does not belong to this organization';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_resume_intake_tenant_integrity on public.resume_intake_items;
+create trigger trg_resume_intake_tenant_integrity
+  before insert or update of job_id, candidate_id, application_id, organization_id
+  on public.resume_intake_items
+  for each row execute function public.enforce_resume_intake_tenant_integrity();
+
+-- =============================================================================
+-- Row-Level Security
+--
+-- The API checks the role too, for a readable error message. This is the part
+-- that actually holds: the browser has an authenticated PostgREST client, so a
+-- Viewer can POST straight to /rest/v1/resume_intake_items and never touch a
+-- route handler. WITH CHECK is what stops them.
+-- =============================================================================
+alter table public.resume_intake_items enable row level security;
+
+drop policy if exists resume_intake_select_member on public.resume_intake_items;
+create policy resume_intake_select_member on public.resume_intake_items
+  for select using (public.is_org_member(organization_id));
+
+drop policy if exists resume_intake_insert_staff on public.resume_intake_items;
+create policy resume_intake_insert_staff on public.resume_intake_items
+  for insert with check (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+drop policy if exists resume_intake_update_staff on public.resume_intake_items;
+create policy resume_intake_update_staff on public.resume_intake_items
+  for update
+  using (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  )
+  with check (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+drop policy if exists resume_intake_delete_owner_admin on public.resume_intake_items;
+create policy resume_intake_delete_owner_admin on public.resume_intake_items
+  for delete using (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+-- =============================================================================
+-- Storage note
+--
+-- Conflicted files are parked at <organization_id>/_intake/<uuid>-<name> in the
+-- existing private 'resumes' bucket. No new policy is needed: the Module 6
+-- policies authorise on the FIRST path segment, which is still the organization
+-- id, so a member of org A can neither read nor write anything under org B's
+-- _intake folder either.
+-- =============================================================================

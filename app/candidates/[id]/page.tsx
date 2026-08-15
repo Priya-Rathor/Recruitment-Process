@@ -6,6 +6,7 @@ import { SkeletonRows } from "@/components/states";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { getCandidate, getCandidateDuplicates } from "@/lib/candidates/queries";
 import { listApplications } from "@/lib/applications/queries";
+import { listPendingReviews, pendingReviewSummary } from "@/lib/resumes/pending";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/types";
 import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { CandidateForm } from "../CandidateForm";
@@ -45,7 +46,7 @@ async function CandidateDetailContent({
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
 
-  const [duplicates, { applications }] = await Promise.all([
+  const [duplicates, { applications }, pendingReviews] = await Promise.all([
     getCandidateDuplicates({ organizationId: membership.organization.id, candidateId }),
     listApplications({
       organizationId: membership.organization.id,
@@ -54,7 +55,13 @@ async function CandidateDetailContent({
       viewerId: membership.user_id,
       limit: 25,
     }),
+    // Resumes that proposed changes nobody has looked at yet. Bulk intake
+    // queues these instead of interrupting a thirty-file upload thirty times,
+    // which only works if the queue is visible somewhere.
+    listPendingReviews({ organizationId: membership.organization.id, candidate }),
   ]);
+
+  const pendingSummary = pendingReviewSummary(pendingReviews);
 
   // Edit mode is a query param rather than a separate route: the spec lists
   // only /candidates/[id], and editing in place keeps the duplicate context
@@ -105,6 +112,38 @@ async function CandidateDetailContent({
           )}
         </div>
       </div>
+
+      {/*
+        Queued profile updates. Info-toned, not a warning: nothing is wrong, a
+        resume simply said something different and we declined to guess. The
+        link goes to Module 6's existing review screen — the same Conflict Row
+        UI, reached from a new place rather than rebuilt.
+      */}
+      {pendingSummary && canEdit && (
+        <div className="ai-panel mb-4">
+          <div className="is-flex is-justify-content-space-between is-align-items-center">
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--color-info)" }}>
+                From an uploaded resume
+              </p>
+              <p style={{ fontSize: 14 }}>{pendingSummary}</p>
+            </div>
+            <Link
+              className="button is-small"
+              // No resume id in the URL: the review screen already resolves the
+              // most recent parsed resume itself, and intake always stores the
+              // new one as the newest. Passing an id it ignores would be a lie.
+              href={`/candidates/${candidate.id}/resume/review`}
+            >
+              Review
+            </Link>
+          </div>
+          <p className="has-text-secondary mt-2" style={{ fontSize: 12 }}>
+            Nothing has been changed on this profile. Each difference is shown side by side for
+            you to accept or keep.
+          </p>
+        </div>
+      )}
 
       {duplicates.length > 0 && (
         <div className="card mb-4" style={{ borderColor: "var(--color-warning)" }}>

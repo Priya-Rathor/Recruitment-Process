@@ -9,8 +9,10 @@ import { formatExperience, formatSalary } from "@/lib/jobs/format";
 import { listApplications } from "@/lib/applications/queries";
 import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { WORK_MODE_LABELS, type JobQuestion } from "@/lib/types";
+import { listUnresolvedConflicts, loadConflictCandidates } from "@/lib/intake/queries";
 import { HealthBadge, HealthReasons, StatusBadge } from "../JobBadges";
 import { ArchiveJobButton } from "./JobActions";
+import { IntakeModal } from "./IntakeModal";
 
 export const metadata = { title: "Job · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -69,13 +71,27 @@ async function JobDetailContent({ jobId }: { jobId: string }) {
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
 
-  const { applications } = await listApplications({
-    organizationId: membership.organization.id,
-    filters: { jobId },
-    viewerRole: membership.role,
-    viewerId: membership.user_id,
-    limit: 50,
-  });
+  const [{ applications }, intakeConflicts] = await Promise.all([
+    listApplications({
+      organizationId: membership.organization.id,
+      filters: { jobId },
+      viewerRole: membership.role,
+      viewerId: membership.user_id,
+      limit: 50,
+    }),
+    listUnresolvedConflicts({ organizationId: membership.organization.id, jobId }),
+  ]);
+
+  // Names for the candidates each conflicted file pointed at. One query for the
+  // whole banner rather than one per row.
+  const conflictNames = new Map(
+    (
+      await loadConflictCandidates({
+        organizationId: membership.organization.id,
+        candidateIds: [...new Set(intakeConflicts.flatMap((item) => item.conflict_candidate_ids))],
+      })
+    ).map((candidate) => [candidate.id, candidate.name])
+  );
 
   return (
     <>
@@ -96,12 +112,66 @@ async function JobDetailContent({ jobId }: { jobId: string }) {
           </div>
         </div>
 
+        {/*
+          Two frequent actions, equal size, distinct styles. "Add candidates" is
+          outlined rather than filled so the pair reads as two choices instead of
+          one control with a shadow. Both are hidden for a Viewer — the API
+          refuses them anyway, but showing a button that always fails is worse
+          than not showing it.
+        */}
         {canEdit && !job.archived_at && (
-          <Link className="button is-primary" href={`/jobs/${job.id}/edit`}>
-            Edit job
-          </Link>
+          <div className="is-flex" style={{ gap: "var(--space-2)" }}>
+            <IntakeModal jobId={job.id} jobTitle={job.title} />
+            <Link className="button is-primary" href={`/jobs/${job.id}/edit`}>
+              Edit job
+            </Link>
+          </div>
         )}
       </div>
+
+      {/*
+        Files the matcher refused to guess at. They created nothing, so this is
+        the only place they exist in the UI — without it, a conflict would be
+        indistinguishable from a file nobody ever uploaded.
+      */}
+      {intakeConflicts.length > 0 && (
+        <div className="card mb-4" style={{ borderColor: "var(--status-attention-text)" }}>
+          <h2 className="title is-5" style={{ color: "var(--status-attention-text)" }}>
+            {intakeConflicts.length === 1
+              ? "1 resume needs manual review"
+              : `${intakeConflicts.length} resumes need manual review`}
+          </h2>
+          <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>
+            Each of these matched more than one existing candidate, so no candidate or application
+            was created. Open the candidates below and decide who the resume belongs to.
+          </p>
+          <ul>
+            {intakeConflicts.map((item) => (
+              <li
+                key={item.id}
+                className="py-3"
+                style={{ borderTop: "1px solid var(--color-border)" }}
+              >
+                <p style={{ fontSize: 14, fontWeight: 600 }}>{item.file_name}</p>
+                <p className="has-text-secondary" style={{ fontSize: 13 }}>
+                  Matched{" "}
+                  {item.conflict_candidate_ids
+                    .map((id) => conflictNames.get(id) ?? "an archived candidate")
+                    .join(" and ")}
+                  .
+                </p>
+                <div className="is-flex mt-2" style={{ gap: "var(--space-3)", flexWrap: "wrap" }}>
+                  {item.conflict_candidate_ids.map((id) => (
+                    <Link key={id} href={`/candidates/${id}`} style={{ fontSize: 13 }}>
+                      {conflictNames.get(id) ?? "View candidate"}
+                    </Link>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="card mb-4">
         <h2 className="title is-5">Health</h2>
