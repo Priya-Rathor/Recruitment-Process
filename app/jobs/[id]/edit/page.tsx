@@ -4,6 +4,8 @@ import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, requireCurrentUser, hasRole } from "@/lib/tenant";
 import { getJobDetail, listTeamMembers } from "@/lib/jobs/queries";
 import { listClients } from "@/lib/clients/queries";
+import { listJobStages } from "@/lib/hiring-stages/queries";
+import { stagesToFormState } from "@/lib/hiring-stages/formState";
 import { JobForm } from "../../JobForm";
 
 export const metadata = { title: "Edit job" };
@@ -33,10 +35,11 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const [job, members, { clients }] = await Promise.all([
+  const [job, members, { clients }, stages] = await Promise.all([
     getJobDetail({ organizationId: membership.organization.id, jobId: id }),
     listTeamMembers(membership.organization.id),
     listClients({ organizationId: membership.organization.id }),
+    listJobStages({ organizationId: membership.organization.id, jobId: id }),
   ]);
 
   if (!job) notFound();
@@ -71,6 +74,7 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
         clients={clients}
         currentUserId={user.id}
         canClose={canClose}
+        initialStages={stagesToFormState(stages)}
       />
     </AppShell>
   );

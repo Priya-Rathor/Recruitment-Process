@@ -13,6 +13,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormError } from "@/components/states";
+import { HiringStages, emptyStages, type StagesState } from "./HiringStages";
+import { STAGES } from "@/lib/hiring-stages/catalog";
 import { mergeProposal, type FieldConflict, type JobProposal } from "@/lib/ai/extractJobFromDescription";
 import {
   JOB_STATUSES,
@@ -99,11 +101,17 @@ export function JobForm({
   clients,
   currentUserId,
   canClose,
+  initialStages,
+  canEditStages = true,
 }: {
   mode: "create" | "edit";
   job?: Job;
   initialScreeningQuestions?: string[];
   initialInterviewQuestions?: string[];
+  /** Existing stage rows, when editing. Absent on create. */
+  initialStages?: StagesState;
+  /** False for a Viewer, who may see the configuration but not change it. */
+  canEditStages?: boolean;
   members: { id: string; name: string; role: string }[];
   clients: { id: string; name: string }[];
   currentUserId: string;
@@ -120,6 +128,11 @@ export function JobForm({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Hiring stages are held beside the form rather than inside FormState: they
+  // save to their own endpoint, because on create the job has no id until the
+  // first request returns.
+  const [stages, setStages] = useState<StagesState>(() => initialStages ?? emptyStages());
 
   // AI state
   const [pasted, setPasted] = useState("");
@@ -241,9 +254,36 @@ export function JobForm({
       return;
     }
 
-    setDirty(false);
     const id = mode === "create" ? (result.data as Job).id : job!.id;
-    router.push(`/jobs/${id}`);
+
+    // Stages are saved SECOND, and only after the job exists — on create there
+    // is no job id to attach them to until the request above returns.
+    //
+    // A failure here does not discard the job that was just saved. The job is
+    // the important half; the stages can be set again from the edit page, and
+    // losing a valid job because a stage row would not write would be a far
+    // worse trade.
+    const stagesResponse = await fetch(`/api/jobs/${id}/hiring-stages`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stages: STAGES.map((stage) => ({
+          stage_key: stage.key,
+          enabled: stages[stage.key].enabled,
+          prompt_template: stages[stage.key].promptTemplate,
+          config: stages[stage.key].config,
+        })),
+      }),
+    });
+
+    setDirty(false);
+
+    // Navigate EITHER WAY. The job exists from this point on, so staying on the
+    // create form would leave a live job behind an unsubmitted-looking form —
+    // and a second click on "Create job" would make a duplicate. The stage
+    // failure is carried to the job page instead, where it can be acted on.
+    const query = stagesResponse.ok ? "" : "?stages_failed=1";
+    router.push(`/jobs/${id}${query}`);
     router.refresh();
   }
 
@@ -551,6 +591,20 @@ export function JobForm({
           onChange={(questions) => update("screeningQuestions", questions)}
         />
       </div>
+
+      {/* ---- Hiring stages ------------------------------------------------
+          After the question sets, because the AI screening stage edits the
+          screening list above and the two read better adjacent. ----------- */}
+      <HiringStages
+        stages={stages}
+        onChange={(next) => {
+          setStages(next);
+          setDirty(true);
+        }}
+        screeningQuestions={form.screeningQuestions}
+        onScreeningQuestionsChange={(questions) => update("screeningQuestions", questions)}
+        readOnly={!canEditStages}
+      />
 
       <div className="card mb-4">
         <h2 className="title is-5">Interview questions</h2>

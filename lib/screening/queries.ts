@@ -1,6 +1,9 @@
 // Screening call queries and the orchestration that places one.
 import { createClient } from "@/lib/supabase/server";
 import { buildCallScript } from "@/lib/screening/script";
+import { getEnabledScreeningStage } from "@/lib/hiring-stages/queries";
+import { renderTemplate } from "@/lib/hiring-stages/placeholders";
+import { buildPlaceholderValues } from "@/lib/hiring-stages/values";
 import {
   canPlaceFirstCall,
   decideRetry,
@@ -141,8 +144,15 @@ export async function startScreeningCall({
 
   const { data, error } = await supabase
     .from("applications")
+    // Widened for placeholder substitution: a stage script can reference any
+    // catalogued job or candidate field, so all of them have to be loaded here
+    // or the token silently renders empty.
     .select(
-      "id, candidate:candidates(name, phone), job:jobs(id, title)"
+      "id, stage, match_score, " +
+        "candidate:candidates(name, phone, email, current_company, current_role, " +
+        "total_experience_years, expected_salary, notice_period_days), " +
+        "job:jobs(id, title, location, work_mode, experience_min, experience_max, " +
+        "salary_min, salary_max, required_skills, preferred_skills, client:clients(name))"
     )
     .eq("id", applicationId)
     .eq("organization_id", organizationId)
@@ -151,8 +161,31 @@ export async function startScreeningCall({
   if (error || !data) return { ok: false, error: "Application not found." };
 
   const row = data as unknown as {
-    candidate: { name: string; phone: string | null } | null;
-    job: { id: string; title: string } | null;
+    stage: string | null;
+    match_score: number | null;
+    candidate:
+      | ({ name: string; phone: string | null } & {
+          email: string | null;
+          current_company: string | null;
+          current_role: string | null;
+          total_experience_years: number | null;
+          expected_salary: number | null;
+          notice_period_days: number | null;
+        })
+      | null;
+    job:
+      | ({ id: string; title: string } & {
+          location: string | null;
+          work_mode: "onsite" | "remote" | "hybrid" | null;
+          experience_min: number | null;
+          experience_max: number | null;
+          salary_min: number | null;
+          salary_max: number | null;
+          required_skills: string[] | null;
+          preferred_skills: string[] | null;
+          client: { name: string } | null;
+        })
+      | null;
   };
 
   if (!row.candidate?.phone) {
@@ -237,11 +270,32 @@ export async function startScreeningCall({
 
   const callId = (created as { id: string }).id;
 
+  // Module 3's hiring stage, if this job has AI screening switched on. The
+  // prompt is rendered HERE, with this candidate's details, and never stored
+  // rendered — a stored script with a name baked in would be wrong for every
+  // other candidate.
+  const screeningStage = await getEnabledScreeningStage({
+    organizationId,
+    jobId: row.job.id,
+  });
+
+  const instructions = screeningStage?.prompt_template
+    ? renderTemplate(
+        screeningStage.prompt_template,
+        buildPlaceholderValues({
+          job: { ...row.job, client_name: row.job.client?.name ?? null },
+          candidate: row.candidate,
+          application: { stage: row.stage, match_score: row.match_score },
+        })
+      )
+    : null;
+
   const script = buildCallScript({
     candidateName: row.candidate.name,
     jobTitle: row.job.title,
     organizationName,
     questions,
+    instructions,
   });
 
   const result = await placeCall({

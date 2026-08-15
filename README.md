@@ -74,6 +74,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/notifications/` | Module 15's templates, fixed-fact guard, send pipeline, and reminders |
 | `lib/analytics/` | Module 16's metric calculators, trend direction, filters, and CSV export |
 | `lib/settings/` | Module 17's organization settings, preferences, and integration health |
+| `lib/hiring-stages/` | Per-job hiring stages, placeholder tokens (see `docs/modules/03-hiring-stages.md`) |
 | `lib/intake/` | Bulk resume intake — deterministic candidate matching, per-file processing (see `docs/modules/18-bulk-resume-intake.md`) |
 | `lib/integrations/` | Provider adapters (connect/test/getStatus/disconnect) |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |

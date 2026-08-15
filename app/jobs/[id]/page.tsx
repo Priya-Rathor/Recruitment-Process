@@ -10,6 +10,11 @@ import { listApplications } from "@/lib/applications/queries";
 import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { WORK_MODE_LABELS, type JobQuestion } from "@/lib/types";
 import { listUnresolvedConflicts, loadConflictCandidates } from "@/lib/intake/queries";
+import { listJobStages } from "@/lib/hiring-stages/queries";
+import { STAGES, CONFIGURATION_ONLY_NOTE } from "@/lib/hiring-stages/catalog";
+import { getOrganizationSettings } from "@/lib/settings/queries";
+import type { AiScreeningConfig } from "@/lib/hiring-stages/config";
+import { ScreeningSummary } from "./ScreeningSummary";
 import { HealthBadge, HealthReasons, StatusBadge } from "../JobBadges";
 import { ArchiveJobButton } from "./JobActions";
 import { IntakeModal } from "./IntakeModal";
@@ -61,7 +66,14 @@ function QuestionList({
   );
 }
 
-async function JobDetailContent({ jobId }: { jobId: string }) {
+async function JobDetailContent({
+  jobId,
+  stagesFailed,
+}: {
+  jobId: string;
+  /** Set when the job saved but its hiring stages did not (see JobForm). */
+  stagesFailed: boolean;
+}) {
   const membership = await requireMembershipOrRedirect();
   const job = await getJobDetail({ organizationId: membership.organization.id, jobId });
   // A job belonging to another organization resolves to null here, so a guessed
@@ -71,7 +83,7 @@ async function JobDetailContent({ jobId }: { jobId: string }) {
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
 
-  const [{ applications }, intakeConflicts] = await Promise.all([
+  const [{ applications }, intakeConflicts, hiringStages, orgSettings] = await Promise.all([
     listApplications({
       organizationId: membership.organization.id,
       filters: { jobId },
@@ -80,6 +92,8 @@ async function JobDetailContent({ jobId }: { jobId: string }) {
       limit: 50,
     }),
     listUnresolvedConflicts({ organizationId: membership.organization.id, jobId }),
+    listJobStages({ organizationId: membership.organization.id, jobId }),
+    getOrganizationSettings(membership.organization.id),
   ]);
 
   // Names for the candidates each conflicted file pointed at. One query for the
@@ -172,6 +186,61 @@ async function JobDetailContent({ jobId }: { jobId: string }) {
           </ul>
         </div>
       )}
+
+      {stagesFailed && (
+        <div className="card mb-4" style={{ borderColor: "var(--status-attention-text)" }}>
+          <h2 className="title is-5" style={{ color: "var(--status-attention-text)" }}>
+            Hiring stages weren&apos;t saved
+          </h2>
+          <p className="has-text-secondary" style={{ fontSize: "var(--text-label)" }}>
+            The job itself saved correctly. Open Edit job and set the hiring stages again — if it
+            keeps failing, the <code>job_hiring_stages</code> table may not exist yet.
+          </p>
+        </div>
+      )}
+
+      {/* ---- Hiring stages, at a glance --------------------------------- */}
+      {hiringStages.some((stage) => stage.enabled) && (
+        <div className="card mb-4">
+          <h2 className="title is-5">Hiring stages</h2>
+          <p className="has-text-secondary mb-3" style={{ fontSize: "var(--text-label)" }}>
+            What candidates for this role go through.
+          </p>
+          <ul className="stage-summary">
+            {STAGES.map((definition) => {
+              const stage = hiringStages.find((row) => row.stage_key === definition.key);
+              if (!stage?.enabled) return null;
+              return (
+                <li key={definition.key} className="stage-summary__row">
+                  <span className="stage-summary__name">{definition.label}</span>
+                  {definition.execution === "configuration_only" ? (
+                    <span className="intake-chip is-neutral">{CONFIGURATION_ONLY_NOTE}</span>
+                  ) : (
+                    <span className="intake-chip is-success">Active</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* The screening stage gets a fuller card of its own — it is the one that
+          actually calls a candidate, so its setup is worth seeing in full. */}
+      {(() => {
+        const screening = hiringStages.find((row) => row.stage_key === "ai_screening_call");
+        if (!screening?.enabled) return null;
+        return (
+          <ScreeningSummary
+            jobId={job.id}
+            promptTemplate={screening.prompt_template}
+            config={screening.config as AiScreeningConfig}
+            questionCount={job.screeningQuestions.length}
+            organizationMaxAttempts={orgSettings.settings.screening_settings.maxAttempts}
+            canEdit={canEdit}
+          />
+        );
+      })()}
 
       <div className="card mb-4">
         <h2 className="title is-5">Health</h2>
@@ -321,10 +390,12 @@ async function JobDetailContent({ jobId }: { jobId: string }) {
 
 export default async function JobDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ stages_failed?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
 
   return (
     <AppShell>
@@ -335,7 +406,7 @@ export default async function JobDetailPage({
           </div>
         }
       >
-        <JobDetailContent jobId={id} />
+        <JobDetailContent jobId={id} stagesFailed={query.stages_failed === "1"} />
       </Suspense>
     </AppShell>
   );

@@ -21,7 +21,12 @@
 // =============================================================================
 
 export type ScriptSegment = {
-  kind: "consent" | "greeting" | "question" | "closing";
+  /**
+   * "briefing" carries the job's configured screening prompt (Module 3's
+   * hiring stages). It is SUPPLEMENTARY: it can shape how the agent behaves,
+   * and it can never come before or replace the consent disclosure.
+   */
+  kind: "consent" | "greeting" | "briefing" | "question" | "closing";
   text: string;
   /** Segments the candidate is expected to answer. */
   expectsAnswer: boolean;
@@ -42,10 +47,26 @@ export type ScriptInput = {
   /** From job_screening_questions, in display order. */
   questions: string[];
   language?: string;
+  /**
+   * The job's screening stage prompt, ALREADY RENDERED — tokens substituted by
+   * lib/hiring-stages/placeholders.renderTemplate() before it gets here.
+   *
+   * Supplements the script; it does not replace it. The spec for hiring stages
+   * says "replacing/supplementing its current static question list", and only
+   * supplementing is safe: the consent disclosure is a legal obligation the
+   * Privacy chapter assigns to this module, and a recruiter-authored prompt
+   * that could displace it would be a compliance hole with a text box in front
+   * of it. So this lands AFTER consent and AFTER the greeting, and the
+   * questions still come from job_screening_questions.
+   */
+  instructions?: string | null;
 };
 
 /** Longest script we will send. Beyond this a call stops being a screen. */
 export const MAX_QUESTIONS = 12;
+
+/** Cap on the job's briefing, so one job cannot turn a screen into a monologue. */
+export const MAX_INSTRUCTIONS_LENGTH = 2000;
 
 /**
  * The mandatory opening. States three things a recruiter is obliged to disclose:
@@ -103,6 +124,18 @@ export function buildCallScript(input: ScriptInput): CallScript {
       `I'll ask a few short questions about your experience and availability.`,
     expectsAnswer: false,
   });
+
+  // The job's own briefing, if one is configured. Placed here — after consent,
+  // after the greeting, before the questions — so it can set tone and context
+  // without ever being the first thing a candidate hears.
+  const instructions = input.instructions?.trim();
+  if (instructions) {
+    segments.push({
+      kind: "briefing",
+      text: instructions.slice(0, MAX_INSTRUCTIONS_LENGTH),
+      expectsAnswer: false,
+    });
+  }
 
   for (const question of questions) {
     segments.push({ kind: "question", text: question, expectsAnswer: true });
