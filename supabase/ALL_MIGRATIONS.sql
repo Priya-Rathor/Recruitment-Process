@@ -4950,25 +4950,36 @@ create policy job_hiring_stages_write_staff on public.job_hiring_stages
 -- =============================================================================
 
 -- =============================================================================
--- THE VIEWS HAVE TO GO FIRST.
+-- EVERYTHING THAT DEPENDS ON THE COLUMN HAS TO GO FIRST.
 --
--- Postgres refuses `ALTER TABLE ... ALTER COLUMN ... TYPE` while any view
--- references that column:
+-- Postgres refuses `ALTER TABLE ... ALTER COLUMN ... TYPE` while anything still
+-- references that column, and it reports one blocker at a time — so this
+-- migration failed twice, once per category:
 --
 --   ERROR: cannot alter type of a column used by a view or rule
+--   ERROR: cannot alter type of a column used in a trigger definition
 --
--- Four of Module 16's views read applications.stage or
--- application_stage_history.stage, so all four are dropped here and recreated
--- at the bottom of this file. This is why the first version of this migration
--- failed: it dropped only two of them, and did it AFTER the swap.
+-- VIEWS. Four of Module 16's views read applications.stage or
+-- application_stage_history.stage. All four are dropped here and recreated at
+-- the bottom. (analytics_client_performance and analytics_screening_metrics
+-- read neither, so they are left alone.)
 --
--- analytics_client_performance and analytics_screening_metrics are left alone —
--- neither reads a stage column, so neither blocks anything.
+-- TRIGGERS. A trigger declared `update OF <column>` depends on that column —
+-- the column list is part of the definition, not just a filter. Only
+-- trg_applications_stage_history qualifies: the other triggers on these tables
+-- either name different columns (tenant integrity: candidate_id, job_id,
+-- organization_id) or name none at all (touch_updated_at), and a trigger with
+-- no column list has no column dependency.
 -- =============================================================================
 drop view if exists public.analytics_application_funnel;
 drop view if exists public.analytics_stage_durations;
 drop view if exists public.analytics_recruiter_performance;
 drop view if exists public.analytics_job_performance;
+
+-- Recreated below, after the swap, with its function unchanged. The stage
+-- history it maintains is untouched by this — only the column's TYPE changes,
+-- and the rows keep their (remapped) values.
+drop trigger if exists trg_applications_stage_history on public.applications;
 
 do $$
 declare
@@ -5167,6 +5178,14 @@ begin
   return new;
 end;
 $$;
+
+-- Recreated now the column has its new type. Identical to migration 0004's
+-- definition; it was dropped at the top only because `update of stage` made it
+-- a dependency of the column.
+drop trigger if exists trg_applications_stage_history on public.applications;
+create trigger trg_applications_stage_history
+  after insert or update of stage on public.applications
+  for each row execute function public.record_application_stage_change();
 
 drop trigger if exists trg_applications_stamp_rejected_stage on public.applications;
 create trigger trg_applications_stamp_rejected_stage
