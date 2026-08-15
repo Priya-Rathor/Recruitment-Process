@@ -4949,10 +4949,36 @@ create policy job_hiring_stages_write_staff on public.job_hiring_stages
 -- exists.
 -- =============================================================================
 
+-- =============================================================================
+-- THE VIEWS HAVE TO GO FIRST.
+--
+-- Postgres refuses `ALTER TABLE ... ALTER COLUMN ... TYPE` while any view
+-- references that column:
+--
+--   ERROR: cannot alter type of a column used by a view or rule
+--
+-- Four of Module 16's views read applications.stage or
+-- application_stage_history.stage, so all four are dropped here and recreated
+-- at the bottom of this file. This is why the first version of this migration
+-- failed: it dropped only two of them, and did it AFTER the swap.
+--
+-- analytics_client_performance and analytics_screening_metrics are left alone —
+-- neither reads a stage column, so neither blocks anything.
+-- =============================================================================
+drop view if exists public.analytics_application_funnel;
+drop view if exists public.analytics_stage_durations;
+drop view if exists public.analytics_recruiter_performance;
+drop view if exists public.analytics_job_performance;
+
 do $$
 declare
   v_mapping text;
 begin
+  -- Defensive: a previous failed attempt inside a DO block rolls back, but a
+  -- half-run script executed statement-by-statement could leave this behind,
+  -- and `create type` would then fail on a name clash.
+  drop type if exists public.application_stage_next;
+
   -- Idempotent: only runs while the OLD shape is still in place.
   if not exists (
     select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
@@ -5181,9 +5207,6 @@ where a.id = previous.application_id
 -- funnel.
 -- =============================================================================
 
-drop view if exists public.analytics_job_performance;
-drop view if exists public.analytics_application_funnel;
-
 create view public.analytics_application_funnel
 with (security_invoker = true) as
 select
@@ -5253,6 +5276,51 @@ select
 from public.jobs j
 left join public.applications a on a.job_id = j.id
 group by j.id;
+
+-- -----------------------------------------------------------------------------
+-- The two views this migration does not change, recreated verbatim.
+--
+-- They were dropped at the top only because they reference a stage column and
+-- would otherwise have blocked the type swap. Their definitions are unchanged
+-- from migration 0015 — 'hired', 'rejected' and 'withdrawn' all survive the
+-- rename, so nothing in them needed rewriting.
+-- -----------------------------------------------------------------------------
+create view public.analytics_stage_durations
+with (security_invoker = true) as
+select
+  h.id,
+  h.organization_id,
+  h.application_id,
+  h.stage,
+  h.entered_at,
+  h.exited_at,
+  extract(epoch from (h.exited_at - h.entered_at)) / 86400.0 as days_in_stage,
+  a.assigned_recruiter_id,
+  a.job_id,
+  j.client_id
+from public.application_stage_history h
+join public.applications a on a.id = h.application_id
+left join public.jobs j on j.id = a.job_id
+where h.exited_at is not null;
+
+create view public.analytics_recruiter_performance
+with (security_invoker = true) as
+select
+  a.organization_id,
+  a.assigned_recruiter_id                                as recruiter_id,
+  u.name                                                 as recruiter_name,
+  u.email                                                as recruiter_email,
+  count(*)                                               as applications,
+  count(*) filter (where a.archived_at is null
+    and a.stage not in ('hired', 'rejected', 'withdrawn')) as active_applications,
+  count(*) filter (where a.stage = 'hired')              as hires,
+  count(*) filter (where a.stage = 'rejected')           as rejected,
+  min(a.created_at)                                      as first_application_at,
+  max(a.created_at)                                      as last_application_at
+from public.applications a
+left join public.users u on u.id = a.assigned_recruiter_id
+where a.assigned_recruiter_id is not null
+group by a.organization_id, a.assigned_recruiter_id, u.name, u.email;
 
 
 -- ############################################################################
