@@ -81,6 +81,7 @@ async function TeamData() {
       canManage={canManage}
       callerRole={membership.role}
       currentUserId={user.id}
+      timeZone={membership.organization.timezone}
       members={(membersResult.data as Member[] | null) ?? []}
       invites={(invitesResult.data as InviteRow[] | null) ?? []}
       membersFailed={Boolean(membersResult.error)}

@@ -27,6 +27,7 @@ import { trendArrow, trendColor } from "@/lib/analytics/trends";
 import { AnalyticsFilterBar } from "./AnalyticsFilters";
 import { AskAnalytics } from "./AskAnalytics";
 import { BarChart, ChartCard, FunnelChart, KpiTile } from "./charts";
+import { Briefcase, Building2, CheckCircle2, Inbox, Users } from "lucide-react";
 
 export const metadata = { title: "Analytics · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -192,7 +193,9 @@ async function AnalyticsBody({
             subtitle="Each step counts applications that ever reached it, not those sitting there now."
           >
             {report.funnel.total === 0 ? (
-              <EmptyState message="No applications in this period." />
+              <EmptyState headline="No applications"
+            message="Nothing was created in this date range. Try a wider period."
+            icon={Inbox} />
             ) : (
               <FunnelChart
                 bars={report.funnel.steps.map((step) => ({
@@ -392,7 +395,9 @@ async function AnalyticsBody({
             subtitle="Only rules that actually failed appear here."
           >
             {report.automations.failures.length === 0 ? (
-              <EmptyState message="No automation failed in this period." />
+              <EmptyState headline="No failures"
+            message="Every automation run in this period completed or was skipped."
+            icon={CheckCircle2} />
             ) : (
               <BarChart
                 bars={report.automations.failures.map((failure) => ({
@@ -435,7 +440,9 @@ async function JobsTab({
 }) {
   const { rows, failed } = await fetchJobPerformance({ organizationId, filters });
   if (failed) return <ErrorState message="Couldn't load job performance." />;
-  if (rows.length === 0) return <EmptyState message="No jobs to report on yet." />;
+  if (rows.length === 0) return <EmptyState headline="No jobs to report on"
+            message="Job performance appears here once you have created a job."
+            icon={Briefcase} />;
 
   return (
     <ChartCard title="Job performance" subtitle="Ordered by application volume.">
@@ -485,7 +492,9 @@ async function JobsTab({
 async function ClientsTab({ organizationId }: { organizationId: string }) {
   const { rows, failed } = await fetchClientPerformance({ organizationId });
   if (failed) return <ErrorState message="Couldn't load client performance." />;
-  if (rows.length === 0) return <EmptyState message="No clients to report on yet." />;
+  if (rows.length === 0) return <EmptyState headline="No clients to report on"
+            message="Client turnaround appears here once you add a client."
+            icon={Building2} />;
 
   return (
     <ChartCard
@@ -550,7 +559,9 @@ async function RecruitersTab({
 }) {
   const { rows, failed } = await fetchRecruiterPerformance({ organizationId, role });
   if (failed) return <ErrorState message="Couldn't load recruiter figures." />;
-  if (rows.length === 0) return <EmptyState message="No assigned work to report on yet." />;
+  if (rows.length === 0) return <EmptyState headline="No assigned work"
+            message="Figures appear here once applications are assigned to recruiters."
+            icon={Users} />;
 
   /*
     TWO SEPARATE VIEWS, not one ranked table.

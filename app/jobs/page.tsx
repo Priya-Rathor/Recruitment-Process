@@ -2,11 +2,13 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/states";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Briefcase, Plus } from "lucide-react";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { listJobsWithHealth, listTeamMembers } from "@/lib/jobs/queries";
 import { listClients } from "@/lib/clients/queries";
 import { formatExperience } from "@/lib/jobs/format";
-import { isJobStatus, JOB_STATUS_LABELS, WORK_MODE_LABELS } from "@/lib/types";
+import { isJobStatus, WORK_MODE_LABELS } from "@/lib/types";
 import { HealthBadge, StatusBadge } from "./JobBadges";
 import { JobFilters } from "./JobFilters";
 
@@ -57,10 +59,12 @@ async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
           <ErrorState message="Couldn't load jobs." />
         ) : jobs.length === 0 ? (
           <EmptyState
+            icon={Briefcase}
+            headline={hasFilters ? "No matching jobs" : "No jobs yet"}
             message={
               hasFilters
-                ? "No jobs match these filters."
-                : "No jobs yet. Create your first requisition — you can paste a job description and let AI structure it."
+                ? "Nothing matches these filters. Clear them to see every job."
+                : "Create your first requisition. You can paste a job description and let AI structure it."
             }
             action={
               hasFilters ? (
@@ -68,8 +72,11 @@ async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
                   Clear filters
                 </Link>
               ) : hasRole(membership.role, ["owner", "admin", "recruiter"]) ? (
+                // Same name as the header action — an action keeps its name
+                // through the whole flow.
                 <Link className="button is-primary" href="/jobs/new">
-                  Create a job
+                  <Plus size={16} aria-hidden="true" />
+                  Create job
                 </Link>
               ) : undefined
             }
@@ -152,20 +159,19 @@ export default async function JobsPage({
 
   return (
     <AppShell>
-      <div className="is-flex is-justify-content-space-between is-align-items-flex-end mb-5">
-        <div>
-          <h1 className="title is-4 mb-1">Jobs</h1>
-          <p className="has-text-secondary" style={{ fontSize: 13 }}>
-            {Object.values(JOB_STATUS_LABELS).join(" · ")}
-          </p>
-        </div>
-        {/* Viewer cannot create, so the action is absent rather than greyed out. */}
-        {canCreate && (
-          <Link className="button is-primary" href="/jobs/new">
-            New job
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        title="Jobs"
+        description="Every requisition you are hiring for, and how each one is doing."
+        action={
+          // Viewer cannot create, so the action is absent rather than greyed out.
+          canCreate ? (
+            <Link className="button is-primary" href="/jobs/new">
+              <Plus size={16} aria-hidden="true" />
+              Create job
+            </Link>
+          ) : undefined
+        }
+      />
 
       <Suspense
         fallback={

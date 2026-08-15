@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { EmptyState, ErrorState } from "@/components/states";
 import type { AttentionItem } from "@/lib/dashboard/metrics";
+import { CheckCircle2 } from "lucide-react";
 
 const SEVERITY_COLOR: Record<AttentionItem["severity"], string> = {
   error: "var(--color-error)",
@@ -28,7 +29,9 @@ export function AttentionQueue({
       ) : status === "pending" ? (
         <EmptyState message="The attention queue starts working once Applications (Module 5) exists — that's where stalled work is detected." />
       ) : items.length === 0 ? (
-        <EmptyState message="Nothing is waiting on a decision right now." />
+        <EmptyState headline="Nothing needs you"
+            message="Applications waiting too long in a stage will appear here."
+            icon={CheckCircle2} />
       ) : (
         <ul>
           {items.map((item) => (

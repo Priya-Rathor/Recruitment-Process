@@ -47,6 +47,7 @@ export default async function SubmissionPage({
         candidateName={application.candidate_name}
         existing={existing}
         canSubmit={hasRole(membership.role, ["owner", "admin", "recruiter"])}
+        timeZone={membership.organization.timezone}
       />
     </AppShell>
   );

@@ -16,6 +16,7 @@ import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
 import { RunStatusBadge, StatusBadge } from "../AutomationBadges";
 import { ActivationPanel } from "./ActivationPanel";
 import { AutomationForm } from "../AutomationForm";
+import { Zap } from "lucide-react";
 
 export const metadata = { title: "Automation · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -44,7 +45,9 @@ async function RunHistory({ automationId }: { automationId: string }) {
   if (failed) return <ErrorState message="Couldn't load the run history." />;
   if (runs.length === 0) {
     return (
-      <EmptyState message="This automation hasn't run yet. Runs appear here with what happened, including the ones it skipped." />
+      <EmptyState headline="No runs yet"
+            message="Every run appears here with what happened — including the ones it skipped."
+            icon={Zap} />
     );
   }
 

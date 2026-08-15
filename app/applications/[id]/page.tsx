@@ -14,6 +14,7 @@ import { ScheduleInterview } from "./ScheduleInterview";
 import { daysSince } from "@/lib/time";
 import { MatchScore, StageBadge } from "../StageBadge";
 import { ApplicationSummary, NoteComposer, StageControl } from "./ApplicationDetailClient";
+import { Activity } from "lucide-react";
 
 export const metadata = { title: "Application · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -84,7 +85,9 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
             <NoteComposer applicationId={application.id} canWrite={canEdit} />
 
             {timeline.length === 0 ? (
-              <EmptyState message="Nothing has happened on this application yet." />
+              <EmptyState headline="No activity yet"
+            message="Stage changes, calls and notes appear here as they happen."
+            icon={Activity} />
             ) : (
               <ul>
                 {timeline.map((event) => (

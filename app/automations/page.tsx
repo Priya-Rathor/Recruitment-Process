@@ -7,6 +7,7 @@ import { listAutomations, listRuns } from "@/lib/automations/queries";
 import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
 import { describeRule } from "@/lib/automations/catalog";
 import { RunStatusBadge, StatusBadge } from "./AutomationBadges";
+import { Zap } from "lucide-react";
 
 export const metadata = { title: "Automations · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -136,7 +137,9 @@ async function RecentRuns() {
 
   if (failed) return <ErrorState message="Couldn't load the run history." />;
   if (runs.length === 0) {
-    return <EmptyState message="Nothing has run yet." />;
+    return <EmptyState headline="No runs yet"
+            message="Runs appear here once an automation is active and its trigger fires."
+            icon={Zap} />;
   }
 
   return (

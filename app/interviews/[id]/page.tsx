@@ -11,6 +11,7 @@ import {
 } from "@/lib/interviews/feedback";
 import { CalendarBadge, InterviewStatusBadge, ModeBadge } from "../InterviewBadges";
 import { CancelInterview, FeedbackForm } from "./FeedbackForm";
+import { MessageSquare } from "lucide-react";
 
 export const metadata = { title: "Interview · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -160,7 +161,9 @@ export default async function InterviewDetailPage({
           {feedback.length === 0 && (
             <div className="card">
               <h2 className="title is-5">All feedback</h2>
-              <EmptyState message="No feedback has been submitted for this interview yet." />
+              <EmptyState headline="No feedback yet"
+            message="The assigned interviewer can submit their assessment from this page."
+            icon={MessageSquare} />
             </div>
           )}
         </div>

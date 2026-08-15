@@ -50,7 +50,10 @@ export default async function IntegrationsSettingsPage({
               </div>
             }
           >
-            <IntegrationList organizationId={membership.organization.id} />
+            <IntegrationList
+              organizationId={membership.organization.id}
+              timeZone={membership.organization.timezone}
+            />
           </Suspense>
         </>
       )}
@@ -58,13 +61,23 @@ export default async function IntegrationsSettingsPage({
   );
 }
 
-async function IntegrationList({ organizationId }: { organizationId: string }) {
+async function IntegrationList({
+  organizationId,
+  timeZone,
+}: {
+  organizationId: string;
+  timeZone: string;
+}) {
   const integrations = await getAllIntegrationHealth(organizationId);
 
   return (
     <>
       {integrations.map((integration) => (
-        <IntegrationCard key={integration.provider} integration={integration} />
+        <IntegrationCard
+          key={integration.provider}
+          integration={integration}
+          timeZone={timeZone}
+        />
       ))}
 
       <p className="has-text-secondary" style={{ fontSize: 12 }}>

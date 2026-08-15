@@ -10,6 +10,7 @@ import { getStatus } from "@/lib/integrations/bolna";
 import { buildConsentDisclosure } from "@/lib/screening/script";
 import { CallStatusBadge, ConsentBadge } from "@/app/screening-calls/CallStatusBadge";
 import { StartCallPanel } from "./StartCallPanel";
+import { Phone } from "lucide-react";
 
 export const metadata = { title: "Screening call · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -163,7 +164,9 @@ export default async function ScreeningCallPage({
         </p>
 
         {calls.length === 0 ? (
-          <EmptyState message="No screening calls have been attempted for this application." />
+          <EmptyState headline="No screening calls yet"
+            message="Start one from this application once the candidate has a phone number on file."
+            icon={Phone} />
         ) : (
           <ul>
             {calls.map((call) => (

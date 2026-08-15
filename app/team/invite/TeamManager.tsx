@@ -3,13 +3,16 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState, ErrorState, FormError } from "@/components/states";
+import { formatDateInZone } from "@/lib/time";
 import { ORG_ROLES, type OrgRole } from "@/lib/types";
 import type { InviteRow, Member } from "./page";
+import { Mail, Users } from "lucide-react";
 
 export function TeamManager({
   canManage,
   callerRole,
   currentUserId,
+  timeZone,
   members,
   invites,
   membersFailed,
@@ -18,6 +21,8 @@ export function TeamManager({
   canManage: boolean;
   callerRole: OrgRole;
   currentUserId: string;
+  /** The ORGANIZATION's timezone, so dates read the same on server and client. */
+  timeZone: string;
   members: Member[];
   invites: InviteRow[];
   membersFailed: boolean;
@@ -183,7 +188,9 @@ export function TeamManager({
           {invitesFailed ? (
             <ErrorState message="Couldn't load pending invites." onRetry={refresh} />
           ) : invites.length === 0 ? (
-            <EmptyState message="No pending invites." />
+            <EmptyState headline="No pending invites"
+            message="Invites you send appear here until they're accepted."
+            icon={Mail} />
           ) : (
             <div className="table-container">
               <table className="table is-fullwidth">
@@ -201,7 +208,11 @@ export function TeamManager({
                       <td>{invite.email}</td>
                       <td style={{ textTransform: "capitalize" }}>{invite.role}</td>
                       <td className="has-text-secondary">
-                        {new Date(invite.expires_at).toLocaleDateString()}
+                        {/* Explicit locale AND timezone: toLocaleDateString()
+                            with no arguments uses each runtime's own defaults,
+                            so the server rendered "8/22/2026" and the browser
+                            "22/08/2026" — a hydration mismatch. */}
+                        {formatDateInZone(invite.expires_at, timeZone)}
                       </td>
                       <td className="has-text-right">
                         <button
@@ -232,7 +243,9 @@ export function TeamManager({
         {membersFailed ? (
           <ErrorState message="Couldn't load your team." onRetry={refresh} />
         ) : members.length === 0 ? (
-          <EmptyState message="No team members yet." />
+          <EmptyState headline="No teammates yet"
+            message="Invite someone above to start sharing the work."
+            icon={Users} />
         ) : (
           <div className="table-container">
             <table className="table is-fullwidth">

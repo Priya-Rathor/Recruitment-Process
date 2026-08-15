@@ -8,6 +8,7 @@ import { requireMembershipOrRedirect } from "@/lib/tenant";
 import { getCandidate } from "@/lib/candidates/queries";
 import { candidateTimelineTargets, getEntityTimeline } from "@/lib/activity/queries";
 import { NarrativePanel } from "./NarrativePanel";
+import { Activity } from "lucide-react";
 
 export const metadata = { title: "Candidate activity · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -29,7 +30,9 @@ async function Timeline({ candidateId, candidateName }: { candidateId: string; c
 
   if (events.length === 0) {
     return (
-      <EmptyState message="Nothing has been recorded for this candidate yet. Activity appears here as they move through the pipeline." />
+      <EmptyState headline="No activity yet"
+            message="Everything recorded for this candidate appears here as they move through the pipeline."
+            icon={Activity} />
     );
   }
 

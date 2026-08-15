@@ -48,7 +48,12 @@ async function MatchContent({ applicationId }: { applicationId: string }) {
         </p>
       </div>
 
-      <MatchView match={match} applicationId={application.id} canRecalculate={canRecalculate} />
+      <MatchView
+        match={match}
+        applicationId={application.id}
+        canRecalculate={canRecalculate}
+        timeZone={membership.organization.timezone}
+      />
     </>
   );
 }

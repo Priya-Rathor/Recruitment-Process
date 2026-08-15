@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 async function Notifications({ unreadOnly }: { unreadOnly: boolean }) {
   const membership = await requireMembershipOrRedirect();
+  const timeZone = membership.organization.timezone;
 
   const [{ notifications, failed }, email] = await Promise.all([
     listNotifications({ organizationId: membership.organization.id, unreadOnly, limit: 100 }),
@@ -41,7 +42,7 @@ async function Notifications({ unreadOnly }: { unreadOnly: boolean }) {
       )}
 
       <div className="card">
-        <NotificationList notifications={notifications} />
+        <NotificationList notifications={notifications} timeZone={timeZone} />
       </div>
     </>
   );

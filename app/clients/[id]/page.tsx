@@ -6,6 +6,7 @@ import { requireMembershipOrRedirect } from "@/lib/tenant";
 import { getClient, getClientActivity } from "@/lib/clients/queries";
 import { computeTurnaround, describeTurnaround } from "@/lib/clients/sla";
 import { ClientActivityPanel } from "./ClientActivityPanel";
+import { Send } from "lucide-react";
 
 export const metadata = { title: "Client · Recruitment OS" };
 export const dynamic = "force-dynamic";
@@ -90,7 +91,9 @@ export default async function ClientDetailPage({
       <div className="card">
         <h2 className="title is-5">Submissions</h2>
         {activity.events.length === 0 ? (
-          <EmptyState message="No candidates have been submitted to this client yet." />
+          <EmptyState headline="No submissions yet"
+            message="Candidates you send to this client will appear here with their response time."
+            icon={Send} />
         ) : (
           <div className="table-container">
             <table className="table is-fullwidth">

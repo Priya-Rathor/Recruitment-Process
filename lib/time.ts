@@ -153,3 +153,72 @@ export function daysSince(
   if (!(then instanceof Date) || Number.isNaN(then.getTime())) return 0;
   return Math.floor((now.getTime() - then.getTime()) / (24 * 60 * 60 * 1000));
 }
+
+// =============================================================================
+// Display formatting.
+//
+// WHY THESE EXIST RATHER THAN CALLING toLocaleDateString() DIRECTLY.
+//
+// `new Date(x).toLocaleDateString()` uses the runtime's OWN locale and
+// timezone. In a Client Component that is rendered twice — once on the server,
+// once in the browser — and the two runtimes rarely agree:
+//
+//   server (Vercel, UTC, en-US)  ->  "8/22/2026"
+//   browser (en-GB, Asia/Kolkata) ->  "22/08/2026"
+//
+// React sees different text and throws a hydration error. That is exactly the
+// bug this file's helpers prevent, and it is invisible in local development
+// whenever the dev server and the browser happen to share a locale.
+//
+// It is also a correctness problem beyond hydration: a timestamp rendered in
+// whatever timezone the server happens to run in is not the timestamp the
+// organization operates in. Every "today" in this product is the
+// ORGANIZATION's today (see resolveTimeZone above), and displayed timestamps
+// should agree with it.
+//
+// So both the locale AND the timezone are always explicit here. Passing the
+// organization's timezone is the caller's job; UTC is the fallback, chosen
+// because it is deterministic on both sides rather than because it is right.
+// =============================================================================
+
+const DISPLAY_LOCALE = "en-GB";
+
+/** Tolerates a null/garbage timestamp — one bad row must not blank a whole list. */
+function toDate(value: string | Date | null | undefined): Date | null {
+  if (value === null || value === undefined) return null;
+  const date = typeof value === "string" ? new Date(value) : value;
+  return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+/** e.g. "22 Aug 2026". Identical on server and client. */
+export function formatDateInZone(
+  value: string | Date | null | undefined,
+  timeZone: string | null | undefined
+): string {
+  const date = toDate(value);
+  if (!date) return "—";
+
+  return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+    timeZone: resolveTimeZone(timeZone),
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+/** e.g. "22 Aug 2026, 14:30". Identical on server and client. */
+export function formatDateTimeInZone(
+  value: string | Date | null | undefined,
+  timeZone: string | null | undefined
+): string {
+  const date = toDate(value);
+  if (!date) return "—";
+
+  return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+    timeZone: resolveTimeZone(timeZone),
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}

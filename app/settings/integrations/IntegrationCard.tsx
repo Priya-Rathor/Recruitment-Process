@@ -4,45 +4,38 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormError } from "@/components/states";
 import type { IntegrationHealth } from "@/lib/settings/integrations";
+import { formatDateTimeInZone } from "@/lib/time";
+import { StatusChip, type ChipTone } from "@/components/ui/StatusChip";
 
 /**
- * Status chip.
+ * Integration status, rendered with the shared chip.
  *
- * Exact tokens from the spec's section 4: Connected #DCFCE7/#15803D, Needs
- * Attention #FEF3C7/#B45309, Disconnected #F1F5F9/#475569, Error
- * #FEE2E2/#B91C1C. The word is always present, so status is never carried by
- * colour alone.
+ * The colours the spec names for this module (Connected #DCFCE7/#15803D and so
+ * on) are the same tokens StatusChip already uses for its tones, so mapping to
+ * a tone gives the specified appearance AND one consistent chip geometry across
+ * every module — rather than a fourth bespoke chip with its own padding.
  */
-function StatusChip({ status }: { status: string }) {
-  const styles: Record<string, { bg: string; color: string; label: string }> = {
-    connected: { bg: "#DCFCE7", color: "#15803D", label: "Connected" },
-    needs_attention: { bg: "#FEF3C7", color: "#B45309", label: "Needs attention" },
-    disconnected: { bg: "#F1F5F9", color: "#475569", label: "Disconnected" },
-    error: { bg: "#FEE2E2", color: "#B91C1C", label: "Error" },
+function StatusChipFor({ status }: { status: string }) {
+  const map: Record<string, { tone: ChipTone; label: string }> = {
+    connected: { tone: "success", label: "Connected" },
+    needs_attention: { tone: "warning", label: "Needs attention" },
+    disconnected: { tone: "neutral", label: "Disconnected" },
+    error: { tone: "error", label: "Error" },
   };
-
-  const style = styles[status] ?? styles.disconnected;
-
-  return (
-    <span
-      style={{
-        background: style.bg,
-        color: style.color,
-        borderRadius: 999,
-        padding: "2px 10px",
-        fontSize: 12,
-        fontWeight: 600,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {style.label}
-    </span>
-  );
+  const entry = map[status] ?? map.disconnected;
+  return <StatusChip tone={entry.tone} label={entry.label} />;
 }
 
 type Dependency = { kind: string; name: string; active: boolean };
 
-export function IntegrationCard({ integration }: { integration: IntegrationHealth }) {
+export function IntegrationCard({
+  integration,
+  timeZone,
+}: {
+  integration: IntegrationHealth;
+  /** The ORGANIZATION's timezone, so dates read the same on server and client. */
+  timeZone: string;
+}) {
   const router = useRouter();
 
   const [mode, setMode] = useState<"idle" | "connecting" | "confirming_disconnect">("idle");
@@ -161,7 +154,7 @@ export function IntegrationCard({ integration }: { integration: IntegrationHealt
             {integration.description}
           </p>
         </div>
-        <StatusChip status={integration.status} />
+        <StatusChipFor status={integration.status} />
       </div>
 
       {/* MASKED ONLY. The secret went in once and never comes back out. */}
@@ -179,7 +172,7 @@ export function IntegrationCard({ integration }: { integration: IntegrationHealt
 
       {integration.lastSuccessAt && (
         <p className="has-text-secondary" style={{ fontSize: 12, margin: "4px 0 0" }}>
-          Last worked {new Date(integration.lastSuccessAt).toLocaleString("en-GB")}
+          Last worked {formatDateTimeInZone(integration.lastSuccessAt, timeZone)}
         </p>
       )}
 

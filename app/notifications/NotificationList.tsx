@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EmptyState, FormError } from "@/components/states";
 import type { NotificationWithDelivery } from "@/lib/notifications/queries";
+import { formatDateTimeInZone } from "@/lib/time";
+import { Bell } from "lucide-react";
 
-function formatWhen(value: string) {
-  return new Date(value).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatWhen(value: string, timeZone: string) {
+  // timeZone pinned as well as locale: without it the server formats in its own
+  // zone (UTC in production) and the browser in the viewer's, which is a
+  // hydration mismatch that only appears once deployed.
+  return formatDateTimeInZone(value, timeZone);
 }
 
 /**
@@ -42,8 +42,11 @@ function DeliveryNote({ notification }: { notification: NotificationWithDelivery
 
 export function NotificationList({
   notifications,
+  timeZone,
 }: {
   notifications: NotificationWithDelivery[];
+  /** The ORGANIZATION's timezone, so dates read the same on server and client. */
+  timeZone: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -118,7 +121,9 @@ export function NotificationList({
   }
 
   if (visible.length === 0) {
-    return <EmptyState message="Nothing here. Notifications appear as work needs your attention." />;
+    return <EmptyState headline="You're all caught up"
+            message="Notifications appear here as work needs your attention."
+            icon={Bell} />;
   }
 
   const unreadCount = visible.filter((notification) => !notification.read_at).length;
@@ -187,7 +192,7 @@ export function NotificationList({
                 </p>
                 <p style={{ fontSize: 14, margin: "2px 0 0" }}>{notification.body}</p>
                 <p className="has-text-secondary" style={{ fontSize: 12, margin: "4px 0 0" }}>
-                  {formatWhen(notification.created_at)}
+                  {formatWhen(notification.created_at, timeZone)}
                 </p>
                 <DeliveryNote notification={notification} />
               </div>

@@ -13,6 +13,7 @@ import { FormError } from "@/components/states";
 import type { MatchFinding } from "@/lib/matching/deterministic";
 import { scoreBand } from "@/lib/matching/score";
 import type { StoredMatch } from "@/lib/matching/queries";
+import { formatDateTimeInZone } from "@/lib/time";
 
 const BAND_COLOR = {
   strong: "var(--color-success)",
@@ -82,10 +83,14 @@ export function MatchView({
   match,
   applicationId,
   canRecalculate,
+  timeZone,
 }: {
   match: StoredMatch | null;
   applicationId: string;
   canRecalculate: boolean;
+
+  /** The ORGANIZATION's timezone, so dates read the same on server and client. */
+  timeZone: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -200,12 +205,7 @@ export function MatchView({
         )}
 
         <p className="has-text-secondary mt-3" style={{ fontSize: 12 }}>
-          Calculated {new Date(match.calculated_at).toLocaleString("en-GB", {
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
+          Calculated {formatDateTimeInZone(match.calculated_at, timeZone)}
           . This score is for this job only — the same candidate scores differently elsewhere.
         </p>
       </div>

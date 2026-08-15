@@ -51,6 +51,91 @@
   --card-radius: 12px;
   --card-padding: 24px;
   --card-padding-mobile: 16px;
+
+  // ---------------------------------------------------------------------------
+  // TYPOGRAPHY
+  //
+  // The audit found eight ad-hoc font sizes and `fontSize: 13` written inline
+  // 248 times. These tokens replace that: a component picks a ROLE, never a
+  // number, so "section heading" means the same thing in every module.
+  //
+  // Two families, deliberately (see app/layout.tsx). The display face carries
+  // headings; Inter carries everything read closely — body, table cells, labels,
+  // numbers.
+  // ---------------------------------------------------------------------------
+  --font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: var(--font-display), var(--font-inter), -apple-system, sans-serif;
+
+  --text-display: 30px;      // hero numbers, KPI values
+  --text-page: 23px;         // page title, one per screen
+  --text-section: 17px;      // card and section headings
+  --text-body: 14px;         // default reading size
+  --text-body-lg: 15px;      // long-form prose
+  --text-label: 13px;        // form labels, table headers
+  --text-caption: 12px;      // helper text, timestamps
+
+  --leading-tight: 1.25;     // headings
+  --leading-normal: 1.5;     // body
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  // ---------------------------------------------------------------------------
+  // SPACING — one 4px-based scale. Sections stack on --space-8 (32px).
+  // ---------------------------------------------------------------------------
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  // Vertical rhythm between stacked sections on a page. The audit found mb-4
+  // and mb-5 mixed within single pages; this is the one value.
+  --stack-gap: var(--space-8);
+
+  // ---------------------------------------------------------------------------
+  // CONTROLS — one height and radius for every input, select and button, so a
+  // filter row lines up without per-page nudging.
+  // ---------------------------------------------------------------------------
+  --control-height: 40px;
+  --control-height-sm: 32px;
+  --control-radius: 8px;
+  --control-padding-x: 12px;
+
+  // ---------------------------------------------------------------------------
+  // MOTION — restrained. Colour and border changes only; nothing decorative.
+  // 150ms is below the threshold where a UI starts to feel like it is waiting
+  // for an animation rather than responding.
+  // ---------------------------------------------------------------------------
+  --transition-fast: 150ms;
+  --transition-base: 200ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  // Focus ring. A 2px primary ring, offset so it reads on both white cards and
+  // the page background. The audit found no :focus-visible rule anywhere.
+  --focus-ring: 0 0 0 2px var(--color-card), 0 0 0 4px var(--color-primary);
+}
+
+// -----------------------------------------------------------------------------
+// MOTION PREFERENCE
+//
+// Honours prefers-reduced-motion. Transitions here are small, but a user who
+// has asked the OS for less movement has asked for less movement.
+// -----------------------------------------------------------------------------
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 html,
@@ -289,19 +374,152 @@ th {
 .app-nav {
   background-color: var(--color-card);
   border-bottom: 1px solid var(--color-border);
-  padding: 0.75rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+// Tier 1 — identity and account controls.
+.app-nav__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-6);
+  min-height: 56px;
 }
 
 .app-nav__brand {
-  font-weight: 700;
+  font-family: var(--font-heading);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-body-lg);
+  letter-spacing: -0.02em;
   color: var(--color-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.app-nav__account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+// The organization name TRUNCATES rather than reflowing the bar. Before this
+// it wrapped onto three lines and pushed everything else out of the viewport.
+.app-nav__org {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-right: var(--space-2);
+  border-right: 1px solid var(--color-border);
+}
+
+.app-nav__org-name {
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.app-nav__role {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  text-transform: capitalize;
+  color: var(--color-text-secondary);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 1px var(--space-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.app-nav__icon-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  position: relative;
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  padding: var(--space-2);
+  border-radius: var(--control-radius);
+  white-space: nowrap;
+  transition:
+    color var(--transition-fast) var(--ease),
+    background-color var(--transition-fast) var(--ease);
+
+  &:hover {
+    color: var(--color-text);
+    background-color: var(--color-background);
+  }
+}
+
+// Icon-only below 1280px: the labels are the first thing that can go, because
+// the icons carry the same meaning and the title attribute keeps it accessible.
+@media (max-width: 1280px) {
+  .app-nav__icon-label {
+    display: none;
+  }
+}
+
+.app-nav__badge {
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  line-height: 1.5;
+}
+
+// The email is the least load-bearing item in the bar, so it is the first to
+// be dropped rather than being clipped mid-word as it was before.
+.app-nav__email {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+@media (max-width: 1024px) {
+  .app-nav__email {
+    display: none;
+  }
+}
+
+// Tier 2 — module links. Scrolls horizontally instead of wrapping.
+.app-nav__modules {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-6) var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .app-nav__link {
   color: var(--color-text-secondary);
-  padding: 0.4rem 0.75rem;
-  border-radius: 6px;
-  font-size: 14px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--control-radius);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    color var(--transition-fast) var(--ease),
+    background-color var(--transition-fast) var(--ease);
 
   &:hover {
     color: var(--color-text);
@@ -311,9 +529,10 @@ th {
   &.is-active {
     color: var(--color-primary);
     background-color: rgba(79, 70, 229, 0.08);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
   }
 }
+
 
 // Auth pages sit on the page background with a single centred card.
 .auth-layout {
@@ -336,4 +555,285 @@ th {
   border: 1px solid #bfdbfe;
   border-radius: var(--card-radius);
   padding: 1rem 1.25rem;
+}
+
+// =============================================================================
+// BASE STYLES BUILT ON THE TOKENS
+//
+// Everything below applies the tokens above to the elements every module
+// already renders, so the 17 modules inherit the pass without each page being
+// rewritten. Where a component library exists (components/ui/*), it composes
+// these same rules rather than redefining them.
+// =============================================================================
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// -----------------------------------------------------------------------------
+// TYPE SCALE
+//
+// Headings take the display face; body and data stay on Inter. The audit's
+// finding C1 — one family for a page title and a table cell — is what this
+// fixes, and it is the single change that most stops the UI reading as
+// scaffolded.
+// -----------------------------------------------------------------------------
+h1, h2, h3, h4,
+.title,
+.subtitle {
+  font-family: var(--font-heading);
+  letter-spacing: -0.015em;
+}
+
+.title {
+  line-height: var(--leading-tight);
+  color: var(--color-text);
+  margin-bottom: 0;
+}
+
+// Bulma's is-* sizes remapped onto the scale, so existing markup inherits the
+// new rhythm without every page being edited.
+.title.is-3 { font-size: var(--text-display); font-weight: var(--weight-bold); }
+.title.is-4 { font-size: var(--text-page);    font-weight: var(--weight-bold); }
+.title.is-5 { font-size: var(--text-section); font-weight: var(--weight-semibold); }
+.title.is-6 { font-size: var(--text-body-lg); font-weight: var(--weight-semibold); }
+
+.subtitle {
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+}
+
+// -----------------------------------------------------------------------------
+// FOCUS — the audit found no :focus-visible rule in the entire product.
+//
+// :focus-visible rather than :focus, so a mouse click does not leave a ring
+// behind but a keyboard user always sees where they are.
+// -----------------------------------------------------------------------------
+*:focus {
+  outline: none;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--control-radius);
+}
+
+// -----------------------------------------------------------------------------
+// CONTROLS — one height, one radius, one focus treatment.
+// -----------------------------------------------------------------------------
+.input,
+.textarea,
+.select select {
+  height: var(--control-height);
+  border-radius: var(--control-radius);
+  border: 1px solid var(--color-border);
+  padding-inline: var(--control-padding-x);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  color: var(--color-text);
+  background-color: var(--color-card);
+  box-shadow: none;
+  transition:
+    border-color var(--transition-fast) var(--ease),
+    box-shadow var(--transition-fast) var(--ease);
+}
+
+.textarea {
+  height: auto;
+  min-height: 88px;
+  padding-block: var(--space-2);
+  line-height: var(--leading-normal);
+}
+
+.input:hover,
+.textarea:hover,
+.select select:hover {
+  border-color: #cbd5e1;
+}
+
+.input:focus-visible,
+.textarea:focus-visible,
+.select select:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.input:disabled,
+.textarea:disabled,
+.select select:disabled {
+  background-color: var(--color-background);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+// Inline validation: a red border on the FIELD, not only a message elsewhere.
+.input.is-danger,
+.textarea.is-danger,
+.select select.is-danger {
+  border-color: var(--color-error);
+}
+
+.select,
+.select select {
+  width: 100%;
+}
+
+.select::after {
+  border-color: var(--color-primary) !important;
+}
+
+.label {
+  font-family: var(--font-body);
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
+}
+
+// Checkboxes and radios were entirely unstyled (audit A3) — the "Show archived"
+// control on /jobs rendered misaligned with its own label.
+input[type="checkbox"],
+input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  vertical-align: -2px;
+  margin-right: var(--space-2);
+  cursor: pointer;
+}
+
+// -----------------------------------------------------------------------------
+// BUTTONS — hover, focus, ACTIVE and disabled. The audit found no pressed state
+// anywhere, and disabled buttons with no cursor treatment.
+// -----------------------------------------------------------------------------
+.button {
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  height: var(--control-height);
+  border-radius: var(--control-radius);
+  transition:
+    background-color var(--transition-fast) var(--ease),
+    border-color var(--transition-fast) var(--ease),
+    color var(--transition-fast) var(--ease),
+    transform var(--transition-fast) var(--ease);
+}
+
+.button.is-small {
+  height: var(--control-height-sm);
+  font-size: var(--text-label);
+}
+
+// Pressed: slightly darker (already set above) plus a very subtle scale-down,
+// so a click feels acknowledged without anything moving on the page.
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.button:disabled,
+.button[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+// -----------------------------------------------------------------------------
+// TABLES — the audit found 19 raw tables with per-page cell padding, no row
+// hover, and numeric columns left-aligned next to text.
+// -----------------------------------------------------------------------------
+.table {
+  width: 100%;
+  background-color: transparent;
+  font-size: var(--text-body);
+}
+
+.table thead th {
+  font-family: var(--font-body);
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom: 1px solid var(--color-border) !important;
+  padding: var(--space-3) var(--space-4);
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+  color: var(--color-text);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+// Only rows that actually go somewhere get a hover — a tint on a static row
+// promises an interaction that is not there.
+.table.is-hoverable tbody tr:hover {
+  background-color: var(--color-background);
+}
+
+// Right-align numeric columns. Opt-in via class, because "is this column a
+// number?" is a decision the page makes, not something CSS can infer.
+.table .is-numeric,
+.table td.is-numeric,
+.table th.is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+// Tabular figures wherever numbers are compared down a column.
+.table td {
+  font-variant-numeric: tabular-nums;
+}
+
+// -----------------------------------------------------------------------------
+// LINKS & NAV
+// -----------------------------------------------------------------------------
+a {
+  transition: color var(--transition-fast) var(--ease);
+}
+
+// -----------------------------------------------------------------------------
+// MOTION — one fade, used for skeleton-to-content swaps. Nothing decorative.
+// -----------------------------------------------------------------------------
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.fade-in {
+  animation: fade-in var(--transition-base) var(--ease);
+}
+
+// Spinner for the Button component's loading state.
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// Ghost button — a tertiary action that should not compete with the primary.
+.button.is-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-secondary);
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-background);
+    color: var(--color-text);
+  }
 }

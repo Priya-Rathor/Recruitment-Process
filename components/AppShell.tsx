@@ -2,6 +2,7 @@
 // Server component: it reads the session-resolved organization so no page can
 // render with an unresolved or client-supplied tenant.
 import Link from "next/link";
+import { Bell, ChevronsUpDown, Users } from "lucide-react";
 import { getCurrentMembership, getCurrentUser, getUserMemberships, hasRole } from "@/lib/tenant";
 import { SignOutButton } from "@/components/SignOutButton";
 import { countUnread } from "@/lib/notifications/queries";
@@ -28,6 +29,22 @@ const ADMIN_NAV_ITEMS = [
   { href: "/settings", label: "Settings" },
 ];
 
+/**
+ * TWO TIERS, because one row could not hold this.
+ *
+ * The UI audit found the single-row nav visibly broken at 1440px: "Audit log"
+ * wrapped onto two lines, the organization name onto three, and the user's
+ * email was clipped mid-word at the right edge. Eleven module links plus an org
+ * name, a role badge, notifications, team, an email address and a sign-out
+ * control do not fit on one line at any realistic width, and no amount of
+ * tightening makes them.
+ *
+ * So: identity and account controls sit on the top bar, and the module links
+ * get their own row that scrolls horizontally on narrow screens rather than
+ * wrapping. The organization name truncates with an ellipsis instead of
+ * reflowing the whole bar, and the email is hidden below 1024px where it is the
+ * least load-bearing thing present.
+ */
 export async function AppShell({ children }: { children: ReactNode }) {
   const [user, membership, memberships] = await Promise.all([
     getCurrentUser(),
@@ -35,80 +52,72 @@ export async function AppShell({ children }: { children: ReactNode }) {
     getUserMemberships(),
   ]);
 
-  // null means the count could not be read — rendered as a dot rather than a
+  // null means the count could not be read — rendered as nothing rather than a
   // confident "0", which would hide exactly the alerts that matter most.
   const unread = membership ? await countUnread(membership.organization.id) : null;
 
+  const isAdmin = membership && hasRole(membership.role, ["owner", "admin"]);
+
   return (
     <div className="app-shell">
-      <nav className="app-nav" aria-label="Main navigation">
-        <div className="is-flex is-align-items-center is-justify-content-space-between">
-          <div className="is-flex is-align-items-center" style={{ gap: "1.25rem" }}>
-            <Link href="/dashboard" className="app-nav__brand">
-              Recruitment OS
-            </Link>
-            <div className="is-flex" style={{ gap: "0.25rem" }}>
-              {NAV_ITEMS.map((item) => (
-                <Link key={item.href} href={item.href} className="app-nav__link">
-                  {item.label}
-                </Link>
-              ))}
-              {membership &&
-                hasRole(membership.role, ["owner", "admin"]) &&
-                ADMIN_NAV_ITEMS.map((item) => (
-                  <Link key={item.href} href={item.href} className="app-nav__link">
-                    {item.label}
-                  </Link>
-                ))}
-            </div>
-          </div>
+      <header className="app-nav">
+        {/* Tier 1 — identity and account */}
+        <div className="app-nav__bar">
+          <Link href="/dashboard" className="app-nav__brand">
+            Recruitment&nbsp;OS
+          </Link>
 
-          <div className="is-flex is-align-items-center" style={{ gap: "0.75rem" }}>
+          <div className="app-nav__account">
             {membership && (
-              <>
-                <span className="has-text-secondary" style={{ fontSize: 13 }}>
-                  {membership.organization.name}
-                </span>
-                <span className="tag is-light" style={{ textTransform: "capitalize" }}>
-                  {membership.role}
-                </span>
-              </>
+              <div className="app-nav__org" title={membership.organization.name}>
+                <span className="app-nav__org-name">{membership.organization.name}</span>
+                <span className="app-nav__role">{membership.role}</span>
+              </div>
             )}
+
             {memberships.length > 1 && (
-              <Link href="/organizations/switch" className="app-nav__link">
-                Switch
+              <Link href="/organizations/switch" className="app-nav__icon-link" title="Switch organization">
+                <ChevronsUpDown size={16} aria-hidden="true" />
+                <span className="app-nav__icon-label">Switch</span>
               </Link>
             )}
-            <Link href="/notifications" className="app-nav__link">
-              Notifications
+
+            <Link href="/notifications" className="app-nav__icon-link" title="Notifications">
+              <Bell size={16} aria-hidden="true" />
+              <span className="app-nav__icon-label">Notifications</span>
               {unread !== null && unread > 0 && (
-                <span
-                  className="ml-1"
-                  style={{
-                    background: "var(--color-primary)",
-                    color: "#fff",
-                    borderRadius: 999,
-                    padding: "1px 7px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
+                <span className="app-nav__badge" aria-label={`${unread} unread`}>
                   {unread > 99 ? "99+" : unread}
                 </span>
               )}
             </Link>
-            <Link href="/team/invite" className="app-nav__link">
-              Team
+
+            <Link href="/team/invite" className="app-nav__icon-link" title="Team">
+              <Users size={16} aria-hidden="true" />
+              <span className="app-nav__icon-label">Team</span>
             </Link>
-            {user && (
-              <span className="has-text-secondary" style={{ fontSize: 13 }}>
-                {user.email}
-              </span>
-            )}
+
+            {user && <span className="app-nav__email">{user.email}</span>}
+
             <SignOutButton />
           </div>
         </div>
-      </nav>
+
+        {/* Tier 2 — module navigation. Scrolls rather than wraps. */}
+        <nav className="app-nav__modules" aria-label="Main navigation">
+          {NAV_ITEMS.map((item) => (
+            <Link key={item.href} href={item.href} className="app-nav__link">
+              {item.label}
+            </Link>
+          ))}
+          {isAdmin &&
+            ADMIN_NAV_ITEMS.map((item) => (
+              <Link key={item.href} href={item.href} className="app-nav__link">
+                {item.label}
+              </Link>
+            ))}
+        </nav>
+      </header>
 
       <main className="section">
         <div className="container">{children}</div>

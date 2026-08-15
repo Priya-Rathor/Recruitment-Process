@@ -13,17 +13,22 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormError } from "@/components/states";
 import type { SubmissionDraft } from "@/lib/ai/generateClientSubmission";
+import { formatDateInZone } from "@/lib/time";
 
 export function SubmissionPanel({
   applicationId,
   candidateName,
   existing,
   canSubmit,
+  timeZone,
 }: {
   applicationId: string;
   candidateName: string;
   existing: { requested_at: string; submission_text: string | null; responded_at: string | null } | null;
   canSubmit: boolean;
+
+  /** The ORGANIZATION's timezone, so dates read the same on server and client. */
+  timeZone: string;
 }) {
   const router = useRouter();
   const [text, setText] = useState(existing?.submission_text ?? "");
@@ -107,11 +112,7 @@ export function SubmissionPanel({
           <h2 className="title is-5">Already submitted</h2>
           <p className="has-text-secondary mb-2" style={{ fontSize: 13 }}>
             Sent{" "}
-            {new Date(existing.requested_at).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            {formatDateInZone(existing.requested_at, timeZone)}
             {existing.responded_at ? " · client has responded" : " · awaiting a response"}
           </p>
           {existing.submission_text && (
