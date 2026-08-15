@@ -35,6 +35,18 @@ yarn-error.log*
 .env*
 !.env.local.example
 
+# Credential files that have been used during setup and must never be
+# committed. Listed explicitly rather than relying on .env* — a connection
+# string or a key dump does not have to be named ".env" to be a secret, and the
+# cost of one of these reaching a public repo is a rotated project at best.
+*.pem
+*.key
+*.p12
+*credentials*.json
+.supabase-db-url
+supabase/.temp/
+supabase/.branches/
+
 # vercel
 .vercel
 

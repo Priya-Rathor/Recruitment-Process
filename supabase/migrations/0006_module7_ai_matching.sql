@@ -121,7 +121,7 @@ begin
      or new.expected_salary is distinct from old.expected_salary
      or new.notice_period_days is distinct from old.notice_period_days
      or new.location is distinct from old.location
-     or new.current_role is distinct from old.current_role
+     or new."current_role" is distinct from old."current_role"
   then
     update public.application_matches m
       set is_stale = true, stale_reason = 'Candidate profile changed'

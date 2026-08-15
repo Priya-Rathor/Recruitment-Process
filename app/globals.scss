@@ -103,6 +103,156 @@ a.is-primary:focus {
 }
 
 // -----------------------------------------------------------------------------
+// FORCE THE LIGHT SCHEME.
+//
+// Bulma 1.x ships an automatic dark theme keyed off `prefers-color-scheme`.
+// This product is designed light-only — the spec fixes every surface
+// (#FFFFFF cards on an #F8FAFC page) and every text colour (#0F172A) as a
+// literal hex value, with no dark equivalents.
+//
+// On a machine set to dark mode Bulma flipped its own variables while our
+// tokens stayed light, producing unreadable combinations: black inputs with
+// black text, black tables with invisible rows, and headings so pale they
+// looked like placeholders. Every one of those was this, not a styling mistake
+// in the individual components.
+//
+// `color-scheme: light` tells the browser to render form controls, scrollbars
+// and autofill in light mode. The variable pins below stop Bulma's dark block
+// from winning inside the media query, which `color-scheme` alone does not do.
+//
+// A real dark theme is a design exercise (the dataviz work in Module 16 makes
+// that plain — dark needs its own validated steps, not an inverted light
+// palette), so this locks to light rather than half-supporting both.
+// -----------------------------------------------------------------------------
+html {
+  color-scheme: light;
+}
+
+:root {
+  --bulma-scheme-main: #ffffff;
+  --bulma-scheme-main-bis: #f8fafc;
+  --bulma-scheme-main-ter: #f1f5f9;
+  --bulma-scheme-invert: #0f172a;
+  --bulma-background: #f8fafc;
+  --bulma-border: #e2e8f0;
+  --bulma-border-weak: #eef2f7;
+  --bulma-text: #0f172a;
+  --bulma-text-weak: #64748b;
+  --bulma-text-strong: #0f172a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    // Repeated inside the media query so they beat Bulma's dark block, which
+    // is itself defined here and would otherwise take precedence.
+    --bulma-scheme-main: #ffffff;
+    --bulma-scheme-main-bis: #f8fafc;
+    --bulma-scheme-main-ter: #f1f5f9;
+    --bulma-scheme-invert: #0f172a;
+    --bulma-background: #f8fafc;
+    --bulma-border: #e2e8f0;
+    --bulma-border-weak: #eef2f7;
+    --bulma-text: #0f172a;
+    --bulma-text-weak: #64748b;
+    --bulma-text-strong: #0f172a;
+    --bulma-title-color: #0f172a;
+    --bulma-subtitle-color: #64748b;
+    --bulma-label-color: #0f172a;
+    --bulma-body-color: #0f172a;
+
+    --bulma-input-background-color: #ffffff;
+    --bulma-input-color: #0f172a;
+    --bulma-input-border-color: #e2e8f0;
+    --bulma-input-placeholder-color: #94a3b8;
+    --bulma-input-hover-border-color: #cbd5e1;
+
+    --bulma-table-background-color: #ffffff;
+    --bulma-table-color: #0f172a;
+    --bulma-table-cell-border-color: #e2e8f0;
+    --bulma-table-head-cell-color: #0f172a;
+    --bulma-table-row-hover-background-color: #f8fafc;
+    --bulma-table-striped-row-even-background-color: #f8fafc;
+
+    --bulma-select-color: #0f172a;
+    --bulma-select-background-color: #ffffff;
+  }
+}
+
+// Belt and braces: pin the controls themselves, so a Bulma variable renamed in
+// a future release cannot silently bring the black inputs back.
+.input,
+.textarea,
+.select select {
+  background-color: #ffffff;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: #94a3b8;
+}
+
+.table {
+  background-color: var(--color-card);
+  color: var(--color-text);
+}
+
+.table th,
+.table td {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+// -----------------------------------------------------------------------------
+// Headings and form labels.
+//
+// Bulma 1.x resolves .title / .subtitle / label through its own scheme
+// variables (--bulma-title-color and friends). This project themes Bulma with
+// the design tokens above but never defines those, so Bulma fell back to a
+// near-white shade and every heading rendered almost invisible against the
+// white card — "Team", "Invite a teammate", "Members" were all barely legible.
+//
+// Pinned to the spec's tokens instead of Bulma's fallbacks:
+//   Section headings: 18-20px, semibold, #0F172A
+//   Main text: #0F172A
+// Setting the Bulma variables themselves (rather than only the selectors) means
+// any Bulma component that derives from them is fixed too, not just these three.
+// -----------------------------------------------------------------------------
+:root {
+  --bulma-title-color: var(--color-text);
+  --bulma-subtitle-color: var(--color-text-secondary);
+  --bulma-text-strong: var(--color-text);
+  --bulma-label-color: var(--color-text);
+  --bulma-body-color: var(--color-text);
+}
+
+.title,
+.title.is-1,
+.title.is-2,
+.title.is-3,
+.title.is-4,
+.title.is-5,
+.title.is-6 {
+  color: var(--color-text);
+}
+
+.subtitle {
+  color: var(--color-text-secondary);
+}
+
+// Form labels sat at the same washed-out shade as the headings.
+.label {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+strong,
+th {
+  color: var(--color-text);
+}
+
+// -----------------------------------------------------------------------------
 // Loading skeletons — required UI state per spec section 8: skeleton blocks
 // matching the shape of the eventual content, never one full-page spinner.
 // -----------------------------------------------------------------------------

@@ -46,7 +46,13 @@ async function TeamData() {
 
   const membersQuery = supabase
     .from("organization_members")
-    .select("id, role, status, joined_at, user:users(id, name, email, avatar_url)")
+    // The FK is named explicitly because organization_members has TWO foreign
+    // keys to users — user_id and invited_by. Without it PostgREST returns
+    // PGRST201 (ambiguous embedding) and refuses to guess, which surfaced as
+    // "Couldn't load your team."
+    .select(
+      "id, role, status, joined_at, user:users!organization_members_user_id_fkey(id, name, email, avatar_url)"
+    )
     .eq("organization_id", membership.organization.id)
     .eq("status", "active")
     .order("joined_at", { ascending: true });

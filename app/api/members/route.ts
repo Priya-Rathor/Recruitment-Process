@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     let query = supabase
       .from("organization_members")
-      .select("id, role, status, joined_at, user:users(id, name, email, avatar_url)", {
+      // Explicit FK: organization_members has two references to users
+      // (user_id and invited_by), so an unqualified embed is ambiguous.
+      .select(
+        "id, role, status, joined_at, user:users!organization_members_user_id_fkey(id, name, email, avatar_url)",
+        {
         count: "exact",
       })
       .eq("organization_id", membership.organization.id)

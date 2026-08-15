@@ -52,7 +52,17 @@ create table if not exists public.candidates (
 
   location text,
   current_company text,
-  current_role text,
+  /**
+   * QUOTED because `current_role` is a RESERVED WORD in PostgreSQL — it is the
+   * SQL-standard CURRENT_ROLE function. Unquoted, `current_role text` is a
+   * syntax error at parse time.
+   *
+   * Quoting at DDL time only tells the parser this is an identifier; the column
+   * is still plainly named current_role, and PostgREST (and therefore every
+   * TypeScript caller) refers to it without quotes as normal. The only places
+   * that must quote it are raw SQL like this file and the trigger in 0006.
+   */
+  "current_role" text,
   total_experience_years numeric(4, 1)
     check (total_experience_years is null or (total_experience_years >= 0 and total_experience_years <= 60)),
   skills text[] not null default '{}',

@@ -211,7 +211,9 @@ export async function listTeamMembers(organizationId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("organization_members")
-    .select("user_id, role, user:users(id, name, email)")
+    // Explicit FK: organization_members has two references to users
+    // (user_id and invited_by), so an unqualified embed is ambiguous.
+    .select("user_id, role, user:users!organization_members_user_id_fkey(id, name, email)")
     .eq("organization_id", organizationId)
     .eq("status", "active");
 

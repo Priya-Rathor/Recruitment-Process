@@ -42,7 +42,50 @@ export async function getCurrentUser(): Promise<AppUser | null> {
     .eq("auth_id", user.id)
     .maybeSingle();
 
-  return (data as AppUser) ?? null;
+  if (data) return data as AppUser;
+
+  /**
+   * A VALID SESSION WITH NO PROFILE ROW.
+   *
+   * public.users rows come from the on_auth_user_created trigger. Anyone who
+   * signed up before migration 0001 was applied — or during any window where
+   * that trigger was missing — has an auth session and no profile.
+   *
+   * Returning null here used to produce an infinite redirect loop:
+   *
+   *   proxy.ts sees a session      -> allows /dashboard
+   *   /dashboard: no profile       -> redirect /login
+   *   proxy.ts sees a session      -> redirect /dashboard
+   *
+   * ...until the browser gave up with ERR_TOO_MANY_REDIRECTS, pointing nowhere
+   * near the cause. So instead of giving up, backfill the row and carry on. The
+   * RPC takes no arguments and reads auth.uid() only, so it can only ever
+   * create the caller's own profile, and never overwrite an existing one.
+   *
+   * A backfilled user has no organization and lands on /onboarding, exactly
+   * like any new signup.
+   */
+  const { error: repairError } = await supabase.rpc("ensure_current_user_profile");
+
+  if (repairError) {
+    // Genuinely unrecoverable — most likely migration 0017 has not been applied.
+    // Logged loudly because the visible symptom (a redirect loop) is a long way
+    // from this line.
+    console.error(
+      "[tenant] session has no public.users row and the profile repair failed. " +
+        "Has migration 0017 been applied?",
+      repairError
+    );
+    return null;
+  }
+
+  const { data: repaired } = await supabase
+    .from("users")
+    .select("*")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+
+  return (repaired as AppUser) ?? null;
 }
 
 export async function requireCurrentUser(): Promise<AppUser> {
