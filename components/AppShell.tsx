@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/interviews", label: "Interviews" },
   { href: "/clients", label: "Clients" },
   { href: "/automations", label: "Automations" },
+  { href: "/analytics", label: "Analytics" },
 ];
 
 /**

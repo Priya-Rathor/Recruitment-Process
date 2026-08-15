@@ -393,6 +393,23 @@ export const EVENT_CATALOGUE = {
   },
 
   // ---------------------------------------------------------------------------
+  // Module 16 — analytics.
+  //
+  // Sensitive: an export takes organizational data out of the product in a form
+  // that can be forwarded anywhere, so who took what is an access question, not
+  // a recruitment one.
+  // ---------------------------------------------------------------------------
+  "analytics.exported": {
+    entity: "organization",
+    sensitive: true,
+    label: "Analytics exported",
+    describe: (m) => {
+      const range = text(m.range, "a period");
+      return `Exported an analytics report for ${range}`;
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // AI calls.
   //
   // Section 10 requires every AI call logged "at a summary level ... without

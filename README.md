@@ -72,6 +72,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/automations/` | Module 13's rule catalogue, evaluator, and execution engine |
 | `lib/activity/` | Module 14's event catalogue, append-only logger, and narrative grounding |
 | `lib/notifications/` | Module 15's templates, fixed-fact guard, send pipeline, and reminders |
+| `lib/analytics/` | Module 16's metric calculators, trend direction, filters, and CSV export |
 | `lib/integrations/` | Provider adapters (connect/test/getStatus/disconnect) |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
@@ -130,7 +131,7 @@ project.
 - [x] **Module 13** — Automation Engine
 - [x] **Module 14** — Activity & Audit
 - [x] **Module 15** — Notifications & Communication
-- [ ] Module 16 — Analytics & Reporting
+- [x] **Module 16** — Analytics & Reporting
 - [ ] Module 17 — Settings & Integrations
 - [ ] Cross-cutting: Privacy & Compliance retrofit
 - [ ] Cross-cutting: AI & Calling Cost tracking retrofit

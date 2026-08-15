@@ -137,16 +137,21 @@ export async function buildContext({
     .limit(1)
     .maybeSingle();
 
+  // screening_reports.interest_level IS the authoritative value: Module 9 writes
+  // a human's correction over it and preserves the model's original in
+  // ai_interest_level. An earlier version of this query selected a
+  // `reviewed_interest_level` column that has never existed, which made the
+  // whole select fail and left every interest_level condition permanently
+  // "unknown" — so any rule using it silently never matched.
   const { data: reportRow } = await supabase
     .from("screening_reports")
-    .select("interest_level, reviewed_interest_level")
+    .select("interest_level")
     .eq("organization_id", organizationId)
     .eq("application_id", applicationId)
     .maybeSingle();
 
   const report = reportRow as unknown as {
     interest_level: string | null;
-    reviewed_interest_level: string | null;
   } | null;
 
   return {
@@ -165,8 +170,7 @@ export async function buildContext({
         : null,
       jobHasScreeningQuestions,
       daysInStage,
-      // The reviewed value wins: a human confirmed it against what was said.
-      interestLevel: report?.reviewed_interest_level ?? report?.interest_level ?? null,
+      interestLevel: report?.interest_level ?? null,
     },
   };
 }
