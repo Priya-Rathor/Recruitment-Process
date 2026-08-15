@@ -26,6 +26,8 @@ import { STAGE_LABELS } from "@/lib/applications/stages";
 import { getLatestParsedResume } from "@/lib/resumes/queries";
 import { resumeKeyPoints } from "@/lib/resumes/keyPoints";
 import { ApplicationStageSection } from "./ApplicationStageSection";
+import { ApplicationHeaderActions } from "./ApplicationHeaderActions";
+import { PRIORITY_LABELS, PRIORITY_TONE, type ApplicationPriority } from "@/lib/applications/validation";
 import { Activity } from "lucide-react";
 
 export const metadata = { title: "Application" };
@@ -99,12 +101,37 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
           </span>
           <Link href={`/jobs/${application.job_id}`}>{application.job_title}</Link>
         </h1>
-        {application.archived_at && (
-          <span className="tag is-light" style={{ fontSize: 12 }}>
-            Archived
+        <div className="is-flex is-align-items-center mt-2" style={{ gap: "var(--space-3)", flexWrap: "wrap" }}>
+          <span className={`intake-chip is-${PRIORITY_TONE[(application.priority ?? "normal") as ApplicationPriority]}`}>
+            {PRIORITY_LABELS[(application.priority ?? "normal") as ApplicationPriority]} priority
           </span>
-        )}
+          {application.archived_at && (
+            <span className="tag is-light" style={{ fontSize: 12 }}>
+              Archived
+            </span>
+          )}
+          {/*
+            Candidate identity is shown, never edited here. One candidate can
+            hold five applications, and letting any of them own the person's
+            phone number means five screens racing over one fact.
+          */}
+          <Link href={`/candidates/${application.candidate_id}`} className="text-link">
+            Edit candidate details →
+          </Link>
+        </div>
       </div>
+
+      {canEdit && (
+        <ApplicationHeaderActions
+          applicationId={application.id}
+          members={members}
+          initial={{
+            assignedRecruiterId: application.assigned_recruiter_id,
+            source: application.source,
+            priority: (application.priority ?? "normal") as ApplicationPriority,
+          }}
+        />
+      )}
 
       {/*
         The stepper replaces the small stage chip. It spans the full width

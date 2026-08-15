@@ -12,7 +12,7 @@ import type { Application, ApplicationWithContext, OrgRole } from "@/lib/types";
 
 export const APPLICATION_COLUMNS =
   "id, organization_id, candidate_id, job_id, stage, rejected_at_stage, match_score, " +
-  "assigned_recruiter_id, source, archived_at, created_at, updated_at";
+  "assigned_recruiter_id, source, priority, archived_at, created_at, updated_at";
 
 /** Candidate and job names, embedded via the foreign keys. */
 const APPLICATION_WITH_CONTEXT =

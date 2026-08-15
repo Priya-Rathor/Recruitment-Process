@@ -12,6 +12,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormError } from "@/components/states";
+import type { EducationEntry, EmploymentEntry } from "@/lib/candidates/profile";
+import { RepeatableEditor } from "./RepeatableEditor";
 import {
   mergeCandidateProposal,
   type CandidateFieldConflict,
@@ -39,6 +41,8 @@ type FormState = {
   currentRole: string | null;
   totalExperienceYears: number | null;
   skills: string[];
+  education: EducationEntry[];
+  employmentHistory: EmploymentEntry[];
   expectedSalary: number | null;
   noticePeriodDays: number | null;
   source: CandidateSource;
@@ -54,6 +58,8 @@ function emptyForm(): FormState {
     currentRole: null,
     totalExperienceYears: null,
     skills: [],
+    education: [],
+    employmentHistory: [],
     expectedSalary: null,
     noticePeriodDays: null,
     source: "manual",
@@ -70,6 +76,8 @@ function formFromCandidate(candidate: Candidate): FormState {
     currentRole: candidate.current_role,
     totalExperienceYears: candidate.total_experience_years,
     skills: candidate.skills ?? [],
+    education: candidate.education ?? [],
+    employmentHistory: candidate.employment_history ?? [],
     expectedSalary: candidate.expected_salary,
     noticePeriodDays: candidate.notice_period_days,
     source: candidate.source,
@@ -189,6 +197,8 @@ export function CandidateForm({
       current_role: form.currentRole,
       total_experience_years: form.totalExperienceYears,
       skills: form.skills,
+      education: form.education,
+      employment_history: form.employmentHistory,
       expected_salary: form.expectedSalary,
       notice_period_days: form.noticePeriodDays,
       source: form.source,
@@ -478,6 +488,42 @@ export function CandidateForm({
         </div>
 
         <SkillEditor skills={form.skills} onChange={(skills) => update("skills", skills)} />
+
+        {/* Repeatable history. Both lists drop entirely blank rows on save, so
+            an accidental Add costs nothing — see lib/candidates/profile.ts. */}
+        <div className="mt-5">
+          <RepeatableEditor<EducationEntry>
+            label="Education"
+            help="Qualifications, most recent first."
+            entries={form.education}
+            onChange={(education) => update("education", education)}
+            blank={() => ({ degree: null, institution: null, year: null })}
+            addLabel="Add qualification"
+            emptyText="No qualifications recorded."
+            fields={[
+              { key: "degree", label: "Degree", placeholder: "B.Tech Computer Science" },
+              { key: "institution", label: "Institution", placeholder: "Delhi Technological University" },
+              { key: "year", label: "Year", placeholder: "2019", width: "is-one-quarter" },
+            ]}
+          />
+        </div>
+
+        <div className="mt-5">
+          <RepeatableEditor<EmploymentEntry>
+            label="Employment history"
+            help="Previous companies, most recent first."
+            entries={form.employmentHistory}
+            onChange={(employmentHistory) => update("employmentHistory", employmentHistory)}
+            blank={() => ({ company: null, role: null, duration: null })}
+            addLabel="Add employer"
+            emptyText="No previous employers recorded."
+            fields={[
+              { key: "company", label: "Company", placeholder: "Infosys" },
+              { key: "role", label: "Role", placeholder: "Senior Java Developer" },
+              { key: "duration", label: "Duration", placeholder: "2022 – present", width: "is-one-quarter" },
+            ]}
+          />
+        </div>
 
         <div className="field">
           <label className="label" htmlFor="source">

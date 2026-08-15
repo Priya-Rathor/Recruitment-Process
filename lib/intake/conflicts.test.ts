@@ -27,6 +27,8 @@ const EXISTING = {
   expected_salary: 1_800_000,
   notice_period_days: 30,
   skills: ["Java", "Spring"],
+  education: [],
+  employment_history: [],
   source: "manual",
   archived_at: null,
 } as unknown as Candidate;

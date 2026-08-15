@@ -7,6 +7,10 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { getCandidate, getCandidateDuplicates } from "@/lib/candidates/queries";
 import { listApplications } from "@/lib/applications/queries";
 import { listPendingReviews, pendingReviewSummary } from "@/lib/resumes/pending";
+import { listCandidateApplicationHistory } from "@/lib/candidates/applicationHistory";
+import { resumeKeyPoints } from "@/lib/resumes/keyPoints";
+import { getLatestParsedResume } from "@/lib/resumes/queries";
+import { ApplicationHistory } from "./ApplicationHistory";
 import { listResumeHistory } from "@/lib/resumes/history";
 import { ResumesCard } from "./ResumesCard";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/types";
@@ -48,7 +52,8 @@ async function CandidateDetailContent({
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
 
-  const [duplicates, { applications }, pendingReviews, resumes] = await Promise.all([
+  const [duplicates, { applications }, pendingReviews, resumes, historyCards, parsedResume] =
+    await Promise.all([
     getCandidateDuplicates({ organizationId: membership.organization.id, candidateId }),
     listApplications({
       organizationId: membership.organization.id,
@@ -64,6 +69,16 @@ async function CandidateDetailContent({
     // Full history, newest first. Nothing is filtered out — the point of the
     // section is that older resumes are still there.
     listResumeHistory({ organizationId: membership.organization.id, candidateId }),
+    // Every application this candidate holds, each rolled up against ITS OWN
+    // job's stage configuration — the shared effectiveStages() rule, not a
+    // second implementation. See lib/candidates/applicationHistory.ts.
+    listCandidateApplicationHistory({
+      organizationId: membership.organization.id,
+      candidateId,
+      viewerRole: membership.role,
+      viewerId: membership.user_id,
+    }),
+    getLatestParsedResume({ organizationId: membership.organization.id, candidateId }),
   ]);
 
   const pendingSummary = pendingReviewSummary(pendingReviews);
@@ -289,6 +304,14 @@ async function CandidateDetailContent({
         could not answer the question a recruiter actually has — which version
         is this, and where did it come from.
       */}
+      {/* Read-only for EVERY role, including Owner — it links out to where
+          editing actually happens rather than duplicating it. */}
+      <ApplicationHistory
+        cards={historyCards}
+        resumeSummary={resumeKeyPoints(parsedResume?.parseResult.raw_json)}
+        timeZone={membership.organization.timezone}
+      />
+
       <ResumesCard
         candidateId={candidate.id}
         resumes={resumes}

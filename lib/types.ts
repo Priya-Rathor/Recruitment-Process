@@ -155,6 +155,10 @@ export type Candidate = {
   skills: string[];
   expected_salary: number | null;
   notice_period_days: number | null;
+  /** Repeatable qualifications. See lib/candidates/profile.ts for the shape. */
+  education: import("@/lib/candidates/profile").EducationEntry[];
+  /** Previous employers, most recent first as entered. */
+  employment_history: import("@/lib/candidates/profile").EmploymentEntry[];
   source: CandidateSource;
   resume_url: string | null;
   archived_at: string | null;
@@ -198,6 +202,8 @@ export type Application = {
   match_score: number | null;
   assigned_recruiter_id: string | null;
   source: CandidateSource;
+  /** Recruiter-set urgency. Not derived from stage or SLA. */
+  priority: import("@/lib/applications/validation").ApplicationPriority;
   archived_at: string | null;
   created_at: string;
   updated_at: string;

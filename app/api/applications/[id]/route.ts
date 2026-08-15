@@ -11,7 +11,8 @@ import {
   isApplicationStage,
   type ApplicationStage,
 } from "@/lib/applications/stages";
-import type { Application } from "@/lib/types";
+import { isCandidateSource, type Application } from "@/lib/types";
+import { isApplicationPriority, rejectCandidateFields } from "@/lib/applications/validation";
 import { formatDbError } from "@/lib/supabase/errors";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -58,6 +59,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return jsonError("Invalid JSON body.", 400);
     }
 
+    // BEFORE anything else. Candidate identity is not editable through an
+    // application, and hiding the fields in the UI does not stop a curl. See
+    // lib/applications/validation.ts for why present-and-null still counts.
+    const guard = rejectCandidateFields(body);
+    if (!guard.ok) return jsonError(guard.message, 422);
+
     const payload = (body ?? {}) as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
 
@@ -103,6 +110,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       } else {
         return jsonError("Invalid recruiter.", 400);
       }
+    }
+
+    if ("priority" in payload) {
+      if (!isApplicationPriority(payload.priority)) {
+        return jsonError("Priority must be Low, Normal or High.", 400);
+      }
+      updates.priority = payload.priority;
+    }
+
+    if ("source" in payload) {
+      if (!isCandidateSource(payload.source)) return jsonError("Invalid source.", 400);
+      // How this candidate reached THIS job. Distinct from candidates.source,
+      // which records how the person entered the system at all — editing one
+      // must never touch the other.
+      updates.source = payload.source;
     }
 
     // Accepted so Module 7 can write scores through the same endpoint. Bounded

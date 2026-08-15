@@ -9,7 +9,8 @@ import { formatDbError } from "@/lib/supabase/errors";
 export const CANDIDATE_COLUMNS =
   "id, organization_id, name, email, phone, email_normalized, phone_normalized, location, " +
   "current_company, current_role, total_experience_years, skills, expected_salary, " +
-  "notice_period_days, source, resume_url, archived_at, created_at, updated_at";
+  "notice_period_days, education, employment_history, source, resume_url, " +
+  "archived_at, created_at, updated_at";
 
 /**
  * Lists candidates for an organization.

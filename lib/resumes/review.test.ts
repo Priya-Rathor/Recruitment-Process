@@ -22,6 +22,8 @@ const candidate: Candidate = {
   current_role: null,
   total_experience_years: 5,
   skills: ["Java"],
+  education: [],
+  employment_history: [],
   expected_salary: 1_800_000,
   notice_period_days: null,
   source: "manual",

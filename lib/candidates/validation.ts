@@ -1,6 +1,10 @@
 // Server-side validation for candidate payloads. Pure and shared by POST/PATCH
 // so create and update can never drift, and unit-testable without a database.
 import { isCandidateSource, type CandidateSource } from "@/lib/types";
+import {
+  normalizeEducation,
+  normalizeEmploymentHistory,
+} from "@/lib/candidates/profile";
 
 export type ParsedCandidateFields = {
   name?: string;
@@ -11,6 +15,8 @@ export type ParsedCandidateFields = {
   current_role?: string | null;
   total_experience_years?: number | null;
   skills?: string[];
+  education?: import("@/lib/candidates/profile").EducationEntry[];
+  employment_history?: import("@/lib/candidates/profile").EmploymentEntry[];
   expected_salary?: number | null;
   notice_period_days?: number | null;
   source?: CandidateSource;
@@ -135,6 +141,18 @@ export function parseCandidatePayload(
       if (!parsed.ok) return { ok: false, error: parsed.error };
       data[key] = parsed.value;
     }
+  }
+
+  // --- education and employment history --------------------------------------
+  //
+  // Normalised rather than rejected: the caller is a form someone has been
+  // typing into, and refusing the whole save because one row is half-filled
+  // would lose the other six. See lib/candidates/profile.ts.
+  if ("education" in raw) {
+    data.education = normalizeEducation(raw.education);
+  }
+  if ("employment_history" in raw) {
+    data.employment_history = normalizeEmploymentHistory(raw.employment_history);
   }
 
   // --- skills ----------------------------------------------------------------
