@@ -25,12 +25,21 @@ import {
   CheckCircle2,
   CircleDashed,
   FileText,
+  Link2,
   Loader2,
   RotateCw,
   Upload,
   UserCheck,
   X,
 } from "lucide-react";
+import { CandidatePicker, type PickerCandidate } from "@/components/CandidatePicker";
+// From the policy module, NOT from extract.ts: that one pulls in the PDF and
+// Word parsers, which need Node's `fs` and cannot be bundled for the browser.
+import {
+  RESUME_UPLOAD_ACCEPT,
+  RESUME_UPLOAD_REJECTION,
+  isAllowedResumeUpload,
+} from "@/lib/resumes/uploadPolicy";
 import {
   INTAKE_TONE,
   summarize,
@@ -41,17 +50,34 @@ import {
 /** How many files are in flight at once. See the note at the top of the file. */
 const CONCURRENCY = 3;
 
-const ACCEPT = ".pdf,.docx,.txt,application/pdf,text/plain";
+// PDF and Word only. The `accept` attribute and the server's allowlist come
+// from the SAME constant, so the file picker cannot offer something the route
+// will reject four seconds later.
+const ACCEPT = RESUME_UPLOAD_ACCEPT;
 
 type Row = {
   /** Stable client id; the server row's id is not known until it resolves. */
   key: string;
   file: File;
   status: IntakeStatus;
+  /** The server row's id, needed to reconnect. Null until the file resolves. */
+  itemId: string | null;
   candidateId: string | null;
   candidateName: string | null;
   queuedConflictCount: number;
   errorMessage: string | null;
+  /** Set after a manual reconnection, so the row can say what it cleaned up. */
+  cleanupNote: string | null;
+  /** True while this row's reconnection request is in flight. */
+  connecting: boolean;
+  /**
+   * Refused for its file type, rather than failed while being read.
+   *
+   * Both render as an error chip, but only one is worth trying again: a .txt
+   * will be a .txt on the second attempt too. Offering Retry there would be an
+   * invitation to a loop.
+   */
+  rejected: boolean;
 };
 
 function formatBytes(bytes: number): string {
@@ -75,6 +101,10 @@ function statusLabel(row: Row): string {
       return "Already applied to this job";
     case "match_conflict":
       return "Possible match conflict — needs manual review";
+    case "manually_connected":
+      return row.candidateName
+        ? `Manually connected: ${row.candidateName} — application added`
+        : "Manually connected — application added";
     case "failed":
       return "Couldn't parse this file";
   }
@@ -88,6 +118,7 @@ function StatusIcon({ status }: { status: IntakeStatus }) {
   if (status === "candidate_created") return <CheckCircle2 size={14} aria-hidden="true" />;
   if (status === "candidate_matched") return <UserCheck size={14} aria-hidden="true" />;
   if (status === "match_conflict") return <AlertTriangle size={14} aria-hidden="true" />;
+  if (status === "manually_connected") return <Link2 size={14} aria-hidden="true" />;
   if (status === "failed") return <X size={14} aria-hidden="true" />;
   return <CheckCircle2 size={14} aria-hidden="true" />;
 }
@@ -99,6 +130,8 @@ export function IntakeModal({ jobId, jobTitle }: { jobId: string; jobTitle: stri
   const [rows, setRows] = useState<Row[]>([]);
   const [dragging, setDragging] = useState(false);
   const [batchId] = useState(() => crypto.randomUUID());
+  /** Row key whose "connect to existing candidate" search is open, if any. */
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   // Rows are read inside an async loop that must not restart when they change,
@@ -147,6 +180,7 @@ export function IntakeModal({ jobId, jobTitle }: { jobId: string; jobTitle: stri
         const item = payload?.data;
         patch(row.key, {
           status: (item?.status as IntakeStatus) ?? "failed",
+          itemId: item?.id ?? null,
           candidateId: item?.candidate_id ?? null,
           candidateName: item?.candidate_name ?? null,
           queuedConflictCount: item?.queued_conflict_count ?? 0,
@@ -203,21 +237,87 @@ export function IntakeModal({ jobId, jobTitle }: { jobId: string; jobTitle: stri
     if (waiting) void drain();
   }, [open, rows, drain]);
 
+  /**
+   * Points one file at a candidate the recruiter chose.
+   *
+   * Everything destructive happens on the server — removing a wrongly created
+   * candidate, deleting the application filed against the wrong person. This
+   * only reports what came back, including what was cleaned up, because a
+   * recruiter who just deleted a record needs to be told so.
+   */
+  const reconnect = useCallback(
+    async (row: Row, candidate: PickerCandidate) => {
+      if (!row.itemId) return;
+      patch(row.key, { connecting: true });
+
+      try {
+        const response = await fetch(`/api/jobs/${jobId}/intake/${row.itemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidate_id: candidate.id }),
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          patch(row.key, {
+            connecting: false,
+            errorMessage: payload?.error ?? "Couldn't connect this resume.",
+          });
+          return;
+        }
+
+        const item = payload.data;
+        const cleanup =
+          item.cleanup_action === "deleted"
+            ? `Removed the duplicate candidate ${item.removed_candidate_name ?? ""} that was created automatically.`.trim()
+            : item.cleanup_action === "archived"
+              ? `Archived ${item.removed_candidate_name ?? "the auto-created candidate"} — it had already picked up other work, so it wasn't deleted.`
+              : null;
+
+        patch(row.key, {
+          status: "manually_connected",
+          candidateId: item.candidate_id,
+          candidateName: item.candidate_name,
+          queuedConflictCount: item.queued_conflict_count ?? 0,
+          errorMessage: null,
+          cleanupNote: cleanup,
+          connecting: false,
+        });
+        setPickerFor(null);
+      } catch {
+        patch(row.key, { connecting: false, errorMessage: "Couldn't reach the server." });
+      }
+    },
+    [jobId, patch]
+  );
+
   const addFiles = useCallback((files: FileList | File[]) => {
     const incoming = Array.from(files);
     if (incoming.length === 0) return;
 
     setRows((current) => [
       ...current,
-      ...incoming.map((file) => ({
-        key: crypto.randomUUID(),
-        file,
-        status: "queued" as IntakeStatus,
-        candidateId: null,
-        candidateName: null,
-        queuedConflictCount: 0,
-        errorMessage: null,
-      })),
+      ...incoming.map((file) => {
+        // Rejected HERE, before anything is uploaded or parsed. The spec is
+        // explicit that an unsupported file must not fail deep in the parsing
+        // step with a generic error — so the row appears already-failed, named,
+        // and with the reason, and never costs an AI call.
+        const allowed = isAllowedResumeUpload(file.name, file.type || null);
+
+        return {
+          key: crypto.randomUUID(),
+          file,
+          status: (allowed ? "queued" : "failed") as IntakeStatus,
+          itemId: null,
+          candidateId: null,
+          candidateName: null,
+          queuedConflictCount: 0,
+          errorMessage: allowed ? null : `${RESUME_UPLOAD_REJECTION}.`,
+          cleanupNote: null,
+          connecting: false,
+          rejected: !allowed,
+        };
+      }),
     ]);
   }, []);
 
@@ -307,7 +407,7 @@ export function IntakeModal({ jobId, jobTitle }: { jobId: string; jobTitle: stri
                     event.target.value = "";
                   }}
                 />
-                <p className="intake-drop__formats">PDF, DOCX or TXT · up to 10 MB each</p>
+                <p className="intake-drop__formats">PDF or Word (.doc, .docx) · up to 10 MB each</p>
               </div>
 
               {rows.length > 0 && (
@@ -363,15 +463,51 @@ export function IntakeModal({ jobId, jobTitle }: { jobId: string; jobTitle: stri
                             </span>
                           )}
 
+                          {row.cleanupNote && (
+                            <span className="intake-row__note">{row.cleanupNote}</span>
+                          )}
+
                           {row.errorMessage && (
                             <span className="intake-row__note">{row.errorMessage}</span>
                           )}
+
+                          {/*
+                            The manual override, on EVERY resolved row — not
+                            only the ambiguous ones. Automatic matching can
+                            create the wrong new candidate or pick the wrong
+                            existing one, and both need correcting from here
+                            rather than by re-uploading the file.
+                          */}
+                          {row.itemId && (
+                            pickerFor === row.key ? (
+                              <CandidatePicker
+                                busy={row.connecting}
+                                excludeId={row.candidateId}
+                                onPick={(candidate) => void reconnect(row, candidate)}
+                                onCancel={() => setPickerFor(null)}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                className="text-link intake-row__connect"
+                                onClick={() => setPickerFor(row.key)}
+                                disabled={row.connecting}
+                              >
+                                <Link2 size={14} aria-hidden="true" />
+                                {row.connecting ? "Connecting…" : "Connect to existing candidate"}
+                              </button>
+                            )
+                          )}
                         </div>
 
-                        {/* Retry is offered for parse failures only. A match
-                            conflict would resolve the same way every time — it
-                            needs a person, not another attempt. */}
-                        {row.status === "failed" && (
+                        {/*
+                          Retry is for a file that FAILED while being read. A
+                          file refused for its type would be refused again, and
+                          a match conflict would resolve the same way every
+                          time — that one needs a person, which is what the
+                          connect link above is for.
+                        */}
+                        {row.status === "failed" && !row.rejected && (
                           <button
                             type="button"
                             className="button is-small intake-row__retry"

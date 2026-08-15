@@ -13,6 +13,8 @@
 // (OCR at scale is Build Later per the spec).
 // =============================================================================
 
+import { RESUME_UPLOAD_REJECTION } from "@/lib/resumes/uploadPolicy";
+
 export type ExtractionResult =
   | { ok: true; text: string; characters: number; truncated: boolean }
   | { ok: false; reason: ExtractionFailure; message: string };
@@ -42,6 +44,16 @@ export const SUPPORTED_MIME_TYPES = [
 
 export const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt"] as const;
 
+// Re-exported so server callers keep a single import. The definitions live in
+// uploadPolicy.ts because the file picker needs them too, and this module pulls
+// in unpdf/mammoth/word-extractor, which need Node's `fs`.
+export {
+  RESUME_UPLOAD_ACCEPT,
+  RESUME_UPLOAD_EXTENSIONS,
+  RESUME_UPLOAD_REJECTION,
+  isAllowedResumeUpload,
+} from "@/lib/resumes/uploadPolicy";
+
 /** Normalises whitespace without destroying the line structure resumes rely on. */
 export function normalizeExtractedText(raw: string): string {
   return raw
@@ -57,20 +69,27 @@ export function normalizeExtractedText(raw: string): string {
 export function detectFileKind(
   fileName: string,
   mimeType: string | null
-): "pdf" | "docx" | "text" | null {
+): "pdf" | "docx" | "doc" | "text" | null {
   const lowerName = fileName.toLowerCase();
   const type = (mimeType ?? "").toLowerCase();
 
-  if (type === "application/pdf" || lowerName.endsWith(".pdf")) return "pdf";
-  if (
-    type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    lowerName.endsWith(".docx")
-  ) {
+  // Extension wins over MIME type throughout. A .docx and a legacy .doc are
+  // completely different binary formats needing different parsers, and some
+  // browsers label both "application/msword" — trusting that would hand a ZIP
+  // to the OLE reader and produce a corrupt-file error for a perfectly good
+  // file. The extension is what the recruiter actually chose.
+  if (lowerName.endsWith(".pdf")) return "pdf";
+  if (lowerName.endsWith(".docx")) return "docx";
+  if (lowerName.endsWith(".doc")) return "doc";
+  if (lowerName.endsWith(".txt")) return "text";
+
+  if (type === "application/pdf") return "pdf";
+  if (type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
     return "docx";
   }
-  if (type === "text/plain" || lowerName.endsWith(".txt")) return "text";
-  // Legacy .doc is binary and NOT handled by mammoth; treated as unsupported
-  // rather than silently producing mojibake.
+  if (type === "application/msword") return "doc";
+  if (type === "text/plain") return "text";
+
   return null;
 }
 
@@ -98,7 +117,7 @@ export async function extractResumeText({
     return {
       ok: false,
       reason: "unsupported_type",
-      message: "Upload a PDF, DOCX, or plain-text file. Older .doc files aren't supported.",
+      message: `${RESUME_UPLOAD_REJECTION}.`,
     };
   }
 
@@ -116,6 +135,16 @@ export async function extractResumeText({
         buffer: Buffer.from(buffer),
       });
       raw = value;
+    } else if (kind === "doc") {
+      // Legacy binary Word (OLE compound document). A completely different
+      // format from .docx, which is a ZIP of XML — mammoth cannot read it, and
+      // for a long time this branch did not exist, so every .doc was rejected.
+      // word-extractor reads the OLE streams directly.
+      const WordExtractor = (await import("word-extractor")).default;
+      const document = await new WordExtractor().extract(Buffer.from(buffer));
+      // getBody() is the document text; headers and footnotes are deliberately
+      // left out — on a resume they hold page numbers, not experience.
+      raw = document.getBody();
     } else {
       raw = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
     }

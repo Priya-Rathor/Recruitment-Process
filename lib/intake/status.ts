@@ -13,6 +13,7 @@ export const INTAKE_STATUSES = [
   "candidate_matched",
   "already_applied",
   "match_conflict",
+  "manually_connected",
   "failed",
 ] as const;
 
@@ -43,6 +44,10 @@ export const INTAKE_TONE: Record<IntakeStatus, ChipTone> = {
   candidate_matched: "info",
   already_applied: "neutral",
   match_conflict: "warning",
+  // Info, like an automatic match — the outcome is the same, an application on
+  // this job for an existing person. What differs is who decided, which the
+  // label carries.
+  manually_connected: "info",
   failed: "error",
 };
 
@@ -52,6 +57,8 @@ export type IntakeSummary = {
   matched: number;
   alreadyApplied: number;
   conflicts: number;
+  /** Corrected by hand after automatic matching got it wrong. */
+  manuallyConnected: number;
   failed: number;
   pending: number;
 };
@@ -63,6 +70,7 @@ export function summarize(statuses: IntakeStatus[]): IntakeSummary {
     matched: 0,
     alreadyApplied: 0,
     conflicts: 0,
+    manuallyConnected: 0,
     failed: 0,
     pending: 0,
   };
@@ -77,6 +85,7 @@ export function summarize(statuses: IntakeStatus[]): IntakeSummary {
     else if (status === "candidate_matched") summary.matched += 1;
     else if (status === "already_applied") summary.alreadyApplied += 1;
     else if (status === "match_conflict") summary.conflicts += 1;
+    else if (status === "manually_connected") summary.manuallyConnected += 1;
     else if (status === "failed") summary.failed += 1;
   }
 
@@ -110,6 +119,9 @@ export function summaryLine(summary: IntakeSummary): string | null {
     );
   }
   if (summary.alreadyApplied > 0) clauses.push(`${summary.alreadyApplied} already applied`);
+  if (summary.manuallyConnected > 0) {
+    clauses.push(`${summary.manuallyConnected} connected manually`);
+  }
   if (summary.conflicts > 0) clauses.push(plural(summary.conflicts, "needs review", "need review"));
   if (summary.failed > 0) clauses.push(`${summary.failed} failed`);
 

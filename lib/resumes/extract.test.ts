@@ -54,9 +54,13 @@ describe("detectFileKind", () => {
     expect(detectFileKind("RESUME.PDF", null)).toBe("pdf");
   });
 
-  it("rejects legacy .doc rather than producing mojibake", () => {
-    // mammoth cannot read the old binary format; failing clearly beats garbage.
-    expect(detectFileKind("resume.doc", "application/msword")).toBeNull();
+  it("routes legacy .doc to its own reader, not to mammoth", () => {
+    // .doc is an OLE compound document and .docx is a ZIP of XML — the same
+    // three letters and nothing else in common. Handing a .doc to mammoth
+    // produced "corrupt file" for a perfectly good document, so this was
+    // rejected outright until word-extractor was added.
+    expect(detectFileKind("resume.doc", "application/msword")).toBe("doc");
+    // Real end-to-end extraction of all three formats: lib/resumes/formats.test.ts
   });
 
   it("rejects anything else", () => {
@@ -124,7 +128,7 @@ describe("extractResumeText", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe("unsupported_type");
-      expect(result.message).toMatch(/PDF, DOCX/);
+      expect(result.message).toMatch(/PDF and Word documents/);
     }
   });
 

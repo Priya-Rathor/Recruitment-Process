@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { getJobDetail } from "@/lib/jobs/queries";
-import { detectFileKind, hashFile } from "@/lib/resumes/extract";
+import { RESUME_UPLOAD_REJECTION, hashFile, isAllowedResumeUpload } from "@/lib/resumes/extract";
 import { processIntakeFile } from "@/lib/intake/process";
 import { listBatchItems } from "@/lib/intake/queries";
 
@@ -135,11 +135,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // An unsupported type is a per-file failure, not a request error: in a drop
     // of thirty files the other twenty-nine must still run, and the row has to
     // appear in the list so the recruiter can see WHICH file was rejected.
-    if (!detectFileKind(file.name, file.type)) {
+    // The same allowlist the file picker uses, enforced again here. The client
+    // check is for speed; this one is the rule — a direct POST bypasses the UI
+    // entirely.
+    if (!isAllowedResumeUpload(file.name, file.type || null)) {
       const item = await record({
         status: "failed",
-        error_message:
-          "Only PDF, DOCX and plain-text files can be read. Older .doc files aren't supported.",
+        error_message: `${RESUME_UPLOAD_REJECTION}.`,
       });
       return NextResponse.json({ data: item, batch_id: batchId }, { status: 200 });
     }

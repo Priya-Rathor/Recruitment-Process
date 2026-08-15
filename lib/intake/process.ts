@@ -88,6 +88,24 @@ function failed(message: string, extra: Partial<ProcessOutcome> = {}): ProcessOu
 export async function processIntakeFile(input: ProcessInput): Promise<ProcessOutcome> {
   const { organizationId, jobId, actorId, file } = input;
 
+  /**
+   * A failure that KEEPS the file.
+   *
+   * A resume that could not be parsed is still a resume. Discarding it would
+   * make "Connect to existing candidate" a lie on a failed row — the recruiter
+   * would pick the right person and no file would be filed against them. Parked
+   * under <org>/_intake/, so a later reconnection has something to move.
+   */
+  const failKeepingFile = async (message: string): Promise<ProcessOutcome> => ({
+    ...failed(message),
+    storagePath: await parkFile({
+      organizationId,
+      fileName: file.name,
+      buffer: file.buffer,
+      contentType: file.type,
+    }),
+  });
+
   // --- 1. Text ---------------------------------------------------------------
   const extraction = await extractResumeText({
     buffer: file.buffer,
@@ -95,7 +113,7 @@ export async function processIntakeFile(input: ProcessInput): Promise<ProcessOut
     mimeType: file.type,
   });
 
-  if (!extraction.ok) return failed(extraction.message);
+  if (!extraction.ok) return failKeepingFile(extraction.message);
 
   // --- 2. AI parse -----------------------------------------------------------
   const result = await parseResume(extraction.text);
@@ -110,12 +128,12 @@ export async function processIntakeFile(input: ProcessInput): Promise<ProcessOut
     ok: result.ok,
   });
 
-  if (!result.ok) return failed(result.message);
+  if (!result.ok) return failKeepingFile(result.message);
 
   const parsed = result.data;
 
   if (!hasIdentifyingDetails(parsed)) {
-    return failed(
+    return failKeepingFile(
       "This file parsed, but contained no name, email or phone number — nothing to identify a person by."
     );
   }
@@ -137,7 +155,7 @@ export async function processIntakeFile(input: ProcessInput): Promise<ProcessOut
   // profile change — the spec forbids guessing, and a wrong guess here merges
   // two real people's histories, which is close to unrecoverable by hand.
   if (match.kind === "conflict") {
-    const storagePath = await parkConflictedFile({
+    const storagePath = await parkFile({
       organizationId,
       fileName: file.name,
       buffer: file.buffer,
@@ -200,7 +218,7 @@ export async function processIntakeFile(input: ProcessInput): Promise<ProcessOut
       : 0;
 
   // --- 6. Application --------------------------------------------------------
-  const application = await ensureApplication({
+  const application = await ensureApplicationForCandidate({
     organizationId,
     organizationName: input.organizationName,
     candidateId: candidate.id,
@@ -481,14 +499,19 @@ async function storeResumeForCandidate({
 }
 
 /**
- * Parks a file whose owner could not be determined.
+ * Parks a file that has no candidate to be filed under — yet.
+ *
+ * Two cases reach here: an ambiguous match, where the matcher refused to decide,
+ * and any parse failure, where there is nothing to decide FROM. Both may later
+ * be connected to a candidate by hand, and that reconnection needs a file to
+ * move — so the upload is kept rather than discarded.
  *
  * Under <organization_id>/_intake/, which the Module 6 storage policies already
- * cover — they authorise on the first path segment, so no new policy is needed
+ * cover: they authorise on the first path segment, so no new policy is needed
  * and no cross-tenant hole is opened. `_intake` cannot collide with a candidate
  * id, which is always a UUID.
  */
-async function parkConflictedFile({
+async function parkFile({
   organizationId,
   fileName,
   buffer,
@@ -525,7 +548,7 @@ async function parkConflictedFile({
  * (candidate_id, job_id) index is what actually makes the guarantee — this code
  * only decides how to report it.
  */
-async function ensureApplication({
+export async function ensureApplicationForCandidate({
   organizationId,
   organizationName,
   candidateId,

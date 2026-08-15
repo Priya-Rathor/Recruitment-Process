@@ -1,0 +1,25 @@
+Ananya Sharma
+Senior Java Developer
+
+Email: ananya@example.com
+Phone: +91 98765 43210
+Location: Gurgaon, India
+
+SUMMARY
+Backend engineer with 6 years of experience building payment systems in Java and Spring Boot. Currently at Infosys, leading a team of four engineers across two time zones.
+
+SKILLS
+Java, Spring Boot, PostgreSQL, Kafka, Docker, Kubernetes, REST APIs, Microservices, JUnit, Maven
+
+EXPERIENCE
+Infosys - Senior Java Developer - January 2022 to Present
+Led the migration of a monolithic billing service to microservices, cutting p99 latency by 40 percent.
+
+Wipro - Java Developer - June 2019 to December 2021
+Built internal reporting tools used by 200 staff.
+
+EDUCATION
+B.Tech Computer Science, Delhi Technological University, 2019
+
+Expected CTC: 18 LPA
+Notice period: 30 days

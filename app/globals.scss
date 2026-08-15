@@ -1774,3 +1774,175 @@ a {
     flex-basis: 100%;
   }
 }
+
+// =============================================================================
+// CANDIDATE PICKER — the inline "which person is this?" search.
+// =============================================================================
+.picker {
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  background-color: var(--color-card);
+}
+
+.picker__field {
+  position: relative;
+}
+
+.picker__icon {
+  position: absolute;
+  left: var(--control-padding-x);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  // Bulma sets position:relative on .input, so a positioned sibling that comes
+  // second paints over this one. Same trap as the candidates search sparkle.
+  z-index: 1;
+}
+
+.picker__busy {
+  position: absolute;
+  right: var(--control-padding-x);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-primary);
+  z-index: 1;
+}
+
+.picker__input {
+  height: var(--control-height-sm);
+  font-size: var(--text-label);
+  padding-left: 34px;
+}
+
+.picker__results {
+  margin-top: var(--space-2);
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border);
+}
+
+.picker__result {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--ease);
+
+  &:hover:not(:disabled) { background-color: var(--color-primary-tint); }
+  &:focus-visible { box-shadow: var(--focus-ring); }
+  &:disabled { cursor: not-allowed; opacity: 0.6; }
+}
+
+.picker__result-icon {
+  color: var(--color-text-secondary);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.picker__result-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.picker__name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.picker__tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  background-color: var(--status-disconnected-bg);
+  color: var(--status-disconnected-text);
+}
+
+.picker__detail {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.picker__empty {
+  margin-top: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.picker__cancel {
+  margin-top: var(--space-3);
+}
+
+.intake-row__connect {
+  margin-top: var(--space-1);
+}
+
+// =============================================================================
+// RESUME HISTORY (Candidate profile)
+// =============================================================================
+.resume-list {
+  border-top: 1px solid var(--color-border);
+}
+
+.resume-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.resume-row__icon {
+  color: var(--color-text-secondary);
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.resume-row__meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.resume-row__name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.resume-row__tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  background-color: var(--color-primary-tint);
+  color: var(--color-primary);
+  vertical-align: 1px;
+}
+
+.resume-row__detail {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.resume-row__action {
+  flex: 0 0 auto;
+}

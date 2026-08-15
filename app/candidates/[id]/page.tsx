@@ -7,6 +7,8 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { getCandidate, getCandidateDuplicates } from "@/lib/candidates/queries";
 import { listApplications } from "@/lib/applications/queries";
 import { listPendingReviews, pendingReviewSummary } from "@/lib/resumes/pending";
+import { listResumeHistory } from "@/lib/resumes/history";
+import { ResumesCard } from "./ResumesCard";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/types";
 import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { CandidateForm } from "../CandidateForm";
@@ -46,7 +48,7 @@ async function CandidateDetailContent({
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
 
-  const [duplicates, { applications }, pendingReviews] = await Promise.all([
+  const [duplicates, { applications }, pendingReviews, resumes] = await Promise.all([
     getCandidateDuplicates({ organizationId: membership.organization.id, candidateId }),
     listApplications({
       organizationId: membership.organization.id,
@@ -59,6 +61,9 @@ async function CandidateDetailContent({
     // queues these instead of interrupting a thirty-file upload thirty times,
     // which only works if the queue is visible somewhere.
     listPendingReviews({ organizationId: membership.organization.id, candidate }),
+    // Full history, newest first. Nothing is filtered out — the point of the
+    // section is that older resumes are still there.
+    listResumeHistory({ organizationId: membership.organization.id, candidateId }),
   ]);
 
   const pendingSummary = pendingReviewSummary(pendingReviews);
@@ -279,21 +284,12 @@ async function CandidateDetailContent({
 
       </div>
 
-      <div className="card mb-4">
-        <div className="is-flex is-justify-content-space-between is-align-items-center">
-          <div>
-            <h2 className="title is-5 mb-1">Resume</h2>
-            <p className="has-text-secondary" style={{ fontSize: 13 }}>
-              {candidate.resume_url
-                ? "A reviewed resume is on file."
-                : "Upload a resume and AI will propose profile updates for you to review."}
-            </p>
-          </div>
-          <Link className="button is-small" href={`/candidates/${candidate.id}/resume`}>
-            {candidate.resume_url ? "Manage resumes" : "Upload a resume"}
-          </Link>
-        </div>
-      </div>
+      {/*
+        Replaces a single line that said only whether *a* resume existed. It
+        could not answer the question a recruiter actually has — which version
+        is this, and where did it come from.
+      */}
+      <ResumesCard candidateId={candidate.id} resumes={resumes} canUpload={canEdit} />
 
       {canArchive && !candidate.archived_at && (
         <div className="card" style={{ borderColor: "var(--color-error)" }}>

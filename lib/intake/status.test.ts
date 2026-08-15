@@ -17,17 +17,19 @@ describe("summarize", () => {
       "candidate_matched",
       "already_applied",
       "match_conflict",
+      "manually_connected",
       "failed",
       "processing",
       "queued",
     ]);
 
     expect(summary).toEqual({
-      processed: 6,
+      processed: 7,
       created: 2,
       matched: 1,
       alreadyApplied: 1,
       conflicts: 1,
+      manuallyConnected: 1,
       failed: 1,
       pending: 2,
     });
@@ -40,6 +42,7 @@ describe("summarize", () => {
       matched: 0,
       alreadyApplied: 0,
       conflicts: 0,
+      manuallyConnected: 0,
       failed: 0,
       pending: 0,
     });
@@ -100,6 +103,19 @@ describe("status vocabulary", () => {
       if (status === "queued" || status === "processing") continue;
       expect(isTerminal(status), status).toBe(true);
     }
+  });
+
+  it("distinguishes a manual connection from an automatic match", () => {
+    // Same outcome, different decider. Collapsing them would erase the audit
+    // that correcting a bad auto-match exists to leave behind.
+    const line = summaryLine(summarize(["candidate_matched", "manually_connected"]));
+    expect(line).toContain("1 matched to an existing candidate");
+    expect(line).toContain("1 connected manually");
+  });
+
+  it("tones a manual connection like a match, not like a warning", () => {
+    expect(INTAKE_TONE.manually_connected).toBe("info");
+    expect(isTerminal("manually_connected")).toBe(true);
   });
 
   it("keeps already_applied neutral rather than a warning", () => {
