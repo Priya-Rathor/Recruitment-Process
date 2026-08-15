@@ -94,11 +94,16 @@ async function CandidateDetailContent({
           </div>
         </div>
 
-        {canEdit && !candidate.archived_at && (
-          <Link className="button is-primary" href={`/candidates/${candidate.id}?edit=1`}>
-            Edit
+        <div className="buttons">
+          <Link className="button" href={`/candidates/${candidate.id}/activity`}>
+            Activity
           </Link>
-        )}
+          {canEdit && !candidate.archived_at && (
+            <Link className="button is-primary" href={`/candidates/${candidate.id}?edit=1`}>
+              Edit
+            </Link>
+          )}
+        </div>
       </div>
 
       {duplicates.length > 0 && (

@@ -70,6 +70,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/interviews/` | Module 11's scheduling, feedback, and reminder queue |
 | `lib/clients/` | Module 12's client records and feedback turnaround |
 | `lib/automations/` | Module 13's rule catalogue, evaluator, and execution engine |
+| `lib/activity/` | Module 14's event catalogue, append-only logger, and narrative grounding |
 | `lib/integrations/` | Provider adapters (connect/test/getStatus/disconnect) |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
@@ -125,8 +126,8 @@ project.
 - [x] **Module 10** — Advanced Pipeline
 - [x] **Module 11** — Interviews
 - [x] **Module 12** — Clients
-- [ ] Module 13 — Automation Engine
-- [ ] Module 14 — Activity & Audit
+- [x] **Module 13** — Automation Engine
+- [x] **Module 14** — Activity & Audit
 - [ ] Module 15 — Notifications & Communication
 - [ ] Module 16 — Analytics & Reporting
 - [ ] Module 17 — Settings & Integrations

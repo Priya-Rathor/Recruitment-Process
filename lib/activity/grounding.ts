@@ -42,7 +42,11 @@ export type TimelineFact = {
  */
 const CLAIM_VOCABULARY: { pattern: RegExp; requires: string[]; claim: string }[] = [
   {
-    pattern: /\b(screen(ed|ing)\s+call|phone\s+screen|was\s+screened|screening\s+call)\b/i,
+    // Deliberately just the word. "completed AI screening" asserts a screening
+    // happened every bit as much as "completed a screening call" does, and an
+    // earlier version of this pattern that required the word "call" let exactly
+    // that phrasing through.
+    pattern: /\b(screen(ed|ing)|phone\s+screen)\b/i,
     requires: ["screening_call.started", "screening_call.completed", "screening_report.generated"],
     claim: "a screening call",
   },
@@ -158,14 +162,27 @@ export function findUngroundedClaims({
     }
   }
 
+  // Both orders. "25 August" is as much a fabricated date as "August 25", and
+  // checking only one of them would leave the other unguarded.
+  const dateMentions: { text: string; month: string; day: number }[] = [];
+
   for (const mention of narrative.matchAll(
-    /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b/gi
+    new RegExp(`\\b(${MONTH})\\s+(\\d{1,2})(st|nd|rd|th)?(?!\\d)`, "gi")
   )) {
-    const key = `${mention[1].toLowerCase()}-${Number(mention[2])}`;
-    if (!allowedDates.has(key)) {
+    dateMentions.push({ text: mention[0], month: mention[1].toLowerCase(), day: Number(mention[2]) });
+  }
+
+  for (const mention of narrative.matchAll(
+    new RegExp(`\\b(\\d{1,2})(st|nd|rd|th)?\\s+(${MONTH})\\b`, "gi")
+  )) {
+    dateMentions.push({ text: mention[0], month: mention[3].toLowerCase(), day: Number(mention[1]) });
+  }
+
+  for (const mention of dateMentions) {
+    if (!allowedDates.has(`${mention.month}-${mention.day}`)) {
       violations.push({
         kind: "unsupported_date",
-        detail: `The summary dates something to ${mention[0]}, but no recorded event happened then.`,
+        detail: `The summary dates something to ${mention.text}, but no recorded event happened then.`,
       });
     }
   }
@@ -173,20 +190,34 @@ export function findUngroundedClaims({
   return violations;
 }
 
+const MONTH = "January|February|March|April|May|June|July|August|September|October|November|December";
+
 /**
  * Removes date-shaped text so the numeric guard doesn't flag day and year
  * numbers. Dates get their own check above.
+ *
+ * ORDER AND ANCHORING BOTH MATTER. An earlier version matched only
+ * "August 10"-style dates, with an unanchored `\d{1,2}` for the day. Given
+ * "10 August 2026" it matched "August 20" — the first two digits of the YEAR —
+ * and left behind "10" and "26" as two invented figures. Both correct
+ * narratives failed and the guard looked broken, which is how a guard gets
+ * switched off.
+ *
+ * So: four-digit years go FIRST, and each day number is anchored with a
+ * lookahead that refuses to stop mid-number.
  */
 function stripDateLike(text: string): string {
-  return text
-    .replace(
-      /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(,?\s+\d{4})?/gi,
-      " "
-    )
-    .replace(/\b\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/g, " ")
-    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
-    // A bare four-digit year.
-    .replace(/\b(19|20)\d{2}\b/g, " ");
+  return (
+    text
+      // Years first, so no later pattern can bite off half of one.
+      .replace(/\b(19|20)\d{2}\b/g, " ")
+      // "10 August" / "10th August"
+      .replace(new RegExp(`\\b\\d{1,2}(st|nd|rd|th)?\\s+(${MONTH})\\b`, "gi"), " ")
+      // "August 10" / "August 10th" — (?!\d) so it cannot stop inside a number.
+      .replace(new RegExp(`\\b(${MONTH})\\s+\\d{1,2}(st|nd|rd|th)?(?!\\d)`, "gi"), " ")
+      .replace(/\b\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/g, " ")
+      .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
+  );
 }
 
 function monthDayKey(date: Date): string {

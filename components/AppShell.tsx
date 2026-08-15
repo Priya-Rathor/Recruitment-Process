@@ -2,7 +2,7 @@
 // Server component: it reads the session-resolved organization so no page can
 // render with an unresolved or client-supplied tenant.
 import Link from "next/link";
-import { getCurrentMembership, getCurrentUser, getUserMemberships } from "@/lib/tenant";
+import { getCurrentMembership, getCurrentUser, getUserMemberships, hasRole } from "@/lib/tenant";
 import { SignOutButton } from "@/components/SignOutButton";
 import type { ReactNode } from "react";
 
@@ -16,6 +16,12 @@ const NAV_ITEMS = [
   { href: "/clients", label: "Clients" },
   { href: "/automations", label: "Automations" },
 ];
+
+/**
+ * Owner/Admin only, so it is not in NAV_ITEMS — the spec requires a restricted
+ * action to be hidden rather than shown-and-refused.
+ */
+const ADMIN_NAV_ITEMS = [{ href: "/audit-log", label: "Audit log" }];
 
 export async function AppShell({ children }: { children: ReactNode }) {
   const [user, membership, memberships] = await Promise.all([
@@ -38,6 +44,13 @@ export async function AppShell({ children }: { children: ReactNode }) {
                   {item.label}
                 </Link>
               ))}
+              {membership &&
+                hasRole(membership.role, ["owner", "admin"]) &&
+                ADMIN_NAV_ITEMS.map((item) => (
+                  <Link key={item.href} href={item.href} className="app-nav__link">
+                    {item.label}
+                  </Link>
+                ))}
             </div>
           </div>
 
