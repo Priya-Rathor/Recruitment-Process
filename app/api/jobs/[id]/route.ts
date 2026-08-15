@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireMembership, requireRole } from "@/lib/tenant";
 import { parseJobPayload } from "@/lib/jobs/validation";
+import { logActivity, logActivityBatch } from "@/lib/activity/log";
 import type { Job } from "@/lib/types";
 import { JOB_SELECT, replaceQuestions } from "../route";
 
@@ -136,6 +137,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     });
     if (questionError) return jsonError(questionError, 400);
 
+    // Module 14. A status change is logged as its own event as well as the
+    // generic update — "closed this job" is the thing a manager looks for, and
+    // it would be invisible inside a list of changed field names.
+    await logActivityBatch([
+      {
+        organizationId: membership.organization.id,
+        entityType: "job",
+        entityId: id,
+        eventType: "job.updated",
+        actorId: membership.user_id,
+        metadata: { fields: Object.keys(parsed.data) },
+      },
+      ...(parsed.data.status && parsed.data.status !== existing.status
+        ? [
+            {
+              organizationId: membership.organization.id,
+              entityType: "job" as const,
+              entityId: id,
+              eventType: "job.status_changed" as const,
+              actorId: membership.user_id,
+              metadata: { from: existing.status, to: parsed.data.status },
+            },
+          ]
+        : []),
+    ]);
+
     return NextResponse.json({ data: job });
   } catch (error) {
     return handleRouteError(error);
@@ -173,6 +200,16 @@ export async function DELETE(
       return jsonError("Could not archive the job.", 400);
     }
     if (!data) return jsonError("Job not found, or already archived.", 404);
+
+    // Module 14.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "job",
+      entityId: id,
+      eventType: "job.archived",
+      actorId: membership.user_id,
+      metadata: {},
+    });
 
     return NextResponse.json({ data });
   } catch (error) {

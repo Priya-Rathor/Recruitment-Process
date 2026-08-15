@@ -6,6 +6,7 @@ import {
   getReportForApplication,
 } from "@/lib/screening/reportQueries";
 import { dispatch } from "@/lib/automations/engine";
+import { logActivity, logAiCall } from "@/lib/activity/log";
 
 export const maxDuration = 60;
 
@@ -57,10 +58,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.error, code: result.code }, { status });
     }
 
+    const user = await requireCurrentUser();
+
+    // Module 14.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "screening_report",
+      entityId: result.reportId,
+      eventType: "screening_report.generated",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { application_id: id },
+    });
+    await logAiCall({
+      organizationId: membership.organization.id,
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      feature: "generateScreeningSummary",
+      entityType: "screening_report",
+      entityId: result.reportId,
+      ok: true,
+    });
+
     // Module 13. Wrapped: the report exists and is worth returning even if a
     // downstream rule fails.
     try {
-      const user = await requireCurrentUser();
       await dispatch({
         organizationId: membership.organization.id,
         organizationName: membership.organization.name,

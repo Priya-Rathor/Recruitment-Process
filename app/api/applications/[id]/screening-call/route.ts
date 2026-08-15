@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { handleRouteError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { listCallsForApplication, startScreeningCall } from "@/lib/screening/queries";
+import { logActivity } from "@/lib/activity/log";
 
 // Placing a call involves a provider round trip.
 export const maxDuration = 60;
@@ -60,7 +61,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.error, code: result.code }, { status });
     }
 
-    // TODO(Module 14): log the call trigger to activity_events.
+    // Module 14. Telephoning a member of the public is exactly the kind of act
+    // that must be attributable afterwards, so the actor is recorded on the call
+    // itself rather than only on the application.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "screening_call",
+      entityId: result.callId,
+      eventType: "screening_call.started",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { application_id: id, triggered_manually: true },
+    });
+
     return NextResponse.json({ data: { id: result.callId } }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);

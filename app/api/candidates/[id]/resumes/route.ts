@@ -5,6 +5,7 @@ import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { getCandidate } from "@/lib/candidates/queries";
 import { detectFileKind, hashFile } from "@/lib/resumes/extract";
 import { listResumes, RESUME_BUCKET } from "@/lib/resumes/queries";
+import { logActivity } from "@/lib/activity/log";
 
 /** Mirrors the bucket's file_size_limit. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -144,6 +145,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       console.error("[api] resume record failed:", error);
       return jsonError("Could not save that resume.", 400);
     }
+
+    // Module 14. Recorded against the RESUME, and the candidate timeline picks
+    // it up through candidateTimelineTargets() — so a resume deleted later still
+    // leaves "a resume was uploaded on this date" behind.
+    const uploaded = data as unknown as { id: string; file_name: string };
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "resume",
+      entityId: uploaded.id,
+      eventType: "resume.uploaded",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { file_name: uploaded.file_name, candidate_id: id },
+    });
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {

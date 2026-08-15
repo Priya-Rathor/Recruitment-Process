@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import { requireMembership, requireRole } from "@/lib/tenant";
+import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * Guards :id against the caller's server-resolved tenant. A valid-looking id
@@ -87,6 +88,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return jsonError("Could not update the organization.", 400);
     }
     if (!data) return jsonError("Organization not found.", 404);
+
+    // Module 14. Field NAMES only, never the values: this payload can carry the
+    // organization's identity details, and the audit log's job is to record that
+    // a change happened and who made it, not to accumulate a second copy of the
+    // data. The organization row itself holds the current values.
+    const actor = await requireCurrentUser();
+    await logActivity({
+      organizationId: id,
+      entityType: "organization",
+      entityId: id,
+      eventType: "organization.updated",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { fields: Object.keys(updates) },
+    });
 
     return NextResponse.json({ data });
   } catch (error) {

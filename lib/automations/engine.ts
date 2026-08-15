@@ -35,6 +35,7 @@ import { startScreeningCall } from "@/lib/screening/queries";
 import { calculateAndStoreMatch } from "@/lib/matching/queries";
 import { generateReportForApplication } from "@/lib/screening/reportQueries";
 import { canTransition, isApplicationStage, type ApplicationStage } from "@/lib/applications/stages";
+import { logActivity } from "@/lib/activity/log";
 
 export type StoredAutomation = {
   id: string;
@@ -239,6 +240,22 @@ async function executeAction({
           triggeredBy,
           webhookUrl,
         });
+        // Module 14. The route logs this for a manual call; the automation path
+        // does not go through the route, so it is logged here too. actorId is
+        // the user whose action triggered the rule, with the automation named in
+        // the label — nobody chose to make this call personally.
+        if (result.ok) {
+          await logActivity({
+            organizationId,
+            entityType: "screening_call",
+            entityId: result.callId,
+            eventType: "screening_call.started",
+            actorId: triggeredBy,
+            actorLabel: `Automation: ${automationName}`,
+            metadata: { application_id: applicationId, triggered_manually: false },
+          });
+        }
+
         return result.ok
           ? { action: action.type, status: "success", detail: "Screening call started." }
           : { action: action.type, status: "failed", detail: result.error };
@@ -246,6 +263,20 @@ async function executeAction({
 
       case "calculate_match": {
         const result = await calculateAndStoreMatch({ organizationId, applicationId });
+
+        // Module 14, same reasoning as above.
+        if (result.ok) {
+          await logActivity({
+            organizationId,
+            entityType: "application",
+            entityId: applicationId,
+            eventType: "match.calculated",
+            actorId: triggeredBy,
+            actorLabel: `Automation: ${automationName}`,
+            metadata: { score: result.match.overallScore, ai_used: result.match.aiUsed },
+          });
+        }
+
         return result.ok
           ? {
               action: action.type,
@@ -257,6 +288,20 @@ async function executeAction({
 
       case "generate_screening_report": {
         const result = await generateReportForApplication({ organizationId, applicationId });
+
+        // Module 14, same reasoning as above.
+        if (result.ok) {
+          await logActivity({
+            organizationId,
+            entityType: "screening_report",
+            entityId: result.reportId,
+            eventType: "screening_report.generated",
+            actorId: triggeredBy,
+            actorLabel: `Automation: ${automationName}`,
+            metadata: { application_id: applicationId },
+          });
+        }
+
         return result.ok
           ? {
               action: action.type,
@@ -303,6 +348,21 @@ async function executeAction({
           .eq("id", applicationId)
           .eq("organization_id", organizationId);
 
+        if (!error) {
+          // Module 14. This write skips the PATCH route entirely, so without
+          // this the timeline would show a candidate arriving in a stage with
+          // nothing explaining how they got there.
+          await logActivity({
+            organizationId,
+            entityType: "application",
+            entityId: applicationId,
+            eventType: "application.stage_changed",
+            actorId: triggeredBy,
+            actorLabel: `Automation: ${automationName}`,
+            metadata: { from: current, to: target },
+          });
+        }
+
         return error
           ? { action: action.type, status: "failed", detail: "Could not move the application." }
           : { action: action.type, status: "success", detail: `Moved to ${target}.` };
@@ -322,6 +382,18 @@ async function executeAction({
           // judgement about a candidate.
           body: `[Automation: ${automationName}] ${text}`,
         });
+
+        if (!error) {
+          await logActivity({
+            organizationId,
+            entityType: "application",
+            entityId: applicationId,
+            eventType: "application.note_added",
+            actorId: triggeredBy,
+            actorLabel: `Automation: ${automationName}`,
+            metadata: {},
+          });
+        }
 
         return error
           ? { action: action.type, status: "failed", detail: "Could not add the note." }
@@ -508,6 +580,29 @@ async function runOne({
       })
       .eq("id", runId)
       .eq("organization_id", input.organizationId);
+
+    // Module 14. Logged in finish() rather than at each call-site, so every
+    // outcome is captured exactly once however dispatch was reached — including
+    // skips and blocks, which are the ones people ask about.
+    //
+    // actorId is the user whose action triggered the rule, NOT the author of the
+    // rule: they are the reason it ran. It reads on the candidate's timeline as
+    // "Screen strong matches ran successfully", attributed to the automation by
+    // name rather than blamed on whoever moved the stage.
+    await logActivity({
+      organizationId: input.organizationId,
+      entityType: "application",
+      entityId: input.applicationId,
+      eventType: "automation.run",
+      actorId: input.triggeredBy,
+      actorLabel: `Automation: ${automation.name}`,
+      metadata: {
+        name: automation.name,
+        automation_id: automation.id,
+        status: status === "deduped" ? "skipped" : status,
+        reason: reason ?? undefined,
+      },
+    });
 
     return {
       automationId: automation.id,

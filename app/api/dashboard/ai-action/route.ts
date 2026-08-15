@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { handleRouteError } from "@/lib/api";
-import { requireMembership } from "@/lib/tenant";
+import { requireCurrentUser, requireMembership } from "@/lib/tenant";
+import { logAiCall } from "@/lib/activity/log";
 import {
   availableMetrics,
   getDashboardData,
@@ -107,8 +108,20 @@ export async function POST() {
       return NextResponse.json({ error: result.message, code: result.code }, { status });
     }
 
-    // TODO(Module 14): log this AI call at summary level to activity_events
-    // once logActivity() exists — required by the Module 14 retrofit.
+    // Module 14 (section 10): every AI call recorded at summary level — which
+    // feature ran and whether it worked. Never the prompt or the completion:
+    // those carry candidate personal data, and this table is append-only.
+    const aiActor = await requireCurrentUser();
+    await logAiCall({
+      organizationId: membership.organization.id,
+      actorId: aiActor.id,
+      actorLabel: aiActor.name ?? aiActor.email,
+      feature: "generateDailyBrief",
+      entityType: "organization",
+      entityId: membership.organization.id,
+      ok: true,
+    });
+
     const payload = { data: result.data, saved: false };
     writeCache(cacheKey, payload);
 

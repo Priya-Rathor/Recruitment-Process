@@ -4,6 +4,7 @@ import { handleRouteError, jsonError, parsePagination } from "@/lib/api";
 import { requireMembership, requireRole } from "@/lib/tenant";
 import { isJobStatus, type Job } from "@/lib/types";
 import { parseJobPayload } from "@/lib/jobs/validation";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * Columns returned by list/detail. Explicit so a new column is never leaked
@@ -146,6 +147,16 @@ export async function POST(request: NextRequest) {
       body,
     });
     if (questionError) return jsonError(questionError, 400);
+
+    // Module 14.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "job",
+      entityId: job.id,
+      eventType: "job.created",
+      actorId: membership.user_id,
+      metadata: { title: job.title, status: job.status },
+    });
 
     return NextResponse.json({ data: job }, { status: 201 });
   } catch (error) {

@@ -4,6 +4,8 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireMembership, requireRole } from "@/lib/tenant";
 import { getInterview } from "@/lib/interviews/queries";
 import { INTERVIEW_STATUSES } from "@/lib/interviews/feedback";
+import { requireCurrentUser } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 
 /** GET /api/interviews/:id — with feedback. Viewable by all roles. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -103,6 +105,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return jsonError("Could not update that interview.", 400);
     }
     if (!data) return jsonError("Interview not found.", 404);
+
+    // Module 14. Only cancellation gets its own event — the spec names it, and
+    // "the interview did not happen" is a fact somebody will later need to
+    // explain. Rescheduling is covered by the row's own scheduled_at.
+    if (updates.status === "cancelled") {
+      const actor = await requireCurrentUser();
+      await logActivity({
+        organizationId: membership.organization.id,
+        entityType: "interview",
+        entityId: id,
+        eventType: "interview.cancelled",
+        actorId: actor.id,
+        actorLabel: actor.name ?? actor.email,
+        metadata: {},
+      });
+    }
 
     return NextResponse.json({ data });
   } catch (error) {

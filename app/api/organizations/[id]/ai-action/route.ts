@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import { requireRole } from "@/lib/tenant";
+import { requireCurrentUser, requireRole } from "@/lib/tenant";
+import { logAiCall } from "@/lib/activity/log";
 import { generateOnboardingRecommendations } from "@/lib/ai/generateOnboardingRecommendations";
 
 /**
@@ -46,8 +47,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.message, code: result.code }, { status });
     }
 
-    // TODO(Module 14): log this AI call at summary level to activity_events
-    // once the logActivity() helper exists — required by the Module 14 retrofit.
+    // Module 14 (section 10): every AI call recorded at summary level — which
+    // feature ran and whether it worked. Never the prompt or the completion:
+    // those carry candidate personal data, and this table is append-only.
+    const aiActor = await requireCurrentUser();
+    await logAiCall({
+      organizationId: membership.organization.id,
+      actorId: aiActor.id,
+      actorLabel: aiActor.name ?? aiActor.email,
+      feature: "generateOnboardingRecommendations",
+      entityType: "organization",
+      entityId: id,
+      ok: true,
+    });
+
     return NextResponse.json({ data: result.data, saved: false });
   } catch (error) {
     return handleRouteError(error);

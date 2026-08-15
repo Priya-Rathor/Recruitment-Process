@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import { requireRole } from "@/lib/tenant";
+import { requireCurrentUser, requireRole } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 import { isOrgRole, type OrgRole } from "@/lib/types";
 
 type TargetMember = { id: string; user_id: string; role: OrgRole; status: string };
@@ -95,6 +96,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (!data) return jsonError("Team member not found.", 404);
 
+    // Module 14. A role change is the most security-sensitive thing this
+    // product does, so it is logged with both the old and the new role — "was
+    // promoted to Owner" is only meaningful next to what they were before.
+    const actor = await requireCurrentUser();
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "member",
+      entityId: id,
+      eventType: "member.role_changed",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { from: target.role, to: nextRole, member_user_id: target.user_id },
+    });
+
     // Role changes take effect on the next request: getCurrentMembership()
     // re-reads organization_members every time, with no cached role anywhere.
     return NextResponse.json({ data, changed: true });
@@ -142,6 +157,18 @@ export async function DELETE(
       return jsonError("Could not remove this team member.", 400);
     }
     if (!data) return jsonError("Team member not found.", 404);
+
+    // Module 14.
+    const actor = await requireCurrentUser();
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "member",
+      entityId: id,
+      eventType: "member.removed",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { role: target.role, member_user_id: target.user_id },
+    });
 
     return NextResponse.json({ data });
   } catch (error) {

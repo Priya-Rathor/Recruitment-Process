@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireMembership, requireRole } from "@/lib/tenant";
 import { listClients, parseClientPayload } from "@/lib/clients/queries";
+import { requireCurrentUser } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 
 /** GET /api/clients — viewable by every role including Viewer. */
 export async function GET(request: NextRequest) {
@@ -50,6 +52,19 @@ export async function POST(request: NextRequest) {
       console.error("[api] client create failed:", error);
       return jsonError("Could not create that client.", 400);
     }
+
+    // Module 14.
+    const created = data as unknown as { id: string; name: string };
+    const actor = await requireCurrentUser();
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "client",
+      entityId: created.id,
+      eventType: "client.created",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { name: created.name },
+    });
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {

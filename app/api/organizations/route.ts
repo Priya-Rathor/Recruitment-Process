@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError, parsePagination } from "@/lib/api";
 import { requireCurrentUser, getUserMemberships } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * GET /api/organizations
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireCurrentUser();
+    const user = await requireCurrentUser();
 
     let body: unknown;
     try {
@@ -66,6 +67,19 @@ export async function POST(request: NextRequest) {
       console.error("[api] create_organization_and_owner failed:", error);
       return jsonError("Could not create the organization. Please try again.", 400);
     }
+
+    // Module 14. The RPC makes the caller the Owner in the same transaction, so
+    // by this point they are a member and the tenant-integrity trigger accepts
+    // them as the actor. Logged after, never before.
+    await logActivity({
+      organizationId: data as string,
+      entityType: "organization",
+      entityId: data as string,
+      eventType: "organization.created",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { name },
+    });
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {

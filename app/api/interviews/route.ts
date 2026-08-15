@@ -3,6 +3,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { listInterviews, scheduleInterview } from "@/lib/interviews/queries";
 import { INTERVIEW_STATUSES, parseSchedulePayload, type InterviewStatus } from "@/lib/interviews/feedback";
+import { logActivity } from "@/lib/activity/log";
 
 /** GET /api/interviews — organization-scoped list. Viewable by all roles. */
 export async function GET(request: NextRequest) {
@@ -72,7 +73,21 @@ export async function POST(request: NextRequest) {
       return jsonError(result.error, result.error.includes("not found") ? 404 : 400);
     }
 
-    // TODO(Module 14): log the scheduling to activity_events.
+    // Module 14.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "interview",
+      entityId: result.interviewId,
+      eventType: "interview.scheduled",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: {
+        application_id: applicationId,
+        scheduled_at: parsed.data.scheduledAt,
+        mode: parsed.data.mode,
+      },
+    });
+
     return NextResponse.json(
       { data: { id: result.interviewId }, calendarMessage: result.calendarMessage },
       { status: 201 }

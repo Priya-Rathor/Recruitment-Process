@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import { requireMembership } from "@/lib/tenant";
+import { requireCurrentUser, requireMembership } from "@/lib/tenant";
+import { logAiCall } from "@/lib/activity/log";
 import { parseCandidateSearch } from "@/lib/ai/parseCandidateSearch";
 import { describeFilters } from "@/lib/candidates/filters";
 import { listCandidates } from "@/lib/candidates/queries";
@@ -54,7 +55,20 @@ export async function POST(request: NextRequest) {
 
     if (failed) return jsonError("Could not run that search.", 400);
 
-    // TODO(Module 14): log this AI call at summary level to activity_events.
+    // Module 14 (section 10): every AI call recorded at summary level — which
+    // feature ran and whether it worked. Never the prompt or the completion:
+    // those carry candidate personal data, and this table is append-only.
+    const aiActor = await requireCurrentUser();
+    await logAiCall({
+      organizationId: membership.organization.id,
+      actorId: aiActor.id,
+      actorLabel: aiActor.name ?? aiActor.email,
+      feature: "parseCandidateSearch",
+      entityType: "candidate",
+      entityId: null,
+      ok: true,
+    });
+
     return NextResponse.json({
       data: candidates,
       total,

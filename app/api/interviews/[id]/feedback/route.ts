@@ -4,6 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { parseFeedback } from "@/lib/interviews/feedback";
 import { dispatch } from "@/lib/automations/engine";
+import { logActivity } from "@/lib/activity/log";
 
 // Submitting feedback completes the interview, which may run automations.
 export const maxDuration = 60;
@@ -89,6 +90,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return jsonError("Could not save that feedback.", 400);
     }
 
+    // Module 14. The recommendation is recorded because it is the outcome —
+    // the free-text notes are not, for the same reason application notes are not.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "interview",
+      entityId: id,
+      eventType: "interview.feedback_submitted",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { recommendation: parsed.data.recommendation, rating: parsed.data.rating },
+    });
+
     // Module 13. A database trigger marks the interview completed when feedback
     // lands, so this is the moment "interview completed" is actually true.
     // Wrapped so a failing rule never loses someone's written assessment.
@@ -107,7 +120,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    // TODO(Module 14): log the feedback submission to activity_events.
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);

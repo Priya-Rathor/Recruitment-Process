@@ -5,6 +5,7 @@ import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { getCandidate } from "@/lib/candidates/queries";
 import { getParseResult, getResume } from "@/lib/resumes/queries";
 import { applyReviewDecisions, parseReviewDecisions } from "@/lib/resumes/review";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * POST /api/resumes/:id/review — apply the recruiter's per-field choices.
@@ -103,7 +104,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .eq("id", candidate.id)
       .eq("organization_id", membership.organization.id);
 
-    // TODO(Module 14): log the applied fields to activity_events.
+    // Module 14. Which fields a human accepted is the record that matters here:
+    // it is the difference between "the AI said this" and "a recruiter agreed".
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "resume",
+      entityId: id,
+      eventType: "resume.review_applied",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: {
+        accepted_count: appliedFields.length,
+        accepted_fields: appliedFields,
+        candidate_id: candidate.id,
+      },
+    });
+
     return NextResponse.json({
       data: { applied_fields: appliedFields, reviewed_at: reviewedAt },
     });

@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import { requireRole } from "@/lib/tenant";
+import { requireCurrentUser, requireRole } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * DELETE /api/invites/:id — Owner/Admin only. Revokes a pending invite
@@ -31,6 +32,19 @@ export async function DELETE(
       return jsonError("Could not revoke the invite.", 400);
     }
     if (!data) return jsonError("Pending invite not found.", 404);
+
+    // Module 14.
+    const actor = await requireCurrentUser();
+    const invite = data as unknown as { email: string; role: string };
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "member",
+      entityId: id,
+      eventType: "member.invite_revoked",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { email: invite.email, role: invite.role },
+    });
 
     return NextResponse.json({ data });
   } catch (error) {

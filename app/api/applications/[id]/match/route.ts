@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import { hasRole, requireMembership, requireRole } from "@/lib/tenant";
+import { hasRole, requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
+import { logActivity, logAiCall } from "@/lib/activity/log";
 import { calculateAndStoreMatch, getOrCalculateMatch } from "@/lib/matching/queries";
 
 // The deterministic pass is instant; the semantic call is a normal LLM request.
@@ -65,7 +66,30 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       return jsonError(result.error, result.error.includes("not found") ? 404 : 400);
     }
 
-    // TODO(Module 14): log this AI call at summary level to activity_events.
+    // Module 14. The score itself goes in the domain event — the narrative is
+    // allowed to quote it, and the grounding check reads it from here. The AI
+    // record separately notes whether the semantic half actually ran, since a
+    // deterministic-only score is a different claim.
+    const actor = await requireCurrentUser();
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "application",
+      entityId: id,
+      eventType: "match.calculated",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { score: result.match.overallScore, ai_used: result.match.aiUsed },
+    });
+    await logAiCall({
+      organizationId: membership.organization.id,
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      feature: "matchCandidateToJob",
+      entityId: id,
+      ok: result.aiError === null,
+      errorCode: result.aiError ? "provider_error" : null,
+    });
+
     return NextResponse.json({
       data: result.match,
       // Surfaced rather than hidden: a deterministic-only score is a different

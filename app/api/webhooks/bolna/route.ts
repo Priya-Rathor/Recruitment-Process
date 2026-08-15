@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logActivity } from "@/lib/activity/log";
 import { isConsentRefusal } from "@/lib/screening/script";
 
 /**
@@ -117,7 +118,29 @@ export async function POST(request: NextRequest) {
   }
 
   // TODO(Module 9): a completed call with consent_confirmed feeds summarisation.
-  // TODO(Module 14): log the outcome to activity_events.
+
+  // Module 14. Two things are unusual here and both are deliberate:
+  //   - actorId is NULL. A provider callback is not a person, and naming the
+  //     recruiter who started the call as the actor of its outcome would be a
+  //     false record.
+  //   - useAdminClient, because there is no session. organization_id comes from
+  //     OUR screening_calls row, never from the payload — the same rule the rest
+  //     of this handler follows.
+  await logActivity({
+    organizationId: call.organization_id,
+    entityType: "screening_call",
+    entityId: call.id,
+    eventType: "screening_call.completed",
+    actorId: null,
+    actorLabel: "Bolna (automated call)",
+    metadata: {
+      status,
+      consent_confirmed: updates.consent_confirmed === true || call.consent_confirmed,
+      duration_seconds: updates.duration_seconds ?? null,
+    },
+    useAdminClient: true,
+  });
+
   return NextResponse.json({ received: true, matched: true });
 }
 

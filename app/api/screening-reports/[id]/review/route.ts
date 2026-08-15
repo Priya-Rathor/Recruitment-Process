@@ -4,6 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { getReport } from "@/lib/screening/reportQueries";
 import { applyCorrections, parseCorrections, type ReportValues } from "@/lib/screening/report";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * POST /api/screening-reports/:id/review — apply corrections and mark reviewed.
@@ -80,7 +81,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return jsonError("Could not save that review.", 400);
     }
 
-    // TODO(Module 14): log the review and the corrected fields to activity_events.
+    // Module 14. WHICH fields a human corrected, not what they were corrected
+    // to — the report row holds the values, and this log answers "how often does
+    // the AI get the interest level wrong?", which is the question worth asking.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "screening_report",
+      entityId: id,
+      eventType: "screening_report.reviewed",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { corrected_fields: correctedFields },
+    });
+
     return NextResponse.json({
       data: { corrected_fields: correctedFields, reviewed_at: new Date().toISOString() },
     });

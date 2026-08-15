@@ -9,6 +9,7 @@ import {
   TRIGGER_AVAILABILITY,
 } from "@/lib/automations/catalog";
 import { checkIntegrations } from "@/lib/automations/engine";
+import { logActivity } from "@/lib/activity/log";
 
 /** GET /api/automations/:id */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -171,8 +172,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (!data) return jsonError("Automation not found.", 404);
 
-    // TODO(Module 14): log automation.activated / .paused to activity_events.
-    return NextResponse.json({ data: data as unknown as AutomationRow });
+    // Module 14. Activation is the event that matters: it is the moment a rule
+    // starts acting on people. Logged only on a real status transition, so
+    // re-saving an active rule does not fill the audit log with noise.
+    const saved = data as unknown as AutomationRow;
+    if (updates.status && updates.status !== existing.status) {
+      const eventType =
+        updates.status === "active"
+          ? "automation.activated"
+          : ("automation.paused" as const);
+      await logActivity({
+        organizationId: membership.organization.id,
+        entityType: "automation",
+        entityId: id,
+        eventType,
+        actorId: user.id,
+        actorLabel: user.name ?? user.email,
+        metadata: { name: saved.name, from: existing.status, to: updates.status as string },
+      });
+    }
+
+    return NextResponse.json({ data: saved });
   } catch (error) {
     return handleRouteError(error);
   }
@@ -193,6 +213,15 @@ export async function DELETE(
   try {
     const { id } = await params;
     const membership = await requireRole(["owner", "admin"]);
+
+    // Loaded before the delete: once the row is gone there is nothing left to
+    // name in the audit event, and its run history goes with it.
+    const existing = await getAutomation({
+      organizationId: membership.organization.id,
+      automationId: id,
+    });
+    if (!existing) return jsonError("Automation not found.", 404);
+
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -208,6 +237,20 @@ export async function DELETE(
       return jsonError("Could not delete the automation.", 400);
     }
     if (!data) return jsonError("Automation not found.", 404);
+
+    // Module 14. Deleting a rule cascades its run history away, so this event is
+    // the only remaining evidence the rule ever existed. Its name is kept for
+    // exactly that reason.
+    const actor = await requireCurrentUser();
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "automation",
+      entityId: id,
+      eventType: "automation.deleted",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { name: existing.name, status: existing.status },
+    });
 
     return NextResponse.json({ data });
   } catch (error) {

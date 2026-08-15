@@ -7,6 +7,7 @@ import { filtersFromSearchParams } from "@/lib/candidates/filters";
 import { CANDIDATE_COLUMNS, findDuplicateCandidates, listCandidates } from "@/lib/candidates/queries";
 import { formatMatchedOn } from "@/lib/candidates/dedupe";
 import type { Candidate } from "@/lib/types";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * GET /api/candidates — organization-scoped list.
@@ -121,6 +122,33 @@ export async function POST(request: NextRequest) {
       if (duplicateError) {
         console.error("[api] recording duplicates failed:", duplicateError);
       }
+    }
+
+    // Module 14. Two events, because they answer different questions: "when did
+    // this person enter our system?" and "did we know they might already be in
+    // it?". The second is what a manager asks after a duplicate causes trouble.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "candidate",
+      entityId: candidate.id,
+      eventType: "candidate.created",
+      actorId: membership.user_id,
+      metadata: { name: candidate.name, source: candidate.source },
+    });
+
+    if (duplicates.length > 0) {
+      await logActivity({
+        organizationId: membership.organization.id,
+        entityType: "candidate",
+        entityId: candidate.id,
+        eventType: "candidate.duplicate_flagged",
+        actorId: membership.user_id,
+        metadata: {
+          duplicate_count: duplicates.length,
+          acknowledged,
+          matched_on: duplicates.flatMap((match) => match.matchedOn).slice(0, 5),
+        },
+      });
     }
 
     return NextResponse.json(

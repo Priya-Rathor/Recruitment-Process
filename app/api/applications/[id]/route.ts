@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { dispatch } from "@/lib/automations/engine";
+import { logActivityBatch } from "@/lib/activity/log";
 import { APPLICATION_COLUMNS, getApplicationDetail } from "@/lib/applications/queries";
 import {
   canTransition,
@@ -135,6 +136,40 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (!data) return jsonError("Application not found.", 404);
 
+    // Module 14. Both changes this endpoint can make, each as its own event.
+    // Recorded before the automation dispatch so an automated follow-on action
+    // appears after the change that caused it.
+    const actor = await requireCurrentUser();
+    await logActivityBatch([
+      ...(updates.stage && updates.stage !== current.stage
+        ? [
+            {
+              organizationId: membership.organization.id,
+              entityType: "application" as const,
+              entityId: id,
+              eventType: "application.stage_changed" as const,
+              actorId: actor.id,
+              actorLabel: actor.name ?? actor.email,
+              metadata: { from: current.stage, to: updates.stage as string },
+            },
+          ]
+        : []),
+      ...("assigned_recruiter_id" in updates &&
+      updates.assigned_recruiter_id !== current.assigned_recruiter_id
+        ? [
+            {
+              organizationId: membership.organization.id,
+              entityType: "application" as const,
+              entityId: id,
+              eventType: "application.recruiter_assigned" as const,
+              actorId: actor.id,
+              actorLabel: actor.name ?? actor.email,
+              metadata: { recruiter_id: (updates.assigned_recruiter_id as string) ?? null },
+            },
+          ]
+        : []),
+    ]);
+
     // Module 13. Fires only on a real stage CHANGE, so re-saving the same stage
     // cannot re-trigger a call — the dedupe key would catch it anyway, but not
     // asking is cheaper than being refused.
@@ -146,13 +181,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // test that the engine never blocks the manual action.
     if (updates.stage && updates.stage !== current.stage) {
       try {
-        const user = await requireCurrentUser();
         await dispatch({
           organizationId: membership.organization.id,
           organizationName: membership.organization.name,
           applicationId: id,
           trigger: "application_stage_changed",
-          triggeredBy: user.id,
+          triggeredBy: actor.id,
           webhookUrl: `${request.nextUrl.origin}/api/webhooks/bolna`,
         });
       } catch (automationError) {
@@ -196,6 +230,20 @@ export async function DELETE(
       return jsonError("Could not archive the application.", 400);
     }
     if (!data) return jsonError("Application not found, or already archived.", 404);
+
+    // Module 14.
+    const archiver = await requireCurrentUser();
+    await logActivityBatch([
+      {
+        organizationId: membership.organization.id,
+        entityType: "application",
+        entityId: id,
+        eventType: "application.archived",
+        actorId: archiver.id,
+        actorLabel: archiver.name ?? archiver.email,
+        metadata: {},
+      },
+    ]);
 
     return NextResponse.json({ data });
   } catch (error) {

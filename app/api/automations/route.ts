@@ -4,6 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { listAutomations, type AutomationRow } from "@/lib/automations/queries";
 import { requiredIntegrationsFor, validateRule } from "@/lib/automations/catalog";
+import { logActivity } from "@/lib/activity/log";
 
 /** GET /api/automations — every role may see what rules exist. */
 export async function GET() {
@@ -85,8 +86,21 @@ export async function POST(request: NextRequest) {
       return jsonError("Could not create the automation.", 400);
     }
 
-    // TODO(Module 14): log automation.created to activity_events.
-    return NextResponse.json({ data: data as unknown as AutomationRow }, { status: 201 });
+    // Module 14. Sensitive: a rule that acts on candidates unattended is a
+    // settings change, and drafted_by_ai is recorded so "did a human write this
+    // one?" stays answerable long after the fact.
+    const automation = data as unknown as AutomationRow;
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "automation",
+      entityId: automation.id,
+      eventType: "automation.created",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { name: automation.name, drafted_by_ai: automation.drafted_by_ai },
+    });
+
+    return NextResponse.json({ data: automation }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);
   }

@@ -5,6 +5,8 @@ import { requireRole } from "@/lib/tenant";
 import { extractResumeText } from "@/lib/resumes/extract";
 import { getResume, RESUME_BUCKET } from "@/lib/resumes/queries";
 import { parseResume } from "@/lib/ai/parseResume";
+import { logActivity, logAiCall } from "@/lib/activity/log";
+import { requireCurrentUser } from "@/lib/tenant";
 
 // Extraction plus a large AI call; the default serverless budget is too short.
 export const maxDuration = 120;
@@ -128,7 +130,30 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       .eq("id", id)
       .eq("organization_id", membership.organization.id);
 
-    // TODO(Module 14): log this AI call at summary level to activity_events.
+    // Module 14. Two events: the domain fact (a resume was parsed) and the
+    // section-10 AI-call record. Summary level only — the extracted text and the
+    // model's output are the candidate's personal data and are already stored
+    // once, in resume_parse_results.
+    const actor = await requireCurrentUser();
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "resume",
+      entityId: id,
+      eventType: "resume.parsed",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { confidence: result.data.confidence },
+    });
+    await logAiCall({
+      organizationId: membership.organization.id,
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      feature: "parseResume",
+      entityType: "resume",
+      entityId: id,
+      ok: true,
+    });
+
     return NextResponse.json({
       data: result.data,
       // Explicit: this is a proposal awaiting review, not saved candidate data.

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 
 const MAX_NOTE_LENGTH = 5000;
 
@@ -65,6 +66,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       console.error("[api] note create failed:", error);
       return jsonError("Could not save the note.", 400);
     }
+
+    // Module 14. That a note was written, never its text. A recruiter's private
+    // assessment of a candidate does not belong in a second, append-only table
+    // that nobody can redact — the note itself is already stored and deletable.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "application",
+      entityId: id,
+      eventType: "application.note_added",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: {},
+    });
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {

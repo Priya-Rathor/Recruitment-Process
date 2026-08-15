@@ -7,6 +7,7 @@ import { getMatch } from "@/lib/matching/queries";
 import { getReportForApplication } from "@/lib/screening/reportQueries";
 import { getSubmissionForApplication } from "@/lib/clients/queries";
 import { generateClientSubmission } from "@/lib/ai/generateClientSubmission";
+import { logActivity, logAiCall } from "@/lib/activity/log";
 
 export const maxDuration = 60;
 
@@ -40,7 +41,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const membership = await requireRole(["owner", "admin", "recruiter"]);
+    const [membership, user] = await Promise.all([
+      requireRole(["owner", "admin", "recruiter"]),
+      requireCurrentUser(),
+    ]);
 
     const application = await getApplicationDetail({
       organizationId: membership.organization.id,
@@ -120,7 +124,17 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: result.message, code: result.code }, { status });
     }
 
-    // TODO(Module 14): log this AI call at summary level to activity_events.
+    // Module 14 (section 10). Summary level only — the drafted submission text
+    // describes a real person to a third party and is stored once, on send.
+    await logAiCall({
+      organizationId: membership.organization.id,
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      feature: "generateClientSubmission",
+      entityId: id,
+      ok: true,
+    });
+
     return NextResponse.json({
       data: result.data,
       clientId: job.client_id,
@@ -171,13 +185,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { data: jobRow } = await supabase
       .from("applications")
-      .select("job_id, job:jobs(client_id)")
+      // The client NAME is fetched too, so the activity timeline can read
+      // "Submitted to ABC Tech" rather than a UUID a human can't act on.
+      .select("job_id, job:jobs(client_id, client:clients(name))")
       .eq("id", id)
       .eq("organization_id", membership.organization.id)
       .maybeSingle();
 
-    const clientId = (jobRow as unknown as { job: { client_id: string | null } | null } | null)
-      ?.job?.client_id;
+    const jobClient = (
+      jobRow as unknown as {
+        job: { client_id: string | null; client: { name: string } | null } | null;
+      } | null
+    )?.job;
+    const clientId = jobClient?.client_id;
+    const sentToClientName = jobClient?.client?.name ?? null;
 
     if (!clientId) {
       return jsonError("This job has no client attached, so there's nobody to submit to.", 409);
@@ -202,7 +223,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // TODO(Module 15): actually deliver the message.
-    // TODO(Module 14): log the submission to activity_events.
+
+    // Module 14. Recorded against the APPLICATION, not the client, because this
+    // is the candidate's story: "was submitted to ABC Tech" is a line in their
+    // narrative. The submission text itself lives in client_feedback_events and
+    // is not duplicated here.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "application",
+      entityId: id,
+      eventType: "client.submission_sent",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { client_id: clientId, client_name: sentToClientName },
+    });
+
     return NextResponse.json({ data, sent: true }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);

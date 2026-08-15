@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError, parsePagination } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { isOrgRole } from "@/lib/types";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * GET /api/invites — Owner/Admin only. Lists invites for the caller's
@@ -112,6 +113,19 @@ export async function POST(request: NextRequest) {
       console.error("[api] invite create failed:", error);
       return jsonError("Could not create the invite.", 400);
     }
+
+    // Module 14. The invite id is the entity — NOT the token, which must never
+    // reach a durable log: anyone who could read the audit trail could then use
+    // the link to join the organization.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "member",
+      entityId: data.id,
+      eventType: "member.invited",
+      actorId: inviter.id,
+      actorLabel: inviter.name ?? inviter.email,
+      metadata: { email, role },
+    });
 
     // The token is returned once, to the Owner/Admin who created it, so they
     // can share the link. Module 15 (Notifications) will email this instead.

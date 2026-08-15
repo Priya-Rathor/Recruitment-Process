@@ -208,6 +208,12 @@ export async function generateReportForApplication({
     return { ok: false, error: "Could not save the screening report." };
   }
 
-  // TODO(Module 14): log this AI call at summary level to activity_events.
+  // Module 14: logged by the CALLER, not here.
+  //
+  // This function has no actor — it is reached both from the route (a named
+  // recruiter) and from a Module 13 automation (no user at all). Logging here
+  // would have to invent one or leave it null, and neither is right in both
+  // cases. app/api/applications/[id]/screening-report/route.ts records the
+  // generation and the AI call with the real actor.
   return { ok: true, reportId: (created as { id: string }).id };
 }

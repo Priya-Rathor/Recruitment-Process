@@ -5,6 +5,7 @@ import { requireMembership, requireRole } from "@/lib/tenant";
 import { parseCandidatePayload } from "@/lib/candidates/validation";
 import { CANDIDATE_COLUMNS, getCandidate, getCandidateDuplicates } from "@/lib/candidates/queries";
 import type { Candidate } from "@/lib/types";
+import { logActivity } from "@/lib/activity/log";
 
 /** GET /api/candidates/:id — any member may view. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -70,6 +71,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (!data) return jsonError("Candidate not found.", 404);
 
+    // Module 14. Field names only — the values are the candidate's personal
+    // data, and the audit log must not become a permanent second copy of it.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "candidate",
+      entityId: id,
+      eventType: "candidate.updated",
+      actorId: membership.user_id,
+      metadata: { fields: Object.keys(parsed.data) },
+    });
+
     return NextResponse.json({ data: data as unknown as Candidate });
   } catch (error) {
     return handleRouteError(error);
@@ -110,6 +122,16 @@ export async function DELETE(
       return jsonError("Could not archive the candidate.", 400);
     }
     if (!data) return jsonError("Candidate not found, or already archived.", 404);
+
+    // Module 14.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "candidate",
+      entityId: id,
+      eventType: "candidate.archived",
+      actorId: membership.user_id,
+      metadata: {},
+    });
 
     return NextResponse.json({ data });
   } catch (error) {

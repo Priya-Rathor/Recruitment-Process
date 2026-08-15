@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireMembership, requireRole } from "@/lib/tenant";
 import { getClient, getClientActivity, parseClientPayload } from "@/lib/clients/queries";
+import { requireCurrentUser } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 
 /** GET /api/clients/:id — with activity. Viewable by every role. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -67,6 +69,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return jsonError("Could not update that client.", 400);
     }
     if (!data) return jsonError("Client not found.", 404);
+
+    // Module 14.
+    const actor = await requireCurrentUser();
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "client",
+      entityId: id,
+      eventType: "client.updated",
+      actorId: actor.id,
+      actorLabel: actor.name ?? actor.email,
+      metadata: { fields: Object.keys(parsed.data) },
+    });
 
     return NextResponse.json({ data });
   } catch (error) {

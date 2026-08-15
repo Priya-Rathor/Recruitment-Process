@@ -10,6 +10,7 @@ import {
 import { isApplicationStage } from "@/lib/applications/stages";
 import { isCandidateSource, type Application } from "@/lib/types";
 import { dispatch } from "@/lib/automations/engine";
+import { logActivity } from "@/lib/activity/log";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -143,6 +144,17 @@ export async function POST(request: NextRequest) {
     }
 
     const created = data as unknown as Application;
+
+    // Module 14. Logged BEFORE the automation dispatch, so the timeline reads in
+    // causal order: the application existed, then a rule acted on it.
+    await logActivity({
+      organizationId: membership.organization.id,
+      entityType: "application",
+      entityId: created.id,
+      eventType: "application.created",
+      actorId: membership.user_id,
+      metadata: { stage: created.stage, source: created.source },
+    });
 
     // Module 13. Wrapped so a failing rule cannot fail the creation — the
     // application exists either way, and a 500 here would make the caller retry

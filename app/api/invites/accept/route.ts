@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { ACTIVE_ORG_COOKIE, requireCurrentUser } from "@/lib/tenant";
+import { logActivity } from "@/lib/activity/log";
 
 /**
  * POST /api/invites/accept
@@ -14,7 +15,7 @@ import { ACTIVE_ORG_COOKIE, requireCurrentUser } from "@/lib/tenant";
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireCurrentUser();
+    const user = await requireCurrentUser();
 
     let body: unknown;
     try {
@@ -39,6 +40,19 @@ export async function POST(request: NextRequest) {
       console.error("[api] accept_invite failed:", error);
       return jsonError("This invite link is no longer valid. Ask for a new invite.", 400);
     }
+
+    // Module 14. Logged AFTER the RPC succeeds, so the row only exists if the
+    // membership does — and the actor is the person who joined, which is the
+    // only actor here that is true.
+    await logActivity({
+      organizationId: organizationId as string,
+      entityType: "member",
+      entityId: user.id,
+      eventType: "member.invite_accepted",
+      actorId: user.id,
+      actorLabel: user.name ?? user.email,
+      metadata: { email: user.email },
+    });
 
     const response = NextResponse.json({ data: { organization_id: organizationId } });
 

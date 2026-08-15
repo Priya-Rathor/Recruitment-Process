@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import { requireRole } from "@/lib/tenant";
+import { requireCurrentUser, requireRole } from "@/lib/tenant";
+import { logAiCall } from "@/lib/activity/log";
 import { boardToPipelineItems, getBoard } from "@/lib/pipeline/queries";
 import { prioritizePipeline } from "@/lib/ai/prioritizePipeline";
 
@@ -91,7 +92,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.message, code: result.code }, { status });
     }
 
-    // TODO(Module 14): log this AI call at summary level to activity_events.
+    // Module 14 (section 10): every AI call recorded at summary level — which
+    // feature ran and whether it worked. Never the prompt or the completion:
+    // those carry candidate personal data, and this table is append-only.
+    const aiActor = await requireCurrentUser();
+    await logAiCall({
+      organizationId: membership.organization.id,
+      actorId: aiActor.id,
+      actorLabel: aiActor.name ?? aiActor.email,
+      feature: "prioritizePipeline",
+      entityType: "application",
+      entityId: null,
+      ok: true,
+    });
+
     const payload = {
       data: result.data,
       // Explicit: this is advice. Nothing was moved.
