@@ -31,6 +31,7 @@ import {
   type StageConfig,
 } from "@/lib/hiring-stages/config";
 import { stageDefinition, type StageKey } from "@/lib/hiring-stages/catalog";
+import { ROUND_SCORE_MAX } from "@/lib/evaluation/verdict";
 import { StringListEditor } from "./StringListEditor";
 
 export type StageDraft = {
@@ -248,6 +249,39 @@ export function StageConfigModal({
 
           {/* ---- Stage-specific extras ------------------------------------- */}
           <div className="stage-extras">
+            {/*
+              On EVERY stage, not just one. The four-part verdict (score +
+              status + strengths + concerns) needs a number to judge against,
+              and a threshold on some stages but not others would make "Pass"
+              mean different things in different sections.
+
+              Blank is meaningful: no gate configured reads as Needs Review
+              rather than failing everyone below an invented number.
+            */}
+            <div className="columns is-variable is-3">
+              <div className="column is-half">
+                <label className="label" htmlFor="stage-passing">Passing score (1-10)</label>
+                <input
+                  id="stage-passing"
+                  className="input"
+                  type="number"
+                  min={0}
+                  max={ROUND_SCORE_MAX}
+                  readOnly={readOnly}
+                  value={(config as { passingScore: number | null }).passingScore ?? ""}
+                  onChange={(e) =>
+                    patchConfig({
+                      passingScore: e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                />
+                <p className="stage-field__help">
+                  Leave blank for no gate — results then read &ldquo;Needs Review&rdquo; rather
+                  than failing.
+                </p>
+              </div>
+            </div>
+
             {stageKey === "ai_screening_call" && (
               <>
                 {/*

@@ -9,6 +9,7 @@ import {
 } from "@/lib/applications/stages";
 import type { NoteRow, StageHistoryRow } from "@/lib/applications/timeline";
 import type { Application, ApplicationWithContext, OrgRole } from "@/lib/types";
+import { isPipelinePhase, stagesInPhase, type PipelinePhase } from "@/lib/applications/phase";
 
 export const APPLICATION_COLUMNS =
   "id, organization_id, candidate_id, job_id, stage, rejected_at_stage, match_score, " +
@@ -44,6 +45,8 @@ export type ApplicationFilters = {
   recruiterId?: string | null;
   /** Free text matched against candidate name and email. */
   candidateText?: string | null;
+  /** Coarse grouping. Derived from stage, so it filters BY the stages it spans. */
+  phase?: PipelinePhase | null;
   includeArchived?: boolean;
   sort?: ApplicationSort;
 };
@@ -56,6 +59,7 @@ export function applicationFiltersFromParams(params: URLSearchParams): Applicati
     candidateId: params.get("candidate_id") || null,
     recruiterId: params.get("recruiter_id") || null,
     candidateText: params.get("q")?.trim() || null,
+    phase: isPipelinePhase(params.get("phase")) ? (params.get("phase") as PipelinePhase) : null,
     includeArchived: params.get("archived") === "true",
     // Anything other than an explicit "updated" means stage order, so a
     // malformed URL lands on the default rather than an empty list.
@@ -101,6 +105,9 @@ export async function listApplications({
 
   if (!filters.includeArchived) query = query.is("archived_at", null);
   if (filters.stage) query = query.eq("stage", filters.stage);
+  // Phase is never stored — it filters by the stages it groups, which keeps it
+  // impossible for the filter and the displayed phase to disagree.
+  if (filters.phase && !filters.stage) query = query.in("stage", stagesInPhase(filters.phase));
   if (filters.jobId) query = query.eq("job_id", filters.jobId);
   if (filters.candidateId) query = query.eq("candidate_id", filters.candidateId);
   if (filters.recruiterId) query = query.eq("assigned_recruiter_id", filters.recruiterId);

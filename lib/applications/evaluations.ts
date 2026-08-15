@@ -23,6 +23,7 @@
 // scale is normalised here and the native value is kept alongside it.
 // =============================================================================
 import type { ConfigurableStage } from "@/lib/applications/stages";
+import type { EvaluationStatus } from "@/lib/evaluation/verdict";
 
 /** The stages the Evaluation panel has a section for, in board order. */
 export const EVALUATION_STAGES = [
@@ -66,6 +67,19 @@ export type EvaluationEntry = {
   /** Screening only — the spec's Yes / No / Unclear field. */
   interested: InterestLevel | null;
   summary: string | null;
+  /** Two to four points in favour. Supplements the summary, never replaces it. */
+  strengths: string[];
+  /** Two to four points against. */
+  concerns: string[];
+  /**
+   * Pass / Fail / Needs Review against this stage's configured threshold.
+   *
+   * Computed by the query layer, which is the only place that knows the job's
+   * configuration. Needs Review when a score or a threshold is missing — see
+   * statusFor() for why that is not the same as a Fail.
+   */
+  status: EvaluationStatus;
+  threshold: number | null;
   loggedByName: string | null;
   /**
    * Where this row lives, which decides whether the panel may edit it here.

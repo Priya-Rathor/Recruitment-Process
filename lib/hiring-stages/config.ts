@@ -12,6 +12,7 @@
 // — the security boundary is RLS, which decides WHO may write, not what.
 // =============================================================================
 import { isStageKey, type StageKey } from "@/lib/hiring-stages/catalog";
+import { ROUND_SCORE_MAX, normalizeThreshold } from "@/lib/evaluation/verdict";
 
 /** Longest a single free-text list item may be, matching job questions. */
 const MAX_ITEM_LENGTH = 500;
@@ -23,7 +24,21 @@ export const MAX_DURATION_MINUTES = 480;
 export const MIN_CALL_ATTEMPTS = 1;
 export const MAX_CALL_ATTEMPTS = 10;
 
-export type AiScreeningConfig = {
+/**
+ * The score at or above which this stage passes.
+ *
+ * Present on EVERY stage config. The brief described this as an existing
+ * "passing_score pattern built for Written Assessment" — it was not; no stage
+ * had one. Adding it to all four at once is what makes the four-part verdict
+ * (score + status + strengths + concerns) mean the same thing everywhere.
+ *
+ * Null means no gate is configured, which reads as Needs Review rather than
+ * Fail — failing candidates against a number nobody set would be worse than
+ * declining to judge.
+ */
+export type PassingScore = { passingScore: number | null };
+
+export type AiScreeningConfig = PassingScore & {
   /**
    * NOTE: the question list is NOT stored here.
    *
@@ -37,19 +52,19 @@ export type AiScreeningConfig = {
   language: string | null;
 };
 
-export type PhoneInterviewConfig = {
+export type PhoneInterviewConfig = PassingScore & {
   durationMinutes: number | null;
   questions: string[];
 };
 
-export type VideoInterviewConfig = {
+export type VideoInterviewConfig = PassingScore & {
   durationMinutes: number | null;
   questions: string[];
   /** Free text; feeds Module 11's interview brief once that integration exists. */
   whatToEvaluate: string | null;
 };
 
-export type WrittenAssessmentConfig = {
+export type WrittenAssessmentConfig = PassingScore & {
   questions: string[];
   timeLimitMinutes: number | null;
 };
@@ -108,13 +123,13 @@ export function emptyStageConfig<K extends StageKey>(stageKey: K): ConfigForStag
 function emptyStageConfigImpl(stageKey: StageKey): StageConfig {
   switch (stageKey) {
     case "ai_screening_call":
-      return { maxAttempts: null, language: null };
+      return { maxAttempts: null, language: null, passingScore: null };
     case "phone_interview":
-      return { durationMinutes: null, questions: [] };
+      return { durationMinutes: null, questions: [], passingScore: null };
     case "video_interview":
-      return { durationMinutes: null, questions: [], whatToEvaluate: null };
+      return { durationMinutes: null, questions: [], whatToEvaluate: null, passingScore: null };
     case "written_assessment":
-      return { questions: [], timeLimitMinutes: null };
+      return { questions: [], timeLimitMinutes: null, passingScore: null };
   }
 }
 
@@ -145,6 +160,7 @@ function normalizeStageConfigImpl(stageKey: StageKey, raw: unknown): StageConfig
         // A short code, not a display name: Module 17 stores "en" and Bolna
         // expects the same.
         language: cleanText(input.language, 12),
+        passingScore: normalizeThreshold(input.passingScore, ROUND_SCORE_MAX),
       };
 
     case "phone_interview":
@@ -155,6 +171,7 @@ function normalizeStageConfigImpl(stageKey: StageKey, raw: unknown): StageConfig
           MAX_DURATION_MINUTES
         ),
         questions: cleanList(input.questions),
+        passingScore: normalizeThreshold(input.passingScore, ROUND_SCORE_MAX),
       };
 
     case "video_interview":
@@ -166,6 +183,7 @@ function normalizeStageConfigImpl(stageKey: StageKey, raw: unknown): StageConfig
         ),
         questions: cleanList(input.questions),
         whatToEvaluate: cleanText(input.whatToEvaluate, 2000),
+        passingScore: normalizeThreshold(input.passingScore, ROUND_SCORE_MAX),
       };
 
     case "written_assessment":
@@ -176,6 +194,7 @@ function normalizeStageConfigImpl(stageKey: StageKey, raw: unknown): StageConfig
           MIN_DURATION_MINUTES,
           MAX_DURATION_MINUTES
         ),
+        passingScore: normalizeThreshold(input.passingScore, ROUND_SCORE_MAX),
       };
   }
 }

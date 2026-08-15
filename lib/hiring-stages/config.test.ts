@@ -62,19 +62,23 @@ describe("normalizeStageConfig", () => {
     expect(normalizeStageConfig("ai_screening_call", {})).toEqual({
       maxAttempts: null,
       language: null,
+      passingScore: null,
     });
     expect(normalizeStageConfig("phone_interview", {})).toEqual({
       durationMinutes: null,
       questions: [],
+      passingScore: null,
     });
     expect(normalizeStageConfig("video_interview", {})).toEqual({
       durationMinutes: null,
       questions: [],
       whatToEvaluate: null,
+      passingScore: null,
     });
     expect(normalizeStageConfig("written_assessment", {})).toEqual({
       questions: [],
       timeLimitMinutes: null,
+      passingScore: null,
     });
   });
 
@@ -89,7 +93,7 @@ describe("normalizeStageConfig", () => {
       maxAttempts: 2,
     });
     expect(config).not.toHaveProperty("questions");
-    expect(config).toEqual({ maxAttempts: 2, language: null });
+    expect(config).toEqual({ maxAttempts: 2, language: null, passingScore: null });
   });
 
   it("drops unknown keys rather than storing them", () => {
@@ -99,7 +103,7 @@ describe("normalizeStageConfig", () => {
       evilFlag: true,
       __proto__: { polluted: true },
     });
-    expect(config).toEqual({ questions: ["Q1"], timeLimitMinutes: 60 });
+    expect(config).toEqual({ questions: ["Q1"], timeLimitMinutes: 60, passingScore: null });
   });
 
   it("clamps numbers instead of rejecting the whole save", () => {
@@ -108,6 +112,7 @@ describe("normalizeStageConfig", () => {
     expect(normalizeStageConfig("written_assessment", { timeLimitMinutes: 9999 })).toEqual({
       questions: [],
       timeLimitMinutes: MAX_DURATION_MINUTES,
+      passingScore: null,
     });
     expect(normalizeStageConfig("ai_screening_call", { maxAttempts: 99 }).maxAttempts).toBe(
       MAX_CALL_ATTEMPTS
@@ -131,7 +136,11 @@ describe("normalizeStageConfig", () => {
     const config = normalizeStageConfig("written_assessment", {
       questions: ["  Real question  ", "", "   ", 42, null, "Another"],
     });
-    expect(config).toEqual({ questions: ["Real question", "Another"], timeLimitMinutes: null });
+    expect(config).toEqual({
+      questions: ["Real question", "Another"],
+      timeLimitMinutes: null,
+      passingScore: null,
+    });
   });
 
   it("caps list length", () => {
@@ -139,6 +148,23 @@ describe("normalizeStageConfig", () => {
       questions: Array.from({ length: 100 }, (_, i) => `Q${i}`),
     });
     expect((config as { questions: string[] }).questions).toHaveLength(25);
+  });
+
+  it("carries a passing threshold on every stage", () => {
+    // The brief described this as an existing "passing_score pattern built for
+    // Written Assessment". No stage had one — it is added to all four here, so
+    // the four-part verdict means the same thing everywhere.
+    for (const key of STAGE_KEYS) {
+      expect(normalizeStageConfig(key, { passingScore: 7 }), key).toMatchObject({
+        passingScore: 7,
+      });
+      expect(normalizeStageConfig(key, {}), key).toMatchObject({ passingScore: null });
+    }
+  });
+
+  it("clamps a threshold to the round score scale", () => {
+    expect(normalizeStageConfig("phone_interview", { passingScore: 99 }).passingScore).toBe(10);
+    expect(normalizeStageConfig("phone_interview", { passingScore: -3 }).passingScore).toBe(0);
   });
 
   it("survives rubbish input without throwing", () => {
@@ -180,7 +206,7 @@ describe("parseStagesPayload", () => {
       stageKey: "phone_interview",
       enabled: true,
       promptTemplate: "Call them.",
-      config: { durationMinutes: null, questions: [] },
+      config: { durationMinutes: null, questions: [], passingScore: null },
     });
   });
 
@@ -239,6 +265,10 @@ describe("parseStagesPayload", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.stages[0].promptTemplate).toBe("Keep me.");
-    expect(result.stages[0].config).toEqual({ questions: [], timeLimitMinutes: 90 });
+    expect(result.stages[0].config).toEqual({
+      questions: [],
+      timeLimitMinutes: 90,
+      passingScore: null,
+    });
   });
 });

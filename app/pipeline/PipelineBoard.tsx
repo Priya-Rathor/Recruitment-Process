@@ -15,6 +15,7 @@ import { EmptyState, FormError } from "@/components/states";
 import { availableTransitions, STAGE_LABELS, type ApplicationStage } from "@/lib/applications/stages";
 import { slaColor } from "@/lib/pipeline/sla";
 import type { Board, BoardCard } from "@/lib/pipeline/queries";
+import { PHASE_LABELS, phaseOf } from "@/lib/applications/phase";
 
 function Card({
   card,
@@ -156,6 +157,8 @@ export function PipelineBoard({
             <div key={column.stage} style={{ minWidth: 260, width: 260, flexShrink: 0 }}>
               <div className="is-flex is-justify-content-space-between is-align-items-center mb-2">
                 <p style={{ fontSize: 13, fontWeight: 600 }}>{STAGE_LABELS[column.stage]}</p>
+                {/* The coarse grouping above the stage — derived, never stored. */}
+                <p className="pipeline-phase">{PHASE_LABELS[phaseOf(column.stage)]}</p>
                 <span className="has-text-secondary" style={{ fontSize: 12 }}>
                   {column.cards.length}
                 </span>

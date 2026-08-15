@@ -21,7 +21,13 @@ import {
   effectiveStages,
   flagsFromRows,
   movableStages,
+  visibleStages,
 } from "@/lib/applications/effectiveStages";
+import { statusFor } from "@/lib/evaluation/verdict";
+import { DEFAULT_SCREENING_SETTINGS } from "@/lib/settings/queries";
+import { suggestNextAction } from "@/lib/evaluation/nextAction";
+import { getMatchHighlights, getJobResumeThreshold, thresholdsFromStages } from "@/lib/evaluation/sources";
+import { phaseOf, PHASE_LABELS } from "@/lib/applications/phase";
 import { STAGE_LABELS } from "@/lib/applications/stages";
 import { getLatestParsedResume } from "@/lib/resumes/queries";
 import { resumeKeyPoints } from "@/lib/resumes/keyPoints";
@@ -46,7 +52,14 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
 
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
 
-  const [{ interviews }, members, stageRows, evaluationEntries, parsedResume] = await Promise.all([
+  const [
+    { interviews },
+    members,
+    stageRows,
+    parsedResume,
+    matchHighlights,
+    resumeThreshold,
+  ] = await Promise.all([
     listInterviews({
       organizationId: membership.organization.id,
       applicationId: application.id,
@@ -54,15 +67,33 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     listTeamMembers(membership.organization.id),
     // Which of the four configurable stages this application's JOB runs.
     listJobStages({ organizationId: membership.organization.id, jobId: application.job_id }),
-    listEvaluationEntries({
-      organizationId: membership.organization.id,
-      applicationId: application.id,
-    }),
     getLatestParsedResume({
       organizationId: membership.organization.id,
       candidateId: application.candidate_id,
     }),
+    // Module 7's labelled lists — strong_matches, gaps, needs_verification —
+    // ARE the resume gate's strengths and concerns. Read, never re-derived.
+    getMatchHighlights({
+      organizationId: membership.organization.id,
+      applicationId: application.id,
+    }),
+    getJobResumeThreshold({
+      organizationId: membership.organization.id,
+      jobId: application.job_id,
+    }),
   ]);
+
+  // Per-stage passing thresholds, from the SAME rows that decided visibility —
+  // one fetch, so the two cannot disagree about the job's configuration.
+  const thresholds = thresholdsFromStages(stageRows);
+
+  // Loaded AFTER the stages, because each entry's Pass/Fail is judged against
+  // its own stage's threshold, and those live on the rows above.
+  const evaluationEntries = await listEvaluationEntries({
+    organizationId: membership.organization.id,
+    applicationId: application.id,
+    thresholds,
+  });
 
   // One derivation, shared by the stepper, the Evaluation panel and the move
   // dropdown — so the three cannot disagree about which stages exist here.
@@ -70,6 +101,22 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     flags: flagsFromRows(stageRows),
     entryCounts: countByStage(evaluationEntries),
     currentStage: application.stage,
+  });
+  const screeningConfig = stageRows.find((row) => row.stage_key === "ai_screening_call")
+    ?.config as { maxAttempts: number | null } | undefined;
+
+  const resumeStatus = statusFor({
+    score: application.match_score,
+    threshold: resumeThreshold,
+  });
+
+  // The suggestion. Reads the most recent COMPLETED round, judged against its
+  // own stage's threshold — never a global one.
+  const lastRound = evaluationEntries[0] ?? null;
+  const nextAction = suggestNextAction({
+    currentStage: application.stage,
+    visibleStages: visibleStages(availability),
+    lastRoundStatus: lastRound ? lastRound.status : null,
   });
 
   const stepper = buildStepper({
@@ -102,6 +149,10 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
           <Link href={`/jobs/${application.job_id}`}>{application.job_title}</Link>
         </h1>
         <div className="is-flex is-align-items-center mt-2" style={{ gap: "var(--space-3)", flexWrap: "wrap" }}>
+          {/* Derived from the stage, never stored — see lib/applications/phase.ts. */}
+          <span className="has-text-secondary" style={{ fontSize: "var(--text-label)" }}>
+            Phase: {PHASE_LABELS[phaseOf(application.stage)]}
+          </span>
           <span className={`intake-chip is-${PRIORITY_TONE[(application.priority ?? "normal") as ApplicationPriority]}`}>
             {PRIORITY_LABELS[(application.priority ?? "normal") as ApplicationPriority]} priority
           </span>
@@ -146,9 +197,15 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
         entries={evaluationEntries}
         resume={{
           matchScore: application.match_score,
+          passingScore: resumeThreshold,
+          status: resumeStatus,
+          strengths: matchHighlights.strengths,
+          concerns: matchHighlights.concerns,
           summary: resumeKeyPoints(parsedResume?.parseResult.raw_json),
           resumeId: parsedResume?.resume.id ?? null,
         }}
+        maxCallAttempts={screeningConfig?.maxAttempts ?? DEFAULT_SCREENING_SETTINGS.maxAttempts}
+        nextAction={nextAction}
         canEdit={canEdit}
         timeZone={membership.organization.timezone}
       />
@@ -212,12 +269,14 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
         <div className="column">
           <div className="card mb-4">
             <h2 className="title is-5">Pipeline</h2>
+            <div id="stage-control">
             <StageControl
               applicationId={application.id}
               currentStage={application.stage}
               canEdit={canEdit}
               allowedStages={movableStages(availability)}
             />
+            </div>
           </div>
 
           <div className="card mb-4">

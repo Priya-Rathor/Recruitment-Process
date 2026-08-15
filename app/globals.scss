@@ -2787,3 +2787,161 @@ a {
   .repeatable__fields { flex-wrap: wrap; }
   .history-card__body { padding-left: 0; grid-template-columns: 1fr; }
 }
+
+// =============================================================================
+// EVALUATION VERDICT — score + status + strengths/concerns
+//
+// One layout for the resume gate, the screening call and every interview round,
+// so the pattern is learned once.
+// =============================================================================
+.verdict__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.verdict__score {
+  font-size: var(--text-section);
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
+}
+
+.verdict__threshold {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.verdict__summary {
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--color-text);
+}
+
+.verdict__lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.verdict__list-title {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.verdict__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  margin-bottom: var(--space-1);
+}
+
+.verdict__bullet {
+  flex: 0 0 auto;
+  margin-top: 3px;
+
+  &.is-strength { color: var(--color-success); }
+  &.is-concern { color: var(--color-warning); }
+}
+
+.verdict__none {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.eval-section__attempts {
+  font-family: var(--font-body);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--color-text-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.eval-row__verdict { grid-column: 2 / -2; }
+
+// =============================================================================
+// NEXT ACTION — a suggestion, never an action
+// =============================================================================
+.next-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border-radius: var(--control-radius);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  flex-wrap: wrap;
+
+  &.is-error { border-color: var(--status-error-text); background-color: var(--status-error-bg); }
+  &.is-success { border-color: var(--status-connected-text); background-color: var(--status-connected-bg); }
+  &.is-info { border-color: #bfdbfe; background-color: #eff6ff; }
+}
+
+.next-action__text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.next-action__label {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+}
+
+.next-action__value {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.next-action__reason {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.next-action__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.next-action__dismiss {
+  border: 0;
+  background: none;
+  padding: var(--space-1);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: var(--control-radius);
+
+  &:hover { color: var(--color-text); }
+  &:focus-visible { box-shadow: var(--focus-ring); }
+}
+
+@media (max-width: 768px) {
+  .verdict__lists { grid-template-columns: 1fr; }
+  .eval-row__verdict { grid-column: 1 / -1; }
+}
+
+// The phase label above a board column — coarse grouping, derived from stage.
+.pipeline-phase {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}

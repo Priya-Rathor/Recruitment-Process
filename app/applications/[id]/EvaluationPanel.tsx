@@ -27,8 +27,6 @@ import { ExternalLink, FileText, Plus, SquarePen } from "lucide-react";
 import {
   EVALUATION_STAGES,
   INTEREST_LABELS,
-  OUTCOME_LABELS,
-  OUTCOME_TONE,
   groupByStage,
   isManualEvaluationStage,
   previewSummary,
@@ -38,6 +36,8 @@ import {
 import { acceptsEntries, visibleStages, type StageAvailability } from "@/lib/applications/effectiveStages";
 import { STAGE_LABELS, type ApplicationStage } from "@/lib/applications/stages";
 import { formatDateInZone } from "@/lib/time";
+import { EvaluationVerdict } from "@/components/EvaluationVerdict";
+import type { EvaluationStatus } from "@/lib/evaluation/verdict";
 import { EvaluationEntryForm, type EntryDraft } from "./EvaluationEntryForm";
 
 export function EvaluationPanel({
@@ -47,12 +47,19 @@ export function EvaluationPanel({
   resume,
   canEdit,
   timeZone,
+  maxCallAttempts,
 }: {
   applicationId: string;
   availability: StageAvailability[];
   entries: EvaluationEntry[];
+  /** From the job's screening config, falling back to the org default. */
+  maxCallAttempts: number;
   resume: {
     matchScore: number | null;
+    passingScore: number | null;
+    status: EvaluationStatus;
+    strengths: string[];
+    concerns: string[];
     summary: string | null;
     resumeId: string | null;
   };
@@ -85,26 +92,26 @@ export function EvaluationPanel({
         </div>
 
         <div className="eval-resume">
-          <div className="eval-resume__score">
-            <p className="eval-resume__label">Resume score</p>
-            <p className="eval-resume__value">
-              {resume.matchScore === null ? (
-                <span className="has-text-secondary" style={{ fontSize: "var(--text-body)" }}>
-                  Not scored yet
-                </span>
-              ) : (
-                `${resume.matchScore}%`
-              )}
-            </p>
-          </div>
-
-          <div className="eval-resume__summary">
-            <p className="eval-resume__label">Resume summary</p>
-            <p style={{ fontSize: "var(--text-body)" }}>
-              {resume.summary?.trim()
-                ? previewSummary(resume.summary, 400)
-                : "No parsed summary on file."}
-            </p>
+          <div className="eval-resume__summary" style={{ gridColumn: "1 / -1" }}>
+            {/*
+              Strengths and concerns here are Module 7's own strong_matches and
+              gaps — already labelled, already tagged with whether code or AI
+              produced them. Storing a second copy would give the same
+              judgement two homes.
+            */}
+            <EvaluationVerdict
+              verdict={{
+                score: resume.matchScore,
+                threshold: resume.passingScore,
+                status: resume.status,
+                summary: resume.summary?.trim()
+                  ? previewSummary(resume.summary, 400)
+                  : "No parsed summary on file.",
+                strengths: resume.strengths,
+                concerns: resume.concerns,
+              }}
+              scoreSuffix="%"
+            />
 
             <div className="is-flex mt-2" style={{ gap: "var(--space-4)", flexWrap: "wrap" }}>
               {/* A compact preview, never a replacement for the real screens. */}
@@ -139,6 +146,17 @@ export function EvaluationPanel({
                 {STAGE_LABELS[stage]}
                 {stageEntries.length > 0 && (
                   <span className="eval-section__count">{stageEntries.length}</span>
+                )}
+                {/*
+                  An EXPLICIT counter, not one implied by how many rows happen
+                  to be listed. "3 of 2 max" is the sentence a recruiter needs
+                  before deciding whether another attempt is even allowed —
+                  counting rows themselves is work the page should do.
+                */}
+                {stage === "ai_screening_call" && (
+                  <span className="eval-section__attempts">
+                    Attempts: {stageEntries.length} of {maxCallAttempts} max
+                  </span>
                 )}
               </h3>
 
@@ -185,24 +203,29 @@ export function EvaluationPanel({
                       )}
                     </div>
 
-                    <span className="eval-score">
-                      {entry.score === null ? "—" : `${entry.score}/10`}
-                    </span>
+                    {/*
+                      The same four-part block the resume gate and every other
+                      round uses — score, status, strengths, concerns — so the
+                      layout is learned once and read everywhere.
+                    */}
+                    <div className="eval-row__verdict">
+                      <EvaluationVerdict
+                        verdict={{
+                          score: entry.score,
+                          threshold: entry.threshold,
+                          status: entry.status,
+                          summary: previewSummary(entry.summary),
+                          strengths: entry.strengths,
+                          concerns: entry.concerns,
+                        }}
+                      />
 
-                    <div className="eval-row__chips">
-                      {entry.outcome && (
-                        <span className={`intake-chip is-${OUTCOME_TONE[entry.outcome]}`}>
-                          {OUTCOME_LABELS[entry.outcome]}
-                        </span>
-                      )}
                       {entry.interested && (
-                        <span className="intake-chip is-neutral">
+                        <span className="intake-chip is-neutral mt-2">
                           Interested: {INTEREST_LABELS[entry.interested]}
                         </span>
                       )}
                     </div>
-
-                    <p className="eval-row__summary">{previewSummary(entry.summary)}</p>
 
                     <div className="eval-row__actions">
                       {entry.editable && canEdit && open && (

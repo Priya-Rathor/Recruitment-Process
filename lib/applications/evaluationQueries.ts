@@ -18,15 +18,25 @@ import {
   type EvaluationStage,
   type InterestLevel,
 } from "@/lib/applications/evaluations";
+import { normalizeHighlights, statusFor } from "@/lib/evaluation/verdict";
 import { formatDbError } from "@/lib/supabase/errors";
 
 /** Every evaluation entry for one application, newest first. */
 export async function listEvaluationEntries({
   organizationId,
   applicationId,
+  /**
+   * Passing score per stage, from the job's hiring-stage configuration.
+   *
+   * Passed in rather than fetched here: the caller already loaded the job's
+   * stages to compute stage visibility, and a second fetch would be a second
+   * chance for the two to disagree about the same configuration.
+   */
+  thresholds = {},
 }: {
   organizationId: string;
   applicationId: string;
+  thresholds?: Partial<Record<EvaluationStage, number | null>>;
 }): Promise<EvaluationEntry[]> {
   const [screening, interviews, manual] = await Promise.all([
     loadScreeningEntries({ organizationId, applicationId }),
@@ -34,7 +44,17 @@ export async function listEvaluationEntries({
     loadManualEntries({ organizationId, applicationId }),
   ]);
 
-  return sortEntries([...screening, ...interviews, ...manual]);
+  // Status is applied HERE, once, so every source is judged the same way — a
+  // per-loader implementation would give three chances to disagree about what
+  // "pass" means.
+  return sortEntries([...screening, ...interviews, ...manual]).map((entry) => {
+    const threshold = thresholds[entry.stage] ?? null;
+    return {
+      ...entry,
+      threshold,
+      status: statusFor({ score: entry.score, threshold }),
+    };
+  });
 }
 
 /**
@@ -59,7 +79,8 @@ async function loadScreeningEntries({
     .from("screening_calls")
     .select(
       "id, status, attempt_number, started_at, created_at, failure_reason, " +
-        "report:screening_reports(id, summary_text, interest_level, score)"
+        "report:screening_reports(id, summary_text, interest_level, score, " +
+        "key_strengths, key_concerns)"
     )
     .eq("organization_id", organizationId)
     .eq("application_id", applicationId);
@@ -76,7 +97,14 @@ async function loadScreeningEntries({
     started_at: string | null;
     created_at: string;
     failure_reason: string | null;
-    report: { id: string; summary_text: string; interest_level: string; score: number | null } | null;
+    report: {
+      id: string;
+      summary_text: string;
+      interest_level: string;
+      score: number | null;
+      key_strengths: string[] | null;
+      key_concerns: string[] | null;
+    } | null;
   }[]).map((call) => {
     const report = Array.isArray(call.report) ? call.report[0] : call.report;
     const interest = (report?.interest_level ?? null) as InterestLevel | null;
@@ -95,6 +123,11 @@ async function loadScreeningEntries({
         // A failed call has no report; saying why beats an empty row that looks
         // like a call nobody wrote up.
         (call.failure_reason ? `Call did not complete: ${call.failure_reason}` : null),
+      strengths: normalizeHighlights(report?.key_strengths),
+      concerns: normalizeHighlights(report?.key_concerns),
+      // Overwritten by listEvaluationEntries once the threshold is known.
+      status: "needs_review" as const,
+      threshold: null,
       loggedByName: null,
       source: "screening_report" as const,
       // Edited on Module 9's report screen, not here — two update paths for one
@@ -168,6 +201,13 @@ async function loadInterviewEntries({
       outcome: feedback ? outcomeFromRecommendation(feedback.recommendation) : "pending",
       interested: null,
       summary: feedback?.notes ?? interview.notes,
+      // Module 11's feedback has no strengths/concerns columns — its shape
+      // predates this pattern — so an interview surfaces its notes as the
+      // narrative and leaves the lists empty rather than inventing them.
+      strengths: [],
+      concerns: [],
+      status: "needs_review" as const,
+      threshold: null,
       loggedByName: feedback?.author?.name ?? feedback?.author?.email ?? null,
       source: "interview" as const,
       href: `/interviews/${interview.id}`,
@@ -189,7 +229,7 @@ async function loadManualEntries({
   const { data, error } = await supabase
     .from("application_evaluations")
     .select(
-      "id, stage_key, occurred_at, score, outcome, summary, " +
+      "id, stage_key, occurred_at, score, outcome, summary, key_strengths, key_concerns, " +
         "author:users!application_evaluations_logged_by_fkey(name, email)"
     )
     .eq("organization_id", organizationId)
@@ -212,6 +252,8 @@ async function loadManualEntries({
     score: number | null;
     outcome: "pass" | "fail" | "pending";
     summary: string | null;
+    key_strengths: string[] | null;
+    key_concerns: string[] | null;
     author: { name: string | null; email: string } | null;
   }[]).map((row) => ({
     id: row.id,
@@ -223,6 +265,10 @@ async function loadManualEntries({
     outcome: row.outcome,
     interested: null,
     summary: row.summary,
+    strengths: normalizeHighlights(row.key_strengths),
+    concerns: normalizeHighlights(row.key_concerns),
+    status: "needs_review" as const,
+    threshold: null,
     loggedByName: row.author?.name ?? row.author?.email ?? null,
     source: "manual" as const,
     href: null,

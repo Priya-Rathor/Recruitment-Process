@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { APPLICATION_STAGES, STAGE_LABELS, type ApplicationStage } from "@/lib/applications/stages";
 import { flagsFromRows, effectiveStages, visibleStages } from "@/lib/applications/effectiveStages";
+import { PHASE_LABELS, PIPELINE_PHASES } from "@/lib/applications/phase";
 
 export function ApplicationFilters({ jobs }: { jobs: { id: string; title: string }[] }) {
   const router = useRouter();
@@ -122,6 +123,26 @@ export function ApplicationFilters({ jobs }: { jobs: { id: string; title: string
               {jobs.map((job) => (
                 <option key={job.id} value={job.id}>
                   {job.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="column is-narrow">
+          <label className="label" style={{ fontSize: 13 }} htmlFor="phase-filter">
+            Phase
+          </label>
+          <div className="select is-fullwidth">
+            <select
+              id="phase-filter"
+              value={searchParams.get("phase") ?? ""}
+              onChange={(event) => apply({ phase: event.target.value || null })}
+            >
+              <option value="">All phases</option>
+              {PIPELINE_PHASES.map((phase) => (
+                <option key={phase} value={phase}>
+                  {PHASE_LABELS[phase]}
                 </option>
               ))}
             </select>
