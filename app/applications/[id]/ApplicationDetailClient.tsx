@@ -91,16 +91,26 @@ export function StageControl({
   applicationId,
   currentStage,
   canEdit,
+  allowedStages,
 }: {
   applicationId: string;
   currentStage: ApplicationStage;
   canEdit: boolean;
+  /**
+   * The stages this application's job actually runs.
+   *
+   * Passed in rather than derived here: the stepper and the Evaluation panel
+   * are computing the same list on the server, and a second derivation in the
+   * browser is how the dropdown ends up offering a stage the stepper does not
+   * show.
+   */
+  allowedStages?: ApplicationStage[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const options = availableTransitions(currentStage);
+  const options = availableTransitions(currentStage, allowedStages);
 
   if (!canEdit) {
     return (

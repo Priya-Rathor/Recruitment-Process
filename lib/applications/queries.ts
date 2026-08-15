@@ -1,12 +1,16 @@
 // Server-side application queries. One tenant-scoped place for both pages and
 // route handlers.
 import { createClient } from "@/lib/supabase/server";
-import { isApplicationStage, type ApplicationStage } from "@/lib/applications/stages";
+import {
+  isApplicationStage,
+  stageSortKey,
+  type ApplicationStage,
+} from "@/lib/applications/stages";
 import type { NoteRow, StageHistoryRow } from "@/lib/applications/timeline";
 import type { Application, ApplicationWithContext, OrgRole } from "@/lib/types";
 
 export const APPLICATION_COLUMNS =
-  "id, organization_id, candidate_id, job_id, stage, match_score, " +
+  "id, organization_id, candidate_id, job_id, stage, rejected_at_stage, match_score, " +
   "assigned_recruiter_id, source, archived_at, created_at, updated_at";
 
 /** Candidate and job names, embedded via the foreign keys. */
@@ -29,12 +33,18 @@ function flatten(row: EmbeddedRow): ApplicationWithContext {
   };
 }
 
+/** How the list is ordered. Stage order is the default — see listApplications. */
+export type ApplicationSort = "stage" | "updated";
+
 export type ApplicationFilters = {
   stage?: ApplicationStage | null;
   jobId?: string | null;
   candidateId?: string | null;
   recruiterId?: string | null;
+  /** Free text matched against candidate name and email. */
+  candidateText?: string | null;
   includeArchived?: boolean;
+  sort?: ApplicationSort;
 };
 
 export function applicationFiltersFromParams(params: URLSearchParams): ApplicationFilters {
@@ -44,7 +54,11 @@ export function applicationFiltersFromParams(params: URLSearchParams): Applicati
     jobId: params.get("job_id") || null,
     candidateId: params.get("candidate_id") || null,
     recruiterId: params.get("recruiter_id") || null,
+    candidateText: params.get("q")?.trim() || null,
     includeArchived: params.get("archived") === "true",
+    // Anything other than an explicit "updated" means stage order, so a
+    // malformed URL lands on the default rather than an empty list.
+    sort: params.get("sort") === "updated" ? "updated" : "stage",
   };
 }
 
@@ -84,11 +98,28 @@ export async function listApplications({
   if (filters.candidateId) query = query.eq("candidate_id", filters.candidateId);
   if (filters.recruiterId) query = query.eq("assigned_recruiter_id", filters.recruiterId);
 
+  // Candidate search. Filters on the EMBEDDED candidate rather than fetching
+  // ids first — one round trip, and the count stays accurate for pagination.
+  if (filters.candidateText) {
+    const escaped = filters.candidateText.replace(/[,()\\%]/g, " ").trim();
+    if (escaped.length > 0) {
+      query = query.or(`name.ilike.%${escaped}%,email.ilike.%${escaped}%`, {
+        referencedTable: "candidates",
+      });
+      // An `or` on an embedded table filters the EMBED, not the parent, unless
+      // the join is made inner — without this, non-matching rows come back with
+      // a null candidate instead of being excluded.
+      query = query.not("candidates", "is", null);
+    }
+  }
+
   if (viewerRole === "recruiter") {
     query = query.or(`assigned_recruiter_id.eq.${viewerId},assigned_recruiter_id.is.null`);
   }
 
   const { data, error, count } = await query
+    // Secondary order always applied, so rows within one stage have a stable
+    // sequence rather than whatever the planner returns.
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -97,8 +128,27 @@ export async function listApplications({
     return { applications: [], total: 0, failed: true };
   }
 
+  const applications = ((data ?? []) as unknown as EmbeddedRow[]).map(flatten);
+
+  // STAGE ORDER IS SORTED IN MEMORY, not in SQL.
+  //
+  // Postgres orders an enum by its declaration order, which happens to be the
+  // board order today — but that is a coincidence of migration 0021, and the
+  // next stage inserted in the middle would silently reorder every list. The
+  // sort key is defined once in lib/applications/stages.ts and applied here, so
+  // the board, the list and the funnel cannot disagree.
+  //
+  // Safe at this scale: the page is already limited to `limit` rows.
+  if ((filters.sort ?? "stage") === "stage") {
+    applications.sort((a, b) => {
+      const byStage = stageSortKey(a.stage) - stageSortKey(b.stage);
+      if (byStage !== 0) return byStage;
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
+  }
+
   return {
-    applications: ((data ?? []) as unknown as EmbeddedRow[]).map(flatten),
+    applications,
     total: count ?? 0,
     failed: false,
   };

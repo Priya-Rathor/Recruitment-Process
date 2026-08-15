@@ -19,17 +19,17 @@ import { isTerminalStage, PIPELINE_STAGES } from "@/lib/applications/stages";
 
 describe("targetDaysFor", () => {
   it("uses the configured value when present", () => {
-    expect(targetDaysFor("screening", { screening: 7 })).toBe(7);
+    expect(targetDaysFor("ai_screening_call", { ai_screening_call: 7 })).toBe(7);
   });
 
   it("falls back to the default when unconfigured", () => {
     // An absent row means "use the default", never "no SLA" — a board with no
     // aging at all would defeat the module.
-    expect(targetDaysFor("screening", {})).toBe(DEFAULT_SLA_DAYS.screening);
+    expect(targetDaysFor("ai_screening_call", {})).toBe(DEFAULT_SLA_DAYS.ai_screening_call);
   });
 
   it("accepts a configured 0 as same-day", () => {
-    expect(targetDaysFor("screening", { screening: 0 })).toBe(0);
+    expect(targetDaysFor("ai_screening_call", { ai_screening_call: 0 })).toBe(0);
   });
 
   it("returns null for terminal stages", () => {
@@ -52,10 +52,10 @@ describe("targetDaysFor", () => {
 });
 
 describe("assessSla — 'matches the configured target_days per stage'", () => {
-  const config = { screening: 4 };
+  const config = { ai_screening_call: 4 };
 
   it("is ok well within the target", () => {
-    const result = assessSla({ stage: "screening", daysInStage: 1, config });
+    const result = assessSla({ stage: "ai_screening_call", daysInStage: 1, config });
     expect(result.status).toBe("ok");
     expect(result.targetDays).toBe(4);
     expect(result.overdueDays).toBe(0);
@@ -63,38 +63,38 @@ describe("assessSla — 'matches the configured target_days per stage'", () => {
 
   it("becomes at-risk at the threshold", () => {
     // 75% of 4 days is 3.
-    const result = assessSla({ stage: "screening", daysInStage: 3, config });
+    const result = assessSla({ stage: "ai_screening_call", daysInStage: 3, config });
     expect(result.status).toBe("at_risk");
     expect(result.label).toMatch(/Due in 1 day/);
   });
 
   it("is still ok one day before the threshold", () => {
-    expect(assessSla({ stage: "screening", daysInStage: 2, config }).status).toBe("ok");
+    expect(assessSla({ stage: "ai_screening_call", daysInStage: 2, config }).status).toBe("ok");
   });
 
   it("is NOT breached exactly at the target", () => {
     // Day 4 of a 4-day target is the last day, not a breach.
-    expect(assessSla({ stage: "screening", daysInStage: 4, config }).status).toBe("at_risk");
+    expect(assessSla({ stage: "ai_screening_call", daysInStage: 4, config }).status).toBe("at_risk");
   });
 
   it("breaches one day past the target", () => {
-    const result = assessSla({ stage: "screening", daysInStage: 5, config });
+    const result = assessSla({ stage: "ai_screening_call", daysInStage: 5, config });
     expect(result.status).toBe("breached");
     expect(result.overdueDays).toBe(1);
     expect(result.label).toBe("1 day over");
   });
 
   it("counts overdue days accurately", () => {
-    const result = assessSla({ stage: "screening", daysInStage: 12, config });
+    const result = assessSla({ stage: "ai_screening_call", daysInStage: 12, config });
     expect(result.overdueDays).toBe(8);
     expect(result.label).toBe("8 days over");
   });
 
   it("honours a same-day target", () => {
-    expect(assessSla({ stage: "screening", daysInStage: 0, config: { screening: 0 } }).status).toBe(
+    expect(assessSla({ stage: "ai_screening_call", daysInStage: 0, config: { ai_screening_call: 0 } }).status).toBe(
       "ok"
     );
-    expect(assessSla({ stage: "screening", daysInStage: 1, config: { screening: 0 } }).status).toBe(
+    expect(assessSla({ stage: "ai_screening_call", daysInStage: 1, config: { ai_screening_call: 0 } }).status).toBe(
       "breached"
     );
   });
@@ -125,45 +125,45 @@ describe("SLA config parsing", () => {
   it("reads stored rows, ignoring unknown stages", () => {
     expect(
       toSlaConfig([
-        { stage: "screening", target_days: 5 },
+        { stage: "ai_screening_call", target_days: 5 },
         { stage: "not_a_stage", target_days: 9 },
       ])
-    ).toEqual({ screening: 5 });
+    ).toEqual({ ai_screening_call: 5 });
   });
 
   it("lists every board stage for editing, flagging defaults", () => {
-    const rows = editableSlaRows({ screening: 9 });
+    const rows = editableSlaRows({ ai_screening_call: 9 });
     expect(rows).toHaveLength(PIPELINE_STAGES.length);
 
-    const screening = rows.find((row) => row.stage === "screening");
+    const screening = rows.find((row) => row.stage === "ai_screening_call");
     expect(screening?.targetDays).toBe(9);
     expect(screening?.isDefault).toBe(false);
 
-    const newStage = rows.find((row) => row.stage === "new");
+    const newStage = rows.find((row) => row.stage === "applied");
     expect(newStage?.isDefault).toBe(true);
   });
 
   it("accepts a valid payload", () => {
-    const result = parseSlaPayload({ screening: 5, offer: 10 });
+    const result = parseSlaPayload({ ai_screening_call: 5, director_round: 10 });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.config).toEqual({ screening: 5, offer: 10 });
+    if (result.ok) expect(result.config).toEqual({ ai_screening_call: 5, director_round: 10 });
   });
 
   it("rejects out-of-range values with a readable message", () => {
-    const result = parseSlaPayload({ screening: 900 });
+    const result = parseSlaPayload({ ai_screening_call: 900 });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Screening must be between 0 and 365/);
+    if (!result.ok) expect(result.error).toMatch(/AI Screening Call must be between 0 and 365/);
   });
 
   it("rejects negatives and non-numbers", () => {
-    expect(parseSlaPayload({ screening: -1 }).ok).toBe(false);
-    expect(parseSlaPayload({ screening: "soon" }).ok).toBe(false);
+    expect(parseSlaPayload({ ai_screening_call: -1 }).ok).toBe(false);
+    expect(parseSlaPayload({ ai_screening_call: "soon" }).ok).toBe(false);
   });
 
   it("ignores keys that are not stages", () => {
-    const result = parseSlaPayload({ screening: 5, organization_id: "sneaky" });
+    const result = parseSlaPayload({ ai_screening_call: 5, organization_id: "sneaky" });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.config).toEqual({ screening: 5 });
+    if (result.ok) expect(result.config).toEqual({ ai_screening_call: 5 });
   });
 
   it("rejects a payload with nothing usable", () => {
@@ -177,7 +177,7 @@ const items: PipelineItem[] = [
     id: "app-1",
     candidateName: "Rahul Sharma",
     jobTitle: "Senior Java Developer",
-    stage: "client_review",
+    stage: "director_round",
     daysInStage: 9,
     slaStatus: "breached",
     overdueDays: 4,
@@ -188,7 +188,7 @@ const items: PipelineItem[] = [
     id: "app-2",
     candidateName: "Priya Nair",
     jobTitle: "Data Engineer",
-    stage: "recruiter_review",
+    stage: "shortlisted",
     daysInStage: 1,
     slaStatus: "ok",
     overdueDays: 0,

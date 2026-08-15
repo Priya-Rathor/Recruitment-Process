@@ -54,7 +54,7 @@ export const DEFAULT_RETENTION_SETTINGS: RetentionSettings = {
 export const DEFAULT_SETTINGS: Omit<OrganizationSettings, "organization_id" | "updated_at"> = {
   currency: "INR",
   default_recruiter_id: null,
-  default_application_stage: "new",
+  default_application_stage: "applied",
   default_interview_duration_minutes: 60,
   screening_settings: DEFAULT_SCREENING_SETTINGS,
   retention_settings: DEFAULT_RETENTION_SETTINGS,
@@ -102,7 +102,7 @@ export async function getOrganizationSettings(
       default_recruiter_id: (row.default_recruiter_id as string | null) ?? null,
       default_application_stage: isApplicationStage(row.default_application_stage)
         ? row.default_application_stage
-        : "new",
+        : "applied",
       default_interview_duration_minutes:
         typeof row.default_interview_duration_minutes === "number"
           ? row.default_interview_duration_minutes

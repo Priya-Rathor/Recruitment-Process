@@ -2363,3 +2363,293 @@ a {
   .stage-picker__menu { width: min(320px, calc(100vw - 64px)); }
   .screening-summary__stats { grid-template-columns: 1fr; }
 }
+
+// =============================================================================
+// STAGE STEPPER (application detail)
+//
+// Replaces a small chip. Segments are chevron-shaped by way of a clipped edge,
+// so left-to-right progression reads without an explanatory legend.
+// =============================================================================
+.stepper-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.stepper {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: var(--control-radius);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.stepper__segment {
+  flex: 1 1 0;
+  min-width: 0;
+  border-right: 1px solid var(--color-border);
+
+  &:last-child { border-right: 0; }
+}
+
+.stepper__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  // Thick, per the spec: this is the page's primary visual element now.
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: var(--text-caption);
+  cursor: pointer;
+  text-align: center;
+  transition: background-color var(--transition-fast) var(--ease);
+
+  &.is-static { cursor: default; }
+  &:focus-visible { box-shadow: var(--focus-ring); }
+}
+
+.stepper__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepper__marker {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
+.stepper__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+// Completed: filled primary with a checkmark.
+.stepper__segment.is-complete .stepper__button {
+  background-color: var(--color-primary);
+  color: #ffffff;
+
+  &:hover { background-color: var(--color-primary-hover); }
+}
+.stepper__segment.is-complete .stepper__marker {
+  background-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+// Current: filled primary, bold, and given more room than its neighbours.
+.stepper__segment.is-current {
+  flex-grow: 1.6;
+}
+.stepper__segment.is-current .stepper__button {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+
+  &:hover { background-color: var(--color-primary-hover); }
+}
+.stepper__segment.is-current .stepper__marker {
+  background-color: #ffffff;
+  color: var(--color-primary);
+}
+
+// Upcoming: outline, secondary ink.
+.stepper__segment.is-upcoming .stepper__button {
+  background-color: var(--color-card);
+  color: var(--color-text-secondary);
+}
+.stepper__segment.is-upcoming .stepper__marker { color: var(--color-border); }
+
+// Rejected: the terminus. Error red, so "how far did it get" and "how did it
+// end" are both answered without reading the labels.
+.stepper__segment.is-rejected {
+  flex-grow: 1.4;
+}
+.stepper__segment.is-rejected .stepper__button {
+  background-color: var(--color-error);
+  color: #ffffff;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-label);
+}
+.stepper__segment.is-rejected .stepper__marker {
+  background-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.stepper__match {
+  flex: 0 0 auto;
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.stepper__match-value {
+  font-size: var(--text-section);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+// =============================================================================
+// EVALUATION PANEL
+// =============================================================================
+.eval-section {
+  padding-top: var(--space-5, 20px);
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+
+  &:first-of-type {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 0;
+  }
+}
+
+.eval-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.eval-section__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-heading);
+  font-size: var(--text-section);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.eval-section__count {
+  padding: 0 8px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  background-color: var(--color-primary-tint);
+  color: var(--color-primary);
+}
+
+.eval-section__note {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--control-radius);
+  background-color: var(--status-disconnected-bg);
+  color: var(--status-disconnected-text);
+  font-size: var(--text-caption);
+}
+
+.eval-section__empty {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.eval-resume {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-4);
+}
+
+.eval-resume__label {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.eval-resume__value {
+  font-size: var(--text-display);
+  font-weight: var(--weight-semibold);
+  line-height: 1.1;
+}
+
+.eval-list { border-top: 1px solid var(--color-border); }
+
+.eval-row {
+  display: grid;
+  grid-template-columns: 130px 60px 160px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.eval-row__date {
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+}
+
+.eval-row__author {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.eval-score {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--control-radius);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  text-align: center;
+}
+
+.eval-row__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.eval-row__summary {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eval-row__actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+// =============================================================================
+// APPLICATIONS LIST — candidate search
+// =============================================================================
+.applications-search { position: relative; }
+
+.applications-search__icon {
+  position: absolute;
+  left: var(--control-padding-x);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  // Bulma sets position:relative on .input, so a positioned sibling that comes
+  // second paints over this one.
+  z-index: 1;
+}
+
+.applications-search__input { padding-left: 34px; }
+
+@media (max-width: 1023px) {
+  .stepper { flex-wrap: wrap; }
+  .stepper__segment { flex-basis: 50%; border-bottom: 1px solid var(--color-border); }
+  .eval-row { grid-template-columns: 1fr; }
+  .eval-resume { grid-template-columns: 1fr; }
+}

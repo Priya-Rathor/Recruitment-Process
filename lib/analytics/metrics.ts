@@ -17,7 +17,12 @@
 // obliged to handle it. Returning a bare number would make the misleading case
 // the easy one.
 // =============================================================================
-import { APPLICATION_STAGES, type ApplicationStage } from "@/lib/applications/stages";
+import {
+  APPLICATION_STAGES,
+  PIPELINE_STAGES,
+  STAGE_LABELS,
+  type ApplicationStage,
+} from "@/lib/applications/stages";
 
 /**
  * Below this many observations a rate is reported as insufficient rather than
@@ -98,11 +103,20 @@ export type FunnelRow = {
   client_id: string | null;
   created_at: string;
   hired_at: string | null;
-  reached_screening: boolean;
+  /**
+   * Ever-reached flags, one per board stage, from the immutable stage history.
+   *
+   * Renamed with the pipeline: the old set (screening / client_review /
+   * interview / offer) described stages that no longer exist. Keeping the old
+   * names as aliases would have left the funnel silently counting zero for
+   * every step once the data migrated.
+   */
   reached_shortlisted: boolean;
-  reached_client_review: boolean;
-  reached_interview: boolean;
-  reached_offer: boolean;
+  reached_ai_screening_call: boolean;
+  reached_phone_interview: boolean;
+  reached_video_interview: boolean;
+  reached_written_assessment: boolean;
+  reached_director_round: boolean;
   reached_hired: boolean;
   reached_rejected: boolean;
   screening_call_attempted: boolean;
@@ -137,36 +151,34 @@ export type Funnel = {
  * exceeds an earlier one is a bug, not a data quirk, and this shape makes it
  * impossible.
  */
+/** Reads the ever-reached flag for a stage without a lookup table per caller. */
+function reachedFlag(row: FunnelRow, stage: ApplicationStage): boolean {
+  const key = `reached_${stage}` as keyof FunnelRow;
+  return row[key] === true;
+}
+
 export function buildFunnel(rows: FunnelRow[]): Funnel {
   const total = rows.length;
 
+  // One step per board stage, in board order. Derived from PIPELINE_STAGES
+  // rather than listed by hand, so a future stage change updates the funnel
+  // without anyone remembering to come here.
+  //
+  // "AI Screening Call" is the exception and counts calls actually PLACED, not
+  // arrivals at the stage. The spec's own example figures treat it as a real
+  // activity count, and reporting stage-arrivals as screenings would overstate
+  // the product's own contribution — the number most likely to be quoted back
+  // to a customer.
   const counts = [
     { key: "applications", label: "Applications", count: total },
-    {
-      key: "screened",
-      label: "AI screened",
-      count: rows.filter((row) => row.screening_call_attempted).length,
-    },
-    {
-      key: "shortlisted",
-      label: "Shortlisted",
-      count: rows.filter((row) => row.reached_shortlisted).length,
-    },
-    {
-      key: "interviews",
-      label: "Interviews",
-      count: rows.filter((row) => row.reached_interview).length,
-    },
-    {
-      key: "offers",
-      label: "Offers",
-      count: rows.filter((row) => row.reached_offer).length,
-    },
-    {
-      key: "hired",
-      label: "Hired",
-      count: rows.filter((row) => row.reached_hired).length,
-    },
+    ...PIPELINE_STAGES.filter((stage) => stage !== "applied").map((stage) => ({
+      key: stage,
+      label: STAGE_LABELS[stage],
+      count:
+        stage === "ai_screening_call"
+          ? rows.filter((row) => row.screening_call_attempted).length
+          : rows.filter((row) => reachedFlag(row, stage)).length,
+    })),
   ];
 
   return {
@@ -260,7 +272,7 @@ export type StageDuration = {
  * page load.
  *
  * The bottleneck is identified by the MEDIAN, not the mean. One application
- * stuck in Client Review for six months makes that stage look like the
+ * stuck in a Director Round for six months makes that stage look like the
  * bottleneck under a mean even when everything else moves through it in a day.
  */
 export function computeStageDurations({
@@ -352,7 +364,13 @@ export function computeSourcePerformance(rows: FunnelRow[]): SourcePerformance[]
 
   return [...bySource.entries()]
     .map(([source, bucket]) => {
-      const interviews = bucket.filter((row) => row.reached_interview).length;
+      // "Interviews" here means "reached ANY interview round" — a candidate who
+      // did a phone screen and then a video round is one interviewed candidate,
+      // not two. Summing the flags would double-count exactly the sources that
+      // perform best.
+      const interviews = bucket.filter(
+        (row) => row.reached_phone_interview || row.reached_video_interview
+      ).length;
       const hires = bucket.filter((row) => row.reached_hired).length;
 
       return {

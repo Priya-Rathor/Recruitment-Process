@@ -2,14 +2,26 @@
 // a hire is Success, and the negative exits are Error/Disconnected.
 import { STAGE_LABELS, type ApplicationStage } from "@/lib/applications/stages";
 
+// Neutral at intake, info while the pipeline is doing its work, amber for the
+// two rounds that need a human's diary, then the terminal colours. The gradient
+// carries the same information as the stepper does, at badge size.
 const STAGE_STYLE: Record<ApplicationStage, { background: string; color: string }> = {
-  new: { background: "var(--status-disconnected-bg)", color: "var(--status-disconnected-text)" },
-  screening: { background: "#eff6ff", color: "var(--color-info)" },
-  recruiter_review: { background: "#eff6ff", color: "var(--color-info)" },
+  applied: { background: "var(--status-disconnected-bg)", color: "var(--status-disconnected-text)" },
   shortlisted: { background: "#eff6ff", color: "var(--color-info)" },
-  client_review: { background: "var(--status-attention-bg)", color: "var(--status-attention-text)" },
-  interview: { background: "var(--status-attention-bg)", color: "var(--status-attention-text)" },
-  offer: { background: "var(--status-attention-bg)", color: "var(--status-attention-text)" },
+  ai_screening_call: { background: "#eff6ff", color: "var(--color-info)" },
+  phone_interview: { background: "#eff6ff", color: "var(--color-info)" },
+  video_interview: {
+    background: "var(--status-attention-bg)",
+    color: "var(--status-attention-text)",
+  },
+  written_assessment: {
+    background: "var(--status-attention-bg)",
+    color: "var(--status-attention-text)",
+  },
+  director_round: {
+    background: "var(--status-attention-bg)",
+    color: "var(--status-attention-text)",
+  },
   hired: { background: "var(--status-connected-bg)", color: "var(--status-connected-text)" },
   rejected: { background: "var(--status-error-bg)", color: "var(--status-error-text)" },
   withdrawn: {

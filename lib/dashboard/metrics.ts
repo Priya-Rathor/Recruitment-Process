@@ -220,8 +220,8 @@ export function buildOverdueClause(config: SlaConfig, now: Date): string {
  *
  * Uses the same per-stage SLA the pipeline board does, so an item flagged here
  * is flagged there too. Urgency is days OVER the target rather than raw age —
- * three days in Client Review (target 5) is fine, three days in Recruiter
- * Review (target 2) is not.
+ * three days in a Director Round (target 7) is fine, three days in Applied
+ * (target 2) is not.
  */
 export function buildAttentionItems(
   rows: AttentionSourceRow[],

@@ -22,13 +22,15 @@ import {
  * involve someone else's calendar; offer involves a decision.
  */
 export const DEFAULT_SLA_DAYS: Record<ApplicationStage, number> = {
-  new: 2,
-  screening: 3,
-  recruiter_review: 2,
+  applied: 2,
   shortlisted: 3,
-  client_review: 5,
-  interview: 7,
-  offer: 5,
+  // The automated call should happen quickly; the human rounds need diary time,
+  // and a director's diary needs the most.
+  ai_screening_call: 3,
+  phone_interview: 5,
+  video_interview: 7,
+  written_assessment: 7,
+  director_round: 7,
   // Terminal stages are not aged; these values are never consulted.
   hired: 0,
   rejected: 0,

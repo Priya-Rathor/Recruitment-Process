@@ -83,9 +83,14 @@ export async function fetchFunnelRows({
   let query = supabase
     .from("analytics_application_funnel")
     .select(
-      "application_id, source, current_stage, assigned_recruiter_id, job_id, client_id, " +
-        "created_at, hired_at, reached_screening, reached_shortlisted, reached_client_review, " +
-        "reached_interview, reached_offer, reached_hired, reached_rejected, " +
+      "application_id, source, current_stage, rejected_at_stage, assigned_recruiter_id, " +
+        "job_id, client_id, created_at, hired_at, " +
+        // One ever-reached flag per board stage. Renamed with the pipeline in
+        // migration 0021 — the old names would select nothing and every funnel
+        // step would read zero without erroring.
+        "reached_shortlisted, reached_ai_screening_call, reached_phone_interview, " +
+        "reached_video_interview, reached_written_assessment, reached_director_round, " +
+        "reached_hired, reached_rejected, " +
         "screening_call_attempted, screening_call_completed, match_score"
     )
     .eq("organization_id", organizationId)

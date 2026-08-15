@@ -26,17 +26,18 @@ function funnelRow(overrides: Partial<FunnelRow> = {}): FunnelRow {
   return {
     application_id: Math.random().toString(36).slice(2),
     source: "manual",
-    current_stage: "new",
+    current_stage: "applied",
     assigned_recruiter_id: null,
     job_id: "job-1",
     client_id: null,
     created_at: "2026-08-01T09:00:00.000Z",
     hired_at: null,
-    reached_screening: false,
     reached_shortlisted: false,
-    reached_client_review: false,
-    reached_interview: false,
-    reached_offer: false,
+    reached_ai_screening_call: false,
+    reached_phone_interview: false,
+    reached_video_interview: false,
+    reached_written_assessment: false,
+    reached_director_round: false,
     reached_hired: false,
     reached_rejected: false,
     screening_call_attempted: false,
@@ -106,8 +107,8 @@ describe("buildFunnel", () => {
       funnelRow({
         current_stage: "hired",
         reached_shortlisted: true,
-        reached_interview: true,
-        reached_offer: true,
+        reached_phone_interview: true,
+        reached_director_round: true,
         reached_hired: true,
         screening_call_attempted: true,
       }),
@@ -121,10 +122,12 @@ describe("buildFunnel", () => {
   it("never lets a later step exceed an earlier one", () => {
     const rows = Array.from({ length: 20 }, (_, index) =>
       funnelRow({
-        screening_call_attempted: index < 14,
-        reached_shortlisted: index < 9,
-        reached_interview: index < 5,
-        reached_offer: index < 2,
+        reached_shortlisted: index < 14,
+        screening_call_attempted: index < 9,
+        reached_phone_interview: index < 7,
+        reached_video_interview: index < 5,
+        reached_written_assessment: index < 4,
+        reached_director_round: index < 2,
         reached_hired: index < 1,
       })
     );
@@ -142,26 +145,44 @@ describe("buildFunnel", () => {
     // Reporting stage-arrivals as screenings overstates the product's own
     // contribution — the number most likely to be quoted to a customer.
     const rows = [
-      funnelRow({ reached_screening: true, screening_call_attempted: false }),
-      funnelRow({ reached_screening: true, screening_call_attempted: true }),
+      funnelRow({ reached_ai_screening_call: true, screening_call_attempted: false }),
+      funnelRow({ reached_ai_screening_call: true, screening_call_attempted: true }),
     ];
 
-    expect(buildFunnel(rows).steps.find((step) => step.key === "screened")?.count).toBe(1);
+    expect(
+      buildFunnel(rows).steps.find((step) => step.key === "ai_screening_call")?.count
+    ).toBe(1);
   });
 
   it("computes conversion from the previous step, not from the total", () => {
+    // Shortlisted now comes BEFORE the screening call in the board order, so
+    // the pair to check is shortlisted -> screened.
     const rows = Array.from({ length: 10 }, (_, index) =>
       funnelRow({
-        screening_call_attempted: index < 6,
-        reached_shortlisted: index < 3,
+        reached_shortlisted: index < 6,
+        screening_call_attempted: index < 3,
       })
     );
 
     const funnel = buildFunnel(rows);
-    const shortlisted = funnel.steps.find((step) => step.key === "shortlisted");
+    const screened = funnel.steps.find((step) => step.key === "ai_screening_call");
 
-    // 3 of 6 screened = 50%, not 3 of 10 = 30%.
-    expect(shortlisted?.conversionFromPrevious).toMatchObject({ kind: "rate", percent: 50 });
+    // 3 of 6 shortlisted = 50%, not 3 of 10 = 30%.
+    expect(screened?.conversionFromPrevious).toMatchObject({ kind: "rate", percent: 50 });
+  });
+
+  it("has one step per board stage, in board order", () => {
+    const funnel = buildFunnel([funnelRow()]);
+    expect(funnel.steps.map((step) => step.key)).toEqual([
+      "applications",
+      "shortlisted",
+      "ai_screening_call",
+      "phone_interview",
+      "video_interview",
+      "written_assessment",
+      "director_round",
+      "hired",
+    ]);
   });
 });
 
@@ -220,11 +241,11 @@ describe("computeTimeToHire", () => {
 // Time in stage
 // -----------------------------------------------------------------------------
 describe("computeStageDurations", () => {
-  const SLA = { screening: 2, client_review: 3 } as const;
+  const SLA = { ai_screening_call: 2, director_round: 3 } as const;
 
   it("returns no figures for a stage with no closed visits", () => {
     const result = computeStageDurations({ rows: [], slaDays: SLA });
-    const screening = result.find((entry) => entry.stage === "screening");
+    const screening = result.find((entry) => entry.stage === "ai_screening_call");
 
     expect(screening?.averageDays).toBeNull();
     expect(screening?.sample).toBe(0);
@@ -233,36 +254,36 @@ describe("computeStageDurations", () => {
 
   it("flags a stage over its SLA", () => {
     const rows = Array.from({ length: 5 }, () => ({
-      stage: "client_review" as const,
+      stage: "director_round" as const,
       days_in_stage: 6,
     }));
 
     const result = computeStageDurations({ rows, slaDays: SLA });
-    expect(result.find((entry) => entry.stage === "client_review")?.overSla).toBe(true);
+    expect(result.find((entry) => entry.stage === "director_round")?.overSla).toBe(true);
   });
 
   it("does not flag a stage on a sample too small to mean it", () => {
     // One slow application is not a bottleneck, and calling it one sends
     // somebody to chase a problem that doesn't exist.
-    const rows = [{ stage: "client_review" as const, days_in_stage: 40 }];
+    const rows = [{ stage: "director_round" as const, days_in_stage: 40 }];
 
     const result = computeStageDurations({ rows, slaDays: SLA });
-    const clientReview = result.find((entry) => entry.stage === "client_review");
+    const clientReview = result.find((entry) => entry.stage === "director_round");
     expect(clientReview?.overSla).toBe(false);
     expect(clientReview?.insufficient).toBe(true);
   });
 
   it("uses the median, so one outlier doesn't invent a bottleneck", () => {
     const rows = [
-      { stage: "screening" as const, days_in_stage: 1 },
-      { stage: "screening" as const, days_in_stage: 1 },
-      { stage: "screening" as const, days_in_stage: 1 },
-      { stage: "screening" as const, days_in_stage: 1 },
-      { stage: "screening" as const, days_in_stage: 180 },
+      { stage: "ai_screening_call" as const, days_in_stage: 1 },
+      { stage: "ai_screening_call" as const, days_in_stage: 1 },
+      { stage: "ai_screening_call" as const, days_in_stage: 1 },
+      { stage: "ai_screening_call" as const, days_in_stage: 1 },
+      { stage: "ai_screening_call" as const, days_in_stage: 180 },
     ];
 
     const result = computeStageDurations({ rows, slaDays: SLA });
-    const screening = result.find((entry) => entry.stage === "screening");
+    const screening = result.find((entry) => entry.stage === "ai_screening_call");
 
     expect(screening?.medianDays).toBe(1);
     expect(screening?.averageDays).toBeGreaterThan(30);
@@ -272,7 +293,7 @@ describe("computeStageDurations", () => {
 
   it("finds no bottleneck when everything is within SLA", () => {
     const rows = Array.from({ length: 5 }, () => ({
-      stage: "screening" as const,
+      stage: "ai_screening_call" as const,
       days_in_stage: 1,
     }));
 
@@ -280,15 +301,15 @@ describe("computeStageDurations", () => {
   });
 
   it("picks the stage furthest past its own SLA, not the slowest", () => {
-    // screening: 5 days against a 2-day SLA = 3 over.
-    // client_review: 7 days against a 3-day SLA = 4 over. Slower AND worse.
+    // ai_screening_call: 5 days against a 2-day SLA = 3 over.
+    // director_round: 7 days against a 3-day SLA = 4 over. Slower AND worse.
     const rows = [
-      ...Array.from({ length: 5 }, () => ({ stage: "screening" as const, days_in_stage: 5 })),
-      ...Array.from({ length: 5 }, () => ({ stage: "client_review" as const, days_in_stage: 7 })),
+      ...Array.from({ length: 5 }, () => ({ stage: "ai_screening_call" as const, days_in_stage: 5 })),
+      ...Array.from({ length: 5 }, () => ({ stage: "director_round" as const, days_in_stage: 7 })),
     ];
 
     expect(findBottleneck(computeStageDurations({ rows, slaDays: SLA }))?.stage).toBe(
-      "client_review"
+      "director_round"
     );
   });
 });

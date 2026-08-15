@@ -12,8 +12,20 @@ import { listTeamMembers } from "@/lib/jobs/queries";
 import { InterviewStatusBadge } from "@/app/interviews/InterviewBadges";
 import { ScheduleInterview } from "./ScheduleInterview";
 import { daysSince } from "@/lib/time";
-import { MatchScore, StageBadge } from "../StageBadge";
 import { ApplicationSummary, NoteComposer, StageControl } from "./ApplicationDetailClient";
+import { listJobStages } from "@/lib/hiring-stages/queries";
+import { listEvaluationEntries } from "@/lib/applications/evaluationQueries";
+import { countByStage } from "@/lib/applications/evaluations";
+import {
+  buildStepper,
+  effectiveStages,
+  flagsFromRows,
+  movableStages,
+} from "@/lib/applications/effectiveStages";
+import { STAGE_LABELS } from "@/lib/applications/stages";
+import { getLatestParsedResume } from "@/lib/resumes/queries";
+import { resumeKeyPoints } from "@/lib/resumes/keyPoints";
+import { ApplicationStageSection } from "./ApplicationStageSection";
 import { Activity } from "lucide-react";
 
 export const metadata = { title: "Application" };
@@ -32,13 +44,38 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
 
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
 
-  const [{ interviews }, members] = await Promise.all([
+  const [{ interviews }, members, stageRows, evaluationEntries, parsedResume] = await Promise.all([
     listInterviews({
       organizationId: membership.organization.id,
       applicationId: application.id,
     }),
     listTeamMembers(membership.organization.id),
+    // Which of the four configurable stages this application's JOB runs.
+    listJobStages({ organizationId: membership.organization.id, jobId: application.job_id }),
+    listEvaluationEntries({
+      organizationId: membership.organization.id,
+      applicationId: application.id,
+    }),
+    getLatestParsedResume({
+      organizationId: membership.organization.id,
+      candidateId: application.candidate_id,
+    }),
   ]);
+
+  // One derivation, shared by the stepper, the Evaluation panel and the move
+  // dropdown — so the three cannot disagree about which stages exist here.
+  const availability = effectiveStages({
+    flags: flagsFromRows(stageRows),
+    entryCounts: countByStage(evaluationEntries),
+    currentStage: application.stage,
+  });
+
+  const stepper = buildStepper({
+    availability,
+    currentStage: application.stage,
+    rejectedAtStage: application.rejected_at_stage ?? null,
+    labels: STAGE_LABELS,
+  });
 
   const timeline = buildTimeline({
     stages: application.stageHistory,
@@ -62,18 +99,32 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
           </span>
           <Link href={`/jobs/${application.job_id}`}>{application.job_title}</Link>
         </h1>
-        <div className="is-flex is-align-items-center" style={{ gap: "0.5rem" }}>
-          <StageBadge stage={application.stage} />
-          <Link href={`/applications/${application.id}/match`} title="See the match breakdown">
-            <MatchScore score={application.match_score} />
-          </Link>
-          {application.archived_at && (
-            <span className="tag is-light" style={{ fontSize: 12 }}>
-              Archived
-            </span>
-          )}
-        </div>
+        {application.archived_at && (
+          <span className="tag is-light" style={{ fontSize: 12 }}>
+            Archived
+          </span>
+        )}
       </div>
+
+      {/*
+        The stepper replaces the small stage chip. It spans the full width
+        directly under the heading, because "where is this and how far has it
+        come" is the first question this page is opened to answer.
+      */}
+      <ApplicationStageSection
+        segments={stepper}
+        matchScore={application.match_score}
+        applicationId={application.id}
+        availability={availability}
+        entries={evaluationEntries}
+        resume={{
+          matchScore: application.match_score,
+          summary: resumeKeyPoints(parsedResume?.parseResult.raw_json),
+          resumeId: parsedResume?.resume.id ?? null,
+        }}
+        canEdit={canEdit}
+        timeZone={membership.organization.timezone}
+      />
 
       {/* Spec section 7: AI summary renders at the top, timeline below. */}
       <ApplicationSummary applicationId={application.id} />
@@ -138,6 +189,7 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
               applicationId={application.id}
               currentStage={application.stage}
               canEdit={canEdit}
+              allowedStages={movableStages(availability)}
             />
           </div>
 
@@ -168,31 +220,31 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
               generally — the same person can score differently against another job.
             </p>
             <Link
-              className="button is-small is-fullwidth mt-3"
+              className="button is-outlined-primary is-small is-fullwidth mt-3"
               href={`/applications/${application.id}/match`}
             >
               {application.match_score === null ? "Calculate match" : "See match breakdown"}
             </Link>
             <Link
-              className="button is-small is-fullwidth mt-2"
+              className="button is-outlined-primary is-small is-fullwidth mt-2"
               href={`/applications/${application.id}/screening-call`}
             >
               AI screening call
             </Link>
             <Link
-              className="button is-small is-fullwidth mt-2"
+              className="button is-outlined-primary is-small is-fullwidth mt-2"
               href={`/applications/${application.id}/screening-report`}
             >
               Screening report
             </Link>
             <Link
-              className="button is-small is-fullwidth mt-2"
+              className="button is-outlined-primary is-small is-fullwidth mt-2"
               href={`/applications/${application.id}/interview-brief`}
             >
               Interview brief
             </Link>
             <Link
-              className="button is-small is-fullwidth mt-2"
+              className="button is-outlined-primary is-small is-fullwidth mt-2"
               href={`/applications/${application.id}/submission`}
             >
               Submit to client

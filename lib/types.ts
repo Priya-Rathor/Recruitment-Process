@@ -187,6 +187,14 @@ export type Application = {
   candidate_id: string;
   job_id: string;
   stage: import("@/lib/applications/stages").ApplicationStage;
+  /**
+   * The stage this application was in immediately before being rejected.
+   *
+   * Null unless `stage` is 'rejected'. Kept because "rejected" alone destroys
+   * the most useful fact about a rejection — a candidate turned down after a
+   * director round and one turned down on their CV are not the same outcome.
+   */
+  rejected_at_stage: import("@/lib/applications/stages").ApplicationStage | null;
   match_score: number | null;
   assigned_recruiter_id: string | null;
   source: CandidateSource;

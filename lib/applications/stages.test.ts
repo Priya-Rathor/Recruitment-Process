@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   APPLICATION_STAGES,
+  CONFIGURABLE_STAGES,
   PIPELINE_STAGES,
+  STAGE_LABELS,
   availableTransitions,
   canTransition,
   isApplicationStage,
+  isConfigurableStage,
   isTerminalStage,
   stageIndex,
-  STAGE_LABELS,
+  stageSortKey,
 } from "./stages";
+import { STAGE_KEYS } from "@/lib/hiring-stages/catalog";
 import {
   buildTimeline,
   currentStageRow,
@@ -21,15 +25,43 @@ import {
 describe("stage vocabulary", () => {
   it("matches Module 10's board order exactly", () => {
     expect(PIPELINE_STAGES).toEqual([
-      "new",
-      "screening",
-      "recruiter_review",
+      "applied",
       "shortlisted",
-      "client_review",
-      "interview",
-      "offer",
+      "ai_screening_call",
+      "phone_interview",
+      "video_interview",
+      "written_assessment",
+      "director_round",
       "hired",
     ]);
+  });
+
+  /**
+   * The four toggleable stages share their keys with job_hiring_stages, exactly.
+   * A mismatch here would not fail loudly — it would silently make every stage
+   * look "disabled" for every job, because the lookup would never hit.
+   */
+  it("uses the same keys as the job hiring-stage configuration", () => {
+    expect([...CONFIGURABLE_STAGES]).toEqual([...STAGE_KEYS]);
+    for (const key of CONFIGURABLE_STAGES) {
+      expect(isApplicationStage(key), key).toBe(true);
+      expect(isConfigurableStage(key), key).toBe(true);
+    }
+  });
+
+  it("treats the structural stages as not configurable", () => {
+    // Every application is applied to something, someone sifts, someone decides,
+    // and it ends or it does not. None of those is opt-out.
+    for (const stage of ["applied", "shortlisted", "director_round", "hired"] as const) {
+      expect(isConfigurableStage(stage), stage).toBe(false);
+    }
+  });
+
+  it("sorts terminal exits after every board stage", () => {
+    const board = PIPELINE_STAGES.map(stageSortKey);
+    expect(board).toEqual([...board].sort((a, b) => a - b));
+    expect(stageSortKey("rejected")).toBeGreaterThan(stageSortKey("hired"));
+    expect(stageSortKey("withdrawn")).toBeGreaterThan(stageSortKey("rejected"));
   });
 
   it("labels every stage", () => {
@@ -46,7 +78,7 @@ describe("stage vocabulary", () => {
   });
 
   it("puts terminal exits off the board", () => {
-    expect(stageIndex("new")).toBe(0);
+    expect(stageIndex("applied")).toBe(0);
     expect(stageIndex("hired")).toBe(7);
     expect(stageIndex("rejected")).toBe(-1);
     expect(stageIndex("withdrawn")).toBe(-1);
@@ -56,27 +88,27 @@ describe("stage vocabulary", () => {
     expect(isTerminalStage("hired")).toBe(true);
     expect(isTerminalStage("rejected")).toBe(true);
     expect(isTerminalStage("withdrawn")).toBe(true);
-    expect(isTerminalStage("offer")).toBe(false);
-    expect(isTerminalStage("new")).toBe(false);
+    expect(isTerminalStage("director_round")).toBe(false);
+    expect(isTerminalStage("applied")).toBe(false);
   });
 });
 
 describe("canTransition", () => {
   it("allows normal forward movement", () => {
-    expect(canTransition("new", "screening").allowed).toBe(true);
-    expect(canTransition("shortlisted", "client_review").allowed).toBe(true);
+    expect(canTransition("applied", "ai_screening_call").allowed).toBe(true);
+    expect(canTransition("shortlisted", "director_round").allowed).toBe(true);
   });
 
   it("allows skipping stages", () => {
     // A referral can go straight to interview; the board is not a state machine
     // recruiters should have to fight.
-    expect(canTransition("new", "interview").allowed).toBe(true);
+    expect(canTransition("applied", "phone_interview").allowed).toBe(true);
   });
 
   it("allows moving BACKWARDS", () => {
     // A client asking for a re-review is normal; forbidding it would push
     // people to work around the tool.
-    expect(canTransition("client_review", "shortlisted").allowed).toBe(true);
+    expect(canTransition("director_round", "shortlisted").allowed).toBe(true);
   });
 
   it("allows rejecting from any live stage", () => {
@@ -89,7 +121,7 @@ describe("canTransition", () => {
   it("REFUSES to reopen a finished application", () => {
     // Silently resurrecting a hire or rejection would corrupt Module 16's funnel.
     for (const from of ["hired", "rejected", "withdrawn"] as const) {
-      const result = canTransition(from, "screening");
+      const result = canTransition(from, "ai_screening_call");
       expect(result.allowed).toBe(false);
       if (!result.allowed) expect(result.reason).toMatch(/new application/i);
     }
@@ -105,9 +137,9 @@ describe("canTransition", () => {
   });
 
   it("offers every other stage from a live one", () => {
-    const options = availableTransitions("screening");
-    expect(options).not.toContain("screening");
-    expect(options).toContain("recruiter_review");
+    const options = availableTransitions("ai_screening_call");
+    expect(options).not.toContain("ai_screening_call");
+    expect(options).toContain("shortlisted");
     expect(options).toContain("rejected");
     expect(options).toHaveLength(APPLICATION_STAGES.length - 1);
   });
@@ -135,14 +167,14 @@ describe("buildTimeline", () => {
   const stages: StageHistoryRow[] = [
     {
       id: "s1",
-      stage: "new",
+      stage: "applied",
       entered_at: "2026-08-01T10:00:00Z",
       exited_at: "2026-08-03T10:00:00Z",
       changed_by_name: "Priya",
     },
     {
       id: "s2",
-      stage: "screening",
+      stage: "ai_screening_call",
       entered_at: "2026-08-03T10:00:00Z",
       exited_at: null,
       changed_by_name: "Priya",
@@ -186,12 +218,12 @@ describe("buildTimeline", () => {
   it("orders deterministically when timestamps collide", () => {
     const sameTime = "2026-08-05T12:00:00Z";
     const first = buildTimeline({
-      stages: [{ id: "s9", stage: "offer", entered_at: sameTime, exited_at: null }],
+      stages: [{ id: "s9", stage: "director_round", entered_at: sameTime, exited_at: null }],
       notes: [{ id: "n9", note: "Offer sent", created_at: sameTime }],
     });
     const second = buildTimeline({
       notes: [{ id: "n9", note: "Offer sent", created_at: sameTime }],
-      stages: [{ id: "s9", stage: "offer", entered_at: sameTime, exited_at: null }],
+      stages: [{ id: "s9", stage: "director_round", entered_at: sameTime, exited_at: null }],
     });
     expect(first.map((event) => event.id)).toEqual(second.map((event) => event.id));
   });
@@ -207,12 +239,12 @@ describe("buildTimeline", () => {
 
 describe("current stage", () => {
   const stages: StageHistoryRow[] = [
-    { id: "s1", stage: "new", entered_at: "2026-08-01T10:00:00Z", exited_at: "2026-08-03T10:00:00Z" },
-    { id: "s2", stage: "screening", entered_at: "2026-08-03T10:00:00Z", exited_at: null },
+    { id: "s1", stage: "applied", entered_at: "2026-08-01T10:00:00Z", exited_at: "2026-08-03T10:00:00Z" },
+    { id: "s2", stage: "ai_screening_call", entered_at: "2026-08-03T10:00:00Z", exited_at: null },
   ];
 
   it("finds the one open row", () => {
-    expect(currentStageRow(stages)?.stage).toBe("screening");
+    expect(currentStageRow(stages)?.stage).toBe("ai_screening_call");
   });
 
   it("returns null when every row is closed", () => {

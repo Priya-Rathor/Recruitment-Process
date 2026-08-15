@@ -9,7 +9,7 @@ import {
 const input: ApplicationSummaryInput = {
   candidateName: "Rahul Sharma",
   jobTitle: "Senior Java Developer",
-  stage: "client_review",
+  stage: "director_round",
   matchScore: 89,
   daysInCurrentStage: 2,
   ageDays: 11,

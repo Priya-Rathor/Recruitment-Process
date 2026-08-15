@@ -8,6 +8,7 @@ import { APPLICATION_STAGES, STAGE_LABELS } from "@/lib/applications/stages";
 import { daysSince } from "@/lib/time";
 import { MatchScore, StageBadge } from "./StageBadge";
 import { ApplicationFilters } from "./ApplicationFilters";
+import { listJobsWithHealth } from "@/lib/jobs/queries";
 
 export const metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
@@ -16,12 +17,21 @@ async function ApplicationsTable({ searchParams }: { searchParams: Record<string
   const membership = await requireMembershipOrRedirect();
   const params = new URLSearchParams(searchParams);
 
-  const { applications, total, failed } = await listApplications({
-    organizationId: membership.organization.id,
-    filters: applicationFiltersFromParams(params),
-    viewerRole: membership.role,
-    viewerId: membership.user_id,
-  });
+  const [{ applications, total, failed }, { jobs }] = await Promise.all([
+    listApplications({
+      organizationId: membership.organization.id,
+      filters: applicationFiltersFromParams(params),
+      viewerRole: membership.role,
+      viewerId: membership.user_id,
+    }),
+    // For the Job filter. Archived jobs included: their applications are still
+    // in the list, so a filter that could not name them would be a dead end.
+    listJobsWithHealth({
+      organizationId: membership.organization.id,
+      filters: { includeArchived: true },
+      limit: 200,
+    }),
+  ]);
 
   if (failed) return <ErrorState message="Couldn't load applications." />;
 
@@ -29,7 +39,7 @@ async function ApplicationsTable({ searchParams }: { searchParams: Record<string
 
   return (
     <>
-      <ApplicationFilters />
+      <ApplicationFilters jobs={jobs} />
 
       <div className="card">
         {applications.length === 0 ? (

@@ -119,9 +119,9 @@ describe("buildAttentionItems", () => {
     // More useful than raw age: 4 days is fine in Client Review and late in
     // Recruiter Review, and the recruiter should be able to see which.
     const items = buildAttentionItems(
-      [{ id: "b", stage: "recruiter_review", updated_at: daysAgo(4) }],
+      [{ id: "b", stage: "shortlisted", updated_at: daysAgo(4) }],
       NOW,
-      { recruiter_review: 2 }
+      { shortlisted: 2 }
     );
     expect(items[0].detail).toBe("2 days past the 2-day target for this stage");
   });
@@ -137,10 +137,10 @@ describe("buildAttentionItems", () => {
   });
 
   it("RETROFIT: uses the per-stage SLA, so the same age differs by stage", () => {
-    const config = { client_review: 5, recruiter_review: 2 };
+    const config = { director_round: 5, shortlisted: 2 };
     const rows = [
-      { id: "slow-stage", stage: "client_review", updated_at: daysAgo(4) },
-      { id: "fast-stage", stage: "recruiter_review", updated_at: daysAgo(4) },
+      { id: "slow-stage", stage: "director_round", updated_at: daysAgo(4) },
+      { id: "fast-stage", stage: "shortlisted", updated_at: daysAgo(4) },
     ];
 
     const items = buildAttentionItems(rows, NOW, config);
@@ -150,12 +150,12 @@ describe("buildAttentionItems", () => {
   });
 
   it("RETROFIT: honours a configured target over the default", () => {
-    const rows = [{ id: "a", stage: "screening", updated_at: daysAgo(4) }];
+    const rows = [{ id: "a", stage: "ai_screening_call", updated_at: daysAgo(4) }];
 
     // Default for screening is 3, so 4 days is overdue.
     expect(buildAttentionItems(rows, NOW)).toHaveLength(1);
     // Configured to 10, the same row is fine.
-    expect(buildAttentionItems(rows, NOW, { screening: 10 })).toEqual([]);
+    expect(buildAttentionItems(rows, NOW, { ai_screening_call: 10 })).toEqual([]);
   });
 
   it("never flags a terminal stage as overdue", () => {

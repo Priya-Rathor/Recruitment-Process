@@ -22,7 +22,7 @@ export function NewApplicationForm({
 
   const [candidateId, setCandidateId] = useState(presetCandidateId ?? "");
   const [jobId, setJobId] = useState(presetJobId ?? "");
-  const [stage, setStage] = useState<ApplicationStage>("new");
+  const [stage, setStage] = useState<ApplicationStage>("applied");
   const [source, setSource] = useState<CandidateSource>("manual");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

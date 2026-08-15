@@ -1,7 +1,7 @@
 // =============================================================================
 // AI Service Layer function — Module 5's one-paragraph application summary.
 //
-// Replaces opening five tabs: "Rahul is currently in Client Review. Resume match
+// Replaces opening five tabs: "Rahul is currently in a Director Round. Resume match
 // was 89%, AI screening completed successfully, and technical interview feedback
 // was positive. Client feedback has been pending for two days."
 //
