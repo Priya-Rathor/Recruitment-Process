@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 const MAX_NOTE_LENGTH = 5000;
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .single();
 
     if (error) {
-      console.error("[api] note create failed:", error);
+      console.error("[api] note create failed:", describeDbError(error));
       return jsonError("Could not save the note.", 400);
     }
 

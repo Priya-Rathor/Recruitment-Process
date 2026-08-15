@@ -15,6 +15,9 @@ export type PostgrestLikeError = {
   message?: string | null;
   details?: string | null;
   hint?: string | null;
+  /** Present on some supabase-js errors; the only fact a HEAD request leaves. */
+  status?: number | null;
+  statusText?: string | null;
 };
 
 /** A flat, always-loggable description. Never returns an empty object. */
@@ -31,15 +34,31 @@ export function describeDbError(error: unknown): Record<string, string> {
   if (candidate.details) described.details = String(candidate.details);
   if (candidate.hint) described.hint = String(candidate.hint);
 
+  // A `head: true` count request gets no response BODY, so PostgREST's message
+  // never reaches the client — the status is the only thing left to report, and
+  // without it the log reads `{message: ""}`, which is what sent someone
+  // hunting for a bug that was really an unapplied migration.
+  if (typeof candidate.status === "number") described.status = String(candidate.status);
+  if (candidate.statusText) described.statusText = String(candidate.statusText);
+
   if (Object.keys(described).length === 0) {
-    // Last resort: something that is not shaped like a PostgREST error at all.
-    described.message = (() => {
+    const serialised = (() => {
       try {
         return JSON.stringify(error);
       } catch {
         return String(error);
       }
     })();
+
+    // `{"message":""}` is what a failed `head: true` count produces: PostgREST
+    // sent an error status, the HEAD response carried no body, and supabase-js
+    // had nothing to fill the error with. Printing the empty shell sends people
+    // hunting; naming the limitation and the way round it does not.
+    described.message =
+      serialised === '{"message":""}' || serialised === "{}"
+        ? "no detail available — a `head: true` count returns no response body; " +
+          "re-run the same query without `head` to see the database's message"
+        : serialised;
   }
 
   return described;

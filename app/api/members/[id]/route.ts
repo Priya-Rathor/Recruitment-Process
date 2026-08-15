@@ -4,6 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
 import { isOrgRole, type OrgRole } from "@/lib/types";
+import { describeDbError } from "@/lib/supabase/errors";
 
 type TargetMember = { id: string; user_id: string; role: OrgRole; status: string };
 
@@ -91,7 +92,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (error) {
       if (isLastOwnerViolation(error)) return jsonError(LAST_OWNER_MESSAGE, 409);
-      console.error("[api] member role update failed:", error);
+      console.error("[api] member role update failed:", describeDbError(error));
       return jsonError("Could not update this member's role.", 400);
     }
     if (!data) return jsonError("Team member not found.", 404);
@@ -153,7 +154,7 @@ export async function DELETE(
 
     if (error) {
       if (isLastOwnerViolation(error)) return jsonError(LAST_OWNER_MESSAGE, 409);
-      console.error("[api] member removal failed:", error);
+      console.error("[api] member removal failed:", describeDbError(error));
       return jsonError("Could not remove this team member.", 400);
     }
     if (!data) return jsonError("Team member not found.", 404);

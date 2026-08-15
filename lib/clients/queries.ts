@@ -1,6 +1,7 @@
 // Client persistence, activity aggregation, and the submission flow.
 import { createClient } from "@/lib/supabase/server";
 import { computeClientStats, type FeedbackEvent } from "@/lib/clients/sla";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type ClientContact = {
   name: string;
@@ -45,7 +46,7 @@ export async function listClients({
 
   const { data, error } = await query;
   if (error) {
-    console.error("[clients] list failed:", error);
+    console.error("[clients] list failed:", describeDbError(error));
     return { clients: [], failed: true };
   }
 

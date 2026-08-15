@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSensitiveEvent, type EventType } from "@/lib/activity/events";
 import type { ActivityEntityType } from "@/lib/activity/types";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type LogActivityInput = {
   organizationId: string;
@@ -75,13 +76,13 @@ export async function logActivity(input: LogActivityInput): Promise<boolean> {
     });
 
     if (error) {
-      console.error(`[activity] failed to record ${input.eventType}:`, error);
+      console.error(`[activity] failed to record ${input.eventType}:`, describeDbError(error));
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error(`[activity] failed to record ${input.eventType}:`, error);
+    console.error(`[activity] failed to record ${input.eventType}:`, describeDbError(error));
     return false;
   }
 }

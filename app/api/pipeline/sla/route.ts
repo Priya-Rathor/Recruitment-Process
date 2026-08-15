@@ -4,6 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireMembership, requireRole } from "@/lib/tenant";
 import { getSlaConfig } from "@/lib/pipeline/queries";
 import { editableSlaRows, parseSlaPayload } from "@/lib/pipeline/sla";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * GET /api/pipeline/sla — current targets, with defaults filled in.
@@ -61,7 +62,7 @@ export async function PUT(request: NextRequest) {
       .upsert(rows, { onConflict: "organization_id,stage" });
 
     if (error) {
-      console.error("[api] SLA update failed:", error);
+      console.error("[api] SLA update failed:", describeDbError(error));
       return jsonError("Could not save those targets.", 400);
     }
 

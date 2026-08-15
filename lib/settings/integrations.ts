@@ -13,6 +13,7 @@ import { getStatus as getN8nStatus } from "@/lib/integrations/n8n";
 import { isGoogleOAuthConfigured } from "@/lib/integrations/calendar/oauth";
 import type { IntegrationStatus, Provider } from "@/lib/integrations/store";
 import { ACTION_INTEGRATIONS, ACTION_LABELS, type ActionType } from "@/lib/automations/catalog";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type ProviderDescriptor = {
   provider: Provider;
@@ -242,7 +243,7 @@ export async function findDependencies({
     .contains("required_integrations", [provider]);
 
   if (error) {
-    console.error("[settings] dependency lookup failed:", error);
+    console.error("[settings] dependency lookup failed:", describeDbError(error));
     // Report the failure rather than an empty list. "Nothing depends on this"
     // when we could not check is exactly the false reassurance that makes
     // somebody disconnect a live integration.

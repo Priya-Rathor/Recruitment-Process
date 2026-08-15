@@ -10,6 +10,7 @@ import {
 } from "@/lib/automations/catalog";
 import { checkIntegrations } from "@/lib/automations/engine";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /** GET /api/automations/:id */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -167,7 +168,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if ((error as { code?: string }).code === "23505") {
         return jsonError("An automation with that name already exists.", 409);
       }
-      console.error("[api] automation update failed:", error);
+      console.error("[api] automation update failed:", describeDbError(error));
       return jsonError("Could not update the automation.", 400);
     }
     if (!data) return jsonError("Automation not found.", 404);
@@ -233,7 +234,7 @@ export async function DELETE(
       .maybeSingle();
 
     if (error) {
-      console.error("[api] automation delete failed:", error);
+      console.error("[api] automation delete failed:", describeDbError(error));
       return jsonError("Could not delete the automation.", 400);
     }
     if (!data) return jsonError("Automation not found.", 404);

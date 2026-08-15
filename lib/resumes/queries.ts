@@ -1,6 +1,7 @@
 // Server-side resume queries. One tenant-scoped place for pages and routes.
 import { createClient } from "@/lib/supabase/server";
 import type { ParsedResume } from "@/lib/ai/parseResume";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export const RESUME_BUCKET = "resumes";
 
@@ -64,7 +65,7 @@ export async function listResumes({
     .order("uploaded_at", { ascending: false });
 
   if (error) {
-    console.error("[resumes] list failed:", error);
+    console.error("[resumes] list failed:", describeDbError(error));
     return [];
   }
 
@@ -150,7 +151,7 @@ export async function createSignedResumeUrl(path: string): Promise<string | null
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
 
   if (error || !data) {
-    console.error("[resumes] signing failed:", error);
+    console.error("[resumes] signing failed:", describeDbError(error));
     return null;
   }
   return data.signedUrl;

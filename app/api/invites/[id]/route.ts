@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * DELETE /api/invites/:id — Owner/Admin only. Revokes a pending invite
@@ -28,7 +29,7 @@ export async function DELETE(
       .maybeSingle();
 
     if (error) {
-      console.error("[api] invite revoke failed:", error);
+      console.error("[api] invite revoke failed:", describeDbError(error));
       return jsonError("Could not revoke the invite.", 400);
     }
     if (!data) return jsonError("Pending invite not found.", 404);

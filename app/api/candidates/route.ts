@@ -8,6 +8,7 @@ import { CANDIDATE_COLUMNS, findDuplicateCandidates, listCandidates } from "@/li
 import { formatMatchedOn } from "@/lib/candidates/dedupe";
 import type { Candidate } from "@/lib/types";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * GET /api/candidates — organization-scoped list.
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[api] candidate create failed:", error);
+      console.error("[api] candidate create failed:", describeDbError(error));
       return jsonError("Could not create the candidate.", 400);
     }
 
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
         }))
       );
       if (duplicateError) {
-        console.error("[api] recording duplicates failed:", duplicateError);
+        console.error("[api] recording duplicates failed:", describeDbError(duplicateError));
       }
     }
 

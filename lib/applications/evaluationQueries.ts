@@ -18,6 +18,7 @@ import {
   type EvaluationStage,
   type InterestLevel,
 } from "@/lib/applications/evaluations";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /** Every evaluation entry for one application, newest first. */
 export async function listEvaluationEntries({
@@ -64,7 +65,7 @@ async function loadScreeningEntries({
     .eq("application_id", applicationId);
 
   if (error) {
-    console.error("[evaluations] screening calls failed:", error);
+    console.error("[evaluations] screening calls failed:", describeDbError(error));
     return [];
   }
 
@@ -133,7 +134,7 @@ async function loadInterviewEntries({
     .in("mode", ["phone", "video"]);
 
   if (error) {
-    console.error("[evaluations] interviews failed:", error);
+    console.error("[evaluations] interviews failed:", describeDbError(error));
     return [];
   }
 
@@ -200,7 +201,7 @@ async function loadManualEntries({
       console.info("[evaluations] application_evaluations not created yet — run migration 0022.");
       return [];
     }
-    console.error("[evaluations] manual entries failed:", error);
+    console.error("[evaluations] manual entries failed:", describeDbError(error));
     return [];
   }
 

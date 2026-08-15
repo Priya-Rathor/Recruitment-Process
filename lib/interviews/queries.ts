@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createEvent } from "@/lib/integrations/calendar";
 import type { InterviewMode, InterviewStatus, Recommendation } from "@/lib/interviews/feedback";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type Interview = {
   id: string;
@@ -94,7 +95,7 @@ export async function listInterviews({
 
   const { data, error } = await query;
   if (error) {
-    console.error("[interviews] list failed:", error);
+    console.error("[interviews] list failed:", describeDbError(error));
     return { interviews: [], failed: true };
   }
 
@@ -221,7 +222,7 @@ export async function scheduleInterview({
     .single();
 
   if (error || !created) {
-    console.error("[interviews] scheduling failed:", error);
+    console.error("[interviews] scheduling failed:", describeDbError(error));
     return { ok: false, error: "Could not schedule that interview." };
   }
 

@@ -28,6 +28,7 @@ import { listInterviewsAwaitingFeedback } from "@/lib/interviews/queries";
 import { overdueFeedback, FEEDBACK_DUE_HOURS } from "@/lib/interviews/feedback";
 import { overdueFeedbackRequests } from "@/lib/clients/sla";
 import { getClientActivity, listClients } from "@/lib/clients/queries";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * How long a reminder suppresses its own repeat.
@@ -77,7 +78,7 @@ async function recentlyRemindedPaths({
     // Fail towards SILENCE, not towards sending. If we cannot tell whether
     // someone was already nagged, nagging them again is the worse mistake — a
     // missed reminder is recoverable, a reputation for spam is not.
-    console.error("[reminders] dedupe read failed; suppressing this run:", error);
+    console.error("[reminders] dedupe read failed; suppressing this run:", describeDbError(error));
     return new Set(linkPaths);
   }
 
@@ -153,7 +154,7 @@ export async function sendFeedbackReminders(
 
     return { sent, suppressed, failed: false };
   } catch (error) {
-    console.error("[reminders] feedback reminders failed:", error);
+    console.error("[reminders] feedback reminders failed:", describeDbError(error));
     return { sent: 0, suppressed: 0, failed: true };
   }
 }
@@ -229,7 +230,7 @@ export async function sendClientFeedbackReminders(
 
     return { sent, suppressed, failed: false };
   } catch (error) {
-    console.error("[reminders] client feedback reminders failed:", error);
+    console.error("[reminders] client feedback reminders failed:", describeDbError(error));
     return { sent: 0, suppressed: 0, failed: true };
   }
 }

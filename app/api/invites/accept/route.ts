@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { ACTIVE_ORG_COOKIE, requireCurrentUser } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * POST /api/invites/accept
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     if (error || !organizationId) {
       // Deliberately generic: do not reveal whether the token exists, is
       // expired, or was already used.
-      console.error("[api] accept_invite failed:", error);
+      console.error("[api] accept_invite failed:", describeDbError(error));
       return jsonError("This invite link is no longer valid. Ask for a new invite.", 400);
     }
 

@@ -11,6 +11,7 @@ import { isApplicationStage } from "@/lib/applications/stages";
 import { isCandidateSource, type Application } from "@/lib/types";
 import { dispatch } from "@/lib/automations/engine";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
         organization_id: membership.organization.id,
         candidate_id: candidateId,
         job_id: jobId,
-        stage: stage ?? "new",
+        stage: stage ?? "applied",
         source: source ?? "manual",
         // Default to the creator so every application has an owner.
         assigned_recruiter_id:
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
       if (error.message?.includes("does not belong to this organization")) {
         return jsonError("That candidate or job could not be found.", 404);
       }
-      console.error("[api] application create failed:", error);
+      console.error("[api] application create failed:", describeDbError(error));
       return jsonError("Could not create the application.", 400);
     }
 

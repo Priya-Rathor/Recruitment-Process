@@ -15,6 +15,7 @@
 // =============================================================================
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptSecret, encryptSecret, isEncryptionConfigured } from "@/lib/integrations/crypto";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export const PROVIDERS = ["bolna", "calendar", "email", "llm", "n8n"] as const;
 export type Provider = (typeof PROVIDERS)[number];
@@ -126,7 +127,7 @@ export async function loadAllIntegrations(
     .eq("organization_id", organizationId);
 
   if (error) {
-    console.error("[integrations] load all failed:", error);
+    console.error("[integrations] load all failed:", describeDbError(error));
     return [];
   }
 
@@ -202,7 +203,7 @@ export async function saveCredentials({
   );
 
   if (error) {
-    console.error(`[integrations] saving ${provider} failed:`, error);
+    console.error(`[integrations] saving ${provider} failed:`, describeDbError(error));
     return { ok: false, code: "provider_error", error: "Could not save those credentials." };
   }
 
@@ -259,7 +260,7 @@ export async function recordTestResult({
     .eq("organization_id", organizationId)
     .eq("provider", provider);
 
-  if (error) console.error(`[integrations] recording ${provider} test failed:`, error);
+  if (error) console.error(`[integrations] recording ${provider} test failed:`, describeDbError(error));
 }
 
 /**
@@ -293,7 +294,7 @@ export async function clearCredentials({
     .eq("provider", provider);
 
   if (error) {
-    console.error(`[integrations] disconnecting ${provider} failed:`, error);
+    console.error(`[integrations] disconnecting ${provider} failed:`, describeDbError(error));
     return { ok: false, error: "Could not disconnect that integration." };
   }
 

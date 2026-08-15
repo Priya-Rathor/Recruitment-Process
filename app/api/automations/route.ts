@@ -5,6 +5,7 @@ import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant
 import { listAutomations, type AutomationRow } from "@/lib/automations/queries";
 import { requiredIntegrationsFor, validateRule } from "@/lib/automations/catalog";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /** GET /api/automations — every role may see what rules exist. */
 export async function GET() {
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       if ((error as { code?: string }).code === "23505") {
         return jsonError("An automation with that name already exists.", 409);
       }
-      console.error("[api] automation create failed:", error);
+      console.error("[api] automation create failed:", describeDbError(error));
       return jsonError("Could not create the automation.", 400);
     }
 

@@ -34,6 +34,7 @@ import type { IntakeStatus } from "@/lib/intake/status";
 import { logActivity, logAiCall } from "@/lib/activity/log";
 import { dispatch } from "@/lib/automations/engine";
 import type { Candidate } from "@/lib/types";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type ProcessOutcome = {
   status: IntakeStatus;
@@ -294,7 +295,7 @@ async function findMatchCandidates({
     // Returning [] would mean "no match", which creates a duplicate candidate.
     // Throwing turns a database blip into a per-file failure the recruiter can
     // retry — the safe direction when the alternative is silent data damage.
-    console.error("[intake] match lookup failed:", error);
+    console.error("[intake] match lookup failed:", describeDbError(error));
     throw new Error("Could not check for existing candidates.");
   }
 
@@ -357,7 +358,7 @@ async function createCandidateFromResume({
     .single();
 
   if (error) {
-    console.error("[intake] candidate create failed:", error);
+    console.error("[intake] candidate create failed:", describeDbError(error));
     return null;
   }
 
@@ -435,7 +436,7 @@ async function storeResumeForCandidate({
     });
 
   if (uploadError) {
-    console.error("[intake] resume upload failed:", uploadError);
+    console.error("[intake] resume upload failed:", describeDbError(uploadError));
     return { resumeId: null, storagePath: null };
   }
 
@@ -461,7 +462,7 @@ async function storeResumeForCandidate({
 
   if (error) {
     await supabase.storage.from(RESUME_BUCKET).remove([path]);
-    console.error("[intake] resume record failed:", error);
+    console.error("[intake] resume record failed:", describeDbError(error));
     return { resumeId: null, storagePath: null };
   }
 
@@ -483,7 +484,7 @@ async function storeResumeForCandidate({
   );
 
   if (proposalError) {
-    console.error("[intake] queuing parse result failed:", proposalError);
+    console.error("[intake] queuing parse result failed:", describeDbError(proposalError));
   }
 
   await logActivity({
@@ -532,7 +533,7 @@ async function parkFile({
   });
 
   if (error) {
-    console.error("[intake] parking conflicted file failed:", error);
+    console.error("[intake] parking conflicted file failed:", describeDbError(error));
     return null;
   }
   return path;
@@ -605,7 +606,7 @@ export async function ensureApplicationForCandidate({
         alreadyExisted: true,
       };
     }
-    console.error("[intake] application create failed:", error);
+    console.error("[intake] application create failed:", describeDbError(error));
     return { applicationId: null, alreadyExisted: false };
   }
 

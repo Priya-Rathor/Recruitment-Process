@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError, parsePagination } from "@/lib/api";
 import { requireCurrentUser, requireMembership } from "@/lib/tenant";
 import { listNotifications } from "@/lib/notifications/queries";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * GET /api/notifications — the caller's own notifications.
@@ -62,7 +63,7 @@ export async function PATCH() {
       .select("id");
 
     if (error) {
-      console.error("[api] mark all read failed:", error);
+      console.error("[api] mark all read failed:", describeDbError(error));
       return jsonError("Could not mark those as read.", 400);
     }
 

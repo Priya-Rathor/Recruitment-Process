@@ -6,6 +6,7 @@ import { getJobDetail } from "@/lib/jobs/queries";
 import { RESUME_UPLOAD_REJECTION, hashFile, isAllowedResumeUpload } from "@/lib/resumes/extract";
 import { processIntakeFile } from "@/lib/intake/process";
 import { listBatchItems } from "@/lib/intake/queries";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /** Mirrors the resumes bucket's file_size_limit. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .single();
 
       if (error) {
-        console.error("[api] intake item record failed:", error);
+        console.error("[api] intake item record failed:", describeDbError(error));
         return null;
       }
       return data as unknown as Record<string, unknown>;

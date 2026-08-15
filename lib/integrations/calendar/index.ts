@@ -38,6 +38,7 @@ import {
   revokeToken,
   type GoogleTokens,
 } from "@/lib/integrations/calendar/oauth";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export const CALENDAR_PROVIDER = "calendar" as const;
 
@@ -307,7 +308,7 @@ export async function createEvent(input: CreateEventInput): Promise<CreateEventR
 
     return { ok: true, eventId: payload.id, meetingUrl };
   } catch (error) {
-    console.error("[calendar] createEvent threw:", error);
+    console.error("[calendar] createEvent threw:", describeDbError(error));
     return {
       ok: false,
       reason: "failed",
@@ -345,7 +346,7 @@ export async function deleteEvent({
     // counts as success rather than as an error nobody can act on.
     return { ok: response.ok || response.status === 410 };
   } catch (error) {
-    console.error("[calendar] deleteEvent failed:", error);
+    console.error("[calendar] deleteEvent failed:", describeDbError(error));
     return { ok: false };
   }
 }
@@ -398,7 +399,7 @@ export async function test(
     await recordTestResult({ organizationId, provider: CALENDAR_PROVIDER, status: "connected" });
     return { ok: true, data: { status: "connected" } };
   } catch (error) {
-    console.error("[calendar] test failed:", error);
+    console.error("[calendar] test failed:", describeDbError(error));
     await recordTestResult({
       organizationId,
       provider: CALENDAR_PROVIDER,

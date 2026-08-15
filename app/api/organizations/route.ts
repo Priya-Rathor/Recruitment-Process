@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError, parsePagination } from "@/lib/api";
 import { requireCurrentUser, getUserMemberships } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * GET /api/organizations
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error("[api] create_organization_and_owner failed:", error);
+      console.error("[api] create_organization_and_owner failed:", describeDbError(error));
       return jsonError("Could not create the organization. Please try again.", 400);
     }
 

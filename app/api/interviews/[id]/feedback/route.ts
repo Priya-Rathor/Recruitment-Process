@@ -5,6 +5,7 @@ import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { parseFeedback } from "@/lib/interviews/feedback";
 import { dispatch } from "@/lib/automations/engine";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 // Submitting feedback completes the interview, which may run automations.
 export const maxDuration = 60;
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .single();
 
     if (error) {
-      console.error("[api] feedback submit failed:", error);
+      console.error("[api] feedback submit failed:", describeDbError(error));
       return jsonError("Could not save that feedback.", 400);
     }
 

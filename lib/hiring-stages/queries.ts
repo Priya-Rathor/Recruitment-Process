@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isMissingRelation } from "@/lib/dashboard/metrics";
 import { STAGES, type StageKey } from "@/lib/hiring-stages/catalog";
 import { emptyStageConfig, normalizeStageConfig, type StageConfig } from "@/lib/hiring-stages/config";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type JobHiringStage = {
   stage_key: StageKey;
@@ -44,7 +45,7 @@ export async function listJobStages({
     if (isMissingRelation(error)) {
       console.info("[hiring-stages] job_hiring_stages not created yet — run migration 0020.");
     } else {
-      console.error("[hiring-stages] load failed:", error);
+      console.error("[hiring-stages] load failed:", describeDbError(error));
     }
   }
 

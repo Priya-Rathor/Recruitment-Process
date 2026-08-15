@@ -21,6 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptSecret, encryptSecret, isEncryptionConfigured, maskSecret } from "@/lib/integrations/crypto";
 import { assertScriptIsCompliant, type CallScript } from "@/lib/screening/script";
 import { normalizeRetryPolicy, type RetryPolicy } from "@/lib/screening/retry";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export const BOLNA_PROVIDER = "bolna";
 
@@ -157,7 +158,7 @@ export async function connect({
   );
 
   if (error) {
-    console.error("[bolna] connect failed:", error);
+    console.error("[bolna] connect failed:", describeDbError(error));
     return { ok: false, error: "Could not save those credentials." };
   }
 
@@ -226,7 +227,7 @@ export async function test(organizationId: string): Promise<AdapterResult<{ stat
 
     return { ok: true, data: { status: "connected" } };
   } catch (error) {
-    console.error("[bolna] test failed:", error);
+    console.error("[bolna] test failed:", describeDbError(error));
     await admin
       .from("organization_integrations")
       .update({
@@ -260,7 +261,7 @@ export async function disconnect(organizationId: string): Promise<AdapterResult<
     .eq("provider", BOLNA_PROVIDER);
 
   if (error) {
-    console.error("[bolna] disconnect failed:", error);
+    console.error("[bolna] disconnect failed:", describeDbError(error));
     return { ok: false, error: "Could not disconnect Bolna." };
   }
 
@@ -365,7 +366,7 @@ export async function placeCall(
   } catch (error) {
     // The spec's test: "failure to reach Bolna degrades gracefully without
     // crashing the application record". Never throws.
-    console.error("[bolna] placeCall failed:", error);
+    console.error("[bolna] placeCall failed:", describeDbError(error));
     return { ok: false, error: "Could not reach Bolna. The call was not placed." };
   }
 }

@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { buildFieldComparisons } from "@/lib/resumes/review";
 import type { ParsedResume } from "@/lib/ai/parseResume";
 import type { Candidate } from "@/lib/types";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type PendingReview = {
   resumeId: string;
@@ -53,7 +54,7 @@ export async function listPendingReviews({
     .limit(20);
 
   if (error) {
-    console.error("[resumes] pending review lookup failed:", error);
+    console.error("[resumes] pending review lookup failed:", describeDbError(error));
     return [];
   }
 

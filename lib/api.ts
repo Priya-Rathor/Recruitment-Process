@@ -2,6 +2,7 @@
 // these so error shapes stay consistent across all 17 modules.
 import { NextResponse } from "next/server";
 import { TenantError } from "@/lib/tenant";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type ApiError = { error: string };
 
@@ -19,7 +20,7 @@ export function handleRouteError(error: unknown) {
   if (error instanceof TenantError) {
     return jsonError(error.message, error.status);
   }
-  console.error("[api] unhandled error:", error);
+  console.error("[api] unhandled error:", describeDbError(error));
   return jsonError("Something went wrong. Please try again.", 500);
 }
 

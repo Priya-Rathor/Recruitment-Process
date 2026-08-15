@@ -37,6 +37,23 @@ describe("describeDbError", () => {
     expect(describeDbError({ unexpected: true }).message).toContain("unexpected");
   });
 
+  it("reports the HTTP status when a HEAD request left no body", () => {
+    // A `head: true` count query gets no response body, so PostgREST's message
+    // never arrives. Without the status the log reads `{message: ""}`.
+    expect(describeDbError({ message: "", status: 400, statusText: "Bad Request" })).toEqual({
+      status: "400",
+      statusText: "Bad Request",
+    });
+  });
+
+  it("explains the empty error a failed count produces, rather than echoing it", () => {
+    // `{"message":""}` is exactly what supabase-js yields when a `head: true`
+    // request fails: there is no response body to read a message from.
+    const described = describeDbError({ message: "" });
+    expect(described.message).toContain("head");
+    expect(described.message).not.toBe('{"message":""}');
+  });
+
   it("passes a plain string through", () => {
     expect(describeDbError("network unreachable")).toEqual({ message: "network unreachable" });
   });

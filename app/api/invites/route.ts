@@ -4,6 +4,7 @@ import { handleRouteError, jsonError, parsePagination } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { isOrgRole } from "@/lib/types";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * GET /api/invites — Owner/Admin only. Lists invites for the caller's
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query;
     if (error) {
-      console.error("[api] invites list failed:", error);
+      console.error("[api] invites list failed:", describeDbError(error));
       return jsonError("Could not load invites.", 400);
     }
 
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[api] invite create failed:", error);
+      console.error("[api] invite create failed:", describeDbError(error));
       return jsonError("Could not create the invite.", 400);
     }
 

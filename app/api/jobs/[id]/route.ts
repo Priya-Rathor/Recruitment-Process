@@ -6,6 +6,7 @@ import { parseJobPayload } from "@/lib/jobs/validation";
 import { logActivity, logActivityBatch } from "@/lib/activity/log";
 import type { Job } from "@/lib/types";
 import { JOB_SELECT, replaceQuestions } from "../route";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /** GET /api/jobs/:id — with its question sets. Any member may view. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +23,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       .maybeSingle();
 
     if (error) {
-      console.error("[api] job fetch failed:", error);
+      console.error("[api] job fetch failed:", describeDbError(error));
       return jsonError("Could not load the job.", 400);
     }
     // A job in another organization is reported as not found — never confirm
@@ -124,7 +125,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (error.message?.includes("only close jobs they own")) {
         return jsonError("You can only close jobs you own.", 403);
       }
-      console.error("[api] job update failed:", error);
+      console.error("[api] job update failed:", describeDbError(error));
       return jsonError("Could not update the job.", 400);
     }
     if (!job) return jsonError("Job not found.", 404);
@@ -196,7 +197,7 @@ export async function DELETE(
       .maybeSingle();
 
     if (error) {
-      console.error("[api] job archive failed:", error);
+      console.error("[api] job archive failed:", describeDbError(error));
       return jsonError("Could not archive the job.", 400);
     }
     if (!data) return jsonError("Job not found, or already archived.", 404);

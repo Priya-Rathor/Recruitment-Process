@@ -4,6 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { parseEvaluationPayload } from "@/lib/applications/evaluationValidation";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * PATCH /api/applications/:id/evaluations/:entryId — correct an entry.
@@ -53,7 +54,7 @@ export async function PATCH(
       .maybeSingle();
 
     if (error) {
-      console.error("[api] evaluation update failed:", error);
+      console.error("[api] evaluation update failed:", describeDbError(error));
       return jsonError("Could not save this entry.", 400);
     }
     if (!data) return jsonError("That entry could not be found.", 404);

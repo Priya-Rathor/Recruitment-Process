@@ -9,6 +9,7 @@ import { flagsFromRows } from "@/lib/applications/effectiveStages";
 import { listJobStages } from "@/lib/hiring-stages/queries";
 import { countByStage } from "@/lib/applications/evaluations";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * POST /api/applications/:id/evaluations — log an evaluation entry.
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .single();
 
     if (error) {
-      console.error("[api] evaluation insert failed:", error);
+      console.error("[api] evaluation insert failed:", describeDbError(error));
       return jsonError("Could not save this entry.", 400);
     }
 

@@ -5,6 +5,7 @@ import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { getReport } from "@/lib/screening/reportQueries";
 import { applyCorrections, parseCorrections, type ReportValues } from "@/lib/screening/report";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * POST /api/screening-reports/:id/review — apply corrections and mark reviewed.
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (error.message?.includes("original AI extraction cannot be edited")) {
         return jsonError("The original AI extraction cannot be edited.", 400);
       }
-      console.error("[api] report review failed:", error);
+      console.error("[api] report review failed:", describeDbError(error));
       return jsonError("Could not save that review.", 400);
     }
 

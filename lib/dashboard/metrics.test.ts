@@ -166,9 +166,11 @@ describe("buildAttentionItems", () => {
     expect(buildAttentionItems(rows, NOW)).toEqual([]);
   });
 
-  it("labels a null stage as New rather than rendering 'null'", () => {
+  it("labels a null stage as the first pipeline stage, not 'null'", () => {
     const items = buildAttentionItems([{ id: "a", stage: null, updated_at: daysAgo(4) }], NOW);
-    expect(items[0].title).toBe("Application in New");
+    // "Applied" since the stage rename; the point of the test is that a null
+    // never reaches the UI as the word "null".
+    expect(items[0].title).toBe("Application in Applied");
   });
 
   it("handles an empty source list", () => {

@@ -5,6 +5,7 @@ import { requireMembership, requireRole } from "@/lib/tenant";
 import { isJobStatus, type Job } from "@/lib/types";
 import { parseJobPayload } from "@/lib/jobs/validation";
 import { logActivity } from "@/lib/activity/log";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * Columns returned by list/detail. Explicit so a new column is never leaked
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query;
     if (error) {
-      console.error("[api] jobs list failed:", error);
+      console.error("[api] jobs list failed:", describeDbError(error));
       return jsonError("Could not load jobs.", 400);
     }
 
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[api] job create failed:", error);
+      console.error("[api] job create failed:", describeDbError(error));
       return jsonError("Could not create the job.", 400);
     }
 
@@ -206,7 +207,7 @@ export async function replaceQuestions({
       .eq("organization_id", organizationId);
 
     if (deleteError) {
-      console.error(`[api] clearing ${table} failed:`, deleteError);
+      console.error(`[api] clearing ${table} failed:`, describeDbError(deleteError));
       return "Could not update the job's questions.";
     }
 
@@ -222,7 +223,7 @@ export async function replaceQuestions({
     );
 
     if (insertError) {
-      console.error(`[api] inserting ${table} failed:`, insertError);
+      console.error(`[api] inserting ${table} failed:`, describeDbError(insertError));
       return "Could not save the job's questions.";
     }
   }

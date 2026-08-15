@@ -11,6 +11,7 @@ import {
   type RetryPolicy,
 } from "@/lib/screening/retry";
 import { getStatus, placeCall } from "@/lib/integrations/bolna";
+import { describeDbError } from "@/lib/supabase/errors";
 
 export type ScreeningCall = {
   id: string;
@@ -54,7 +55,7 @@ export async function listCallsForApplication({
     .order("attempt_number", { ascending: false });
 
   if (error) {
-    console.error("[screening] list for application failed:", error);
+    console.error("[screening] list for application failed:", describeDbError(error));
     return [];
   }
   return (data ?? []) as unknown as ScreeningCall[];
@@ -90,7 +91,7 @@ export async function listCalls({
 
   const { data, error } = await query;
   if (error) {
-    console.error("[screening] list failed:", error);
+    console.error("[screening] list failed:", describeDbError(error));
     return { calls: [], failed: true };
   }
 
@@ -264,7 +265,7 @@ export async function startScreeningCall({
     .single();
 
   if (insertError || !created) {
-    console.error("[screening] creating call record failed:", insertError);
+    console.error("[screening] creating call record failed:", describeDbError(insertError));
     return { ok: false, error: "Could not start the call." };
   }
 

@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logActivity } from "@/lib/activity/log";
 import { notify } from "@/lib/notifications/notify";
 import { isConsentRefusal } from "@/lib/screening/script";
+import { describeDbError } from "@/lib/supabase/errors";
 
 /**
  * POST /api/webhooks/bolna — call outcome, transcript and recording.
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
     .eq("organization_id", call.organization_id);
 
   if (error) {
-    console.error("[bolna webhook] update failed:", error);
+    console.error("[bolna webhook] update failed:", describeDbError(error));
     // 500 so the provider retries — losing a transcript silently is worse.
     return NextResponse.json({ error: "Could not record the outcome." }, { status: 500 });
   }
@@ -255,7 +256,7 @@ async function isValidSignature(
     }
     return mismatch === 0;
   } catch (error) {
-    console.error("[bolna webhook] signature check failed:", error);
+    console.error("[bolna webhook] signature check failed:", describeDbError(error));
     return false;
   }
 }
