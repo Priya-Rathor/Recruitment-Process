@@ -1,6 +1,7 @@
 // Server-side application queries. One tenant-scoped place for both pages and
 // route handlers.
 import { createClient } from "@/lib/supabase/server";
+import { describeDbError, isSchemaOutOfDate } from "@/lib/supabase/errors";
 import {
   isApplicationStage,
   stageSortKey,
@@ -84,7 +85,13 @@ export async function listApplications({
   viewerId: string;
   limit?: number;
   offset?: number;
-}): Promise<{ applications: ApplicationWithContext[]; total: number; failed: boolean }> {
+}): Promise<{
+  applications: ApplicationWithContext[];
+  total: number;
+  failed: boolean;
+  /** Set when the failure is a pending migration rather than a real fault. */
+  schemaOutOfDate?: boolean;
+}> {
   const supabase = await createClient();
 
   let query = supabase
@@ -124,8 +131,19 @@ export async function listApplications({
     .range(offset, offset + limit - 1);
 
   if (error) {
-    console.error("[applications] list failed:", error);
-    return { applications: [], total: 0, failed: true };
+    // describeDbError, not the raw object: the raw one serialises to `{}` in
+    // the dev overlay, which is how a missing column reached a human as an
+    // empty error.
+    console.error("[applications] list failed:", describeDbError(error));
+    return {
+      applications: [],
+      total: 0,
+      failed: true,
+      // Still a failure — no fake rows, no fake zero — but one the UI can
+      // explain, because a pending migration has an obvious fix and a timeout
+      // does not.
+      schemaOutOfDate: isSchemaOutOfDate(error),
+    };
   }
 
   const applications = ((data ?? []) as unknown as EmbeddedRow[]).map(flatten);

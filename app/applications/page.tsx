@@ -9,6 +9,7 @@ import { daysSince } from "@/lib/time";
 import { MatchScore, StageBadge } from "./StageBadge";
 import { ApplicationFilters } from "./ApplicationFilters";
 import { listJobsWithHealth } from "@/lib/jobs/queries";
+import { SCHEMA_OUT_OF_DATE_MESSAGE } from "@/lib/supabase/errors";
 
 export const metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ async function ApplicationsTable({ searchParams }: { searchParams: Record<string
   const membership = await requireMembershipOrRedirect();
   const params = new URLSearchParams(searchParams);
 
-  const [{ applications, total, failed }, { jobs }] = await Promise.all([
+  const [{ applications, total, failed, schemaOutOfDate }, { jobs }] = await Promise.all([
     listApplications({
       organizationId: membership.organization.id,
       filters: applicationFiltersFromParams(params),
@@ -33,7 +34,14 @@ async function ApplicationsTable({ searchParams }: { searchParams: Record<string
     }),
   ]);
 
-  if (failed) return <ErrorState message="Couldn't load applications." />;
+  if (failed) {
+    return (
+      <ErrorState
+        headline={schemaOutOfDate ? "Database migration pending" : "Couldn't load this"}
+        message={schemaOutOfDate ? SCHEMA_OUT_OF_DATE_MESSAGE : "Couldn't load applications."}
+      />
+    );
+  }
 
   const hasFilters = Array.from(params.keys()).length > 0;
 
