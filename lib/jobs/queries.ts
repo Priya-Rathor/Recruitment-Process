@@ -4,7 +4,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { evaluateJobHealth, type JobHealth } from "@/lib/jobs/health";
 import type { Job, JobQuestion, JobStatus } from "@/lib/types";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export const JOB_COLUMNS =
   "id, organization_id, client_id, title, description, experience_min, experience_max, " +
@@ -63,7 +63,7 @@ export async function listJobsWithHealth({
 
   const { data, error } = await query;
   if (error) {
-    console.error("[jobs] list failed:", describeDbError(error));
+    console.error(`[jobs] list failed: ${formatDbError(error)}`);
     return { jobs: [], failed: true };
   }
 

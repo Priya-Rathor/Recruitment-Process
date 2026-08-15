@@ -11,7 +11,7 @@ import { isApplicationStage } from "@/lib/applications/stages";
 import { isCandidateSource, type Application } from "@/lib/types";
 import { dispatch } from "@/lib/automations/engine";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       if (error.message?.includes("does not belong to this organization")) {
         return jsonError("That candidate or job could not be found.", 404);
       }
-      console.error("[api] application create failed:", describeDbError(error));
+      console.error(`[api] application create failed: ${formatDbError(error)}`);
       return jsonError("Could not create the application.", 400);
     }
 

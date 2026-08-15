@@ -21,7 +21,7 @@ import type {
   ScreeningCallRow,
   StageDurationRow,
 } from "@/lib/analytics/metrics";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /**
  * Row cap per query.
@@ -114,7 +114,7 @@ export async function fetchFunnelRows({
   const { data, error } = await query;
 
   if (error) {
-    console.error("[analytics] funnel fetch failed:", describeDbError(error));
+    console.error(`[analytics] funnel fetch failed: ${formatDbError(error)}`);
     return { rows: [], failed: true, truncated: false };
   }
 
@@ -153,7 +153,7 @@ export async function fetchStageDurations({
   const { data, error } = await query;
 
   if (error) {
-    console.error("[analytics] stage durations fetch failed:", describeDbError(error));
+    console.error(`[analytics] stage durations fetch failed: ${formatDbError(error)}`);
     return { rows: [], failed: true, truncated: false };
   }
 
@@ -192,7 +192,7 @@ export async function fetchScreeningRows({
   const { data, error } = await query;
 
   if (error) {
-    console.error("[analytics] screening fetch failed:", describeDbError(error));
+    console.error(`[analytics] screening fetch failed: ${formatDbError(error)}`);
     return { rows: [], failed: true, truncated: false };
   }
 
@@ -215,7 +215,7 @@ export async function fetchInterviewRows({
     .limit(ROW_CAP);
 
   if (error) {
-    console.error("[analytics] interview fetch failed:", describeDbError(error));
+    console.error(`[analytics] interview fetch failed: ${formatDbError(error)}`);
     return { rows: [], failed: true, truncated: false };
   }
 
@@ -251,7 +251,7 @@ export async function fetchAutomationRuns({
   if (error) {
     // Distinct from an empty result: Module 13's table exists, so an error here
     // is a real problem rather than a not-built-yet state.
-    console.error("[analytics] automation runs fetch failed:", describeDbError(error));
+    console.error(`[analytics] automation runs fetch failed: ${formatDbError(error)}`);
     return { rows: [], failed: true, truncated: false };
   }
 
@@ -307,7 +307,7 @@ export async function fetchRecruiterPerformance({
     .limit(500);
 
   if (error) {
-    console.error("[analytics] recruiter performance fetch failed:", describeDbError(error));
+    console.error(`[analytics] recruiter performance fetch failed: ${formatDbError(error)}`);
     return { rows: [], failed: true, truncated: false };
   }
 
@@ -345,7 +345,7 @@ export async function fetchClientPerformance({
     .limit(500);
 
   if (error) {
-    console.error("[analytics] client performance fetch failed:", describeDbError(error));
+    console.error(`[analytics] client performance fetch failed: ${formatDbError(error)}`);
     return { rows: [], failed: true, truncated: false };
   }
 
@@ -393,7 +393,7 @@ export async function fetchJobPerformance({
   const { data, error } = await query;
 
   if (error) {
-    console.error("[analytics] job performance fetch failed:", describeDbError(error));
+    console.error(`[analytics] job performance fetch failed: ${formatDbError(error)}`);
     return { rows: [], failed: true, truncated: false };
   }
 

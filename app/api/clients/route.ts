@@ -5,7 +5,7 @@ import { requireMembership, requireRole } from "@/lib/tenant";
 import { listClients, parseClientPayload } from "@/lib/clients/queries";
 import { requireCurrentUser } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /** GET /api/clients — viewable by every role including Viewer. */
 export async function GET(request: NextRequest) {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       if (error.code === "23505") {
         return jsonError("A client with that name already exists.", 409);
       }
-      console.error("[api] client create failed:", describeDbError(error));
+      console.error(`[api] client create failed: ${formatDbError(error)}`);
       return jsonError("Could not create that client.", 400);
     }
 

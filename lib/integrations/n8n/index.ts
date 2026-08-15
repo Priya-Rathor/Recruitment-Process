@@ -29,7 +29,7 @@ import {
   type BaseStatus,
   type IntegrationStatus,
 } from "@/lib/integrations/store";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export const N8N_PROVIDER = "n8n" as const;
 
@@ -144,7 +144,7 @@ export async function test(
     await recordTestResult({ organizationId, provider: N8N_PROVIDER, status: "connected" });
     return { ok: true, data: { status: "connected" } };
   } catch (error) {
-    console.error("[n8n] test failed:", describeDbError(error));
+    console.error(`[n8n] test failed: ${formatDbError(error)}`);
     await recordTestResult({
       organizationId,
       provider: N8N_PROVIDER,

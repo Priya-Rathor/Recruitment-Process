@@ -6,7 +6,7 @@ import { parseCandidatePayload } from "@/lib/candidates/validation";
 import { CANDIDATE_COLUMNS, getCandidate, getCandidateDuplicates } from "@/lib/candidates/queries";
 import type { Candidate } from "@/lib/types";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /** GET /api/candidates/:id — any member may view. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -67,7 +67,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (error.message?.includes("candidates_contactable")) {
         return jsonError("A candidate needs an email address or a phone number.", 400);
       }
-      console.error("[api] candidate update failed:", describeDbError(error));
+      console.error(`[api] candidate update failed: ${formatDbError(error)}`);
       return jsonError("Could not update the candidate.", 400);
     }
     if (!data) return jsonError("Candidate not found.", 404);
@@ -119,7 +119,7 @@ export async function DELETE(
       .maybeSingle();
 
     if (error) {
-      console.error("[api] candidate archive failed:", describeDbError(error));
+      console.error(`[api] candidate archive failed: ${formatDbError(error)}`);
       return jsonError("Could not archive the candidate.", 400);
     }
     if (!data) return jsonError("Candidate not found, or already archived.", 404);

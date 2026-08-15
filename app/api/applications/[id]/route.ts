@@ -12,7 +12,7 @@ import {
   type ApplicationStage,
 } from "@/lib/applications/stages";
 import type { Application } from "@/lib/types";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -133,7 +133,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .maybeSingle();
 
     if (error) {
-      console.error("[api] application update failed:", describeDbError(error));
+      console.error(`[api] application update failed: ${formatDbError(error)}`);
       return jsonError("Could not update the application.", 400);
     }
     if (!data) return jsonError("Application not found.", 404);
@@ -262,7 +262,7 @@ export async function DELETE(
       .maybeSingle();
 
     if (error) {
-      console.error("[api] application archive failed:", describeDbError(error));
+      console.error(`[api] application archive failed: ${formatDbError(error)}`);
       return jsonError("Could not archive the application.", 400);
     }
     if (!data) return jsonError("Application not found, or already archived.", 404);

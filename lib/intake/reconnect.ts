@@ -29,7 +29,7 @@ import { ensureApplicationForCandidate } from "@/lib/intake/process";
 import type { IntakeStatus } from "@/lib/intake/status";
 import type { ParsedResume } from "@/lib/ai/parseResume";
 import type { Candidate } from "@/lib/types";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type CleanupAction = "deleted" | "archived" | "kept";
 
@@ -211,7 +211,7 @@ export async function reconnectIntakeItem({
       .eq("id", item.application_id);
 
     if (error) {
-      console.error("[intake] removing the wrong application failed:", describeDbError(error));
+      console.error(`[intake] removing the wrong application failed: ${formatDbError(error)}`);
       return {
         ok: false,
         error: "Could not remove the application created against the wrong candidate.",
@@ -291,7 +291,7 @@ export async function reconnectIntakeItem({
     .eq("id", item.id);
 
   if (updateError) {
-    console.error("[intake] recording the reconnection failed:", describeDbError(updateError));
+    console.error(`[intake] recording the reconnection failed: ${formatDbError(updateError)}`);
     return { ok: false, error: "Could not record the reconnection.", status: 400 };
   }
 
@@ -404,7 +404,7 @@ async function repointResume({
       // Not fatal. The row is what the product reads; a file left at the old
       // path is still readable and still the right tenant's. Failing the whole
       // reconnection over a rename would be worse than a tidy-up debt.
-      console.error("[intake] moving the resume object failed:", describeDbError(moveError));
+      console.error(`[intake] moving the resume object failed: ${formatDbError(moveError)}`);
     }
   }
 
@@ -419,7 +419,7 @@ async function repointResume({
       .eq("id", row.id);
 
     if (error) {
-      console.error("[intake] re-pointing the resume failed:", describeDbError(error));
+      console.error(`[intake] re-pointing the resume failed: ${formatDbError(error)}`);
       return { resumeId: row.id, storagePath: currentPath };
     }
     return { resumeId: row.id, storagePath: movedPath };
@@ -443,7 +443,7 @@ async function repointResume({
     .single();
 
   if (error) {
-    console.error("[intake] creating the resume row failed:", describeDbError(error));
+    console.error(`[intake] creating the resume row failed: ${formatDbError(error)}`);
     return { resumeId: null, storagePath: movedPath };
   }
 
@@ -485,7 +485,7 @@ async function queueProposal({
     { onConflict: "resume_id" }
   );
 
-  if (error) console.error("[intake] queuing the proposal failed:", describeDbError(error));
+  if (error) console.error(`[intake] queuing the proposal failed: ${formatDbError(error)}`);
 
   return buildFieldComparisons(candidate, parsed).filter(
     (comparison) => comparison.status === "conflict"
@@ -597,7 +597,7 @@ async function cleanUpAutoCandidate({
     // The 0019 trigger refuses a delete that would cascade to a resume. Falling
     // through to archive is the right response: something is still attached,
     // which is exactly the case archiving exists for.
-    console.error("[intake] deleting the orphan failed, archiving instead:", describeDbError(error));
+    console.error(`[intake] deleting the orphan failed, archiving instead: ${formatDbError(error)}`);
   }
 
   const { error: archiveError } = await supabase
@@ -607,7 +607,7 @@ async function cleanUpAutoCandidate({
     .eq("id", previousCandidateId);
 
   if (archiveError) {
-    console.error("[intake] archiving the orphan failed:", describeDbError(archiveError));
+    console.error(`[intake] archiving the orphan failed: ${formatDbError(archiveError)}`);
     return { action: "kept", removedName: orphan.name };
   }
 

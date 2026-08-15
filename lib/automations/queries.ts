@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Action, Condition, TriggerType } from "@/lib/automations/catalog";
 import type { ActionResult } from "@/lib/automations/engine";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type AutomationRow = {
   id: string;
@@ -70,7 +70,7 @@ export async function listAutomations(organizationId: string): Promise<{
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("[automations] list failed:", describeDbError(error));
+    console.error(`[automations] list failed: ${formatDbError(error)}`);
     return { automations: [], failed: true };
   }
 
@@ -185,7 +185,7 @@ export async function listRuns({
 
   const { data, error } = await query;
   if (error) {
-    console.error("[automations] run history failed:", describeDbError(error));
+    console.error(`[automations] run history failed: ${formatDbError(error)}`);
     return { runs: [], failed: true };
   }
 

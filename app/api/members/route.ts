@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError, parsePagination } from "@/lib/api";
 import { requireMembership } from "@/lib/tenant";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /**
  * GET /api/members
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query;
     if (error) {
-      console.error("[api] members list failed:", describeDbError(error));
+      console.error(`[api] members list failed: ${formatDbError(error)}`);
       return jsonError("Could not load team members.", 400);
     }
 

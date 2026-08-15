@@ -5,7 +5,7 @@ import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant
 import { parseStagesPayload } from "@/lib/hiring-stages/config";
 import { listJobStages } from "@/lib/hiring-stages/queries";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /**
  * GET /api/jobs/:id/hiring-stages — all four stages, configured or not.
@@ -95,7 +95,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (error.message?.includes("does not belong to this organization")) {
         return jsonError("Job not found.", 404);
       }
-      console.error("[api] saving hiring stages failed:", describeDbError(error));
+      console.error(`[api] saving hiring stages failed: ${formatDbError(error)}`);
       return jsonError("Could not save the hiring stages.", 400);
     }
 

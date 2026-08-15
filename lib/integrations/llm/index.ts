@@ -34,7 +34,7 @@ import {
   type BaseStatus,
   type IntegrationStatus,
 } from "@/lib/integrations/store";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export const LLM_PROVIDER = "llm" as const;
 
@@ -148,7 +148,7 @@ export async function test(
 
     return { ok: true, data: { status: "connected" } };
   } catch (error) {
-    console.error("[llm] test failed:", describeDbError(error));
+    console.error(`[llm] test failed: ${formatDbError(error)}`);
     await recordTestResult({
       organizationId,
       provider: LLM_PROVIDER,

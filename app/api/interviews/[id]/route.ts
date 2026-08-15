@@ -6,7 +6,7 @@ import { getInterview } from "@/lib/interviews/queries";
 import { INTERVIEW_STATUSES } from "@/lib/interviews/feedback";
 import { requireCurrentUser } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /** GET /api/interviews/:id — with feedback. Viewable by all roles. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -102,7 +102,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .maybeSingle();
 
     if (error) {
-      console.error("[api] interview update failed:", describeDbError(error));
+      console.error(`[api] interview update failed: ${formatDbError(error)}`);
       return jsonError("Could not update that interview.", 400);
     }
     if (!data) return jsonError("Interview not found.", 404);

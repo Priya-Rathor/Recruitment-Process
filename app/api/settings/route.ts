@@ -4,7 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { getOrganizationSettings, parseSettingsPayload } from "@/lib/settings/queries";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /**
  * GET /api/settings — the organization's operating defaults.
@@ -68,7 +68,7 @@ export async function PATCH(request: NextRequest) {
       if (error.message?.includes("not an active member")) {
         return jsonError("That recruiter isn't an active member of this team.", 400);
       }
-      console.error("[api] settings update failed:", describeDbError(error));
+      console.error(`[api] settings update failed: ${formatDbError(error)}`);
       return jsonError("Could not save those settings.", 400);
     }
 

@@ -42,7 +42,7 @@ import { canTransition, isApplicationStage, type ApplicationStage } from "@/lib/
 import { logActivity } from "@/lib/activity/log";
 import { notify, notifyMany } from "@/lib/notifications/notify";
 import { findOwnersAndAdmins } from "@/lib/notifications/queries";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type StoredAutomation = {
   id: string;
@@ -503,7 +503,7 @@ async function executeAction({
         return { action: action.type, status: "failed", detail: "Unknown action." };
     }
   } catch (error) {
-    console.error("[automation] action threw:", describeDbError(error));
+    console.error(`[automation] action threw: ${formatDbError(error)}`);
     return { action: action.type, status: "failed", detail: "The action failed unexpectedly." };
   }
 }
@@ -545,7 +545,7 @@ export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
 
     const { data, error } = await query;
     if (error) {
-      console.error("[automation] loading rules failed:", describeDbError(error));
+      console.error(`[automation] loading rules failed: ${formatDbError(error)}`);
       return [];
     }
 
@@ -576,7 +576,7 @@ export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
 
     return outcomes;
   } catch (error) {
-    console.error("[automation] dispatch failed:", describeDbError(error));
+    console.error(`[automation] dispatch failed: ${formatDbError(error)}`);
     return [];
   }
 }

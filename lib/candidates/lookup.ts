@@ -10,7 +10,7 @@
 // =============================================================================
 import { createClient } from "@/lib/supabase/server";
 import { normalizeEmail, normalizePhone } from "@/lib/candidates/dedupe";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type CandidateLookupResult = {
   id: string;
@@ -87,7 +87,7 @@ export async function lookupCandidates({
     .limit(limit);
 
   if (error) {
-    console.error("[candidates] lookup failed:", describeDbError(error));
+    console.error(`[candidates] lookup failed: ${formatDbError(error)}`);
     return [];
   }
 

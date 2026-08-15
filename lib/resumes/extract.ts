@@ -14,7 +14,7 @@
 // =============================================================================
 
 import { RESUME_UPLOAD_REJECTION } from "@/lib/resumes/uploadPolicy";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type ExtractionResult =
   | { ok: true; text: string; characters: number; truncated: boolean }
@@ -150,7 +150,7 @@ export async function extractResumeText({
       raw = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
     }
   } catch (error) {
-    console.error(`[resumes] extraction failed for ${kind}:`, describeDbError(error));
+    console.error(`[resumes] extraction failed for ${kind}: ${formatDbError(error)}`);
     return {
       ok: false,
       reason: "corrupt_file",

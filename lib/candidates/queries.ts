@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { escapeFilterText, type CandidateFilters } from "@/lib/candidates/filters";
 import { findDuplicates, normalizeEmail, normalizePhone, type DuplicateMatch } from "@/lib/candidates/dedupe";
 import type { Candidate } from "@/lib/types";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export const CANDIDATE_COLUMNS =
   "id, organization_id, name, email, phone, email_normalized, phone_normalized, location, " +
@@ -89,7 +89,7 @@ export async function listCandidates({
     .range(offset, offset + limit - 1);
 
   if (error) {
-    console.error("[candidates] list failed:", describeDbError(error));
+    console.error(`[candidates] list failed: ${formatDbError(error)}`);
     return { candidates: [], total: 0, failed: true };
   }
 
@@ -161,7 +161,7 @@ export async function findDuplicateCandidates({
   if (error) {
     // A failed duplicate check must not block intake — the recruiter can still
     // create the candidate, and the check is advisory rather than a gate.
-    console.error("[candidates] duplicate lookup failed:", describeDbError(error));
+    console.error(`[candidates] duplicate lookup failed: ${formatDbError(error)}`);
     return [];
   }
 

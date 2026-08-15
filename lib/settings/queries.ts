@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isApplicationStage, type ApplicationStage } from "@/lib/applications/stages";
 import { MAX_ALLOWED_ATTEMPTS, MIN_ALLOWED_DELAY_MINUTES } from "@/lib/screening/retry";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type ScreeningSettings = {
   maxAttempts: number;
@@ -88,7 +88,7 @@ export async function getOrganizationSettings(
   };
 
   if (error) {
-    console.error("[settings] read failed:", describeDbError(error));
+    console.error(`[settings] read failed: ${formatDbError(error)}`);
     return { settings: fallback, failed: true, exists: false };
   }
 

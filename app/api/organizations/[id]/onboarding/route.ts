@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireRole } from "@/lib/tenant";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /**
  * POST /api/organizations/:id/onboarding
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .maybeSingle();
 
     if (error) {
-      console.error("[api] onboarding save failed:", describeDbError(error));
+      console.error(`[api] onboarding save failed: ${formatDbError(error)}`);
       return jsonError("Could not save your onboarding answers.", 400);
     }
     if (!data) return jsonError("Organization not found.", 404);

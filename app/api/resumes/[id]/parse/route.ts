@@ -7,7 +7,7 @@ import { getResume, RESUME_BUCKET } from "@/lib/resumes/queries";
 import { parseResume } from "@/lib/ai/parseResume";
 import { logActivity, logAiCall } from "@/lib/activity/log";
 import { requireCurrentUser } from "@/lib/tenant";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 // Extraction plus a large AI call; the default serverless budget is too short.
 export const maxDuration = 120;
@@ -57,7 +57,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       .download(resume.file_url);
 
     if (downloadError || !file) {
-      console.error("[api] resume download failed:", describeDbError(downloadError));
+      console.error(`[api] resume download failed: ${formatDbError(downloadError)}`);
       return fail("Could not read the stored file.", 400);
     }
 
@@ -121,7 +121,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     );
 
     if (resultError) {
-      console.error("[api] storing parse result failed:", describeDbError(resultError));
+      console.error(`[api] storing parse result failed: ${formatDbError(resultError)}`);
       return fail("Could not save the parsed result.", 400);
     }
 

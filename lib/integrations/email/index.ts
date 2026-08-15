@@ -25,7 +25,7 @@ import {
   isEncryptionConfigured,
   maskSecret,
 } from "@/lib/integrations/crypto";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export const EMAIL_PROVIDER = "email";
 
@@ -164,7 +164,7 @@ export async function connect({
   );
 
   if (error) {
-    console.error("[email] connect failed:", describeDbError(error));
+    console.error(`[email] connect failed: ${formatDbError(error)}`);
     return { ok: false, error: "Could not save those credentials." };
   }
 
@@ -233,7 +233,7 @@ export async function test(
 
     return { ok: true, data: { status: "connected" } };
   } catch (error) {
-    console.error("[email] test failed:", describeDbError(error));
+    console.error(`[email] test failed: ${formatDbError(error)}`);
     await admin
       .from("organization_integrations")
       .update({
@@ -266,7 +266,7 @@ export async function disconnect(organizationId: string): Promise<AdapterResult<
     .eq("provider", EMAIL_PROVIDER);
 
   if (error) {
-    console.error("[email] disconnect failed:", describeDbError(error));
+    console.error(`[email] disconnect failed: ${formatDbError(error)}`);
     return { ok: false, error: "Could not disconnect email." };
   }
 
@@ -360,7 +360,7 @@ export async function sendEmail({
     const payload = (await response.json()) as { id?: string };
     return { ok: true, providerMessageId: payload.id ?? "unknown" };
   } catch (error) {
-    console.error("[email] send failed:", describeDbError(error));
+    console.error(`[email] send failed: ${formatDbError(error)}`);
     return { ok: false, skipped: false, error: "Could not reach the email provider." };
   }
 }

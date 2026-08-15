@@ -6,7 +6,7 @@ import { getCandidate } from "@/lib/candidates/queries";
 import { detectFileKind, hashFile } from "@/lib/resumes/extract";
 import { listResumes, RESUME_BUCKET } from "@/lib/resumes/queries";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /** Mirrors the bucket's file_size_limit. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
 
     if (uploadError) {
-      console.error("[api] resume upload failed:", describeDbError(uploadError));
+      console.error(`[api] resume upload failed: ${formatDbError(uploadError)}`);
       return jsonError(
         "Could not store that file. If this keeps happening, check that the resumes storage bucket exists.",
         400
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error) {
       // Roll the object back so a failed insert doesn't leave an orphan file.
       await supabase.storage.from(RESUME_BUCKET).remove([path]);
-      console.error("[api] resume record failed:", describeDbError(error));
+      console.error(`[api] resume record failed: ${formatDbError(error)}`);
       return jsonError("Could not save that resume.", 400);
     }
 

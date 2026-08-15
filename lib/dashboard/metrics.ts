@@ -22,7 +22,7 @@ import {
   type ApplicationStage,
 } from "@/lib/applications/stages";
 import type { OrgRole } from "@/lib/types";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /** Which module will make a currently-unavailable metric work. */
 export type SourceModule = 4 | 5 | 8 | 11 | 13;
@@ -144,7 +144,7 @@ async function safeCount(
     if (error) {
       const typed = error as { code?: string; message?: string };
       if (isMissingRelation(typed)) return { status: "pending", module };
-      console.error(`[dashboard] count on ${table} failed:`, describeDbError(error));
+      console.error(`[dashboard] count on ${table} failed: ${formatDbError(error)}`);
       return { status: "error" };
     }
     return { status: "ok", value: count ?? 0 };

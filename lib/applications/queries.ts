@@ -1,7 +1,7 @@
 // Server-side application queries. One tenant-scoped place for both pages and
 // route handlers.
 import { createClient } from "@/lib/supabase/server";
-import { describeDbError, isSchemaOutOfDate } from "@/lib/supabase/errors";
+import { formatDbError, isSchemaOutOfDate } from "@/lib/supabase/errors";
 import {
   isApplicationStage,
   stageSortKey,
@@ -131,10 +131,10 @@ export async function listApplications({
     .range(offset, offset + limit - 1);
 
   if (error) {
-    // describeDbError, not the raw object: the raw one serialises to `{}` in
-    // the dev overlay, which is how a missing column reached a human as an
-    // empty error.
-    console.error("[applications] list failed:", describeDbError(error));
+    // Interpolated into the STRING, not passed as a second argument: Next's dev
+    // overlay serialises an object argument to `{}`, which is how a perfectly
+    // clear "column does not exist" reached a human as an empty error twice.
+    console.error(`[applications] list failed: ${formatDbError(error)}`);
     return {
       applications: [],
       total: 0,

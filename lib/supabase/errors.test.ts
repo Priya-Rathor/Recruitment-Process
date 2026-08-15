@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeDbError, isSchemaOutOfDate } from "@/lib/supabase/errors";
+import { describeDbError, formatDbError, isSchemaOutOfDate } from "@/lib/supabase/errors";
 
 describe("describeDbError", () => {
   /**
@@ -56,6 +56,48 @@ describe("describeDbError", () => {
 
   it("passes a plain string through", () => {
     expect(describeDbError("network unreachable")).toEqual({ message: "network unreachable" });
+  });
+});
+
+describe("formatDbError", () => {
+  /**
+   * The reason this exists at all: Next's dev overlay serialises a second
+   * console.error argument to `{}`, so the object form told a developer
+   * looking at the overlay nothing. A string survives.
+   */
+  it("returns a string, always", () => {
+    for (const input of [null, undefined, {}, "text", { code: "42703" }, new Error("x")]) {
+      expect(typeof formatDbError(input), String(input)).toBe("string");
+      expect(formatDbError(input).length, String(input)).toBeGreaterThan(0);
+    }
+  });
+
+  it("leads with the code, then the message", () => {
+    expect(
+      formatDbError({
+        code: "42703",
+        message: "column applications.rejected_at_stage does not exist",
+      })
+    ).toBe("42703: column applications.rejected_at_stage does not exist");
+  });
+
+  it("joins details and hint onto the message", () => {
+    expect(
+      formatDbError({ code: "23505", message: "duplicate", details: "Key exists", hint: "Upsert" })
+    ).toBe("23505: duplicate — Key exists — Upsert");
+  });
+
+  it("appends the HTTP status when that is all there is", () => {
+    expect(formatDbError({ status: 400 })).toBe("no detail (HTTP 400)");
+  });
+
+  it("never renders as an empty object or an empty string", () => {
+    // The two exact strings that appeared in the overlay before this existed.
+    for (const input of [{}, { message: "" }, null]) {
+      const formatted = formatDbError(input);
+      expect(formatted).not.toBe("{}");
+      expect(formatted).not.toBe("");
+    }
   });
 });
 

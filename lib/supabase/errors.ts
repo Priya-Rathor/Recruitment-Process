@@ -88,6 +88,31 @@ export function isSchemaOutOfDate(error: unknown): boolean {
   );
 }
 
+/**
+ * The same description as ONE STRING, for `console.error`.
+ *
+ * WHY A STRING AND NOT THE OBJECT: Next's dev overlay renders server-side
+ * console output by serialising each argument, and a plain object arrives as
+ * `{}`. So `console.error(`failed: ${formatDbError(error)}`)` reads perfectly in
+ * a terminal and tells a developer looking at the overlay — which is where they
+ * actually look — precisely nothing. A string survives intact.
+ *
+ * Every call site therefore interpolates this rather than passing a second
+ * argument.
+ */
+export function formatDbError(error: unknown): string {
+  const described = describeDbError(error);
+
+  const code = described.code ? `${described.code}: ` : "";
+  const parts = [described.message, described.details, described.hint]
+    .filter((part): part is string => Boolean(part))
+    .join(" — ");
+
+  const status = described.status ? ` (HTTP ${described.status})` : "";
+
+  return `${code}${parts || "no detail"}${status}`;
+}
+
 /** The message a user sees when the schema is behind the code. */
 export const SCHEMA_OUT_OF_DATE_MESSAGE =
   "This page needs a database migration that hasn't been applied yet. " +

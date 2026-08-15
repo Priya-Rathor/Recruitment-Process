@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { scoreDeterministic, type MatchFinding } from "@/lib/matching/deterministic";
 import { combineMatch, type CombinedMatch } from "@/lib/matching/score";
 import { matchCandidateToJob } from "@/lib/ai/matchCandidateToJob";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type StoredMatch = {
   id: string;
@@ -182,7 +182,7 @@ export async function calculateAndStoreMatch({
   );
 
   if (error) {
-    console.error("[matching] storing match failed:", describeDbError(error));
+    console.error(`[matching] storing match failed: ${formatDbError(error)}`);
     return { ok: false, error: "Could not save the match result." };
   }
 

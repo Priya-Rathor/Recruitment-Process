@@ -5,7 +5,7 @@ import { requireMembership, requireRole } from "@/lib/tenant";
 import { getClient, getClientActivity, parseClientPayload } from "@/lib/clients/queries";
 import { requireCurrentUser } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /** GET /api/clients/:id — with activity. Viewable by every role. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (error) {
       if (error.code === "23505") return jsonError("A client with that name already exists.", 409);
-      console.error("[api] client update failed:", describeDbError(error));
+      console.error(`[api] client update failed: ${formatDbError(error)}`);
       return jsonError("Could not update that client.", 400);
     }
     if (!data) return jsonError("Client not found.", 404);
@@ -115,7 +115,7 @@ export async function DELETE(
       .maybeSingle();
 
     if (error) {
-      console.error("[api] client archive failed:", describeDbError(error));
+      console.error(`[api] client archive failed: ${formatDbError(error)}`);
       return jsonError("Could not archive that client.", 400);
     }
     if (!data) return jsonError("Client not found, or already archived.", 404);

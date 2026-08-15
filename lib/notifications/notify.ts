@@ -21,7 +21,7 @@ import {
 } from "@/lib/notifications/templates";
 import { effectivePreference, type PreferenceRow } from "@/lib/notifications/preferences";
 import { sendEmail } from "@/lib/integrations/email";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type NotifyInput = {
   organizationId: string;
@@ -88,7 +88,7 @@ async function loadPreferenceRows({
   if (error) {
     // Fall back to template defaults rather than dropping the notification. A
     // preferences read failure must not mean a cancelled interview goes unsent.
-    console.error("[notify] preference read failed, using template defaults:", describeDbError(error));
+    console.error(`[notify] preference read failed, using template defaults: ${formatDbError(error)}`);
     return [];
   }
 
@@ -166,7 +166,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
         .single();
 
       if (error || !data) {
-        console.error(`[notify] in-app insert failed for ${input.type}:`, describeDbError(error));
+        console.error(`[notify] in-app insert failed for ${input.type}: ${formatDbError(error)}`);
       } else {
         notificationId = (data as { id: string }).id;
         inAppCreated = true;
@@ -252,7 +252,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
     };
   } catch (error) {
     // The outermost net. Whatever happened, the caller's own work stands.
-    console.error(`[notify] failed for ${input.type}:`, describeDbError(error));
+    console.error(`[notify] failed for ${input.type}: ${formatDbError(error)}`);
     return NOT_CREATED;
   }
 }
@@ -316,7 +316,7 @@ async function recordDelivery({
   if (error) {
     // Losing the delivery record is regrettable; it must not become an
     // exception that unwinds a notification that was genuinely created.
-    console.error("[notify] recording delivery failed:", describeDbError(error));
+    console.error(`[notify] recording delivery failed: ${formatDbError(error)}`);
   }
 }
 

@@ -6,7 +6,7 @@ import { PIPELINE_STAGES, type ApplicationStage } from "@/lib/applications/stage
 import { daysSince } from "@/lib/time";
 import type { OrgRole } from "@/lib/types";
 import type { PipelineItem } from "@/lib/ai/prioritizePipeline";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type BoardCard = {
   id: string;
@@ -40,7 +40,7 @@ export async function getSlaConfig(organizationId: string): Promise<SlaConfig> {
     .eq("organization_id", organizationId);
 
   if (error) {
-    console.error("[pipeline] SLA config load failed:", describeDbError(error));
+    console.error(`[pipeline] SLA config load failed: ${formatDbError(error)}`);
     return {};
   }
   return toSlaConfig((data ?? []) as { stage: string; target_days: number }[]);
@@ -91,7 +91,7 @@ export async function getBoard({
   const { data, error } = await query;
 
   if (error) {
-    console.error("[pipeline] board load failed:", describeDbError(error));
+    console.error(`[pipeline] board load failed: ${formatDbError(error)}`);
     return { columns: [], exits: [], slaConfig, totalCards: 0, failed: true };
   }
 

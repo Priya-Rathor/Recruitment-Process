@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership } from "@/lib/tenant";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /**
  * PATCH /api/notifications/:id — mark one read or unread.
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .maybeSingle();
 
     if (error) {
-      console.error("[api] notification update failed:", describeDbError(error));
+      console.error(`[api] notification update failed: ${formatDbError(error)}`);
       return jsonError("Could not update that notification.", 400);
     }
     if (!data) return jsonError("Notification not found.", 404);
@@ -81,7 +81,7 @@ export async function DELETE(
       .maybeSingle();
 
     if (error) {
-      console.error("[api] notification delete failed:", describeDbError(error));
+      console.error(`[api] notification delete failed: ${formatDbError(error)}`);
       return jsonError("Could not dismiss that notification.", 400);
     }
     if (!data) return jsonError("Notification not found.", 404);

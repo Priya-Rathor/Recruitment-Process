@@ -9,7 +9,7 @@ import { getSubmissionForApplication } from "@/lib/clients/queries";
 import { generateClientSubmission } from "@/lib/ai/generateClientSubmission";
 import { logActivity, logAiCall } from "@/lib/activity/log";
 import { notify } from "@/lib/notifications/notify";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export const maxDuration = 60;
 
@@ -221,7 +221,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       .single();
 
     if (error) {
-      console.error("[api] submission send failed:", describeDbError(error));
+      console.error(`[api] submission send failed: ${formatDbError(error)}`);
       return jsonError("Could not record that submission.", 400);
     }
 

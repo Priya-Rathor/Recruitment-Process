@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateScreeningSummary } from "@/lib/ai/generateScreeningSummary";
 import { checkReportEligibility, extractionToReportValues } from "@/lib/screening/report";
 import type { InterestLevel, LocationAcceptance } from "@/lib/ai/generateScreeningSummary";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type ScreeningReport = {
   id: string;
@@ -205,7 +205,7 @@ export async function generateReportForApplication({
         error: "This call has no recorded consent, so its transcript cannot be summarised.",
       };
     }
-    console.error("[screening] storing report failed:", describeDbError(error));
+    console.error(`[screening] storing report failed: ${formatDbError(error)}`);
     return { ok: false, error: "Could not save the screening report." };
   }
 

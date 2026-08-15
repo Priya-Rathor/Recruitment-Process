@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /**
  * Guards :id against the caller's server-resolved tenant. A valid-looking id
@@ -85,7 +85,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .maybeSingle();
 
     if (error) {
-      console.error("[api] organization update failed:", describeDbError(error));
+      console.error(`[api] organization update failed: ${formatDbError(error)}`);
       return jsonError("Could not update the organization.", 400);
     }
     if (!data) return jsonError("Organization not found.", 404);

@@ -6,7 +6,7 @@ import { getCandidate } from "@/lib/candidates/queries";
 import { getParseResult, getResume } from "@/lib/resumes/queries";
 import { applyReviewDecisions, parseReviewDecisions } from "@/lib/resumes/review";
 import { logActivity } from "@/lib/activity/log";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /**
  * POST /api/resumes/:id/review — apply the recruiter's per-field choices.
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (error.message?.includes("candidates_contactable")) {
           return jsonError("A candidate needs an email address or a phone number.", 400);
         }
-        console.error("[api] applying review failed:", describeDbError(error));
+        console.error(`[api] applying review failed: ${formatDbError(error)}`);
         return jsonError("Could not apply those changes.", 400);
       }
     }

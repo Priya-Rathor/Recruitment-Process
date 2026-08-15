@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { describeEvent } from "@/lib/activity/events";
 import type { ActivityEntityType, ActivityEvent } from "@/lib/activity/types";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 const EVENT_COLUMNS =
   "id, organization_id, entity_type, entity_id, event_type, actor_id, actor_label, " +
@@ -75,7 +75,7 @@ export async function listActivity({
   const { data, error, count } = await query;
 
   if (error) {
-    console.error("[activity] list failed:", describeDbError(error));
+    console.error(`[activity] list failed: ${formatDbError(error)}`);
     return { events: [], total: 0, failed: true };
   }
 
@@ -128,7 +128,7 @@ export async function getEntityTimeline({
     .limit(limit);
 
   if (error) {
-    console.error("[activity] timeline failed:", describeDbError(error));
+    console.error(`[activity] timeline failed: ${formatDbError(error)}`);
     return { events: [], failed: true };
   }
 

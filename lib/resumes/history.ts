@@ -15,7 +15,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelation } from "@/lib/dashboard/metrics";
 import { listResumes, type Resume } from "@/lib/resumes/queries";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type ResumeHistoryEntry = Resume & {
   /** "Senior Java Developer" when it arrived through that job's bulk upload. */
@@ -85,7 +85,7 @@ async function loadIntakeOrigins({
     // Before migration 0018 there is no intake table, so nothing came through
     // bulk upload and every resume is correctly labelled "Uploaded directly".
     if (isMissingRelation(error)) return origins;
-    console.error("[resumes] intake origin lookup failed:", describeDbError(error));
+    console.error(`[resumes] intake origin lookup failed: ${formatDbError(error)}`);
     return origins;
   }
 

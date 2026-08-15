@@ -4,7 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { hasRole, requireCurrentUser, requireMembership } from "@/lib/tenant";
 import { getPreferences } from "@/lib/notifications/queries";
 import { isNotificationType, TEMPLATES } from "@/lib/notifications/templates";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 /** GET /api/notifications/preferences — every type, resolved for this caller. */
 export async function GET() {
@@ -100,7 +100,7 @@ export async function PUT(request: NextRequest) {
       .maybeSingle();
 
     if (error) {
-      console.error("[api] preference save failed:", describeDbError(error));
+      console.error(`[api] preference save failed: ${formatDbError(error)}`);
       return jsonError("Could not save that setting.", 400);
     }
 
@@ -132,7 +132,7 @@ export async function DELETE(request: NextRequest) {
       .eq("notification_type", type);
 
     if (error) {
-      console.error("[api] preference clear failed:", describeDbError(error));
+      console.error(`[api] preference clear failed: ${formatDbError(error)}`);
       return jsonError("Could not reset that setting.", 400);
     }
 

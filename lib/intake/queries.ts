@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isMissingRelation } from "@/lib/dashboard/metrics";
 import type { IntakeStatus } from "@/lib/intake/status";
 import type { IntakeConflictReason } from "@/lib/intake/match";
-import { describeDbError } from "@/lib/supabase/errors";
+import { formatDbError } from "@/lib/supabase/errors";
 
 export type IntakeItem = {
   id: string;
@@ -53,7 +53,7 @@ export async function listBatchItems({
       console.info("[intake] resume_intake_items not created yet — run migration 0018.");
       return [];
     }
-    console.error("[intake] batch list failed:", describeDbError(error));
+    console.error(`[intake] batch list failed: ${formatDbError(error)}`);
     return [];
   }
 
@@ -94,7 +94,7 @@ export async function listUnresolvedConflicts({
     // A real failure — an RLS denial, a timeout. Reported loudly, because
     // reporting it as "not built yet" would hide a genuine bug behind a
     // reassuring message. That distinction is the whole point of the split.
-    console.error("[intake] conflict list failed:", describeDbError(error));
+    console.error(`[intake] conflict list failed: ${formatDbError(error)}`);
     return [];
   }
   return (data ?? []) as unknown as IntakeItem[];
@@ -118,7 +118,7 @@ export async function loadConflictCandidates({
     .in("id", candidateIds);
 
   if (error) {
-    console.error("[intake] conflict candidate lookup failed:", describeDbError(error));
+    console.error(`[intake] conflict candidate lookup failed: ${formatDbError(error)}`);
     return [];
   }
   return (data ?? []) as { id: string; name: string | null }[];
