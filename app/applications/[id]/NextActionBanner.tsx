@@ -14,8 +14,19 @@
 // =============================================================================
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Lightbulb, X } from "lucide-react";
 import { NEXT_ACTION_TONE, type NextAction } from "@/lib/evaluation/nextAction";
+
+/**
+ * The tone already decides the colour; this makes it legible without relying on
+ * colour alone, which a red/green-blind reader cannot use.
+ */
+const TONE_ICON = {
+  info: Lightbulb,
+  success: CheckCircle2,
+  error: AlertTriangle,
+  neutral: Clock,
+} as const;
 
 export function NextActionBanner({
   action,
@@ -32,8 +43,13 @@ export function NextActionBanner({
 
   if (dismissed || action.kind === "none") return null;
 
+  const tone = NEXT_ACTION_TONE[action.kind];
+  const Icon = TONE_ICON[tone];
+
   return (
-    <div className={`next-action is-${NEXT_ACTION_TONE[action.kind]}`} role="status">
+    <div className={`next-action is-${tone}`} role="status">
+      <Icon size={16} aria-hidden="true" className="next-action__icon" />
+
       <div className="next-action__text">
         <span className="next-action__label">Suggested next step</span>
         <span className="next-action__value">{action.label}</span>

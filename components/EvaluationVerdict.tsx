@@ -25,12 +25,20 @@ export function EvaluationVerdict({
   verdict,
   scoreSuffix = "/10",
   compact = false,
+  summaryIsEmptyState = false,
 }: {
   verdict: Verdict;
   /** "/10" for rounds, "%" for the resume match. */
   scoreSuffix?: string;
   /** Drops the narrative, for the rollup on the candidate page. */
   compact?: boolean;
+  /**
+   * The summary is a "nothing on file yet" placeholder rather than a real
+   * one. Visual only — it lightens the text so a reader does not take
+   * "No parsed summary on file." for a sentence someone wrote about the
+   * candidate. The caller decides, because only the caller knows.
+   */
+  summaryIsEmptyState?: boolean;
 }) {
   if (isEmptyVerdict(verdict)) {
     return (
@@ -66,7 +74,11 @@ export function EvaluationVerdict({
         )}
       </div>
 
-      {!compact && verdict.summary && <p className="verdict__summary">{verdict.summary}</p>}
+      {!compact && verdict.summary && (
+        <p className={`verdict__summary${summaryIsEmptyState ? " is-empty" : ""}`}>
+          {verdict.summary}
+        </p>
+      )}
 
       {hasLists && (
         <div className="verdict__lists">

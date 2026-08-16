@@ -34,7 +34,7 @@ import { resumeKeyPoints } from "@/lib/resumes/keyPoints";
 import { ApplicationStageSection } from "./ApplicationStageSection";
 import { ApplicationHeaderActions } from "./ApplicationHeaderActions";
 import { PRIORITY_LABELS, PRIORITY_TONE, type ApplicationPriority } from "@/lib/applications/validation";
-import { Activity } from "lucide-react";
+import { Activity, Layers, Pencil } from "lucide-react";
 
 export const metadata = { title: "Application" };
 export const dynamic = "force-dynamic";
@@ -148,26 +148,45 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
           </span>
           <Link href={`/jobs/${application.job_id}`}>{application.job_title}</Link>
         </h1>
-        <div className="is-flex is-align-items-center mt-2" style={{ gap: "var(--space-3)", flexWrap: "wrap" }}>
+        {/*
+          One status line, not three fragments. Each piece is a different KIND
+          of thing — derived context, a stored attribute, an action — so each
+          gets the treatment of its kind (plain text with an icon, a chip, a
+          link) and a hairline divider between them. Run together at equal
+          weight, as they were, a reader has to parse where one ends.
+        */}
+        <div className="meta-line mt-2">
           {/* Derived from the stage, never stored — see lib/applications/phase.ts. */}
-          <span className="has-text-secondary" style={{ fontSize: "var(--text-label)" }}>
+          <span className="meta-line__item">
+            <Layers size={14} aria-hidden="true" />
             Phase: {PHASE_LABELS[phaseOf(application.stage)]}
           </span>
+
+          <span className="meta-line__divider" aria-hidden="true" />
+
           <span className={`intake-chip is-${PRIORITY_TONE[(application.priority ?? "normal") as ApplicationPriority]}`}>
             {PRIORITY_LABELS[(application.priority ?? "normal") as ApplicationPriority]} priority
           </span>
+
           {application.archived_at && (
-            <span className="tag is-light" style={{ fontSize: 12 }}>
-              Archived
-            </span>
+            <>
+              <span className="meta-line__divider" aria-hidden="true" />
+              <span className="tag is-light" style={{ fontSize: 12 }}>
+                Archived
+              </span>
+            </>
           )}
+
+          <span className="meta-line__divider" aria-hidden="true" />
+
           {/*
             Candidate identity is shown, never edited here. One candidate can
             hold five applications, and letting any of them own the person's
             phone number means five screens racing over one fact.
           */}
-          <Link href={`/candidates/${application.candidate_id}`} className="text-link">
-            Edit candidate details →
+          <Link href={`/candidates/${application.candidate_id}`} className="text-link is-primary">
+            <Pencil size={13} aria-hidden="true" />
+            Edit candidate details
           </Link>
         </div>
       </div>
@@ -191,7 +210,6 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
       */}
       <ApplicationStageSection
         segments={stepper}
-        matchScore={application.match_score}
         applicationId={application.id}
         availability={availability}
         entries={evaluationEntries}

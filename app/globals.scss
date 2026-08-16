@@ -1452,6 +1452,54 @@ a {
   &:focus-visible {
     box-shadow: var(--focus-ring);
   }
+
+  // For a link sitting among informational text, where secondary ink would not
+  // read as clickable at all.
+  &.is-primary {
+    color: var(--color-primary);
+
+    &:hover { color: var(--color-primary-hover); }
+  }
+}
+
+// =============================================================================
+// META LINE — a row of small, differently-shaped facts
+//
+// Used under a page heading where the pieces are different KINDS of thing:
+// derived context, a stored attribute, an action. Each keeps the treatment of
+// its kind and a hairline divider separates them, so the row reads as three
+// pieces of metadata rather than one run-on sentence.
+// =============================================================================
+.meta-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  // No gap: the dividers carry the spacing, so a wrapped row does not end up
+  // with a divider and a gap doing the same job.
+  gap: var(--space-1) 0;
+}
+
+.meta-line__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.meta-line__divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 14px;
+  margin: 0 var(--space-4);
+  background-color: var(--color-border);
+}
+
+@media (max-width: 768px) {
+  // A hairline between wrapped rows reads as a stray tick. Below the breakpoint
+  // the row becomes a wrapping list held apart by an ordinary gap.
+  .meta-line { gap: var(--space-2) var(--space-3); }
+  .meta-line__divider { display: none; }
 }
 
 // =============================================================================
@@ -2385,12 +2433,28 @@ a {
   border-radius: var(--control-radius);
   overflow: hidden;
   border: 1px solid var(--color-border);
+
+  // This is an <ol>, and Bulma's minireset clears markers on ul ONLY. Left
+  // alone, every segment renders its decimal ::marker — positioned `outside`,
+  // which paints it to the left of its OWN li and therefore inside the
+  // preceding segment, and the first segment's "1." is eaten by the overflow
+  // above. That is where the stray "2." "3." "4." floating at the right-hand
+  // end of each label came from.
+  //
+  // The element stays an <ol> because the order of the stages is the meaning.
+  // Only the visual marker goes.
+  list-style: none;
 }
 
 .stepper__segment {
   flex: 1 1 0;
   min-width: 0;
   border-right: 1px solid var(--color-border);
+  list-style: none;
+
+  // Belt and braces: a UA that ignores list-style on the parent still has to
+  // honour an empty marker on the item itself.
+  &::marker { content: ""; }
 
   &:last-child { border-right: 0; }
 }
@@ -2490,18 +2554,10 @@ a {
   color: #ffffff;
 }
 
-.stepper__match {
-  flex: 0 0 auto;
-  font-size: var(--text-label);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-.stepper__match-value {
-  font-size: var(--text-section);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text);
-}
+// .stepper__match is gone. The match percentage used to float at the right-hand
+// end of this row, unrelated to anything beside it and repeating — in a
+// different type treatment — the number Resume & Match already shows with its
+// status, strengths and concerns. One number, one home.
 
 // =============================================================================
 // EVALUATION PANEL
@@ -2816,6 +2872,15 @@ a {
   margin-top: var(--space-2);
   font-size: var(--text-body);
   color: var(--color-text);
+
+  // "No parsed summary on file." is not a summary. At full body weight it sat
+  // exactly where a real one would and read as a sentence someone wrote about
+  // the candidate. Same treatment as .verdict__none, one row below it.
+  &.is-empty {
+    font-size: var(--text-label);
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
 }
 
 .verdict__lists {
@@ -2870,24 +2935,58 @@ a {
 // =============================================================================
 // NEXT ACTION — a suggestion, never an action
 // =============================================================================
+// A callout, not a paragraph in a box. Same tinted-background + left-accent +
+// icon treatment the AI panels use, so a reader who has learned "tinted block
+// with a coloured spine = the product is telling me something" reads this the
+// same way. Flat white made a suggestion look like a caption.
+//
+// --accent drives the spine, the icon and the label together, so a tone is one
+// declaration rather than three that can drift apart.
 .next-action {
+  --accent: var(--color-text-secondary);
+
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-4);
+  // 24px, matching header → stepper → banner → Evaluation card.
+  margin-bottom: var(--space-6);
   border-radius: var(--control-radius);
   border: 1px solid var(--color-border);
+  border-left: 3px solid var(--accent);
   background-color: var(--color-background);
   flex-wrap: wrap;
 
-  &.is-error { border-color: var(--status-error-text); background-color: var(--status-error-bg); }
-  &.is-success { border-color: var(--status-connected-text); background-color: var(--status-connected-bg); }
-  &.is-info { border-color: #bfdbfe; background-color: #eff6ff; }
+  &.is-error {
+    --accent: var(--status-error-text);
+    border-color: var(--status-error-text);
+    border-left-color: var(--accent);
+    background-color: var(--status-error-bg);
+  }
+
+  &.is-success {
+    --accent: var(--status-connected-text);
+    border-color: var(--status-connected-text);
+    border-left-color: var(--accent);
+    background-color: var(--status-connected-bg);
+  }
+
+  &.is-info {
+    --accent: var(--color-info);
+    border-color: #bfdbfe;
+    border-left-color: var(--accent);
+    background-color: #dbeafe;
+  }
+}
+
+.next-action__icon {
+  flex: 0 0 auto;
+  color: var(--accent);
 }
 
 .next-action__text {
+  flex: 1 1 auto;
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
@@ -2900,7 +2999,9 @@ a {
   font-weight: var(--weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--color-text-secondary);
+  // Was plain secondary ink, which read as a caption. In the tone's own colour
+  // it reads as a deliberate callout.
+  color: var(--accent);
 }
 
 .next-action__value {
@@ -2922,14 +3023,28 @@ a {
 }
 
 .next-action__dismiss {
+  // 28px square. A 14px icon with 4px of padding was a ~22px target, under the
+  // 24px minimum, and its only hover feedback was an ink change most people
+  // would not notice.
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
   border: 0;
   background: none;
-  padding: var(--space-1);
+  padding: 0;
   color: var(--color-text-secondary);
   cursor: pointer;
   border-radius: var(--control-radius);
+  transition:
+    background-color var(--transition-fast) var(--ease),
+    color var(--transition-fast) var(--ease);
 
-  &:hover { color: var(--color-text); }
+  &:hover {
+    color: var(--color-text);
+    background-color: rgba(15, 23, 42, 0.08);
+  }
   &:focus-visible { box-shadow: var(--focus-ring); }
 }
 

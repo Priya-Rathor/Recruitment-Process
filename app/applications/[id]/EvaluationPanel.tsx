@@ -111,6 +111,7 @@ export function EvaluationPanel({
                 concerns: resume.concerns,
               }}
               scoreSuffix="%"
+              summaryIsEmptyState={!resume.summary?.trim()}
             />
 
             <div className="is-flex mt-2" style={{ gap: "var(--space-4)", flexWrap: "wrap" }}>

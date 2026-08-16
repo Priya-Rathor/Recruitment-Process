@@ -23,7 +23,6 @@ import { EvaluationPanel } from "./EvaluationPanel";
 
 export function ApplicationStageSection({
   segments,
-  matchScore,
   applicationId,
   availability,
   entries,
@@ -34,7 +33,6 @@ export function ApplicationStageSection({
   nextAction,
 }: {
   segments: StepperSegment[];
-  matchScore: number | null;
   applicationId: string;
   availability: StageAvailability[];
   entries: EvaluationEntry[];
@@ -79,7 +77,7 @@ export function ApplicationStageSection({
 
   return (
     <>
-      <StageStepper segments={segments} matchScore={matchScore} onJumpTo={jumpTo} />
+      <StageStepper segments={segments} onJumpTo={jumpTo} />
 
       <NextActionBanner action={nextAction} canAct={canEdit} onAct={actOn} />
 

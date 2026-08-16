@@ -25,7 +25,9 @@ export function ApplicationHeaderActions({
 
   if (!editing) {
     return (
-      <div className="mb-4">
+      // 24px (mb-5), so the run from the heading down to the Evaluation card
+      // keeps one rhythm rather than alternating 16 and 24.
+      <div className="mb-5">
         <button type="button" className="button is-outlined-primary is-small"
                 onClick={() => setEditing(true)}>
           <SquarePen size={14} aria-hidden="true" />
