@@ -21,6 +21,21 @@ export const maxDuration = 60;
  * Available to every role: "View AI interview brief" is Yes for all four,
  * including Viewer, because an interviewer may not be a recruiter.
  */
+/** Order-preserving, case-insensitive dedupe for the merged question lists. */
+function dedupe(items: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of items) {
+    const text = item.trim();
+    if (text.length === 0) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}
+
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -43,11 +58,19 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         .eq("id", application.candidate_id)
         .eq("organization_id", membership.organization.id)
         .maybeSingle(),
+      // The job's interview stages, not job_interview_questions.
+      //
+      // That table backed a standalone list on the job form that no longer
+      // exists — the questions moved into the Phone Interview and Video
+      // Interview stages' own suggested lists (migration 0025 copied them).
+      // Reading the retired table would have left this brief quietly frozen on
+      // whatever was there the day the form changed.
       supabase
-        .from("job_interview_questions")
-        .select("question, display_order")
+        .from("job_hiring_stages")
+        .select("stage_key, config")
+        .eq("organization_id", membership.organization.id)
         .eq("job_id", application.job_id)
-        .order("display_order", { ascending: true }),
+        .in("stage_key", ["phone_interview", "video_interview"]),
     ]);
 
     const candidate = candidateRow.data as unknown as {
@@ -76,8 +99,13 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       expectedCtc: report?.reviewed_at ? report.expected_ctc : null,
       noticePeriodDays: report?.reviewed_at ? report.notice_period_days : null,
       screeningSummary: report?.reviewed_at ? report.summary_text : null,
-      existingQuestions: ((questionRows.data ?? []) as { question: string }[]).map(
-        (row) => row.question
+      // Both stages' lists, deduplicated. The brief is for whoever runs the
+      // next round and does not know which one that is, so offering the union
+      // beats guessing — and 0025 seeded both from one list, so overlap is
+      // expected rather than a sign of duplication.
+      existingQuestions: dedupe(
+        ((questionRows.data ?? []) as { stage_key: string; config: { questions?: string[] } }[])
+          .flatMap((row) => row.config?.questions ?? [])
       ),
     });
 

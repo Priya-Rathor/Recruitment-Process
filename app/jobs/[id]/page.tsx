@@ -322,12 +322,6 @@ async function JobDetailContent({
         emptyWarning="None yet — AI screening can't run on this job until questions are added."
       />
 
-      <QuestionList
-        title="Interview questions"
-        help="Suggested to the human interviewer (Module 11)."
-        questions={job.interviewQuestions}
-      />
-
       <div className="card mb-4">
         <div className="is-flex is-justify-content-space-between is-align-items-center mb-3">
           <h2 className="title is-5 mb-0">Pipeline</h2>

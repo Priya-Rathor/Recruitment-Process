@@ -91,8 +91,11 @@ export async function GET(request: NextRequest) {
  * POST /api/jobs — create a requisition. Owner/Admin/Recruiter (Viewer denied).
  *
  * organization_id is taken from the session; any value in the payload is ignored.
- * Optionally accepts screening_questions / interview_questions arrays so the
- * AI-assisted create flow can save the reviewed question sets in one request.
+ * Optionally accepts a screening_questions array so the AI-assisted create
+ * flow can save the reviewed question set in one request. interview_questions
+ * is no longer accepted: interview questions live in the Phone Interview and
+ * Video Interview hiring-stage configs now, and accepting the old key would let
+ * a caller write rows that nothing reads.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -187,7 +190,6 @@ export async function replaceQuestions({
 
   for (const [key, table] of [
     ["screening_questions", "job_screening_questions"],
-    ["interview_questions", "job_interview_questions"],
   ] as const) {
     if (!(key in raw)) continue;
 

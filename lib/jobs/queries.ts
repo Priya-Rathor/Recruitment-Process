@@ -138,7 +138,6 @@ export async function listJobsWithHealth({
 
 export type JobDetail = JobWithHealth & {
   screeningQuestions: JobQuestion[];
-  interviewQuestions: JobQuestion[];
 };
 
 /** Single job with its question sets. Returns null when not in this tenant. */
@@ -161,14 +160,9 @@ export async function getJobDetail({
   if (error || !data) return null;
   const job = data as unknown as Job;
 
-  const [screening, interview, owner, client] = await Promise.all([
+  const [screening, owner, client] = await Promise.all([
     supabase
       .from("job_screening_questions")
-      .select("id, job_id, question, display_order")
-      .eq("job_id", jobId)
-      .order("display_order", { ascending: true }),
-    supabase
-      .from("job_interview_questions")
       .select("id, job_id, question, display_order")
       .eq("job_id", jobId)
       .order("display_order", { ascending: true }),
@@ -190,7 +184,6 @@ export async function getJobDetail({
   return {
     ...job,
     screeningQuestions,
-    interviewQuestions: (interview.data ?? []) as unknown as JobQuestion[],
     screeningQuestionCount: screeningQuestions.length,
     ownerName: ownerRow ? ownerRow.name ?? ownerRow.email : null,
     clientName: (client.data as { name: string } | null)?.name ?? null,

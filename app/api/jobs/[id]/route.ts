@@ -32,24 +32,19 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     const job = data as unknown as Job;
 
-    const [screening, interview] = await Promise.all([
-      supabase
-        .from("job_screening_questions")
-        .select("id, job_id, question, display_order")
-        .eq("job_id", id)
-        .order("display_order", { ascending: true }),
-      supabase
-        .from("job_interview_questions")
-        .select("id, job_id, question, display_order")
-        .eq("job_id", id)
-        .order("display_order", { ascending: true }),
-    ]);
+    // No interview_questions here any more — they moved into the Phone
+    // Interview and Video Interview stage configs, which are served by
+    // /api/jobs/[id]/stages.
+    const screening = await supabase
+      .from("job_screening_questions")
+      .select("id, job_id, question, display_order")
+      .eq("job_id", id)
+      .order("display_order", { ascending: true });
 
     return NextResponse.json({
       data: {
         ...job,
         screening_questions: screening.data ?? [],
-        interview_questions: interview.data ?? [],
       },
       caller_role: membership.role,
     });

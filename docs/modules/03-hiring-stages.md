@@ -181,9 +181,11 @@ configuration layer and not to attempt the execution infrastructure.
   same job at once: the `PUT` upserts only the stages it was sent, so they do not
   clobber each other's stages — but two people editing the *same* stage, last
   write wins silently.
-- **The AI-assisted create flow** shows the same card as the manual one; AI does
-  not propose stage configurations. Drafting a script from the job description is
-  an obvious follow-up and was not in scope.
+- **The AI-assisted create flow** shows the same card as the manual one. It now
+  seeds one thing: the interview questions it proposes are written into both
+  interview stages' suggested lists (see below). It still does not propose a
+  screening script, a language, or an assessment brief — drafting those from the
+  job description is an obvious follow-up and was not in scope.
 - **`config.language` is a free select of three options.** Module 17's screening
   settings are the source of the default; a shared language list would be better
   than the hardcoded three.
@@ -191,3 +193,59 @@ configuration layer and not to attempt the execution infrastructure.
   preview, and off→on preservation were all verified in a browser. Persistence
   was not: migration 0020 has not been applied to the live database, so the
   `PUT` currently returns 400 and the warning path is what runs.
+
+
+## Retiring the standalone "Interview questions" list
+
+The job form used to carry a single generic "Interview questions" list, stored
+in `job_interview_questions`. Hiring Stages split interviews into **two**
+configurable stages, each with its own "Suggested questions", so that list had
+two possible homes and no way to choose between them.
+
+**It was copied into both** (migration `0025`). The old list never recorded
+which round a question was for, so picking one stage would have silently
+discarded those questions from the other. A duplicate a recruiter can delete is
+recoverable; a deletion nobody sees is not. The two lists are independent after
+the copy — editing the phone list later does not touch the video one.
+
+Where a job had no row for an interview stage, `0025` creates one **disabled**.
+A migration must not switch a hiring stage on: that changes what candidates
+actually go through. Jobs where neither interview stage was enabled end up with
+their questions stored but not visible, and are named in a `raise notice` and in
+the `report_interview_question_migration` view, which can be re-run at any time:
+
+```sql
+select * from report_interview_question_migration
+where status like 'MIGRATED BUT HIDDEN%';
+```
+
+### Unlike the screening case, this list was not orphaned
+
+Removing the "Screening questions" section was safe because nothing read it.
+`job_interview_questions` had a live reader: **Module 11's interview brief**
+(`app/api/applications/[id]/interview-brief/route.ts`) passed those rows to
+`generateInterviewBrief()` as `existingQuestions`. Deleting the form section
+alone would have frozen the brief on whatever happened to be in the table the
+day the form changed — a silent regression with no error to notice.
+
+The brief now reads the `phone_interview` and `video_interview` stage configs
+and offers the **union**, deduplicated case-insensitively. It cannot know which
+round is being briefed for, and `0025` seeded both from one list, so overlap is
+expected rather than a sign of duplication.
+
+### The table is kept, not dropped
+
+`0025` does not drop `job_interview_questions`. It is the original data, and
+dropping it in the same migration that empties its readers would leave a failed
+deploy with nowhere to fall back to. The application no longer reads or writes
+it:
+
+- `GET /api/jobs/[id]` no longer returns `interview_questions`
+- `POST`/`PATCH /api/jobs` no longer accept an `interview_questions` key — it is
+  removed from `replaceQuestions`, so a direct PostgREST-style caller cannot
+  write rows nothing reads
+- `getJobDetail()` no longer fetches them, and the job detail page's read-only
+  card is gone
+
+Dropping the table belongs in a later migration, once `0025` is confirmed
+applied and the brief is confirmed reading the new source.

@@ -458,7 +458,6 @@ create policy invites_update_owner_admin on public.invites
     and (role <> 'owner' or public.has_org_role(organization_id, array['owner']::public.org_role[]))
   );
 
-
 -- ############################################################################
 -- ## 0002_module3_jobs_management.sql
 -- ############################################################################
@@ -709,7 +708,6 @@ create policy job_interview_questions_write_staff on public.job_interview_questi
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
 
-
 -- ############################################################################
 -- ## 0003_module4_candidates_management.sql
 -- ############################################################################
@@ -959,7 +957,6 @@ create policy candidate_duplicates_write_staff on public.candidate_duplicates
   with check (
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
-
 
 -- ############################################################################
 -- ## 0004_module5_applications_management.sql
@@ -1272,7 +1269,6 @@ drop policy if exists application_notes_delete_author on public.application_note
 create policy application_notes_delete_author on public.application_notes
   for delete using (author_id = public.current_app_user_id());
 
-
 -- ############################################################################
 -- ## 0005_module6_resume_ai.sql
 -- ############################################################################
@@ -1522,7 +1518,6 @@ create policy resumes_storage_delete on storage.objects
     )
   );
 
-
 -- ############################################################################
 -- ## 0006_module7_ai_matching.sql
 -- ############################################################################
@@ -1754,7 +1749,6 @@ create policy application_matches_write_staff on public.application_matches
   with check (
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
-
 
 -- ############################################################################
 -- ## 0007_module8_bolna_screening.sql
@@ -2032,7 +2026,6 @@ create policy screening_calls_update_staff on public.screening_calls
 -- and of the consent given. Erasure belongs to the Privacy retrofit's audited
 -- flow, not to a stray delete.
 
-
 -- ############################################################################
 -- ## 0008_module9_screening_reports.sql
 -- ############################################################################
@@ -2249,7 +2242,6 @@ create policy screening_reports_delete_owner_admin on public.screening_reports
     public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
   );
 
-
 -- ############################################################################
 -- ## 0009_module10_pipeline.sql
 -- ############################################################################
@@ -2333,7 +2325,6 @@ create index if not exists idx_applications_open_board
   on public.applications (organization_id, stage, updated_at)
   where archived_at is null
     and stage not in ('hired', 'rejected', 'withdrawn');
-
 
 -- ############################################################################
 -- ## 0010_module11_interviews.sql
@@ -2622,7 +2613,6 @@ create policy interview_feedback_update_author on public.interview_feedback
   using (submitted_by = public.current_app_user_id())
   with check (submitted_by = public.current_app_user_id());
 
-
 -- ############################################################################
 -- ## 0011_module12_clients.sql
 -- ############################################################################
@@ -2900,7 +2890,6 @@ create trigger trg_jobs_client_tenant_integrity
   before insert or update of client_id, organization_id on public.jobs
   for each row execute function public.enforce_job_client_tenant_integrity();
 
-
 -- ############################################################################
 -- ## 0012_module13_automations.sql
 -- ############################################################################
@@ -3165,7 +3154,6 @@ drop policy if exists automation_runs_insert_member on public.automation_runs;
 create policy automation_runs_insert_member on public.automation_runs
   for insert with check (public.is_org_member(organization_id));
 
-
 -- ############################################################################
 -- ## 0013_module14_activity_audit.sql
 -- ############################################################################
@@ -3387,7 +3375,6 @@ create policy activity_events_insert_member on public.activity_events
   );
 
 -- No UPDATE policy. No DELETE policy. See the header.
-
 
 -- ############################################################################
 -- ## 0014_module15_notifications.sql
@@ -3745,7 +3732,6 @@ create policy notification_preferences_write on public.notification_preferences
     )
   );
 
-
 -- ############################################################################
 -- ## 0015_module16_analytics.sql
 -- ############################################################################
@@ -4054,7 +4040,6 @@ grant select on public.analytics_job_performance     to authenticated;
 grant select on public.analytics_client_performance  to authenticated;
 grant select on public.analytics_screening_metrics   to authenticated;
 
-
 -- ############################################################################
 -- ## 0016_module17_settings.sql
 -- ############################################################################
@@ -4349,7 +4334,6 @@ create trigger trg_user_preferences_tenant_integrity
 revoke select (encrypted_credentials) on public.organization_integrations from authenticated;
 revoke select (encrypted_credentials) on public.organization_integrations from anon;
 
-
 -- ############################################################################
 -- ## 0017_fix_missing_user_profile.sql
 -- ############################################################################
@@ -4466,7 +4450,6 @@ left join public.users u on u.auth_id = au.id
 where u.id is null
   and au.email is not null
 on conflict (auth_id) do nothing;
-
 
 -- ############################################################################
 -- ## 0018_bulk_resume_intake.sql
@@ -4667,7 +4650,6 @@ create policy resume_intake_delete_owner_admin on public.resume_intake_items
 -- _intake folder either.
 -- =============================================================================
 
-
 -- ############################################################################
 -- ## 0019_intake_manual_reconnect.sql
 -- ############################################################################
@@ -4787,7 +4769,6 @@ create policy candidates_delete_staff on public.candidates
 create index if not exists idx_resume_intake_items_candidate
   on public.resume_intake_items (organization_id, candidate_id)
   where candidate_id is not null;
-
 
 -- ############################################################################
 -- ## 0020_job_hiring_stages.sql
@@ -4917,7 +4898,6 @@ create policy job_hiring_stages_write_staff on public.job_hiring_stages
   with check (
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
-
 
 -- ############################################################################
 -- ## 0021_pipeline_stage_redefinition.sql
@@ -5327,7 +5307,6 @@ left join public.users u on u.id = a.assigned_recruiter_id
 where a.assigned_recruiter_id is not null
 group by a.organization_id, a.assigned_recruiter_id, u.name, u.email;
 
-
 -- ############################################################################
 -- ## 0022_application_evaluations.sql
 -- ############################################################################
@@ -5476,7 +5455,6 @@ create policy application_evaluations_write_staff on public.application_evaluati
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
 
-
 -- ############################################################################
 -- ## 0023_application_edit_candidate_profile.sql
 -- ############################################################################
@@ -5556,7 +5534,6 @@ alter table public.candidates drop constraint if exists candidates_employment_is
 alter table public.candidates
   add constraint candidates_employment_is_array
   check (jsonb_typeof(employment_history) = 'array');
-
 
 -- ############################################################################
 -- ## 0024_structured_evaluation.sql
@@ -5640,3 +5617,161 @@ alter table public.jobs
 
 comment on column public.jobs.resume_passing_score is
   'Match percentage at or above which a resume passes this job''s first gate. Null = no gate configured; results read as Needs Review.';
+
+-- ############################################################################
+-- ## 0025_retire_standalone_interview_questions.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Retiring the standalone interview-questions list.
+--
+-- The job form had one generic "Interview questions" list. The Hiring Stages
+-- feature split interviews into TWO configurable stages — Phone Interview and
+-- Video Interview — each with its own "Suggested questions". So there is no 1:1
+-- destination, and the old list has to go somewhere.
+--
+-- IT IS COPIED INTO BOTH. The old list never recorded which round a question
+-- was meant for, so choosing one would be a guess that silently discards the
+-- questions from the other. A duplicate a recruiter can delete is recoverable;
+-- a deletion they never see is not.
+--
+-- The two lists are INDEPENDENT after this. Copying is a one-off seed, not a
+-- link: editing the phone list later does not touch the video one.
+--
+-- WHAT THIS DOES *NOT* DO: drop job_interview_questions.
+--
+-- That table is not a duplicate — it is the original, and Module 11's interview
+-- brief reads it today. The application code moves to the stage configs in the
+-- same commit, which leaves the table unused but intact. Dropping it in the
+-- same breath as the migration that empties its readers would mean a failed
+-- deploy has nowhere to fall back to. It can go in a later migration once this
+-- one is confirmed applied and the brief is confirmed reading the new source.
+-- =============================================================================
+
+do $$
+declare
+  v_job record;
+  v_questions text[];
+  v_existing text[];
+  v_merged text[];
+  v_stage text;
+  v_migrated integer := 0;
+  v_flagged integer := 0;
+  v_flagged_ids text := '';
+begin
+  if to_regclass('public.job_hiring_stages') is null then
+    raise exception
+      'job_hiring_stages does not exist — apply migration 0020 before this one.';
+  end if;
+
+  for v_job in
+    select
+      q.job_id,
+      j.organization_id,
+      j.title,
+      array_agg(q.question order by q.display_order, q.created_at) as questions
+    from public.job_interview_questions q
+    join public.jobs j on j.id = q.job_id
+    group by q.job_id, j.organization_id, j.title
+  loop
+    v_questions := v_job.questions;
+
+    foreach v_stage in array array['phone_interview', 'video_interview']
+    loop
+      -- Merge rather than overwrite: a stage that already has its own suggested
+      -- questions keeps them, and the old generic ones are appended. Overwriting
+      -- would destroy work someone did in the new screen.
+      select coalesce(
+               array(select jsonb_array_elements_text(config -> 'questions')),
+               '{}'::text[])
+        into v_existing
+      from public.job_hiring_stages
+      where job_id = v_job.job_id and stage_key = v_stage;
+
+      v_existing := coalesce(v_existing, '{}'::text[]);
+
+      select array_agg(distinct q order by q)
+        into v_merged
+      from unnest(v_existing || v_questions) as q;
+
+      insert into public.job_hiring_stages
+        (job_id, organization_id, stage_key, enabled, config)
+      values (
+        v_job.job_id,
+        v_job.organization_id,
+        v_stage,
+        -- DISABLED when the row did not exist. Creating it enabled would switch
+        -- a hiring stage on for a job that never asked for one, which changes
+        -- what candidates go through — a migration must not do that.
+        false,
+        jsonb_build_object('questions', to_jsonb(coalesce(v_merged, '{}'::text[])))
+      )
+      on conflict (job_id, stage_key) do update
+        set config = public.job_hiring_stages.config
+                     || jsonb_build_object(
+                          'questions',
+                          to_jsonb(coalesce(v_merged, '{}'::text[]))
+                        );
+    end loop;
+
+    v_migrated := v_migrated + 1;
+
+    -- Neither interview stage switched on: the questions are now stored but
+    -- invisible, because a disabled stage hides its configuration. Named in the
+    -- notice so a human can decide whether to switch a stage on or let them go.
+    if not exists (
+      select 1 from public.job_hiring_stages
+      where job_id = v_job.job_id
+        and stage_key in ('phone_interview', 'video_interview')
+        and enabled
+    ) then
+      v_flagged := v_flagged + 1;
+      v_flagged_ids := v_flagged_ids || format(E'\n    - %s (%s)', v_job.title, v_job.job_id);
+    end if;
+  end loop;
+
+  raise notice 'Interview questions migrated for % job(s).', v_migrated;
+
+  if v_flagged > 0 then
+    raise notice
+      E'% job(s) have NEITHER interview stage enabled, so their migrated questions are stored but not visible:%',
+      v_flagged, v_flagged_ids;
+  end if;
+end $$;
+
+-- =============================================================================
+-- The report, as a query rather than only a notice.
+--
+-- Notices scroll past in the SQL editor. This can be re-run at any time to see
+-- exactly what moved and what needs a human decision.
+-- =============================================================================
+create or replace view public.report_interview_question_migration
+with (security_invoker = true) as
+select
+  j.id                                as job_id,
+  j.organization_id,
+  j.title,
+  count(q.id)                         as legacy_questions,
+  coalesce(
+    jsonb_array_length(phone.config -> 'questions'), 0)   as phone_questions,
+  coalesce(
+    jsonb_array_length(video.config -> 'questions'), 0)   as video_questions,
+  coalesce(phone.enabled, false)      as phone_enabled,
+  coalesce(video.enabled, false)      as video_enabled,
+  case
+    when count(q.id) = 0 then 'nothing to migrate'
+    when coalesce(phone.enabled, false) or coalesce(video.enabled, false)
+      then 'migrated and visible'
+    else 'MIGRATED BUT HIDDEN — neither interview stage is enabled'
+  end                                 as status
+from public.jobs j
+left join public.job_interview_questions q on q.job_id = j.id
+left join public.job_hiring_stages phone
+  on phone.job_id = j.id and phone.stage_key = 'phone_interview'
+left join public.job_hiring_stages video
+  on video.job_id = j.id and video.stage_key = 'video_interview'
+group by j.id, j.organization_id, j.title,
+         phone.config, video.config, phone.enabled, video.enabled;
+
+comment on view public.report_interview_question_migration is
+  'Post-migration audit for 0025. Rows with status MIGRATED BUT HIDDEN need a human to enable an interview stage or accept losing the old questions from view.';

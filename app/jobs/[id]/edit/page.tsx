@@ -69,7 +69,6 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
         mode="edit"
         job={job}
         initialScreeningQuestions={job.screeningQuestions.map((question) => question.question)}
-        initialInterviewQuestions={job.interviewQuestions.map((question) => question.question)}
         members={members}
         clients={clients}
         currentUserId={user.id}

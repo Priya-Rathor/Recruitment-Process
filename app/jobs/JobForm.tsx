@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { FormError } from "@/components/states";
 import { HiringStages, emptyStages, type StagesState } from "./HiringStages";
 import { STAGES } from "@/lib/hiring-stages/catalog";
+import type { StageConfig } from "@/lib/hiring-stages/config";
 import { mergeProposal, type FieldConflict, type JobProposal } from "@/lib/ai/extractJobFromDescription";
 import {
   JOB_STATUSES,
@@ -42,7 +43,6 @@ type FormState = {
   /** Module 12 retrofit: jobs can now be attached to a client. */
   clientId: string;
   screeningQuestions: string[];
-  interviewQuestions: string[];
 };
 
 function emptyForm(): FormState {
@@ -61,11 +61,10 @@ function emptyForm(): FormState {
     ownerRecruiterId: "",
     clientId: "",
     screeningQuestions: [],
-    interviewQuestions: [],
   };
 }
 
-function formFromJob(job: Job, screening: string[], interview: string[]): FormState {
+function formFromJob(job: Job, screening: string[]): FormState {
   return {
     title: job.title,
     description: job.description ?? "",
@@ -81,7 +80,6 @@ function formFromJob(job: Job, screening: string[], interview: string[]): FormSt
     ownerRecruiterId: job.owner_recruiter_id ?? "",
     clientId: job.client_id ?? "",
     screeningQuestions: screening,
-    interviewQuestions: interview,
   };
 }
 
@@ -96,7 +94,6 @@ export function JobForm({
   mode,
   job,
   initialScreeningQuestions = [],
-  initialInterviewQuestions = [],
   members,
   clients,
   currentUserId,
@@ -107,7 +104,6 @@ export function JobForm({
   mode: "create" | "edit";
   job?: Job;
   initialScreeningQuestions?: string[];
-  initialInterviewQuestions?: string[];
   /** Existing stage rows, when editing. Absent on create. */
   initialStages?: StagesState;
   /** False for a Viewer, who may see the configuration but not change it. */
@@ -122,7 +118,7 @@ export function JobForm({
 
   const [form, setForm] = useState<FormState>(() =>
     job
-      ? formFromJob(job, initialScreeningQuestions, initialInterviewQuestions)
+      ? formFromJob(job, initialScreeningQuestions)
       : { ...emptyForm(), ownerRecruiterId: currentUserId }
   );
   const [dirty, setDirty] = useState(false);
@@ -202,11 +198,33 @@ export function JobForm({
         // questions the recruiter already wrote.
         screeningQuestions:
           current.screeningQuestions.length > 0 ? current.screeningQuestions : proposal.screeningQuestions,
-        interviewQuestions:
-          current.interviewQuestions.length > 0 ? current.interviewQuestions : proposal.interviewQuestions,
         // Keep the pasted text as the job description if none was set.
         description: current.description.trim() === "" ? pasted.trim() : current.description,
       }));
+
+      // The AI's interview questions have no field of their own any more, so
+      // they are seeded into BOTH interview stages' suggested lists — the same
+      // both-not-one rule migration 0025 used, and for the same reason: the
+      // proposal never says which round a question belongs to.
+      //
+      // Only into an EMPTY list, never over questions the recruiter wrote, and
+      // it seeds the config without enabling the stage: proposing a question is
+      // not the same as deciding the job runs that round.
+      if (proposal.interviewQuestions.length > 0) {
+        setStages((current) => {
+          const next = { ...current };
+          for (const key of ["phone_interview", "video_interview"] as const) {
+            const config = next[key].config as StageConfig & { questions: string[] };
+            if ((config.questions ?? []).length === 0) {
+              next[key] = {
+                ...next[key],
+                config: { ...config, questions: [...proposal.interviewQuestions] } as StageConfig,
+              };
+            }
+          }
+          return next;
+        });
+      }
 
       setConflicts(found);
       setExtracted(true);
@@ -237,7 +255,10 @@ export function JobForm({
       owner_recruiter_id: form.ownerRecruiterId || null,
       client_id: form.clientId || null,
       screening_questions: form.screeningQuestions,
-      interview_questions: form.interviewQuestions,
+      // interview_questions is NOT sent any more. The generic list was split
+      // into the Phone Interview and Video Interview stages' own "Suggested
+      // questions", and migration 0025 copied the old rows into both. Sending
+      // it would write to a table nothing reads.
     };
 
     const response = await fetch(mode === "create" ? "/api/jobs" : `/api/jobs/${job!.id}`, {
@@ -607,17 +628,6 @@ export function JobForm({
         readOnly={!canEditStages}
       />
 
-      <div className="card mb-4">
-        <h2 className="title is-5">Interview questions</h2>
-        <p className="subtitle is-6 has-text-secondary">
-          Suggested to the human interviewer for this role.
-        </p>
-        <QuestionEditor
-          questions={form.interviewQuestions}
-          onChange={(questions) => update("interviewQuestions", questions)}
-        />
-      </div>
-
       {/* ---- Explicit save + unsaved indicator (spec section 8) ----------- */}
       <div className="card">
         <div className="is-flex is-justify-content-space-between is-align-items-center">
@@ -730,100 +740,3 @@ function SkillEditor({
   );
 }
 
-function QuestionEditor({
-  questions,
-  onChange,
-}: {
-  questions: string[];
-  onChange: (questions: string[]) => void;
-}) {
-  const [draft, setDraft] = useState("");
-
-  return (
-    <div>
-      {questions.length === 0 && (
-        <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>
-          None yet.
-        </p>
-      )}
-
-      {questions.map((question, index) => (
-        <div key={`${index}-${question}`} className="field has-addons mb-2">
-          <div className="control is-expanded">
-            <input
-              className="input"
-              type="text"
-              value={question}
-              onChange={(event) => {
-                const next = [...questions];
-                next[index] = event.target.value;
-                onChange(next);
-              }}
-            />
-          </div>
-          <div className="control">
-            <button
-              type="button"
-              className="button"
-              aria-label="Move up"
-              disabled={index === 0}
-              onClick={() => {
-                const next = [...questions];
-                [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                onChange(next);
-              }}
-            >
-              ↑
-            </button>
-          </div>
-          <div className="control">
-            <button
-              type="button"
-              className="button"
-              style={{ color: "var(--color-error)" }}
-              aria-label="Remove question"
-              onClick={() => onChange(questions.filter((_, i) => i !== index))}
-            >
-              Remove
-            </button>
-          </div>
-        </div>
-      ))}
-
-      <div className="field has-addons mt-3">
-        <div className="control is-expanded">
-          <input
-            className="input"
-            type="text"
-            placeholder="Add a question"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                if (draft.trim()) {
-                  onChange([...questions, draft.trim()]);
-                  setDraft("");
-                }
-              }
-            }}
-          />
-        </div>
-        <div className="control">
-          <button
-            type="button"
-            className="button"
-            onClick={() => {
-              if (draft.trim()) {
-                onChange([...questions, draft.trim()]);
-                setDraft("");
-              }
-            }}
-          >
-            Add
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
