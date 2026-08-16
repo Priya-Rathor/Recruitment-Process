@@ -580,21 +580,22 @@ export function JobForm({
         </div>
       </div>
 
-      {/* ---- Step 4: question sets ---------------------------------------- */}
-      <div className="card mb-4">
-        <h2 className="title is-5">Screening questions</h2>
-        <p className="subtitle is-6 has-text-secondary">
-          Asked on the automated screening call. A job with none can&apos;t be screened.
-        </p>
-        <QuestionEditor
-          questions={form.screeningQuestions}
-          onChange={(questions) => update("screeningQuestions", questions)}
-        />
-      </div>
-
       {/* ---- Hiring stages ------------------------------------------------
-          After the question sets, because the AI screening stage edits the
-          screening list above and the two read better adjacent. ----------- */}
+          SCREENING QUESTIONS ARE NOT EDITED HERE ANY MORE.
+          
+          There used to be a standalone "Screening questions" card above this
+          one. It and the list inside the AI Screening Call stage's
+          configuration bound to the SAME state and wrote to the same
+          job_screening_questions rows — one list rendered twice, which meant
+          two places to look and two places to disagree about which was
+          authoritative.
+          
+          The stage screen is the survivor: it is where max attempts, language
+          and the call script already live, so the questions sit beside the
+          things that shape how they are asked. `form.screeningQuestions` is
+          still owned here and still saved on every submit, so a job whose
+          stage is switched off keeps its questions untouched — they are hidden,
+          never dropped. -------------------------------------------------- */}
       <HiringStages
         stages={stages}
         onChange={(next) => {
@@ -703,7 +704,7 @@ function SkillEditor({
           />
         </div>
         <div className="control">
-          <button type="button" className="button" onClick={add}>
+          <button type="button" className="button is-primary" onClick={add}>
             Add
           </button>
         </div>

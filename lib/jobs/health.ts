@@ -58,7 +58,12 @@ export function evaluateJobHealth(input: JobHealthInput, now: Date = new Date())
     // Rule 2 — Module 8 cannot run an AI screening call without questions, so an
     // open job with none silently blocks the downstream workflow.
     if (input.screeningQuestionCount === 0) {
-      reasons.push("No screening questions — AI screening cannot run");
+      // Names WHERE to fix it. The standalone editor on the job form is gone;
+      // the only place these are managed now is the AI Screening Call stage's
+      // configuration, and a warning with no route to the fix is a dead end.
+      reasons.push(
+        "No screening questions — add them in the AI Screening Call stage to enable screening"
+      );
     }
 
     // Rule 3 — Module 7's deterministic matching needs an experience range.

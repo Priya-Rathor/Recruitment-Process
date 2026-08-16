@@ -111,7 +111,7 @@ export function StringListEditor({
               }
             }}
           />
-          <button type="button" className="button is-small" onClick={add} disabled={!draft.trim()}>
+          <button type="button" className="button is-primary is-small" onClick={add} disabled={!draft.trim()}>
             <Plus size={13} aria-hidden="true" />
             Add
           </button>

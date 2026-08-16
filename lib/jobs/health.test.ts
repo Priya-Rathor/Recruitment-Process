@@ -33,7 +33,7 @@ describe("rule 1 — on hold", () => {
 describe("rules 2-5 — completeness, assessed only when open", () => {
   it("flags an open job with no screening questions", () => {
     const result = evaluateJobHealth({ ...healthyJob, screeningQuestionCount: 0 }, NOW);
-    expect(result.reasons).toContain("No screening questions — AI screening cannot run");
+    expect(result.reasons.join(" ")).toContain("No screening questions");
   });
 
   it("flags a missing experience range only when BOTH bounds are absent", () => {
@@ -158,7 +158,7 @@ describe("multiple failures", () => {
     const result = evaluateJobHealth(neglected, NOW);
     expect(result.status).toBe("needs_attention");
     expect(result.reasons).toEqual([
-      "No screening questions — AI screening cannot run",
+      "No screening questions — add them in the AI Screening Call stage to enable screening",
       "No experience range — candidate matching will be less accurate",
       "No salary band — candidate matching will be less accurate",
       "No required skills listed",
