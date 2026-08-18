@@ -14,7 +14,7 @@
 // =============================================================================
 
 import { useRef, useState } from "react";
-import { Eye, Plus, Search, X } from "lucide-react";
+import { Eye, Plus, RotateCcw, Search, X } from "lucide-react";
 import {
   GROUP_LABELS,
   PLACEHOLDER_FIELDS,
@@ -28,10 +28,23 @@ import {
   MAX_DURATION_MINUTES,
   MIN_CALL_ATTEMPTS,
   MIN_DURATION_MINUTES,
+  type ScoringWeights,
   type StageConfig,
 } from "@/lib/hiring-stages/config";
 import { stageDefinition, type StageKey } from "@/lib/hiring-stages/catalog";
-import { ROUND_SCORE_MAX } from "@/lib/evaluation/verdict";
+import { RESUME_SCORE_MAX, ROUND_SCORE_MAX } from "@/lib/evaluation/verdict";
+import { COMPONENT_WEIGHTS, type ComponentKey } from "@/lib/matching/deterministic";
+import { SEMANTIC_WEIGHT } from "@/lib/matching/score";
+import { DEFAULT_SCORING_GUIDANCE } from "@/lib/matching/prompt";
+
+/** Label and one-line reason for each scoring component. */
+const WEIGHT_LABELS: Record<ComponentKey, { label: string; help: string }> = {
+  skills: { label: "Required skills", help: "How much of the mandatory skill list they have" },
+  experience: { label: "Experience", help: "Years against this job's range" },
+  salary: { label: "Salary", help: "Their expectation against the band" },
+  location: { label: "Location", help: "Where they are against where the job is" },
+  notice: { label: "Notice period", help: "How soon they could start" },
+};
 import { StringListEditor } from "./StringListEditor";
 
 export type StageDraft = {
@@ -56,6 +69,10 @@ export function StageConfigModal({
   onCancel: () => void;
 }) {
   const stage = stageDefinition(stageKey);
+  // Resume Score differs from the other four in kind, not just in its fields:
+  // it always runs, and its "script" is judging guidance rather than words
+  // anybody says out loud.
+  const isScoring = stage.kind === "scoring";
 
   const [prompt, setPrompt] = useState(draft.promptTemplate);
   const [config, setConfig] = useState<StageConfig>(draft.config);
@@ -103,6 +120,15 @@ export function StageConfigModal({
     setConfig((current) => ({ ...current, ...changes }) as StageConfig);
   }
 
+  // Null weights mean "platform defaults", so the form shows the defaults
+  // rather than five blanks — someone deciding whether to change a weight needs
+  // to see what it currently is.
+  const weights: ScoringWeights =
+    (config as { weights?: ScoringWeights | null }).weights ?? COMPONENT_WEIGHTS;
+  const weightTotal = Object.values(weights).reduce((sum, value) => sum + value, 0);
+
+  const usingDefaultPrompt = prompt.trim().length === 0 || prompt.trim() === DEFAULT_SCORING_GUIDANCE.trim();
+
   return (
     <div className="modal is-active intake-modal" role="dialog" aria-modal="true"
          aria-label={`Configure ${stage.label}`}>
@@ -127,11 +153,26 @@ export function StageConfigModal({
             </p>
           )}
 
+          {/*
+            Says which prompt is actually in force. "Customise the prompt" is
+            only a real choice if you can tell, at a glance, whether you are
+            looking at the default or at something someone edited last quarter.
+          */}
+          {isScoring && (
+            <p className="intake-callout mb-4">
+              {usingDefaultPrompt
+                ? "This is the default scoring guidance every job starts with. Edit it to judge this role your own way, or leave it exactly as it is."
+                : "This job uses its own scoring guidance. “Reset prompt and weights” below puts the standard one back."}{" "}
+              The JSON format the scorer needs is added automatically and cannot be edited away, so
+              a rewrite here can change the judgement but never break the score.
+            </p>
+          )}
+
           {/* ---- The script ------------------------------------------------ */}
           <div className="stage-field">
             <div className="stage-field__head">
               <label className="label" htmlFor="stage-prompt">
-                Script / instructions for this stage
+                {isScoring ? "Scoring guidance" : "Script / instructions for this stage"}
               </label>
 
               <div className="stage-picker">
@@ -260,13 +301,21 @@ export function StageConfigModal({
             */}
             <div className="columns is-variable is-3">
               <div className="column is-half">
-                <label className="label" htmlFor="stage-passing">Passing score (1-10)</label>
+                {/*
+                  The resume score is a PERCENTAGE; every other stage is judged
+                  on a 1-10 round score. One control, two scales, because the
+                  numbers it gates are genuinely different — labelling both
+                  "score" without the scale is how a 7 ends up meaning "7%".
+                */}
+                <label className="label" htmlFor="stage-passing">
+                  {isScoring ? "Passing match score (%)" : "Passing score (1-10)"}
+                </label>
                 <input
                   id="stage-passing"
                   className="input"
                   type="number"
                   min={0}
-                  max={ROUND_SCORE_MAX}
+                  max={isScoring ? RESUME_SCORE_MAX : ROUND_SCORE_MAX}
                   readOnly={readOnly}
                   value={(config as { passingScore: number | null }).passingScore ?? ""}
                   onChange={(e) =>
@@ -276,11 +325,111 @@ export function StageConfigModal({
                   }
                 />
                 <p className="stage-field__help">
-                  Leave blank for no gate — results then read &ldquo;Needs Review&rdquo; rather
-                  than failing.
+                  {isScoring
+                    ? "At or above this, the resume gate passes. Leave blank for no gate — results then read “Needs Review” rather than failing."
+                    : "Leave blank for no gate — results then read “Needs Review” rather than failing."}
                 </p>
               </div>
             </div>
+
+            {isScoring && (
+              <>
+                <div className="stage-field">
+                  <div className="stage-field__head">
+                    <label className="label">What the score is made of</label>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        className="text-link"
+                        onClick={() => {
+                          // Everything customisable on this row, in one action:
+                          // a reset that left the prompt behind would put the
+                          // job in a state the screen describes as "default"
+                          // while it is still judged by somebody's rewrite.
+                          setPrompt(DEFAULT_SCORING_GUIDANCE);
+                          patchConfig({ weights: null, semanticWeightPercent: null });
+                        }}
+                      >
+                        <RotateCcw size={14} aria-hidden="true" />
+                        Reset prompt and weights
+                      </button>
+                    )}
+                  </div>
+                  <p className="stage-field__help mb-3">
+                    Relative weights, not percentages — they do not have to add up to 100. A
+                    component with nothing to compare (no salary band on the job, no notice period
+                    on the candidate) is skipped and its weight shared out, so a half-filled
+                    profile is never scored as a bad fit.
+                  </p>
+
+                  <div className="columns is-variable is-2 is-multiline">
+                    {(Object.keys(WEIGHT_LABELS) as ComponentKey[]).map((key) => (
+                      <div className="column is-one-third" key={key}>
+                        <label className="label" htmlFor={`weight-${key}`}>
+                          {WEIGHT_LABELS[key].label}
+                        </label>
+                        <input
+                          id={`weight-${key}`}
+                          className="input"
+                          type="number"
+                          min={0}
+                          max={100}
+                          readOnly={readOnly}
+                          value={weights[key]}
+                          onChange={(e) =>
+                            patchConfig({
+                              weights: {
+                                ...weights,
+                                [key]: e.target.value === "" ? 0 : Number(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                        <p className="stage-field__help">{WEIGHT_LABELS[key].help}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {weightTotal === 0 && (
+                    <p className="stage-field__help" style={{ color: "var(--status-attention-text)" }}>
+                      Every weight is zero, so there would be nothing to score on. Saved like this,
+                      the platform defaults are used instead.
+                    </p>
+                  )}
+                </div>
+
+                <div className="columns is-variable is-3">
+                  <div className="column is-half">
+                    <label className="label" htmlFor="stage-ai-share">
+                      How much the AI read counts (%)
+                    </label>
+                    <input
+                      id="stage-ai-share"
+                      className="input"
+                      type="number"
+                      min={0}
+                      max={100}
+                      readOnly={readOnly}
+                      value={
+                        (config as { semanticWeightPercent: number | null })
+                          .semanticWeightPercent ?? ""
+                      }
+                      onChange={(e) =>
+                        patchConfig({
+                          semanticWeightPercent:
+                            e.target.value === "" ? null : Number(e.target.value),
+                        })
+                      }
+                    />
+                    <p className="stage-field__help">
+                      Blank uses the default of {Math.round(SEMANTIC_WEIGHT * 100)}%. The rest
+                      comes from the checkable facts above. Set 0 to score on facts alone and skip
+                      the AI call entirely.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
             {stageKey === "ai_screening_call" && (
               <>

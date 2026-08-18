@@ -2930,6 +2930,25 @@ a {
   letter-spacing: 0;
 }
 
+// The one-line history under a stage's heading: when it was reached, when it
+// was left, how long it held. Caption weight on purpose — it is the context for
+// the scores below it, not a competitor to them.
+.eval-section__timing {
+  margin-top: calc(var(--space-1) * -1);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+// The screens a stage owns (Module 8's call console, Module 9's report), shown
+// inside that stage's section rather than in a sidebar stack that appeared
+// whether or not the job ran the stage.
+.eval-section__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
 .eval-row__verdict { grid-column: 2 / -2; }
 
 // =============================================================================

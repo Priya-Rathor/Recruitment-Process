@@ -12,7 +12,10 @@
 // waiting for something to happen.
 // =============================================================================
 
+import { DEFAULT_SCORING_GUIDANCE } from "@/lib/matching/prompt";
+
 export const STAGE_KEYS = [
+  "resume_score",
   "ai_screening_call",
   "phone_interview",
   "video_interview",
@@ -31,10 +34,22 @@ export type StageExecution =
   /** Configuration is saved and displayed; nothing runs it yet. */
   | "configuration_only";
 
+/**
+ * What the toggle MEANS on this row, which is not the same for all five.
+ *
+ * A `pipeline` stage is a step candidates move through: off means it does not
+ * happen. A `scoring` stage always happens — off means it uses the platform
+ * default rather than this job's own configuration. Rendering both with the
+ * same switch and no explanation would make "off" read as "no resume scoring",
+ * which would be false and alarming.
+ */
+export type StageKind = "pipeline" | "scoring";
+
 export type StageDefinition = {
   key: StageKey;
   label: string;
   description: string;
+  kind: StageKind;
   execution: StageExecution;
   /** Names the engine, so "live" is a checkable claim rather than a promise. */
   engine: string | null;
@@ -42,7 +57,17 @@ export type StageDefinition = {
 
 export const STAGES: StageDefinition[] = [
   {
+    key: "resume_score",
+    label: "Resume Score",
+    description: "How this job's resumes are scored, and the mark they must beat",
+    kind: "scoring",
+    // Genuinely runs: every application is scored the moment it exists.
+    execution: "live",
+    engine: "Matching engine (Module 7)",
+  },
+  {
     key: "ai_screening_call",
+    kind: "pipeline",
     label: "AI Screening Call",
     description: "Automated call screening candidates before recruiter review",
     execution: "live",
@@ -50,6 +75,7 @@ export const STAGES: StageDefinition[] = [
   },
   {
     key: "phone_interview",
+    kind: "pipeline",
     label: "Phone Interview",
     description: "A recruiter calls the candidate and works through set questions",
     execution: "configuration_only",
@@ -57,6 +83,7 @@ export const STAGES: StageDefinition[] = [
   },
   {
     key: "video_interview",
+    kind: "pipeline",
     label: "Video Interview",
     description: "A scheduled video call with the hiring team",
     execution: "configuration_only",
@@ -64,6 +91,7 @@ export const STAGES: StageDefinition[] = [
   },
   {
     key: "written_assessment",
+    kind: "pipeline",
     label: "Written Assessment",
     description: "A take-home or timed written test",
     execution: "configuration_only",
@@ -85,6 +113,13 @@ export function stageDefinition(key: StageKey): StageDefinition {
 export const CONFIGURATION_ONLY_NOTE = "Not yet active — configuration only";
 
 /**
+ * What off means on a scoring row. Shown on the row itself, because a switch
+ * with no explanation is read as on/off for the whole feature.
+ */
+export const SCORING_OFF_NOTE = "Off — scored with the platform default";
+export const SCORING_ON_NOTE = "On — scored with this job's own prompt";
+
+/**
  * The placeholder-aware default script offered when a stage is first enabled.
  *
  * A blank textarea is the single biggest reason a configuration screen gets
@@ -97,6 +132,10 @@ export const CONFIGURATION_ONLY_NOTE = "Not yet active — configuration only";
  * nobody chose.
  */
 export const STARTER_TEMPLATES: Record<StageKey, string> = {
+  // Not an invented example like the others: this IS the prompt the matcher uses
+  // when nothing is configured. Starting the editor anywhere else would mean
+  // "customise" silently began by discarding the default behaviour.
+  resume_score: DEFAULT_SCORING_GUIDANCE,
   ai_screening_call:
     "You are screening {{candidate.name}} for the {{job.title}} role at {{job.client_name}}.\n\n" +
     "Confirm they are still interested, then work through the screening questions below. " +

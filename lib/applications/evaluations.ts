@@ -36,6 +36,11 @@ export const EVALUATION_STAGES = [
 
 export type EvaluationStage = (typeof EVALUATION_STAGES)[number];
 
+/** Whether a stage has anything to assess — i.e. whether it gets scored rows. */
+export function isEvaluationStage(value: unknown): value is EvaluationStage {
+  return typeof value === "string" && (EVALUATION_STAGES as readonly string[]).includes(value);
+}
+
 /** Stages that accept a manually logged entry (application_evaluations). */
 export const MANUAL_EVALUATION_STAGES = [
   "phone_interview",

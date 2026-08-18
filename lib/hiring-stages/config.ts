@@ -11,8 +11,9 @@
 // this is a "make the API's output sane" guard rather than a security boundary
 // — the security boundary is RLS, which decides WHO may write, not what.
 // =============================================================================
-import { isStageKey, type StageKey } from "@/lib/hiring-stages/catalog";
-import { ROUND_SCORE_MAX, normalizeThreshold } from "@/lib/evaluation/verdict";
+import { STAGE_KEYS, isStageKey, type StageKey } from "@/lib/hiring-stages/catalog";
+import { RESUME_SCORE_MAX, ROUND_SCORE_MAX, normalizeThreshold } from "@/lib/evaluation/verdict";
+import { COMPONENT_WEIGHTS, type ComponentKey } from "@/lib/matching/deterministic";
 
 /** Longest a single free-text list item may be, matching job questions. */
 const MAX_ITEM_LENGTH = 500;
@@ -37,6 +38,27 @@ export const MAX_CALL_ATTEMPTS = 10;
  * declining to judge.
  */
 export type PassingScore = { passingScore: number | null };
+
+/**
+ * Per-component weights for the deterministic half of the resume score.
+ *
+ * Stored as whole numbers that need not sum to 100 — scoreDeterministic()
+ * renormalises whatever it is given, because it already has to: a component
+ * with no data to judge is skipped and its weight redistributed. Forcing the
+ * form to sum to exactly 100 would be a rule the scorer itself does not have.
+ */
+export type ScoringWeights = Record<ComponentKey, number>;
+
+export type ResumeScoreConfig = PassingScore & {
+  /** Null means the platform defaults (COMPONENT_WEIGHTS) are used. */
+  weights: ScoringWeights | null;
+  /**
+   * How much of the score the AI read may carry, 0-100. Null means the platform
+   * default (30%). Zero is a legitimate setting: it says "score me on the facts
+   * only", which is exactly what a job with no budget for AI calls wants.
+   */
+  semanticWeightPercent: number | null;
+};
 
 export type AiScreeningConfig = PassingScore & {
   /**
@@ -70,6 +92,7 @@ export type WrittenAssessmentConfig = PassingScore & {
 };
 
 export type StageConfig =
+  | ResumeScoreConfig
   | AiScreeningConfig
   | PhoneInterviewConfig
   | VideoInterviewConfig
@@ -83,13 +106,15 @@ export type StageConfig =
  * `maxAttempts` off a phone-interview config — compiles happily and returns
  * undefined at runtime.
  */
-export type ConfigForStage<K extends StageKey> = K extends "ai_screening_call"
-  ? AiScreeningConfig
-  : K extends "phone_interview"
-    ? PhoneInterviewConfig
-    : K extends "video_interview"
-      ? VideoInterviewConfig
-      : WrittenAssessmentConfig;
+export type ConfigForStage<K extends StageKey> = K extends "resume_score"
+  ? ResumeScoreConfig
+  : K extends "ai_screening_call"
+    ? AiScreeningConfig
+    : K extends "phone_interview"
+      ? PhoneInterviewConfig
+      : K extends "video_interview"
+        ? VideoInterviewConfig
+        : WrittenAssessmentConfig;
 
 function cleanList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -122,6 +147,11 @@ export function emptyStageConfig<K extends StageKey>(stageKey: K): ConfigForStag
 
 function emptyStageConfigImpl(stageKey: StageKey): StageConfig {
   switch (stageKey) {
+    case "resume_score":
+      // Nulls throughout: an unconfigured row must score exactly as the platform
+      // default does, so it cannot be told apart from never having been touched.
+      return { passingScore: null, weights: null, semanticWeightPercent: null };
+
     case "ai_screening_call":
       return { maxAttempts: null, language: null, passingScore: null };
     case "phone_interview":
@@ -150,10 +180,51 @@ export function normalizeStageConfig<K extends StageKey>(
   return normalizeStageConfigImpl(stageKey, raw) as ConfigForStage<K>;
 }
 
+/**
+ * Weights, or null.
+ *
+ * All-or-nothing on purpose. A partial map ("skills: 60" and nothing else) has
+ * no honest reading — the four unnamed components would either vanish or keep
+ * defaults that no longer sum sensibly beside the one that changed. Null means
+ * "use the defaults", and the form always sends all five.
+ */
+function cleanWeights(value: unknown): ScoringWeights | null {
+  if (typeof value !== "object" || value === null) return null;
+  const raw = value as Record<string, unknown>;
+
+  const weights = {} as ScoringWeights;
+  let total = 0;
+
+  for (const key of Object.keys(COMPONENT_WEIGHTS) as ComponentKey[]) {
+    const numeric =
+      typeof raw[key] === "number"
+        ? (raw[key] as number)
+        : typeof raw[key] === "string"
+          ? Number(raw[key])
+          : NaN;
+    if (!Number.isFinite(numeric) || numeric < 0) return null;
+    const clamped = Math.min(Math.round(numeric), 100);
+    weights[key] = clamped;
+    total += clamped;
+  }
+
+  // Every component zeroed would make the deterministic score meaningless
+  // rather than configurable, and scoreDeterministic() would divide by zero.
+  return total > 0 ? weights : null;
+}
+
 function normalizeStageConfigImpl(stageKey: StageKey, raw: unknown): StageConfig {
   const input = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
 
   switch (stageKey) {
+    case "resume_score":
+      return {
+        // A percentage, not a 1-10 round score — this gate reads jobs.match_score.
+        passingScore: normalizeThreshold(input.passingScore, RESUME_SCORE_MAX),
+        weights: cleanWeights(input.weights),
+        semanticWeightPercent: normalizeThreshold(input.semanticWeightPercent, 100),
+      };
+
     case "ai_screening_call":
       return {
         maxAttempts: cleanNumber(input.maxAttempts, MIN_CALL_ATTEMPTS, MAX_CALL_ATTEMPTS),
@@ -265,5 +336,9 @@ export function parseStagesPayload(body: unknown): ParseResult {
   return { ok: true, stages };
 }
 
-/** Four stages exist; anything longer is a malformed or hostile request. */
-const STAGE_LIMIT = 4;
+/**
+ * As many stages as the catalogue defines; anything longer is a malformed or
+ * hostile request. Derived rather than written as a literal, so adding a stage
+ * never leaves a number behind that quietly rejects it.
+ */
+const STAGE_LIMIT = STAGE_KEYS.length;

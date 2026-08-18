@@ -38,6 +38,11 @@ export type NavItem = {
   icon: LucideIcon;
   /** Owner/Admin only. Hidden entirely for other roles, never shown-and-refused. */
   adminOnly?: boolean;
+  /**
+   * Agency-mode only. An in-house team has no clients, so this link would lead
+   * to a page that is empty by definition rather than by accident.
+   */
+  agencyOnly?: boolean;
 };
 
 /** Each inner array is one visual group; a divider is drawn between them. */
@@ -62,7 +67,15 @@ export const NAV_GROUPS: NavItem[][] = [
      */
     { href: "/hires", label: "Onboarding", icon: UserCheck },
     { href: "/interviews", label: "Interviews", icon: Calendar },
-    { href: "/clients", label: "Clients", icon: Building2 },
+    /**
+     * Agency mode only. See lib/organizations/hiringModel.ts — an in-house
+     * team hires for itself, so it has no client companies to submit anyone to.
+     *
+     * Removing it shortens the bar rather than lengthening it, so none of the
+     * width measurements above are at risk; they were all taken with this item
+     * present, which is now the worst case rather than the only case.
+     */
+    { href: "/clients", label: "Clients", icon: Building2, agencyOnly: true },
   ],
 ];
 

@@ -12,14 +12,18 @@ import {
 import { STAGES, STAGE_KEYS, isStageKey, stageDefinition } from "@/lib/hiring-stages/catalog";
 
 describe("the stage catalogue", () => {
-  it("has exactly the four stages the spec names, in order", () => {
+  it("has exactly the stages the spec names, in order", () => {
+    // Resume Score leads: it happens to a candidate before any of the four
+    // steps below it, and it is not one of them — see `kind`.
     expect(STAGE_KEYS).toEqual([
+      "resume_score",
       "ai_screening_call",
       "phone_interview",
       "video_interview",
       "written_assessment",
     ]);
     expect(STAGES.map((s) => s.label)).toEqual([
+      "Resume Score",
       "AI Screening Call",
       "Phone Interview",
       "Video Interview",
@@ -28,15 +32,31 @@ describe("the stage catalogue", () => {
   });
 
   /**
-   * The honesty check. Only the screening call has an engine; the other three
-   * are configuration-only, and the UI reads THIS to decide whether to show
-   * "Not yet active". If someone marks one live without wiring an engine, this
-   * fails rather than the product quietly promising something it cannot do.
+   * The distinction the UI copy rests on. A `scoring` row's switch chooses
+   * WHOSE RULES apply, not whether anything happens — if this ever flipped to
+   * "pipeline", the row would start telling recruiters that switching it off
+   * stops resumes being scored, which is false.
    */
-  it("marks exactly one stage as live, and names its engine", () => {
+  it("marks resume scoring as scoring, and every real step as pipeline", () => {
+    expect(STAGES.filter((s) => s.kind === "scoring").map((s) => s.key)).toEqual(["resume_score"]);
+    for (const stage of STAGES.filter((s) => s.key !== "resume_score")) {
+      expect(stage.kind, stage.key).toBe("pipeline");
+    }
+  });
+
+  /**
+   * The honesty check. Two stages are wired to something that really runs —
+   * the screening call to Bolna, resume scoring to the matcher — and the other
+   * three are configuration-only. The UI reads THIS to decide whether to show
+   * "Not yet active", so marking a stage live without wiring an engine fails
+   * here rather than quietly promising something the product cannot do.
+   */
+  it("only calls a stage live when it names the engine behind it", () => {
     const live = STAGES.filter((s) => s.execution === "live");
-    expect(live.map((s) => s.key)).toEqual(["ai_screening_call"]);
-    expect(live[0].engine).toContain("Bolna");
+    expect(live.map((s) => s.key)).toEqual(["resume_score", "ai_screening_call"]);
+    for (const stage of live) {
+      expect(stage.engine, stage.key).toBeTruthy();
+    }
 
     for (const stage of STAGES.filter((s) => s.execution === "configuration_only")) {
       expect(stage.engine, stage.key).toBeNull();
@@ -270,5 +290,75 @@ describe("parseStagesPayload", () => {
       timeLimitMinutes: 90,
       passingScore: null,
     });
+  });
+});
+
+describe("the resume score config", () => {
+  it("treats the pass mark as a percentage, not a 1-10 round score", () => {
+    // 70 is a legitimate match percentage; on the other four stages the same
+    // number would be clamped to 10, which is exactly why they are separate.
+    expect(normalizeStageConfig("resume_score", { passingScore: 70 }).passingScore).toBe(70);
+    expect(normalizeStageConfig("resume_score", { passingScore: 250 }).passingScore).toBe(100);
+    expect(normalizeStageConfig("phone_interview", { passingScore: 70 }).passingScore).toBe(10);
+  });
+
+  it("starts every value null, so an untouched row scores as the platform default", () => {
+    expect(emptyStageConfig("resume_score")).toEqual({
+      passingScore: null,
+      weights: null,
+      semanticWeightPercent: null,
+    });
+  });
+
+  it("accepts a full set of weights and clamps each one", () => {
+    const config = normalizeStageConfig("resume_score", {
+      weights: { skills: 60, experience: 20, salary: 10, location: 5, notice: 500 },
+    });
+    expect(config.weights).toEqual({
+      skills: 60,
+      experience: 20,
+      salary: 10,
+      location: 5,
+      notice: 100,
+    });
+  });
+
+  it("rejects a PARTIAL set of weights rather than inventing the rest", () => {
+    // The four unnamed components have no honest value here: keeping their
+    // defaults beside one changed number silently rebalances the score.
+    expect(normalizeStageConfig("resume_score", { weights: { skills: 60 } }).weights).toBeNull();
+    expect(
+      normalizeStageConfig("resume_score", { weights: { skills: -1, experience: 1, salary: 1, location: 1, notice: 1 } })
+        .weights
+    ).toBeNull();
+  });
+
+  it("falls back to defaults when every weight is zero", () => {
+    // Otherwise the deterministic half would divide by a total weight of zero.
+    const config = normalizeStageConfig("resume_score", {
+      weights: { skills: 0, experience: 0, salary: 0, location: 0, notice: 0 },
+    });
+    expect(config.weights).toBeNull();
+  });
+
+  it("keeps a deliberate zero AI share, which is not the same as blank", () => {
+    // 0 means "score on facts alone"; null means "use the platform default".
+    expect(
+      normalizeStageConfig("resume_score", { semanticWeightPercent: 0 }).semanticWeightPercent
+    ).toBe(0);
+    expect(
+      normalizeStageConfig("resume_score", { semanticWeightPercent: "nonsense" })
+        .semanticWeightPercent
+    ).toBeNull();
+    expect(
+      normalizeStageConfig("resume_score", { semanticWeightPercent: 900 }).semanticWeightPercent
+    ).toBe(100);
+  });
+
+  it("accepts all five stages in one payload now that there are five", () => {
+    const result = parseStagesPayload({
+      stages: STAGE_KEYS.map((key) => ({ stage_key: key, enabled: false, config: {} })),
+    });
+    expect(result.ok).toBe(true);
   });
 });

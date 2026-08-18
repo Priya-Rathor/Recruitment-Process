@@ -4,6 +4,7 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
 import { formatDbError } from "@/lib/supabase/errors";
+import { parseAgencyMode } from "@/lib/organizations/hiringModel";
 
 /**
  * Guards :id against the caller's server-resolved tenant. A valid-looking id
@@ -49,7 +50,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const payload = (body ?? {}) as Record<string, unknown>;
-    const updates: Record<string, string | null> = {};
+    const updates: Record<string, string | boolean | null> = {};
 
     // Allowlist — anything else in the payload (id, created_at, ...) is ignored.
     for (const field of ["name", "industry", "size", "country", "timezone"] as const) {
@@ -71,6 +72,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }
       }
     }
+
+    /**
+     * agency_mode is handled apart from the string loop because it is a boolean,
+     * and because "absent" has to stay distinguishable from "false" — coercing
+     * here would let a payload that never mentioned the field switch a whole
+     * organization out of agency mode.
+     *
+     * Nothing is deleted either way: turning it off hides the client-facing UI
+     * and leaves every client, submission and feedback event where it is.
+     */
+    const agencyMode = parseAgencyMode(payload.agency_mode);
+    if (!agencyMode.ok) return jsonError(agencyMode.error, 400);
+    if (agencyMode.value !== undefined) updates.agency_mode = agencyMode.value;
 
     if (Object.keys(updates).length === 0) {
       return jsonError("No updatable fields provided.", 400);

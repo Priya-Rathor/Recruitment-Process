@@ -11,6 +11,7 @@ import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { WORK_MODE_LABELS, type JobQuestion } from "@/lib/types";
 import { listUnresolvedConflicts, loadConflictCandidates } from "@/lib/intake/queries";
 import { listJobStages } from "@/lib/hiring-stages/queries";
+import { listCandidates } from "@/lib/candidates/queries";
 import { STAGES, CONFIGURATION_ONLY_NOTE } from "@/lib/hiring-stages/catalog";
 import { getOrganizationSettings } from "@/lib/settings/queries";
 import type { AiScreeningConfig } from "@/lib/hiring-stages/config";
@@ -83,18 +84,26 @@ async function JobDetailContent({
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
 
-  const [{ applications }, intakeConflicts, hiringStages, orgSettings] = await Promise.all([
-    listApplications({
-      organizationId: membership.organization.id,
-      filters: { jobId },
-      viewerRole: membership.role,
-      viewerId: membership.user_id,
-      limit: 50,
-    }),
-    listUnresolvedConflicts({ organizationId: membership.organization.id, jobId }),
-    listJobStages({ organizationId: membership.organization.id, jobId }),
-    getOrganizationSettings(membership.organization.id),
-  ]);
+  const [{ applications }, intakeConflicts, hiringStages, orgSettings, candidatePool] =
+    await Promise.all([
+      listApplications({
+        organizationId: membership.organization.id,
+        filters: { jobId },
+        viewerRole: membership.role,
+        viewerId: membership.user_id,
+        limit: 50,
+      }),
+      listUnresolvedConflicts({ organizationId: membership.organization.id, jobId }),
+      listJobStages({ organizationId: membership.organization.id, jobId }),
+      getOrganizationSettings(membership.organization.id),
+      // Only the COUNT is wanted: "Add existing candidate" is offered when there
+      // is somebody to add, and hidden when the database is empty — a search box
+      // that can only ever return nothing is worse than no button. One row is
+      // fetched because the count comes back with the query either way.
+      listCandidates({ organizationId: membership.organization.id, filters: {}, limit: 1 }),
+    ]);
+
+  const hasCandidates = candidatePool.total > 0;
 
   // Names for the candidates each conflicted file pointed at. One query for the
   // whole banner rather than one per row.
@@ -134,8 +143,19 @@ async function JobDetailContent({
           than not showing it.
         */}
         {canEdit && !job.archived_at && (
-          <div className="is-flex" style={{ gap: "var(--space-2)" }}>
+          <div className="is-flex" style={{ gap: "var(--space-2)", flexWrap: "wrap" }}>
             <IntakeModal jobId={job.id} jobTitle={job.title} />
+            {/*
+              The SAME action as the Pipeline card's "Add a candidate", with the
+              same name and the same destination — surfaced up here because that
+              one sits below the fold. Shown only when there is somebody to add:
+              the form it opens can do nothing with an empty database.
+            */}
+            {hasCandidates && (
+              <Link className="button" href={`/applications/new?job_id=${job.id}`}>
+                Add a candidate
+              </Link>
+            )}
             <Link className="button is-primary" href={`/jobs/${job.id}/edit`}>
               Edit job
             </Link>
@@ -215,6 +235,10 @@ async function JobDetailContent({
                   <span className="stage-summary__name">{definition.label}</span>
                   {definition.execution === "configuration_only" ? (
                     <span className="intake-chip is-neutral">{CONFIGURATION_ONLY_NOTE}</span>
+                  ) : definition.kind === "scoring" ? (
+                    // Not a step candidates go through, so it does not get the
+                    // same "Active" chip as one that happens to them.
+                    <span className="intake-chip is-success">Custom scoring</span>
                   ) : (
                     <span className="intake-chip is-success">Active</span>
                   )}

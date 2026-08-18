@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, requireCurrentUser, hasRole } from "@/lib/tenant";
 import { getJobDetail, listTeamMembers } from "@/lib/jobs/queries";
 import { listClients } from "@/lib/clients/queries";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { listJobStages } from "@/lib/hiring-stages/queries";
 import { stagesToFormState } from "@/lib/hiring-stages/formState";
 import { JobForm } from "../../JobForm";
@@ -35,10 +36,14 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
     );
   }
 
+  const agencyMode = isAgencyMode(membership.organization);
+
   const [job, members, { clients }, stages] = await Promise.all([
     getJobDetail({ organizationId: membership.organization.id, jobId: id }),
     listTeamMembers(membership.organization.id),
-    listClients({ organizationId: membership.organization.id }),
+    agencyMode
+      ? listClients({ organizationId: membership.organization.id })
+      : Promise.resolve({ clients: [], failed: false }),
     listJobStages({ organizationId: membership.organization.id, jobId: id }),
   ]);
 
@@ -71,6 +76,7 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
         initialScreeningQuestions={job.screeningQuestions.map((question) => question.question)}
         members={members}
         clients={clients}
+        agencyMode={agencyMode}
         currentUserId={user.id}
         canClose={canClose}
         initialStages={stagesToFormState(stages)}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormError } from "@/components/states";
 import type { Organization } from "@/lib/types";
+import { HIRING_MODEL_OPTIONS, isAgencyMode } from "@/lib/organizations/hiringModel";
 import type { OnboardingRecommendations } from "@/lib/ai/generateOnboardingRecommendations";
 
 const TEAM_SIZES = ["1-5", "6-20", "21-50", "51-200", "200+"];
@@ -36,6 +37,14 @@ export function OnboardingFlow({
 
   // Step 2 fields
   const [industry, setIndustry] = useState(existingOrganization?.industry ?? "");
+  /**
+   * Agency or in-house. Asked here because it decides which product the user
+   * sees from their very first page, and because the honest default for a new
+   * workspace is "we don't know yet" rather than the column default.
+   */
+  const [agencyMode, setAgencyMode] = useState(
+    isAgencyMode(existingOrganization)
+  );
   const [size, setSize] = useState(existingOrganization?.size ?? TEAM_SIZES[0]);
   const [hiringFocus, setHiringFocus] = useState(existingOrganization?.onboarding_answer ?? "");
 
@@ -113,7 +122,7 @@ export function OnboardingFlow({
     const response = await fetch(`/api/organizations/${organization.id}/onboarding`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ industry, size, hiringFocus }),
+      body: JSON.stringify({ industry, size, hiringFocus, agency_mode: agencyMode }),
     });
 
     if (!response.ok) {
@@ -249,6 +258,35 @@ export function OnboardingFlow({
                 </select>
               </div>
             </div>
+          </div>
+
+          <div className="field">
+            <label className="label">Who do you hire for?</label>
+            {HIRING_MODEL_OPTIONS.map((option) => (
+              <label
+                key={String(option.value)}
+                className="radio is-block mb-2"
+                style={{ display: "block" }}
+              >
+                <input
+                  type="radio"
+                  name="hiring-model"
+                  className="mr-2"
+                  checked={agencyMode === option.value}
+                  onChange={() => setAgencyMode(option.value)}
+                />
+                {option.label}
+                <span
+                  className="has-text-secondary is-block"
+                  style={{ fontSize: 12, marginLeft: "1.6rem" }}
+                >
+                  {option.hint}
+                </span>
+              </label>
+            ))}
+            <p className="help has-text-secondary">
+              You can change this later in Settings → Organization.
+            </p>
           </div>
 
           <div className="field">

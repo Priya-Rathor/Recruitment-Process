@@ -96,6 +96,7 @@ export function JobForm({
   initialScreeningQuestions = [],
   members,
   clients,
+  agencyMode,
   currentUserId,
   canClose,
   initialStages,
@@ -110,6 +111,12 @@ export function JobForm({
   canEditStages?: boolean;
   members: { id: string; name: string; role: string }[];
   clients: { id: string; name: string }[];
+  /**
+   * False for an in-house organization, which recruits for itself and so has no
+   * client to attach a job to. The field is hidden rather than disabled — a
+   * permanently empty dropdown reads as something broken.
+   */
+  agencyMode: boolean;
   currentUserId: string;
   /** False for a Recruiter who doesn't own this job — they may edit, not close. */
   canClose: boolean;
@@ -543,28 +550,30 @@ export function JobForm({
               </p>
             )}
           </div>
-          <div className="column">
-            <label className="label" htmlFor="client">
-              Client
-            </label>
-            <div className="select is-fullwidth">
-              <select
-                id="client"
-                value={form.clientId}
-                onChange={(event) => update("clientId", event.target.value)}
-              >
-                <option value="">No client</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
+          {agencyMode && (
+            <div className="column">
+              <label className="label" htmlFor="client">
+                Client
+              </label>
+              <div className="select is-fullwidth">
+                <select
+                  id="client"
+                  value={form.clientId}
+                  onChange={(event) => update("clientId", event.target.value)}
+                >
+                  <option value="">No client</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="help has-text-secondary">
+                Needed before candidates can be submitted for this job.
+              </p>
             </div>
-            <p className="help has-text-secondary">
-              Needed before candidates can be submitted for this job.
-            </p>
-          </div>
+          )}
 
           <div className="column">
             <label className="label" htmlFor="owner">

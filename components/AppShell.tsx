@@ -6,6 +6,7 @@
 // only job is to hand it plain, already-scoped data — no session object, no
 // functions, nothing that crosses the boundary badly.
 import { getCurrentMembership, getCurrentUser, getUserMemberships, hasRole } from "@/lib/tenant";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { countUnread } from "@/lib/notifications/queries";
 import { TopNav } from "@/components/nav/TopNav";
 import type { ReactNode } from "react";
@@ -26,6 +27,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
       {membership && user && (
         <TopNav
           isAdmin={hasRole(membership.role, ["owner", "admin"])}
+          agencyMode={isAgencyMode(membership.organization)}
           account={{
             userName: user.name,
             userEmail: user.email,

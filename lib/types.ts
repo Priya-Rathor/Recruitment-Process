@@ -15,6 +15,13 @@ export type Organization = {
   size: string | null;
   country: string | null;
   timezone: string;
+  /**
+   * True = recruits for client companies (Module 12 is shown).
+   * False = hires for itself. See lib/organizations/hiringModel.ts — read it
+   * through isAgencyMode(), never directly, so an unmigrated row reads as an
+   * agency rather than as an in-house team.
+   */
+  agency_mode: boolean;
   onboarding_answer: string | null;
   onboarding_completed_at: string | null;
   created_at: string;

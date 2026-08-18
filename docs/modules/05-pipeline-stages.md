@@ -140,6 +140,64 @@ Logging an entry **never** moves the application. The two are separate actions;
 coupling them would mean writing up a failed interview accidentally promoting
 the candidate.
 
+## One stage, one place on the page
+
+The detail page used to say the same thing in two places. The sidebar carried
+`Calculate match`, `AI screening call` and `Screening report` buttons, a full
+interview list, the applied date and days-in-current-stage — all of which the
+Evaluation panel and the stepper already showed. Worse, the sidebar copies were
+**unconditional**: a job that never places a screening call still offered the
+call console and the report screen.
+
+Every stage now appears exactly once, in its own Evaluation section:
+
+| Was in the sidebar | Now |
+|---|---|
+| Calculate match / See match breakdown | inside **Resume & Match** |
+| AI screening call, Screening report | inside **AI Screening Call**, and only when the job runs it |
+| Interviews list | inside **Phone Interview** / **Video Interview** |
+| Applied date | the **Applied** section's timing line |
+| Days in current stage | the current section's "N days so far" |
+
+What stays in the sidebar is what is *not* a stage: the Interview brief (it
+spans whichever rounds the job runs), Submit to client (Module 12), the
+recruiter/source details, total age, and the move control. The Interviews card
+still exists, but only for rounds no stage section shows — an onsite interview,
+or a phone round on a job that has since switched that stage off. Nothing
+disappears; a stage holding entries stays visible by the `has_history` rule.
+
+## Every section states its own timing
+
+`lib/applications/stageTimings.ts` folds `application_stage_history` into one
+record per stage — first entered, last exited, whole days, visit count, and
+whether the stage is open. The Timeline card renders the same history
+chronologically; this renders it per stage, which is the shape the question
+"when did this reach Video Interview and how long did it sit?" actually has.
+
+Days are **summed across every visit**, not taken from the latest. An
+application moved back for a re-review has two rows for one stage, and the last
+visit alone understates a stall. An open visit is measured to `now` and labelled
+"so far", so a running total cannot be mistaken for a finished one — the same
+reading `daysInCurrentStage()` already took for the header.
+
+Applied, Shortlisted and Hired now get sections too. They carry no score —
+nothing is assessed at them — so the timing line is the whole record, and no
+"Nothing logged yet" is printed underneath, which would imply someone forgot to
+write something up. This also means every stepper segment has a section to jump
+to; previously three of them fell back to the top card.
+
+## Job stage changes reach every application immediately
+
+There is no per-application copy of the job's stage configuration to keep in
+sync. `listJobStages()` is read on each request (the detail page is
+`force-dynamic`, nothing is cached), and `effectiveStages()` derives the list
+from those rows plus the application's own state. Switching a stage on or off
+for a job therefore changes the stepper, the Evaluation panel and the move
+dropdown for **all** of that job's applications on their next render, with two
+deliberate exceptions that protect data rather than defeat the rule: an
+application currently *in* a switched-off stage keeps it visible, and a stage
+holding logged entries stays visible read-only.
+
 ## Applications list
 
 - **Job filter** and **candidate search** (name/email) added; the "filter from

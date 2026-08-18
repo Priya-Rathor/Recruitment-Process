@@ -15,9 +15,20 @@
 // checkable facts shown beside it.
 // =============================================================================
 import { completeJson, type AiResult } from "@/lib/ai/provider";
+import { buildScoringSystemPrompt } from "@/lib/matching/prompt";
 
 export type SemanticMatchInput = {
   jobTitle: string;
+  /**
+   * This job's own scoring guidance, from its Resume Score configuration.
+   *
+   * Null when the row is switched off, which is the normal case — the default
+   * guidance is used then. It can only ever change HOW the judgement is made:
+   * buildScoringSystemPrompt() keeps the JSON contract and the "no inventing
+   * equivalences" rule out of its reach, and this function still validates
+   * whatever comes back.
+   */
+  guidance?: string | null;
   /** Required skills with no literal match, from the deterministic pass. */
   unmatchedRequiredSkills: string[];
   candidateSkills: string[];
@@ -132,30 +143,6 @@ export function validateSemanticMatch(
   };
 }
 
-const SYSTEM_PROMPT = `You assess how well a candidate's background fits a job, semantically.
-
-You are given the job title, the candidate's skills and current role, and a list of required skills that did NOT literally appear on the candidate's profile.
-
-Return ONLY a JSON object:
-{
-  "roleSimilarity": number,
-  "seniorityFit": number,
-  "skillEquivalences": [{ "required": string, "coveredBy": string, "confidence": number, "reason": string }],
-  "observations": string[],
-  "needsVerification": string[]
-}
-
-Rules:
-- roleSimilarity: 0 to 1. How close the candidate's current role is to this job.
-- seniorityFit: 0 to 1. Whether their seniority reads as a fit for the job title.
-- skillEquivalences: ONLY for skills in the provided unmatched list. Include an entry when a skill the candidate DOES have genuinely covers it — e.g. "Spring Boot" is covered by "Spring", "PostgreSQL" by "Postgres". Do NOT stretch: React does not cover Angular, and Java does not cover JavaScript.
-- confidence: your honest 0-1 confidence in that specific equivalence.
-- Never invent an equivalence for a skill not in the unmatched list.
-- observations: at most 3 short, specific notes a recruiter would find useful. No filler, no restating the input.
-- needsVerification: at most 3 things you genuinely could not determine from what you were given.
-- Say nothing about salary, notice period, location, or years of experience — you have not been given them and they are checked elsewhere.
-- Return no commentary outside the JSON object.`;
-
 export async function matchCandidateToJob(
   input: SemanticMatchInput
 ): Promise<AiResult<SemanticMatch>> {
@@ -177,7 +164,9 @@ export async function matchCandidateToJob(
   };
 
   return completeJson<SemanticMatch>({
-    system: SYSTEM_PROMPT,
+    // Fixed contract + this job's guidance (or the default), never one replacing
+    // the other.
+    system: buildScoringSystemPrompt(input.guidance),
     user: JSON.stringify(payload, null, 2),
     temperature: 0.2,
     maxOutputTokens: 900,

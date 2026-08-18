@@ -13,9 +13,12 @@ import { JOB_STATUSES, JOB_STATUS_LABELS } from "@/lib/types";
 export function JobFilters({
   members,
   clients,
+  agencyMode,
 }: {
   members: { id: string; name: string; role: string }[];
   clients: { id: string; name: string }[];
+  /** False for an in-house organization — there is nothing to filter by. */
+  agencyMode: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -102,25 +105,27 @@ export function JobFilters({
           </div>
         </div>
 
-        <div className="column is-one-quarter">
-          <label className="label" style={{ fontSize: 13 }} htmlFor="job-client">
-            Client
-          </label>
-          <div className="select is-fullwidth">
-            <select
-              id="job-client"
-              value={activeClient}
-              onChange={(event) => apply({ client_id: event.target.value || null })}
-            >
-              <option value="">All clients</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
+        {agencyMode && (
+          <div className="column is-one-quarter">
+            <label className="label" style={{ fontSize: 13 }} htmlFor="job-client">
+              Client
+            </label>
+            <div className="select is-fullwidth">
+              <select
+                id="job-client"
+                value={activeClient}
+                onChange={(event) => apply({ client_id: event.target.value || null })}
+              >
+                <option value="">All clients</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="column is-flex is-align-items-flex-end">
           <label className="checkbox" style={{ fontSize: 13 }}>

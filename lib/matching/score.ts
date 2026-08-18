@@ -22,7 +22,8 @@ import {
  *
  * Deliberately the minority share: the deterministic half rests on recorded
  * facts, the semantic half on a model's judgement, and the number should lean on
- * whichever is more trustworthy. Per-organization weighting is Build Later.
+ * whichever is more trustworthy. A job may override it from its Resume Score
+ * configuration; this stays the default for everything that does not.
  */
 export const SEMANTIC_WEIGHT = 0.3;
 export const DETERMINISTIC_WEIGHT = 1 - SEMANTIC_WEIGHT;
@@ -70,10 +71,19 @@ export function computeSemanticScore(
 export function combineMatch({
   deterministic,
   semantic,
+  semanticWeight = SEMANTIC_WEIGHT,
 }: {
   deterministic: DeterministicResult;
   semantic: SemanticMatch | null;
+  /**
+   * 0-1 share the semantic read carries, from the job's Resume Score
+   * configuration. Clamped, because a weight above 1 would let the AI half
+   * subtract from the deterministic one — a number no reading of the form
+   * could justify.
+   */
+  semanticWeight?: number;
 }): CombinedMatch {
+  const aiShare = Math.min(Math.max(semanticWeight, 0), 1);
   const strongMatches = [...deterministic.strongMatches];
   const gaps = [...deterministic.gaps];
   const needsVerification = [...deterministic.needsVerification];
@@ -161,7 +171,7 @@ export function combineMatch({
   }
 
   const overallScore = round2(
-    deterministic.score * DETERMINISTIC_WEIGHT + semanticScore * SEMANTIC_WEIGHT
+    deterministic.score * (1 - aiShare) + semanticScore * aiShare
   );
 
   return {

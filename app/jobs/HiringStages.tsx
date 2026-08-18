@@ -22,6 +22,8 @@ import { Settings2 } from "lucide-react";
 import { Toggle } from "@/components/ui/Toggle";
 import {
   CONFIGURATION_ONLY_NOTE,
+  SCORING_OFF_NOTE,
+  SCORING_ON_NOTE,
   STAGES,
   STARTER_TEMPLATES,
   type StageKey,
@@ -117,7 +119,8 @@ export function HiringStages({
     <div className="card mb-4">
       <h2 className="title is-5">Hiring stages</h2>
       <p className="subtitle is-6 has-text-secondary">
-        Choose what this role&apos;s candidates go through, and write the script for each.
+        Choose what this role&apos;s candidates go through, and write the script for each. Resume
+        Score is not a step they go through — it is how their resume is judged before any of this.
       </p>
 
       <ul className="stage-list">
@@ -133,27 +136,49 @@ export function HiringStages({
                 </p>
                 <p className="stage-row__description">{stage.description}</p>
 
-                {/* Says plainly that three of the four cannot run yet, so
+                {/* Says plainly that three of the five cannot run yet, so
                     nobody enables one and waits for something to happen. */}
                 {stage.execution === "configuration_only" && (
                   <span className="stage-row__note">{CONFIGURATION_ONLY_NOTE}</span>
                 )}
-                {stage.execution === "live" && state.enabled && (
-                  <span className="stage-row__note is-live">Runs through {stage.engine}</span>
+
+                {/*
+                  A scoring row's switch does NOT mean "does this happen".
+                  Scoring always happens; the switch chooses whose rules. Both
+                  positions are labelled, because the dangerous misreading is of
+                  OFF — a recruiter who thinks they have turned resume scoring
+                  off has been told something false.
+                */}
+                {stage.kind === "scoring" ? (
+                  <span className={`stage-row__note${state.enabled ? " is-live" : ""}`}>
+                    {state.enabled ? SCORING_ON_NOTE : SCORING_OFF_NOTE}
+                  </span>
+                ) : (
+                  stage.execution === "live" &&
+                  state.enabled && (
+                    <span className="stage-row__note is-live">Runs through {stage.engine}</span>
+                  )
                 )}
               </div>
 
               <div className="stage-row__controls">
                 {/* Configure stays available while ON, so editing does not
                     require switching the stage off and on again. */}
-                {state.enabled && (
+                {(state.enabled || stage.kind === "scoring") && (
                   <button
                     type="button"
                     className="text-link"
                     onClick={() => setEditing({ key: stage.key, firstEnable: false })}
                   >
                     <Settings2 size={14} aria-hidden="true" />
-                    {readOnly ? "View" : configured ? "Configure" : "Finish setup"}
+                    {/* Off + scoring = you are looking at the default, which is
+                        exactly what someone deciding whether to customise needs
+                        to read first. */}
+                    {readOnly || (!state.enabled && stage.kind === "scoring")
+                      ? "View"
+                      : configured
+                        ? "Configure"
+                        : "Finish setup"}
                   </button>
                 )}
 

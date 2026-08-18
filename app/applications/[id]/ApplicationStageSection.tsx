@@ -14,6 +14,7 @@
 
 import type { StepperSegment, StageAvailability } from "@/lib/applications/effectiveStages";
 import type { EvaluationEntry } from "@/lib/applications/evaluations";
+import type { StageTiming } from "@/lib/applications/stageTimings";
 import type { ApplicationStage } from "@/lib/applications/stages";
 import type { EvaluationStatus } from "@/lib/evaluation/verdict";
 import type { NextAction } from "@/lib/evaluation/nextAction";
@@ -26,6 +27,7 @@ export function ApplicationStageSection({
   applicationId,
   availability,
   entries,
+  timings,
   resume,
   canEdit,
   timeZone,
@@ -36,6 +38,7 @@ export function ApplicationStageSection({
   applicationId: string;
   availability: StageAvailability[];
   entries: EvaluationEntry[];
+  timings: Record<ApplicationStage, StageTiming>;
   resume: {
     matchScore: number | null;
     passingScore: number | null;
@@ -51,9 +54,9 @@ export function ApplicationStageSection({
   nextAction: NextAction;
 }) {
   function jumpTo(stage: ApplicationStage) {
-    // Applied / Shortlisted / Hired have no evaluation section — there is
-    // nothing to record about them — so those clicks land on the panel's top
-    // card rather than doing nothing, which would read as a broken control.
+    // Every visible stage now has a section — Applied, Shortlisted and Hired
+    // carry no score but do carry their dates. The fallback stays for the
+    // rejection terminus, which is a segment without a section of its own.
     const target =
       document.getElementById(`eval-${stage}`) ?? document.getElementById("eval-resume");
     target?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -86,6 +89,7 @@ export function ApplicationStageSection({
           applicationId={applicationId}
           availability={availability}
           entries={entries}
+          timings={timings}
           resume={resume}
           canEdit={canEdit}
           timeZone={timeZone}

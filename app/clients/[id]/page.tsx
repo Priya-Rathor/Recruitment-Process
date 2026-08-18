@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/states";
 import { requireMembershipOrRedirect } from "@/lib/tenant";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { getClient, getClientActivity } from "@/lib/clients/queries";
 import { computeTurnaround, describeTurnaround } from "@/lib/clients/sla";
 import { ClientActivityPanel } from "./ClientActivityPanel";
@@ -36,6 +37,10 @@ export default async function ClientDetailPage({
 }) {
   const { id } = await params;
   const membership = await requireMembershipOrRedirect();
+
+  // Client-facing surface — hidden for in-house organizations, which have no
+  // client to submit anyone to. See lib/organizations/hiringModel.ts.
+  if (!isAgencyMode(membership.organization)) redirect("/dashboard");
 
   const client = await getClient({ organizationId: membership.organization.id, clientId: id });
   if (!client) notFound();

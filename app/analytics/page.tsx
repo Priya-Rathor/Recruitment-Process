@@ -7,6 +7,7 @@ import { resolveTimeZone } from "@/lib/time";
 import { STAGE_LABELS } from "@/lib/applications/stages";
 import { getSlaConfig, listBoardJobs } from "@/lib/pipeline/queries";
 import { listClients } from "@/lib/clients/queries";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { listTeamMembers } from "@/lib/jobs/queries";
 import {
   describePeriod,
@@ -37,12 +38,23 @@ const TABS = [
   { key: "recruitment", label: "Recruitment" },
   { key: "screening", label: "Screening" },
   { key: "jobs", label: "Jobs" },
-  { key: "clients", label: "Clients" },
+  /** Agency mode only — see visibleTabs() below. */
+  { key: "clients", label: "Clients", agencyOnly: true },
   { key: "recruiters", label: "Recruiters" },
   { key: "automations", label: "Automations" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+/**
+ * The tabs an organization can actually see.
+ *
+ * An in-house team has no clients, so client turnaround is not a report they
+ * can run — the tab would open onto a table that is empty by definition.
+ */
+function visibleTabs(agencyMode: boolean) {
+  return TABS.filter((entry) => !("agencyOnly" in entry && entry.agencyOnly) || agencyMode);
+}
 
 function rateBar(label: string, value: Rate) {
   return {
@@ -71,6 +83,7 @@ async function AnalyticsBody({
       .map(([key, value]) => [key, value as string])
   );
 
+  const agencyMode = isAgencyMode(membership.organization);
   const filters = filtersFromParams(params);
   const timeZone = resolveTimeZone(membership.organization.timezone);
   const periods = resolvePeriods({ range: filters.range, timeZone });
@@ -86,7 +99,9 @@ async function AnalyticsBody({
       slaConfig,
     }),
     listBoardJobs(membership.organization.id),
-    listClients({ organizationId: membership.organization.id }),
+    agencyMode
+      ? listClients({ organizationId: membership.organization.id })
+      : Promise.resolve({ clients: [], failed: false }),
     listTeamMembers(membership.organization.id),
   ]);
 
@@ -117,6 +132,7 @@ async function AnalyticsBody({
         jobs={jobs.map((job) => ({ id: job.id, title: job.title }))}
         clients={clients.map((client) => ({ id: client.id, name: client.name }))}
         recruiters={members.map((member) => ({ id: member.id, name: member.name }))}
+        canFilterClient={agencyMode}
         canFilterRecruiter={showRecruiters}
       />
 
@@ -607,10 +623,17 @@ export default async function AnalyticsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [, search] = await Promise.all([requireMembershipOrRedirect(), searchParams]);
+  const [membership, search] = await Promise.all([
+    requireMembershipOrRedirect(),
+    searchParams,
+  ]);
 
+  const tabs = visibleTabs(isAgencyMode(membership.organization));
+
+  // Resolved against the VISIBLE tabs, so ?tab=clients on an in-house workspace
+  // falls back to the overview rather than rendering a hidden report.
   const requested = typeof search.tab === "string" ? search.tab : "overview";
-  const tab = (TABS.find((entry) => entry.key === requested)?.key ?? "overview") as TabKey;
+  const tab = (tabs.find((entry) => entry.key === requested)?.key ?? "overview") as TabKey;
 
   const params = new URLSearchParams(
     Object.entries(search)
@@ -630,7 +653,7 @@ export default async function AnalyticsPage({
 
       <div className="card mb-4">
         <div className="buttons mb-0">
-          {TABS.map((entry) => (
+          {tabs.map((entry) => (
             <Link
               key={entry.key}
               className={`button is-small ${tab === entry.key ? "is-primary" : ""}`}

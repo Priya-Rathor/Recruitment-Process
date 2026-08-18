@@ -325,3 +325,43 @@ describe("scoreBand", () => {
     expect(scoreBand(0)).toBe("weak");
   });
 });
+
+describe("a job's own AI share", () => {
+  it("defaults to the platform split when none is given", () => {
+    const deterministic = scoreDeterministic(input);
+    expect(combineMatch({ deterministic, semantic })).toEqual(
+      combineMatch({ deterministic, semantic, semanticWeight: SEMANTIC_WEIGHT })
+    );
+  });
+
+  it("lets a job lean harder on the facts, or on the model", () => {
+    const deterministic = scoreDeterministic(input);
+
+    const factsOnly = combineMatch({ deterministic, semantic, semanticWeight: 0 });
+    const modelOnly = combineMatch({ deterministic, semantic, semanticWeight: 1 });
+
+    expect(factsOnly.overallScore).toBe(deterministic.score);
+    expect(modelOnly.overallScore).toBe(factsOnly.semanticScore);
+    // The findings are unaffected: a weight changes the arithmetic, never what
+    // the recruiter is told was found.
+    expect(modelOnly.strongMatches).toEqual(factsOnly.strongMatches);
+  });
+
+  it("clamps a nonsensical share instead of inverting the score", () => {
+    const deterministic = scoreDeterministic(input);
+    // Above 1 the deterministic half would be multiplied by a negative number.
+    expect(combineMatch({ deterministic, semantic, semanticWeight: 4 }).overallScore).toBe(
+      combineMatch({ deterministic, semantic, semanticWeight: 1 }).overallScore
+    );
+    expect(combineMatch({ deterministic, semantic, semanticWeight: -2 }).overallScore).toBe(
+      deterministic.score
+    );
+  });
+
+  it("ignores the share entirely when AI did not run", () => {
+    const deterministic = scoreDeterministic(input);
+    const result = combineMatch({ deterministic, semantic: null, semanticWeight: 1 });
+    expect(result.overallScore).toBe(deterministic.score);
+    expect(result.aiUsed).toBe(false);
+  });
+});

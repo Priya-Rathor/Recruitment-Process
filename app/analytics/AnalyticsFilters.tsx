@@ -23,12 +23,15 @@ export function AnalyticsFilterBar({
   jobs,
   clients,
   recruiters,
+  canFilterClient,
   canFilterRecruiter,
 }: {
   filters: Filters;
   jobs: { id: string; title: string }[];
   clients: { id: string; name: string }[];
   recruiters: { id: string; name: string }[];
+  /** False for an in-house organization, which has no clients to filter by. */
+  canFilterClient: boolean;
   /** A Recruiter is pinned to their own work, so the control is hidden. */
   canFilterRecruiter: boolean;
 }) {
@@ -57,12 +60,14 @@ export function AnalyticsFilterBar({
           hrefFor={(value) => href({ jobId: value })}
         />
 
-        <FilterSelect
-          label="Client"
-          value={filters.clientId}
-          options={clients.map((client) => ({ value: client.id, label: client.name }))}
-          hrefFor={(value) => href({ clientId: value })}
-        />
+        {canFilterClient && (
+          <FilterSelect
+            label="Client"
+            value={filters.clientId}
+            options={clients.map((client) => ({ value: client.id, label: client.name }))}
+            hrefFor={(value) => href({ clientId: value })}
+          />
+        )}
 
         {canFilterRecruiter && (
           <FilterSelect

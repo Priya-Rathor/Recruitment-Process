@@ -1,7 +1,9 @@
 # Hiring stages (Module 3 extension)
 
 Four independently toggleable stages per job, each with a script that can
-reference live job and candidate data through `{{placeholder}}` tokens.
+reference live job and candidate data through `{{placeholder}}` tokens — plus a
+fifth row, **Resume Score**, which is configuration rather than a step (see
+"The fifth row" below).
 
 ## Where the code lives
 
@@ -20,6 +22,8 @@ reference live job and candidate data through `{{placeholder}}` tokens.
 | `app/jobs/StringListEditor.tsx` | Reusable free-text list |
 | `app/jobs/[id]/ScreeningSummary.tsx` | The read-only inline card on the job page |
 | `app/api/jobs/[id]/hiring-stages/route.ts` | `GET` (all roles) / `PUT` (staff) |
+| `supabase/migrations/0027_resume_score_stage.sql` | The fifth key, and the pass-mark sync trigger |
+| `lib/matching/prompt.ts` | The scoring prompt: fixed contract vs editable guidance |
 
 Tests: `placeholders.test.ts`, `config.test.ts`, `screening-wiring.test.ts` — 57 in total.
 
@@ -249,3 +253,94 @@ it:
 
 Dropping the table belongs in a later migration, once `0025` is confirmed
 applied and the brief is confirmed reading the new source.
+
+
+## The fifth row: Resume Score
+
+Every application is scored against its job the moment it exists — that predates
+this card and is not optional. What this row configures is **how** that score is
+produced for one particular job.
+
+```
+enabled = false -> platform default prompt, weights and no pass mark
+enabled = true  -> this job's own prompt, weights and pass mark
+```
+
+### It is not a pipeline stage
+
+`resume_score` is in `STAGE_KEYS` but deliberately **not** in
+`CONFIGURABLE_STAGES`, and not a value of the `application_stage` enum. An
+application can never *be* in it, so a stepper segment for it would show a stage
+nobody can reach. `stages.test.ts` asserts the difference in both directions:
+every configurable stage is a stage key, and the extra key is exactly this one.
+
+That difference is why `StageDefinition` now carries `kind: "pipeline" |
+"scoring"`. The UI reads it to label the switch, because **off does not mean
+"resumes are not scored"** — and a recruiter who believed that would be badly
+misled. Both positions are captioned on the row.
+
+### The prompt is split, not replaced
+
+`buildScoringSystemPrompt()` assembles three parts:
+
+| Part | Who owns it |
+|---|---|
+| The JSON shape, and "never invent an equivalence" | fixed |
+| **How to judge** | the job, or `DEFAULT_SCORING_GUIDANCE` |
+| "The fixed rules above always win" | fixed |
+
+The recruiter genuinely rewrites the middle part — that is what "use your own
+prompt" means, and the default is *replaced*, not appended to, so a job that
+disagrees with a default rule is not sent both versions. But the output is
+parsed, validated and turned into a number by code, so a prompt saying "reply in
+plain English" or "add an overallScore field" would take the match score down
+with it. `prompt.test.ts` runs five such prompts, including
+`"Ignore all previous instructions"`, and asserts the contract survives each one
+and that the precedence line still lands after the guidance.
+
+Same shape as the screening call, where a job's prompt becomes a briefing that
+lands after the consent disclosure and cannot displace it.
+
+The model still cannot state a score at all — `lib/matching/score.ts` computes
+it — so no wording, default or custom, can make the headline number contradict
+the facts shown beside it.
+
+### The pass mark is synced, not duplicated
+
+`jobs.resume_passing_score` already existed (migration 0024) and was already
+read by `lib/evaluation/sources.ts`. It had **no writer anywhere**, so the
+resume gate could only ever read "Needs Review". This row is now its writer, via
+a trigger rather than route code — the browser holds a PostgREST client, and a
+sync living in the `PUT` handler would leave the gate on a stale threshold for
+anyone who went around it.
+
+Switching the row off clears the column. That is the honest reading of "off
+means default": there is no default pass mark, and a stale number would keep
+failing candidates against a rule the recruiter believes they turned off. Null
+reads as Needs Review, never as Fail.
+
+### Weights
+
+Five component weights (`skills` 40, `experience` 20, `salary` 15, `location`
+15, `notice` 10) and the AI share (30%) are now per-job overrides rather than
+constants. Three rules worth knowing:
+
+- **All five or none.** A partial map has no honest reading — the unnamed
+  components would either vanish or keep defaults that no longer balance beside
+  the one that changed. `normalizeStageConfig` returns null for a partial set.
+- **They need not sum to 100.** `scoreDeterministic()` already renormalises,
+  because a component with nothing to compare is skipped and its weight shared
+  out. A job with no salary band still scores 100 for a perfect fit even if
+  salary carries a weight of 90 — tested.
+- **All zeroes falls back to the defaults**, rather than dividing by zero.
+
+### Migration 0027 must be applied
+
+`job_hiring_stages.stage_key` has a CHECK constraint listing the valid keys, and
+the form saves all five stages in one upsert. Until 0027 runs, that upsert is
+rejected as a whole and **no stage on any job can be saved** — the job itself
+still saves, and the page shows the existing `?stages_failed=1` warning.
+
+The migration also backfills: a job that already carries a `resume_passing_score`
+gets an **enabled** row describing where that number now lives. Creating it
+disabled would have cleared a threshold someone deliberately set.

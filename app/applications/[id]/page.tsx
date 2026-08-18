@@ -4,14 +4,16 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, SkeletonRows } from "@/components/states";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { getApplicationDetail } from "@/lib/applications/queries";
-import { buildTimeline, daysInCurrentStage } from "@/lib/applications/timeline";
+import { buildTimeline } from "@/lib/applications/timeline";
+import { buildStageTimings } from "@/lib/applications/stageTimings";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/types";
 import { listInterviews } from "@/lib/interviews/queries";
 import { listTeamMembers } from "@/lib/jobs/queries";
 import { InterviewStatusBadge } from "@/app/interviews/InterviewBadges";
 import { ScheduleInterview } from "./ScheduleInterview";
-import { daysSince } from "@/lib/time";
+import { daysSince, formatDateTimeInZone } from "@/lib/time";
 import { ApplicationSummary, NoteComposer, StageControl } from "./ApplicationDetailClient";
 import { listJobStages } from "@/lib/hiring-stages/queries";
 import { listEvaluationEntries } from "@/lib/applications/evaluationQueries";
@@ -130,7 +132,19 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     stages: application.stageHistory,
     notes: application.notes,
   });
-  const inStageDays = daysInCurrentStage(application.stageHistory);
+
+  // The same history the Timeline renders chronologically, folded per stage so
+  // each Evaluation section can state its own dates beside its own scores.
+  const timings = buildStageTimings(application.stageHistory);
+
+  // Interviews the Evaluation panel already shows in their own stage section.
+  // Anything left — an onsite round, or a phone interview on a job that has
+  // since switched that stage off — still needs somewhere to appear, and that
+  // is the only thing the sidebar card is now for.
+  const shownInterviewIds = new Set(
+    evaluationEntries.filter((entry) => entry.source === "interview").map((entry) => entry.id)
+  );
+  const otherInterviews = interviews.filter((interview) => !shownInterviewIds.has(interview.id));
 
   return (
     <>
@@ -213,6 +227,7 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
         applicationId={application.id}
         availability={availability}
         entries={evaluationEntries}
+        timings={timings}
         resume={{
           matchScore: application.match_score,
           passingScore: resumeThreshold,
@@ -261,12 +276,11 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
                         )}
                       </p>
                       <span className="has-text-secondary" style={{ fontSize: 12 }}>
-                        {new Date(event.at).toLocaleString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {/*
+                          The ORGANIZATION's timezone, never the server's — see
+                          the note at the top of lib/time.ts.
+                        */}
+                        {formatDateTimeInZone(event.at, membership.organization.timezone)}
                       </span>
                     </div>
                     {event.detail && (
@@ -299,79 +313,67 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
 
           <div className="card mb-4">
             <h2 className="title is-5">Details</h2>
+            {/*
+              WHAT IS NOT HERE ANY MORE, AND WHY.
+              Days in current stage, the applied date, and the entry points for
+              Match and Screening all used to sit in this card as well as in
+              their own Evaluation section. Two homes for one fact is two things
+              to keep in step, and the sidebar copies were unconditional — a job
+              that never places a screening call still offered the call screen.
+              Each stage now appears exactly once, in the section for that stage.
+            */}
             <dl style={{ fontSize: 14 }}>
               <Detail label="Recruiter" value={application.recruiter_name ?? "Unassigned"} />
               <Detail
                 label="Source"
                 value={CANDIDATE_SOURCE_LABELS[application.source] ?? application.source}
               />
-              <Detail
-                label="Days in current stage"
-                value={inStageDays === null ? "—" : String(inStageDays)}
-              />
+              {/* Total age, which is not the same as time in any one stage. */}
               <Detail label="Days since applied" value={String(daysSince(application.created_at))} />
-              <Detail
-                label="Applied"
-                value={new Date(application.created_at).toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              />
             </dl>
             <p className="has-text-secondary mt-3" style={{ fontSize: 12 }}>
               Match score and screening results belong to this application, not to the candidate
               generally — the same person can score differently against another job.
             </p>
+            {/*
+              These two are not stages. An interview brief spans whichever
+              rounds this job runs, and a client submission belongs to Module 12
+              — neither has a stage section to live in, so they stay here.
+            */}
             <Link
               className="button is-outlined-primary is-small is-fullwidth mt-3"
-              href={`/applications/${application.id}/match`}
-            >
-              {application.match_score === null ? "Calculate match" : "See match breakdown"}
-            </Link>
-            <Link
-              className="button is-outlined-primary is-small is-fullwidth mt-2"
-              href={`/applications/${application.id}/screening-call`}
-            >
-              AI screening call
-            </Link>
-            <Link
-              className="button is-outlined-primary is-small is-fullwidth mt-2"
-              href={`/applications/${application.id}/screening-report`}
-            >
-              Screening report
-            </Link>
-            <Link
-              className="button is-outlined-primary is-small is-fullwidth mt-2"
               href={`/applications/${application.id}/interview-brief`}
             >
               Interview brief
             </Link>
-            <Link
-              className="button is-outlined-primary is-small is-fullwidth mt-2"
-              href={`/applications/${application.id}/submission`}
-            >
-              Submit to client
-            </Link>
+            {/* Agency mode only: an in-house team has no client to submit to. */}
+            {isAgencyMode(membership.organization) && (
+              <Link
+                className="button is-outlined-primary is-small is-fullwidth mt-2"
+                href={`/applications/${application.id}/submission`}
+              >
+                Submit to client
+              </Link>
+            )}
           </div>
 
           <div className="card mb-4">
             <h2 className="title is-5">Interviews</h2>
-            {interviews.length === 0 ? (
+            {otherInterviews.length === 0 ? (
               <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>
-                No interviews scheduled yet.
+                {interviews.length === 0
+                  ? "No interviews scheduled yet."
+                  : "Scheduled rounds appear in their own stage above."}
               </p>
             ) : (
               <ul className="mb-3">
-                {interviews.map((interview) => (
+                {otherInterviews.map((interview) => (
                   <li key={interview.id} className="py-2">
                     <Link href={`/interviews/${interview.id}`} style={{ fontSize: 14 }}>
-                      {new Date(interview.scheduled_at).toLocaleString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateTimeInZone(
+                        interview.scheduled_at,
+                        membership.organization.timezone
+                      )}
                     </Link>
                     <div className="mt-1">
                       <InterviewStatusBadge status={interview.status} />

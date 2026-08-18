@@ -133,7 +133,18 @@ export function locationsMatch(jobLocation: string, candidateLocation: string): 
  * incomplete profile as though it were a bad fit, which is a different and much
  * more damaging claim.
  */
-export function scoreDeterministic(input: DeterministicInput): DeterministicResult {
+export function scoreDeterministic(
+  input: DeterministicInput,
+  /**
+   * Per-component weights, from the job's Resume Score configuration.
+   *
+   * Defaults to COMPONENT_WEIGHTS, so every existing caller and every job that
+   * has not customised anything scores exactly as before. Values need not sum
+   * to 100: the combine step below already renormalises, because components
+   * with nothing to judge are skipped.
+   */
+  weights: Record<ComponentKey, number> = COMPONENT_WEIGHTS
+): DeterministicResult {
   const { job, candidate } = input;
 
   const strongMatches: MatchFinding[] = [];
@@ -381,7 +392,7 @@ export function scoreDeterministic(input: DeterministicInput): DeterministicResu
   }
 
   // --- Combine ---------------------------------------------------------------
-  const totalWeight = evaluated.reduce((sum, key) => sum + COMPONENT_WEIGHTS[key], 0);
+  const totalWeight = evaluated.reduce((sum, key) => sum + (weights[key] ?? 0), 0);
 
   // Nothing checkable at all. 0 would read as "terrible fit"; the truth is
   // "we don't know", which the needs-verification list already says.
@@ -390,7 +401,7 @@ export function scoreDeterministic(input: DeterministicInput): DeterministicResu
       ? 0
       : round2(
           (evaluated.reduce(
-            (sum, key) => sum + COMPONENT_WEIGHTS[key] * (fractions.get(key) ?? 0),
+            (sum, key) => sum + (weights[key] ?? 0) * (fractions.get(key) ?? 0),
             0
           ) /
             totalWeight) *

@@ -7,6 +7,7 @@ import { Briefcase, Plus } from "lucide-react";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { listJobsWithHealth, listTeamMembers } from "@/lib/jobs/queries";
 import { listClients } from "@/lib/clients/queries";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { formatExperience } from "@/lib/jobs/format";
 import { isJobStatus, WORK_MODE_LABELS } from "@/lib/types";
 import { HealthBadge, StatusBadge } from "./JobBadges";
@@ -26,6 +27,12 @@ type SearchParams = {
 async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
   const membership = await requireMembershipOrRedirect();
 
+  const agencyMode = isAgencyMode(membership.organization);
+  // An in-house organization has no clients, so a client_id in the URL — from a
+  // bookmark made before the switch, say — is dropped rather than applied. It
+  // would otherwise filter every job away and look like the list was broken.
+  const clientId = agencyMode ? searchParams.client_id || undefined : undefined;
+
   const [{ jobs, failed }, members, { clients }] = await Promise.all([
     listJobsWithHealth({
       organizationId: membership.organization.id,
@@ -33,26 +40,28 @@ async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
         // Filters are validated here, not trusted from the URL.
         status: isJobStatus(searchParams.status) ? searchParams.status : undefined,
         recruiterId: searchParams.recruiter_id || undefined,
-        clientId: searchParams.client_id || undefined,
+        clientId,
         search: searchParams.q || undefined,
         includeArchived: searchParams.archived === "true",
       },
     }),
     listTeamMembers(membership.organization.id),
-    listClients({ organizationId: membership.organization.id }),
+    agencyMode
+      ? listClients({ organizationId: membership.organization.id })
+      : Promise.resolve({ clients: [], failed: false }),
   ]);
 
   const hasFilters = Boolean(
     searchParams.status ||
       searchParams.recruiter_id ||
-      searchParams.client_id ||
+      clientId ||
       searchParams.q ||
       searchParams.archived
   );
 
   return (
     <>
-      <JobFilters members={members} clients={clients} />
+      <JobFilters members={members} clients={clients} agencyMode={agencyMode} />
 
       <div className="card">
         {failed ? (
@@ -91,7 +100,7 @@ async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
                   <th>Health</th>
                   <th>Experience</th>
                   <th>Location</th>
-                  <th>Client</th>
+                  {agencyMode && <th>Client</th>}
                   <th>Owner</th>
                 </tr>
               </thead>
@@ -129,9 +138,11 @@ async function JobsTable({ searchParams }: { searchParams: SearchParams }) {
                         <span className="has-text-secondary"> · {WORK_MODE_LABELS[job.work_mode]}</span>
                       )}
                     </td>
-                    <td className="has-text-secondary" style={{ fontSize: 13 }}>
-                      {job.clientName ?? "—"}
-                    </td>
+                    {agencyMode && (
+                      <td className="has-text-secondary" style={{ fontSize: 13 }}>
+                        {job.clientName ?? "—"}
+                      </td>
+                    )}
                     <td className="has-text-secondary" style={{ fontSize: 13 }}>
                       {job.ownerName ?? "Unassigned"}
                     </td>

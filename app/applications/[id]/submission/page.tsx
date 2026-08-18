@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { getApplicationDetail } from "@/lib/applications/queries";
 import { getSubmissionForApplication } from "@/lib/clients/queries";
 import { SubmissionPanel } from "./SubmissionPanel";
@@ -16,6 +17,10 @@ export default async function SubmissionPage({
 }) {
   const { id } = await params;
   const membership = await requireMembershipOrRedirect();
+
+  // Client-facing surface — hidden for in-house organizations, which have no
+  // client to submit anyone to. See lib/organizations/hiringModel.ts.
+  if (!isAgencyMode(membership.organization)) redirect("/dashboard");
 
   const application = await getApplicationDetail({
     organizationId: membership.organization.id,

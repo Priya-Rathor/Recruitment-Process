@@ -40,12 +40,30 @@ describe("stage vocabulary", () => {
    * The four toggleable stages share their keys with job_hiring_stages, exactly.
    * A mismatch here would not fail loudly — it would silently make every stage
    * look "disabled" for every job, because the lookup would never hit.
+   *
+   * The job's stage catalogue is now WIDER than this list: it also carries
+   * `resume_score`, which is configuration for how a resume is judged rather
+   * than a step a candidate moves into. That one must stay out of the pipeline
+   * — an application can never BE in it, so a stepper segment for it would show
+   * a stage nobody can ever reach.
    */
   it("uses the same keys as the job hiring-stage configuration", () => {
-    expect([...CONFIGURABLE_STAGES]).toEqual([...STAGE_KEYS]);
     for (const key of CONFIGURABLE_STAGES) {
+      expect(STAGE_KEYS, key).toContain(key);
       expect(isApplicationStage(key), key).toBe(true);
       expect(isConfigurableStage(key), key).toBe(true);
+    }
+  });
+
+  it("keeps the non-pipeline stage keys out of the pipeline", () => {
+    const extras = STAGE_KEYS.filter(
+      (key) => !(CONFIGURABLE_STAGES as readonly string[]).includes(key)
+    );
+    expect(extras).toEqual(["resume_score"]);
+
+    for (const key of extras) {
+      // Not a stage an application can hold, so nothing may move into it.
+      expect(isApplicationStage(key), key).toBe(false);
     }
   });
 

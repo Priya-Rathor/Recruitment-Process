@@ -69,6 +69,54 @@ picker** on the job form and the **client filter** on the jobs list (the spec
 asks for "filters by client, recruiter, status"; only two of three worked until
 now).
 
+## This whole module is optional — agency mode
+
+The product has two kinds of buyer, and only one of them has clients:
+
+- a **recruitment agency**, which recruits on behalf of other companies;
+- an **in-house team**, which hires for itself and has no third party to submit
+  anyone to.
+
+`organizations.agency_mode` (migration 0028) says which one an organization is.
+It is asked in onboarding step 2 and changeable at Settings → Organization, and
+it defaults to **true**, so every organization that existed before the flag
+keeps exactly the behaviour it had.
+
+Read it through `isAgencyMode()` in `lib/organizations/hiringModel.ts`, never
+off the row directly. The helper treats a missing flag as *agency*, because
+migrations here are applied by hand and there is a window where the code knows
+about the column and the database does not — failing the other way would delete
+the Clients module from a live agency's navigation without warning.
+
+**It is visibility, not permission.** Deliberately not enforced in RLS, because
+there is nothing to enforce: it decides what is worth showing, not who may see
+it. Role checks remain the security boundary. And nothing is destroyed — an
+organization that switches to in-house keeps every client, submission and
+feedback event, and switching back shows them again unchanged. A toggle must
+never be a delete.
+
+What it hides, when off:
+
+| Surface | Behaviour |
+| --- | --- |
+| Clients nav item | Hidden (`agencyOnly` in `components/nav/navItems.ts`) |
+| `/clients`, `/clients/[id]` | Redirect to `/dashboard` |
+| `/applications/[id]/submission` | Redirects; the "Submit to client" action is hidden |
+| Job form client picker, jobs list client filter + column | Hidden; a `client_id` left in the URL is dropped rather than applied, so a stale bookmark doesn't filter every job away |
+| Analytics "Clients" tab and client filter | Hidden; `?tab=clients` falls back to the overview |
+| Client feedback chases | Skipped in the reminder route, and reported as `skipped` rather than as `0 sent` |
+
+That last one is the case worth understanding. Because switching mode deletes
+nothing, an ex-agency still holds client rows with overdue submissions. Left
+alone, the sweep would keep telling an account manager to chase a client through
+a link to `/clients/:id` — a page that now redirects them away. So the skip is
+load-bearing, not tidiness.
+
+The one deliberate non-change: the analytics CSV still prints its
+`Filter: client, all` header row in either mode. It states a true fact, and
+varying the export's metadata block by mode would make two exports harder to
+compare than the row is worth.
+
 ## Follow-ups
 
 - ☐ **Module 15** — actually deliver the submission. Today `PUT` records it and

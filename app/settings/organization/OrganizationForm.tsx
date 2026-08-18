@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormError } from "@/components/states";
+import { HIRING_MODEL_OPTIONS } from "@/lib/organizations/hiringModel";
 import { Field } from "../SettingsForm";
 
 const COMMON_TIMEZONES = [
@@ -29,7 +30,13 @@ export function OrganizationForm({
   organization,
   branding,
 }: {
-  organization: { id: string; name: string; industry: string | null; timezone: string };
+  organization: {
+    id: string;
+    name: string;
+    industry: string | null;
+    timezone: string;
+    agencyMode: boolean;
+  };
   branding: { logo_url: string | null; brand_color: string | null };
 }) {
   const router = useRouter();
@@ -39,7 +46,7 @@ export function OrganizationForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const set = (key: keyof typeof values, value: string | null) => {
+  const set = (key: keyof typeof values, value: string | boolean | null) => {
     setValues((previous) => ({ ...previous, [key]: value }));
     setDirty(true);
     setSaved(false);
@@ -58,6 +65,7 @@ export function OrganizationForm({
             name: values.name,
             industry: values.industry,
             timezone: values.timezone,
+            agency_mode: values.agencyMode,
           }),
         }),
         fetch("/api/settings", {
@@ -116,6 +124,34 @@ export function OrganizationForm({
             maxLength={120}
             onChange={(event) => set("industry", event.target.value || null)}
           />
+        </Field>
+
+        <Field
+          label="What do you recruit for?"
+          hint="Changing this only shows or hides the client-facing parts of the product. No client, submission or feedback record is ever deleted, so switching back restores everything."
+        >
+          {HIRING_MODEL_OPTIONS.map((option) => (
+            <label
+              key={String(option.value)}
+              className="radio is-block mb-2"
+              style={{ display: "block" }}
+            >
+              <input
+                type="radio"
+                name="hiring-model"
+                className="mr-2"
+                checked={values.agencyMode === option.value}
+                onChange={() => set("agencyMode", option.value)}
+              />
+              {option.label}
+              <span
+                className="has-text-secondary is-block"
+                style={{ fontSize: 12, marginLeft: "1.6rem" }}
+              >
+                {option.hint}
+              </span>
+            </label>
+          ))}
         </Field>
 
         <Field

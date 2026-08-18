@@ -332,3 +332,54 @@ describe("score bounds", () => {
     }
   });
 });
+
+describe("per-job weights", () => {
+  it("defaults to the platform weights when none are given", () => {
+    expect(scoreDeterministic(perfectFit)).toEqual(scoreDeterministic(perfectFit, COMPONENT_WEIGHTS));
+  });
+
+  it("lets a job decide what matters", () => {
+    // Someone who fits everything except salary. Under the default weights the
+    // salary miss costs 15 of 100; a job that says salary is all that matters
+    // should score them far lower, and one that ignores salary entirely should
+    // score them full marks.
+    const overpriced = withCandidate({ expectedSalary: 4_000_000 });
+
+    const byDefault = scoreDeterministic(overpriced).score;
+    const salaryObsessed = scoreDeterministic(overpriced, {
+      skills: 1,
+      experience: 1,
+      salary: 96,
+      location: 1,
+      notice: 1,
+    }).score;
+    const salaryBlind = scoreDeterministic(overpriced, {
+      skills: 40,
+      experience: 20,
+      salary: 0,
+      location: 25,
+      notice: 15,
+    }).score;
+
+    expect(salaryObsessed).toBeLessThan(byDefault);
+    expect(salaryBlind).toBeGreaterThan(byDefault);
+    expect(salaryBlind).toBe(100);
+  });
+
+  it("still skips components with nothing to compare, whatever their weight", () => {
+    // A job with no salary band cannot score salary, so a huge salary weight
+    // must be redistributed rather than counted as a zero — otherwise setting a
+    // weight would punish jobs for the data they happen not to hold.
+    const noBand = withJob({ salaryMin: null, salaryMax: null });
+    const result = scoreDeterministic(noBand, {
+      skills: 10,
+      experience: 10,
+      salary: 90,
+      location: 10,
+      notice: 10,
+    });
+
+    expect(result.skipped).toContain("salary");
+    expect(result.score).toBe(100);
+  });
+});

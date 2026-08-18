@@ -1,4 +1,5 @@
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { getOrganizationSettings } from "@/lib/settings/queries";
 import { RestrictedPanel, SettingsShell } from "../SettingsShell";
 import { OrganizationForm } from "./OrganizationForm";
@@ -20,7 +21,13 @@ export default async function OrganizationSettingsPage() {
         <RestrictedPanel what="the organization profile" />
       ) : (
         <OrganizationBody
-          organization={membership.organization}
+          organization={{
+            id: membership.organization.id,
+            name: membership.organization.name,
+            industry: membership.organization.industry,
+            timezone: membership.organization.timezone,
+            agencyMode: isAgencyMode(membership.organization),
+          }}
         />
       )}
     </SettingsShell>
@@ -30,7 +37,13 @@ export default async function OrganizationSettingsPage() {
 async function OrganizationBody({
   organization,
 }: {
-  organization: { id: string; name: string; industry: string | null; timezone: string };
+  organization: {
+    id: string;
+    name: string;
+    industry: string | null;
+    timezone: string;
+    agencyMode: boolean;
+  };
 }) {
   const { settings } = await getOrganizationSettings(organization.id);
 
@@ -41,6 +54,7 @@ async function OrganizationBody({
         name: organization.name,
         industry: organization.industry,
         timezone: organization.timezone,
+        agencyMode: organization.agencyMode,
       }}
       branding={{ logo_url: settings.logo_url, brand_color: settings.brand_color }}
     />

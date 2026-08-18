@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireRole } from "@/lib/tenant";
 import { formatDbError } from "@/lib/supabase/errors";
+import { parseAgencyMode } from "@/lib/organizations/hiringModel";
 
 /**
  * POST /api/organizations/:id/onboarding
@@ -31,10 +32,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const text = (value: unknown, max: number) =>
       typeof value === "string" && value.trim().length > 0 ? value.trim().slice(0, max) : null;
 
+    // Agency or in-house. Absent leaves the column at its default (agency), so
+    // an older client that does not send the field still completes onboarding.
+    const agencyMode = parseAgencyMode(payload.agency_mode);
+    if (!agencyMode.ok) return jsonError(agencyMode.error, 400);
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("organizations")
       .update({
+        ...(agencyMode.value === undefined ? {} : { agency_mode: agencyMode.value }),
         industry: text(payload.industry, 120),
         size: text(payload.size, 120),
         onboarding_answer: text(payload.hiringFocus, 2000),

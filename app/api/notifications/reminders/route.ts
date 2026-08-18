@@ -6,6 +6,7 @@ import {
   sendFeedbackReminders,
 } from "@/lib/notifications/reminders";
 import { sendOnboardingDocumentReminders } from "@/lib/onboarding/reminders";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 
 // Fans out over every outstanding interview and client.
 export const maxDuration = 60;
@@ -31,7 +32,21 @@ export async function POST() {
     // check, and running them together would let each miss what the other just
     // wrote.
     const feedback = await sendFeedbackReminders(membership.organization.id);
-    const clients = await sendClientFeedbackReminders(membership.organization.id);
+
+    /**
+     * Client chases only apply to an agency. Skipped rather than left to come
+     * back empty: an organization that switched to in-house KEEPS its old
+     * client rows (nothing is deleted), so the sweep would still find overdue
+     * submissions and send an account manager a notification linking to
+     * /clients/:id — a page that now redirects them to the dashboard.
+     *
+     * Reported as `skipped`, not as a plain zero. "We did not run this" and
+     * "we ran it and there was nothing" are different answers.
+     */
+    const agencyMode = isAgencyMode(membership.organization);
+    const clients = agencyMode
+      ? { ...(await sendClientFeedbackReminders(membership.organization.id)), skipped: false }
+      : { sent: 0, suppressed: 0, failed: false, skipped: true };
     // Module 19. Same dispatcher rather than a second button: a user should not
     // have to know which module a reminder belongs to in order to send it.
     const onboarding = await sendOnboardingDocumentReminders(membership.organization.id);

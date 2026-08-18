@@ -22,9 +22,12 @@ import { isActiveHref, NAV_GROUPS } from "./navItems";
 
 export function TopNav({
   isAdmin,
+  agencyMode,
   account,
 }: {
   isAdmin: boolean;
+  /** False for in-house teams — hides the client-facing links. */
+  agencyMode: boolean;
   account: AccountMenuProps;
 }) {
   const pathname = usePathname();
@@ -42,7 +45,9 @@ export function TopNav({
   }, [drawerOpen]);
 
   const groups = NAV_GROUPS.map((group) =>
-    group.filter((item) => !item.adminOnly || isAdmin)
+    group.filter(
+      (item) => (!item.adminOnly || isAdmin) && (!item.agencyOnly || agencyMode)
+    )
   ).filter((group) => group.length > 0);
 
   return (

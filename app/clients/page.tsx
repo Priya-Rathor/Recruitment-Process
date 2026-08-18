@@ -2,15 +2,20 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/states";
+import { redirect } from "next/navigation";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { listClients } from "@/lib/clients/queries";
 import { NewClientForm } from "./NewClientForm";
 
 export const metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
 
-async function ClientsTable() {
-  const membership = await requireMembershipOrRedirect();
+async function ClientsTable({
+  membership,
+}: {
+  membership: Awaited<ReturnType<typeof requireMembershipOrRedirect>>;
+}) {
   const canManage = hasRole(membership.role, ["owner", "admin", "recruiter"]);
 
   const { clients, failed } = await listClients({
@@ -74,6 +79,17 @@ async function ClientsTable() {
 }
 
 export default async function ClientsPage() {
+  const membership = await requireMembershipOrRedirect();
+
+  /**
+   * In-house organizations have no clients by definition, so this page would be
+   * permanently empty for them. Resolved here rather than inside the streamed
+   * table so the redirect happens before any of the page is sent — a header
+   * reading "The companies you recruit for" should never flash at a team that
+   * recruits for itself.
+   */
+  if (!isAgencyMode(membership.organization)) redirect("/dashboard");
+
   return (
     <AppShell>
       <div className="mb-5">
@@ -90,7 +106,7 @@ export default async function ClientsPage() {
           </div>
         }
       >
-        <ClientsTable />
+        <ClientsTable membership={membership} />
       </Suspense>
     </AppShell>
   );

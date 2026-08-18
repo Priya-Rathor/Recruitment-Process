@@ -3,6 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, requireCurrentUser, hasRole } from "@/lib/tenant";
 import { listTeamMembers } from "@/lib/jobs/queries";
 import { listClients } from "@/lib/clients/queries";
+import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { JobForm } from "../JobForm";
 
 export const metadata = { title: "New job" };
@@ -33,9 +34,13 @@ export default async function NewJobPage() {
     );
   }
 
+  const agencyMode = isAgencyMode(membership.organization);
+
   const [members, { clients }] = await Promise.all([
     listTeamMembers(membership.organization.id),
-    listClients({ organizationId: membership.organization.id }),
+    agencyMode
+      ? listClients({ organizationId: membership.organization.id })
+      : Promise.resolve({ clients: [], failed: false }),
   ]);
 
   return (
@@ -54,6 +59,7 @@ export default async function NewJobPage() {
         mode="create"
         members={members}
         clients={clients}
+        agencyMode={agencyMode}
         currentUserId={user.id}
         // The creator becomes the owner by default, so they may set any status.
         canClose
