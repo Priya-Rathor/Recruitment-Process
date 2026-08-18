@@ -51,6 +51,12 @@ const SECTIONS: SettingsSection[] = [
     roles: ["owner", "admin"],
   },
   {
+    href: "/settings/onboarding",
+    label: "Onboarding documents",
+    description: "The checklist every new hire owes",
+    roles: ["owner", "admin"],
+  },
+  {
     href: "/settings/notifications",
     label: "Notifications",
     description: "What reaches you, and how",

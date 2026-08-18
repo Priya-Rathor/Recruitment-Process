@@ -30,6 +30,9 @@ export const NOTIFICATION_TYPES = [
   "screening_callback_requested",
   "candidate_submitted",
   "assigned_to_application",
+  // Module 19.
+  "onboarding_document_uploaded",
+  "onboarding_document_pending",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -193,6 +196,47 @@ export const TEMPLATES: Record<NotificationType, TemplateDefinition> = {
     placeholders: ["candidate_name", "job_title"],
     title: "You've been assigned {{candidate_name}}",
     body: "{{candidate_name}}'s application for the {{job_title}} role is now assigned to you.",
+    defaultInApp: true,
+    defaultEmail: false,
+    priority: "normal",
+  },
+
+  // ---------------------------------------------------------------------------
+  // MODULE 19 — onboarding documents
+  //
+  // Both are INTERNAL. Nothing here emails the new hire: chasing someone for a
+  // copy of their PAN card is a conversation a human is already having on
+  // WhatsApp, and an automated nag sent in a recruiter's name without their
+  // knowledge is exactly what Module 12's client reminders deliberately avoid.
+  // ---------------------------------------------------------------------------
+  onboarding_document_uploaded: {
+    audience: "internal",
+    label: "Onboarding document uploaded",
+    description: "Tells the assignee when a document is waiting to be verified.",
+    // The document name is the fact. "A document was uploaded" would send the
+    // reader to the page to find out which one.
+    fixedFacts: ["candidate_name", "document_name"],
+    placeholders: ["candidate_name", "document_name"],
+    title: "{{document_name}} uploaded for {{candidate_name}}",
+    body:
+      "{{document_name}} has been uploaded for {{candidate_name}}'s onboarding and is " +
+      "waiting to be verified.",
+    defaultInApp: true,
+    defaultEmail: false,
+    priority: "normal",
+  },
+
+  onboarding_document_pending: {
+    audience: "internal",
+    label: "Onboarding document overdue",
+    description: "Reminds the assignee when a required document has sat unfilled too long.",
+    fixedFacts: ["candidate_name", "document_name", "days_waiting"],
+    placeholders: ["candidate_name", "document_name", "days_waiting"],
+    title: "{{document_name}} still missing for {{candidate_name}}",
+    body:
+      "{{document_name}} has been outstanding for {{days_waiting}} days on " +
+      "{{candidate_name}}'s onboarding. It is required, so their onboarding cannot be " +
+      "completed until it is verified.",
     defaultInApp: true,
     defaultEmail: false,
     priority: "normal",

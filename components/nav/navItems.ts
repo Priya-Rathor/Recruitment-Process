@@ -12,7 +12,9 @@
 // The grouping is by what a recruiter is actually doing:
 //   1. core recruiting flow — the day's work, in the order it happens
 //   2. people & scheduling  — the parts that involve other humans
-//   3. ops & config         — set up once, checked occasionally
+//
+// There used to be a third group (Automations, Analytics). It moved into the
+// account menu when Module 19 added Onboarding — see the measurements below.
 // =============================================================================
 import {
   BarChart2,
@@ -25,6 +27,7 @@ import {
   Kanban,
   LayoutGrid,
   Settings,
+  UserCheck,
   Users,
   Zap,
 } from "lucide-react";
@@ -47,12 +50,19 @@ export const NAV_GROUPS: NavItem[][] = [
   ],
   [
     { href: "/pipeline", label: "Pipeline", icon: Kanban },
+    /**
+     * Module 19. Next to Pipeline, because it IS the next step of the same
+     * lifecycle: a hire moves off the board and onto this list.
+     *
+     * The href is /hires, not /onboarding. /onboarding is Module 1's workspace
+     * setup wizard — the page requireMembershipOrRedirect() sends a user to
+     * before they have an organization. Taking that route would have broken
+     * sign-up. The LABEL stays "Onboarding" because that is what a recruiter
+     * calls this.
+     */
+    { href: "/hires", label: "Onboarding", icon: UserCheck },
     { href: "/interviews", label: "Interviews", icon: Calendar },
     { href: "/clients", label: "Clients", icon: Building2 },
-  ],
-  [
-    { href: "/automations", label: "Automations", icon: Zap },
-    { href: "/analytics", label: "Analytics", icon: BarChart2 },
   ],
 ];
 
@@ -66,8 +76,39 @@ export const NAV_GROUPS: NavItem[][] = [
  * These two are the right two. Both are Owner/Admin-only configuration rather
  * than daily recruiting work, and Settings was already duplicated in the
  * dropdown. Every route stays reachable; neither is now reachable twice.
+ *
+ * MODULE 19 MOVED TWO MORE, and the reason is measured rather than argued.
+ *
+ * The nine-item bar fitted 1440px EXACTLY — 961px of links in 961px. Adding
+ * Onboarding needed 1074px, a 113px overflow, and .topnav__links has
+ * `overflow-x: auto` with the scrollbar hidden, so the overflow would not have
+ * looked like a bug. It would have looked like a bar with nothing after Clients.
+ *
+ * Measured at 1440px, links scrollWidth / clientWidth:
+ *
+ *   9 items (before)                     961 / 961   fits exactly
+ *   10 items, Onboarding added          1074 / 961   overflows 113px
+ *   ...with Analytics moved out          974 / 961   overflows 13px
+ *   ...with Analytics + Automations out  961 / 961   fits
+ *
+ * So one move was not enough and gap-tightening could not have closed 113px —
+ * every intra-group gap plus both dividers is only ~36px at this width.
+ *
+ * These two are the right two to move. The group they came from was labelled
+ * "set up once, checked occasionally" in this file's own header, which is
+ * exactly this menu's admission criterion. Analytics and the Audit log are now
+ * neighbours, which is where a reader would look for either.
+ *
+ * It also fixed a pre-existing clip: at 1366px the nine-item bar already
+ * overflowed 70px. It now fits. The first width that still clips is 1280px, at
+ * 25px, down from 156px.
+ *
+ * Neither is adminOnly, so a Recruiter still reaches both — AccountRows filters
+ * on adminOnly, not on membership of this list.
  */
 export const ACCOUNT_NAV_ITEMS: NavItem[] = [
+  { href: "/automations", label: "Automations", icon: Zap },
+  { href: "/analytics", label: "Analytics", icon: BarChart2 },
   { href: "/audit-log", label: "Audit log", icon: History, adminOnly: true },
   { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ];

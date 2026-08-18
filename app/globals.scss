@@ -3060,3 +3060,331 @@ a {
   letter-spacing: 0.04em;
   color: var(--color-text-secondary);
 }
+
+// =============================================================================
+// MODULE 19 — ONBOARDING & DOCUMENT MANAGEMENT
+// =============================================================================
+
+// ---- progress ---------------------------------------------------------------
+// The bar tracks REQUIRED documents; the label says so in words, because a bar
+// alone cannot distinguish "5 of 5 required" from "5 of 9 total" and the
+// difference is exactly what decides whether this hire can be completed.
+.doc-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.doc-progress__track {
+  height: 6px;
+  border-radius: 999px;
+  background-color: var(--color-border);
+  overflow: hidden;
+}
+
+.doc-progress__fill {
+  height: 100%;
+  border-radius: 999px;
+  background-color: var(--color-primary);
+  transition: width var(--transition-base, 200ms) var(--ease);
+
+  // Green only at 100%. A partly-green bar would read as "fine so far", which is
+  // not a thing a checklist can be.
+  &.is-complete { background-color: var(--color-success); }
+}
+
+.doc-progress__label {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.doc-progress__optional { color: var(--color-text-secondary); }
+
+.doc-progress.is-large {
+  gap: var(--space-2);
+
+  .doc-progress__track { height: 10px; }
+  .doc-progress__label { font-size: var(--text-label); }
+}
+
+// ---- the list's avatar ------------------------------------------------------
+.onboarding-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: var(--color-primary-tint);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+// ---- settings: the template list -------------------------------------------
+.doc-template-list { list-style: none; }
+
+.doc-template {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+
+  &:first-child { border-top: 0; padding-top: 0; }
+
+  // Dragging: the row lifts rather than vanishing, so the list does not appear
+  // to lose an item mid-gesture.
+  &.is-dragging { opacity: 0.5; background-color: var(--color-background); }
+
+  // Inactive types stay legible — they have to be findable to be switched back
+  // on — but read as parked.
+  &.is-inactive .doc-template__name,
+  &.is-inactive .doc-template__description { color: var(--color-text-secondary); }
+}
+
+.doc-template__handle {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 28px;
+  color: var(--color-text-secondary);
+  cursor: grab;
+
+  &:active { cursor: grabbing; }
+}
+
+.doc-template__arrows {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 2px;
+
+  .button {
+    width: 26px;
+    height: 22px;
+    padding: 0;
+    min-width: 0;
+  }
+}
+
+.doc-template__body { flex: 1 1 auto; min-width: 0; }
+
+.doc-template__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  flex-wrap: wrap;
+}
+
+.doc-template__owner {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.doc-template__description {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.doc-template__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.doc-template__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+.doc-template__required {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.doc-template__active {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.doc-template__remove,
+.doc-row__remove {
+  color: var(--color-text-secondary);
+
+  &:hover { color: var(--status-error-text); border-color: var(--status-error-text); }
+}
+
+.doc-template-new {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+}
+
+// ---- the per-hire checklist -------------------------------------------------
+.doc-group {
+  padding-top: var(--space-5, 20px);
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+
+  &:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+
+  ul { list-style: none; }
+}
+
+.doc-group__head { margin-bottom: var(--space-2); }
+
+.doc-group__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.doc-group__note {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.doc-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+  flex-wrap: wrap;
+
+  // Reminder links land on #document-<id>. Without this the row would sit under
+  // the sticky header and the reader would think the link was broken.
+  scroll-margin-top: 96px;
+
+  &:first-child { border-top: 0; }
+}
+
+.doc-row__main { flex: 1 1 320px; min-width: 0; }
+
+.doc-row__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.doc-row__name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+
+// Whose responsibility, not who filed it. Outlined rather than filled so it does
+// not compete with the status chip beside it, which is the changing fact.
+.doc-row__owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.doc-row__oneoff {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.doc-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
+
+  &.is-verified { color: var(--status-connected-text); }
+  &.is-rejected { color: var(--status-error-text); }
+}
+
+.doc-row__reject {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--control-radius);
+  border: 1px solid var(--status-error-text);
+  background-color: var(--status-error-bg);
+}
+
+.doc-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+.doc-row__verify {
+  border-color: var(--status-connected-text);
+  color: var(--status-connected-text);
+
+  &:hover:not([disabled]) {
+    background-color: var(--status-connected-bg);
+    border-color: var(--status-connected-text);
+    color: var(--status-connected-text);
+  }
+}
+
+.doc-row__confirm-reject {
+  border-color: var(--status-error-text);
+  color: var(--status-error-text);
+
+  &:hover:not([disabled]) {
+    background-color: #ffffff;
+    border-color: var(--status-error-text);
+    color: var(--status-error-text);
+  }
+}
+
+// The dropzone IS the upload button — a separate always-visible dropzone per row
+// would be seven empty rectangles on a fresh checklist. It accepts a drop and a
+// click, and says which state it is in.
+.doc-row__upload.is-dragover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background-color: var(--color-primary-tint);
+}
+
+@media (max-width: 768px) {
+  .doc-template {
+    flex-wrap: wrap;
+
+    // Drag is unusable on touch anyway; the arrows are the control here.
+    .doc-template__handle { display: none; }
+  }
+  .doc-template__controls { width: 100%; }
+  .doc-row__actions { width: 100%; }
+}

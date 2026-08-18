@@ -180,6 +180,54 @@ export const EVENT_CATALOGUE = {
     label: "Application archived",
     describe: () => "Archived the application",
   },
+  // ---------------------------------------------------------------------------
+  // Module 19 — onboarding documents.
+  //
+  // Filed under the APPLICATION rather than a new entity type, so a hire's
+  // timeline reads straight through from "moved to Hired" into the paperwork
+  // that followed. Splitting them would put the cause and the consequence on
+  // two different screens.
+  //
+  // None are marked sensitive. They record that a document CHANGED STATE, never
+  // its contents — the audit log must not become a second copy of somebody's
+  // identity papers.
+  // ---------------------------------------------------------------------------
+  "onboarding.updated": {
+    entity: "application",
+    label: "Onboarding updated",
+    describe: (m) => {
+      const status = text(m.status);
+      const labels: Record<string, string> = {
+        in_progress: "Reopened onboarding",
+        completed: "Marked onboarding complete",
+        on_hold: "Put onboarding on hold",
+      };
+      if (status && labels[status]) return labels[status];
+      return "assigned_to" in m ? "Reassigned onboarding" : "Updated onboarding";
+    },
+  },
+  "onboarding.document_uploaded": {
+    entity: "application",
+    label: "Onboarding document uploaded",
+    describe: (m) => `Uploaded ${text(m.document_name, "a document")}`,
+  },
+  "onboarding.document_verified": {
+    entity: "application",
+    label: "Onboarding document verified",
+    describe: (m) => `Verified ${text(m.document_name, "a document")}`,
+  },
+  "onboarding.document_rejected": {
+    entity: "application",
+    label: "Onboarding document rejected",
+    // The reason is stored on the document and shown to whoever uploaded it.
+    // Not repeated here: the audit log is read by people who do not need it.
+    describe: (m) => `Rejected ${text(m.document_name, "a document")}`,
+  },
+  "onboarding.document_added": {
+    entity: "application",
+    label: "Onboarding document added",
+    describe: (m) => `Added ${text(m.document_name, "a one-off document")} to the checklist`,
+  },
   "application.note_added": {
     entity: "application",
     label: "Note added",

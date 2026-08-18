@@ -76,6 +76,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/settings/` | Module 17's organization settings, preferences, and integration health |
 | `lib/hiring-stages/` | Per-job hiring stages, placeholder tokens (see `docs/modules/03-hiring-stages.md`) |
 | `lib/intake/` | Bulk resume intake — deterministic candidate matching, per-file processing (see `docs/modules/18-bulk-resume-intake.md`) |
+| `lib/onboarding/` | Module 19's document checklist, completion gate, and overdue sweep (see `docs/modules/19-onboarding-documents.md`). Records are created by a trigger on `applications`, never by a route |
 | `lib/integrations/` | Provider adapters (connect/test/getStatus/disconnect) |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |

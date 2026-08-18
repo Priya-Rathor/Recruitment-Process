@@ -5,6 +5,7 @@ import {
   sendClientFeedbackReminders,
   sendFeedbackReminders,
 } from "@/lib/notifications/reminders";
+import { sendOnboardingDocumentReminders } from "@/lib/onboarding/reminders";
 
 // Fans out over every outstanding interview and client.
 export const maxDuration = 60;
@@ -31,15 +32,19 @@ export async function POST() {
     // wrote.
     const feedback = await sendFeedbackReminders(membership.organization.id);
     const clients = await sendClientFeedbackReminders(membership.organization.id);
+    // Module 19. Same dispatcher rather than a second button: a user should not
+    // have to know which module a reminder belongs to in order to send it.
+    const onboarding = await sendOnboardingDocumentReminders(membership.organization.id);
 
-    const failed = feedback.failed || clients.failed;
+    const failed = feedback.failed || clients.failed || onboarding.failed;
 
     return NextResponse.json({
       data: {
-        sent: feedback.sent + clients.sent,
-        suppressed: feedback.suppressed + clients.suppressed,
+        sent: feedback.sent + clients.sent + onboarding.sent,
+        suppressed: feedback.suppressed + clients.suppressed + onboarding.suppressed,
         feedback,
         clients,
+        onboarding,
         // Surfaced rather than swallowed: "0 sent" and "we couldn't check" are
         // very different answers, and the second must not read as the first.
         partialFailure: failed,

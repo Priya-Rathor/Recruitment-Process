@@ -12,6 +12,14 @@ export type ScreeningSettings = {
   recordCalls: boolean;
 };
 
+export type OnboardingSettings = {
+  /**
+   * Days a required document may sit Pending before the assignee is reminded.
+   * 0 disables the reminder — see normalizeOnboardingSettings.
+   */
+  pendingReminderDays: number;
+};
+
 export type RetentionSettings = {
   /** Days to keep call transcripts and recordings. 0 = keep indefinitely. */
   transcriptRetentionDays: number;
@@ -26,6 +34,7 @@ export type OrganizationSettings = {
   default_interview_duration_minutes: number;
   screening_settings: ScreeningSettings;
   retention_settings: RetentionSettings;
+  onboarding_settings: OnboardingSettings;
   logo_url: string | null;
   brand_color: string | null;
   updated_at: string | null;
@@ -47,6 +56,11 @@ export const DEFAULT_SCREENING_SETTINGS: ScreeningSettings = {
  * that retention is a decision a customer makes, so the product asks rather
  * than assumes.
  */
+/** The spec's default: three days. */
+export const DEFAULT_ONBOARDING_SETTINGS: OnboardingSettings = {
+  pendingReminderDays: 3,
+};
+
 export const DEFAULT_RETENTION_SETTINGS: RetentionSettings = {
   transcriptRetentionDays: 0,
   archivedCandidateRetentionDays: 0,
@@ -59,6 +73,7 @@ export const DEFAULT_SETTINGS: Omit<OrganizationSettings, "organization_id" | "u
   default_interview_duration_minutes: 60,
   screening_settings: DEFAULT_SCREENING_SETTINGS,
   retention_settings: DEFAULT_RETENTION_SETTINGS,
+  onboarding_settings: DEFAULT_ONBOARDING_SETTINGS,
   logo_url: null,
   brand_color: null,
 };
@@ -110,6 +125,7 @@ export async function getOrganizationSettings(
           : 60,
       screening_settings: normalizeScreeningSettings(row.screening_settings),
       retention_settings: normalizeRetentionSettings(row.retention_settings),
+      onboarding_settings: normalizeOnboardingSettings(row.onboarding_settings),
       logo_url: (row.logo_url as string | null) ?? null,
       brand_color: (row.brand_color as string | null) ?? null,
       updated_at: (row.updated_at as string | null) ?? null,
@@ -147,6 +163,19 @@ export function normalizeScreeningSettings(value: unknown): ScreeningSettings {
     // this toggles the default, never the disclosure.
     recordCalls: raw.recordCalls !== false,
   };
+}
+
+export function normalizeOnboardingSettings(value: unknown): OnboardingSettings {
+  const raw = (value ?? {}) as Record<string, unknown>;
+  const days = raw.pendingReminderDays;
+
+  if (typeof days !== "number" || !Number.isFinite(days) || days < 0) {
+    return DEFAULT_ONBOARDING_SETTINGS;
+  }
+
+  // Capped at 90. A "reminder" further out than a quarter is not a reminder,
+  // and 0 is the honest way to say "don't remind me".
+  return { pendingReminderDays: Math.min(Math.floor(days), 90) };
 }
 
 export function normalizeRetentionSettings(value: unknown): RetentionSettings {
@@ -265,6 +294,10 @@ export function parseSettingsPayload(value: unknown): ParseResult {
   // on read — a value that never passes through the form still gets bounded.
   if ("screening_settings" in raw) {
     updates.screening_settings = normalizeScreeningSettings(raw.screening_settings);
+  }
+
+  if ("onboarding_settings" in raw) {
+    updates.onboarding_settings = normalizeOnboardingSettings(raw.onboarding_settings);
   }
 
   if ("retention_settings" in raw) {
