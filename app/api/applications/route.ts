@@ -7,7 +7,7 @@ import {
   applicationFiltersFromParams,
   listApplications,
 } from "@/lib/applications/queries";
-import { isApplicationStage } from "@/lib/applications/stages";
+import { DEFAULT_APPLICATION_STAGE, isApplicationStage } from "@/lib/applications/stages";
 import { isCandidateSource, type Application } from "@/lib/types";
 import { dispatch } from "@/lib/automations/engine";
 import { logActivity } from "@/lib/activity/log";
@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/applications — link a candidate to a job.
  *
- * Creates at stage 'new' per the spec's flow. The opening stage-history row is
+ * Creates at DEFAULT_APPLICATION_STAGE ('applied') unless a stage is given. The
+ * opening stage-history row is
  * written by a database trigger, not here, so the history is complete even for a
  * direct PostgREST insert.
  *
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
         organization_id: membership.organization.id,
         candidate_id: candidateId,
         job_id: jobId,
-        stage: stage ?? "applied",
+        stage: stage ?? DEFAULT_APPLICATION_STAGE,
         source: source ?? "manual",
         // Default to the creator so every application has an owner.
         assigned_recruiter_id:

@@ -2,9 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { buildContext, checkIntegrations } from "@/lib/automations/engine";
+import { createClient } from "@/lib/supabase/server";
 import { getAutomation } from "@/lib/automations/queries";
 import { evaluateConditions } from "@/lib/automations/evaluate";
-import { requiredIntegrationsFor, describeRule } from "@/lib/automations/catalog";
+import {
+  checkExecutable,
+  normalizeConditions,
+  requiredIntegrationsFor,
+  describeRule,
+} from "@/lib/automations/catalog";
 
 /**
  * POST /api/automations/:id/test — would this rule fire for this application?
@@ -45,13 +51,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     if (!automation) return jsonError("Automation not found.", 404);
 
+    // The tester's own session client. A test must see exactly what the caller
+    // can see — running it under the service role would report that a rule
+    // matches on data their session could not have read.
     const built = await buildContext({
+      client: await createClient(),
       organizationId: membership.organization.id,
       applicationId,
     });
     if (!built) return jsonError("Application not found.", 404);
 
-    const evaluation = evaluateConditions(automation.conditions ?? [], built.context);
+    const evaluation = evaluateConditions(
+      normalizeConditions(automation.conditions ?? []),
+      built.context
+    );
+
+    // Reported alongside the verdict rather than instead of it. "Your conditions
+    // match but this rule can never run on that trigger" is two useful facts, and
+    // hiding the first behind the second would send someone editing conditions
+    // that were already right.
+    const executable = checkExecutable({
+      trigger: automation.trigger,
+      actions: automation.actions ?? [],
+    });
 
     const required =
       automation.required_integrations?.length > 0
@@ -64,12 +86,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({
       data: {
-        wouldRun: evaluation.matched && health.ok,
+        wouldRun: evaluation.matched && health.ok && executable.ok,
         matched: evaluation.matched,
         blocked: !health.ok,
         blockedReason: health.ok ? null : health.reason,
+        executable: executable.ok,
+        executableReason: executable.ok ? null : executable.reason,
+        requiresApproval: automation.requires_approval,
         reason: evaluation.reason,
         outcomes: evaluation.outcomes,
+        groups: evaluation.groups,
         // What WOULD have happened, named but not done.
         wouldRunActions: automation.actions.map((action) => action.type),
         summary: describeRule({

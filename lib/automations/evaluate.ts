@@ -6,8 +6,13 @@
 // in the sense the spec requires: given the same context, a rule always reaches
 // the same verdict, and the verdict can be shown to a recruiter as a sentence.
 // =============================================================================
-import type { Condition, ConditionField, Operator } from "@/lib/automations/catalog";
-import { FIELD_LABELS, OPERATOR_LABELS } from "@/lib/automations/catalog";
+import type {
+  Condition,
+  ConditionField,
+  ConditionGroup,
+  Operator,
+} from "@/lib/automations/catalog";
+import { FIELD_LABELS, FIELD_VALUE_OPTIONS, OPERATOR_LABELS, normalizeConditions } from "@/lib/automations/catalog";
 
 /**
  * Everything a rule is allowed to see.
@@ -29,6 +34,12 @@ export type EvaluationContext = {
   jobHasScreeningQuestions: boolean | null;
   daysInStage: number | null;
   interestLevel: string | null;
+  applicationSource: string | null;
+  candidateHasResume: boolean | null;
+  daysSinceApplied: number | null;
+  assignedRecruiterPresent: boolean | null;
+  jobIsOpen: boolean | null;
+  evaluationOutcome: string | null;
 };
 
 const FIELD_ACCESSORS: Record<ConditionField, (ctx: EvaluationContext) => unknown> = {
@@ -40,6 +51,12 @@ const FIELD_ACCESSORS: Record<ConditionField, (ctx: EvaluationContext) => unknow
   job_has_screening_questions: (ctx) => ctx.jobHasScreeningQuestions,
   days_in_stage: (ctx) => ctx.daysInStage,
   interest_level: (ctx) => ctx.interestLevel,
+  application_source: (ctx) => ctx.applicationSource,
+  candidate_has_resume: (ctx) => ctx.candidateHasResume,
+  days_since_applied: (ctx) => ctx.daysSinceApplied,
+  assigned_recruiter_present: (ctx) => ctx.assignedRecruiterPresent,
+  job_is_open: (ctx) => ctx.jobIsOpen,
+  evaluation_outcome: (ctx) => ctx.evaluationOutcome,
 };
 
 export type ConditionOutcome = {
@@ -50,10 +67,18 @@ export type ConditionOutcome = {
   explanation: string;
 };
 
+export type GroupOutcome = {
+  match: "all" | "any";
+  passed: boolean;
+  outcomes: ConditionOutcome[];
+};
+
 export type EvaluationResult = {
   matched: boolean;
+  groups: GroupOutcome[];
+  /** Every condition, flattened — the shape the run record and tests read. */
   outcomes: ConditionOutcome[];
-  /** A sentence naming the first condition that failed, for the run record. */
+  /** A sentence naming why the rule did not match, for the run record. */
   reason: string | null;
 };
 
@@ -87,49 +112,88 @@ function compare(operator: Operator, actual: unknown, expected: unknown): boolea
 function describeCondition(condition: Condition): string {
   const field = FIELD_LABELS[condition.field];
   const operator = OPERATOR_LABELS[condition.operator];
-  return condition.value === null || condition.value === undefined
+  const options = FIELD_VALUE_OPTIONS[condition.field];
+  const shown =
+    options?.find((option) => option.value === String(condition.value))?.label ?? condition.value;
+
+  return shown === null || shown === undefined
     ? `${field} ${operator}`
-    : `${field} ${operator} ${condition.value}`;
+    : `${field} ${operator} ${shown}`;
+}
+
+function evaluateOne(condition: Condition, context: EvaluationContext): ConditionOutcome {
+  const actual = FIELD_ACCESSORS[condition.field]?.(context);
+  const unknown = actual === null || actual === undefined;
+  const passed = unknown ? false : compare(condition.operator, actual, condition.value);
+
+  return {
+    condition,
+    passed,
+    unknown,
+    explanation: unknown
+      ? `${FIELD_LABELS[condition.field]} isn't known for this application.`
+      : `${describeCondition(condition)} — ${passed ? "yes" : `no (it is ${String(actual)})`}`,
+  };
 }
 
 /**
- * Evaluates conditions against a context. All conditions must pass (AND).
+ * Evaluates a rule's condition groups against a context.
  *
- * OR is deliberately absent: the spec's Build Later list keeps rule complexity
- * down, and two rules read more clearly than one rule with a boolean tree.
+ * Groups are ANDed; inside a group, `match` decides. So a rule reads
+ * "(A or B) and C" and evaluates that way.
  *
  * An UNKNOWN field fails its condition. That is the safe direction — a rule that
  * dials a candidate when their consent state is unknown is exactly the failure
  * this module must not have. The run records `unknown: true` so a recruiter sees
  * "we couldn't tell", not "it didn't match".
+ *
+ * A NOTE ON `any` GROUPS AND UNKNOWNS. An unknown fails its own condition but
+ * does not poison its group: `(consent recorded) or (phone present)` still
+ * passes on the phone if consent is unknown. That is correct — the group says
+ * either is sufficient — but it is worth knowing that an `any` group is a place
+ * where a rule can proceed on partial information, which an `all` group is not.
+ * That is why the group's own outcomes are kept and shown, not just the verdict.
  */
 export function evaluateConditions(
-  conditions: Condition[],
+  conditions: ConditionGroup[] | Condition[],
   context: EvaluationContext
 ): EvaluationResult {
-  const outcomes: ConditionOutcome[] = [];
+  const groups = normalizeConditions(conditions);
+  const groupOutcomes: GroupOutcome[] = [];
 
-  for (const condition of conditions) {
-    const actual = FIELD_ACCESSORS[condition.field]?.(context);
-    const unknown = actual === null || actual === undefined;
-    const passed = unknown ? false : compare(condition.operator, actual, condition.value);
+  for (const group of groups) {
+    const outcomes = group.conditions.map((condition) => evaluateOne(condition, context));
+    const passed =
+      group.match === "any"
+        ? outcomes.some((outcome) => outcome.passed)
+        : outcomes.every((outcome) => outcome.passed);
 
-    outcomes.push({
-      condition,
-      passed,
-      unknown,
-      explanation: unknown
-        ? `${FIELD_LABELS[condition.field]} isn't known for this application.`
-        : `${describeCondition(condition)} — ${passed ? "yes" : `no (it is ${String(actual)})`}`,
-    });
+    groupOutcomes.push({ match: group.match, passed, outcomes });
   }
 
-  const firstFailure = outcomes.find((outcome) => !outcome.passed);
+  const failedGroup = groupOutcomes.find((group) => !group.passed);
+  const flattened = groupOutcomes.flatMap((group) => group.outcomes);
+
+  let reason: string | null = null;
+  if (failedGroup) {
+    if (failedGroup.match === "any") {
+      // Naming one condition would be misleading — none of them passed, and the
+      // rule needed only one to.
+      reason = `None of these matched: ${failedGroup.outcomes
+        .map((outcome) => outcome.explanation)
+        .join("; ")}`;
+    } else {
+      reason =
+        failedGroup.outcomes.find((outcome) => !outcome.passed)?.explanation ??
+        "A condition did not match.";
+    }
+  }
 
   return {
-    matched: !firstFailure,
-    outcomes,
-    reason: firstFailure ? firstFailure.explanation : null,
+    matched: !failedGroup,
+    groups: groupOutcomes,
+    outcomes: flattened,
+    reason,
   };
 }
 
@@ -148,6 +212,13 @@ export function evaluateConditions(
  * database trigger — so it cannot be nudged by a caller trying to earn a second
  * run. When it is missing we fall back to the stage alone, which is the STRICTER
  * behaviour: at most one run per stage ever, rather than an unbounded number.
+ *
+ * THE SCHEDULER USES THE SAME KEY, and that is the whole reason a time-based
+ * rule is safe. A sweep that runs hourly re-finds the same stale application
+ * every hour; the key it computes is identical each time, so the second insert
+ * is rejected and the candidate is chased once per stage-entry rather than 24
+ * times a day. No separate "already reminded" bookkeeping, and no window where a
+ * slow sweep overlapping the next one sends twice.
  */
 export function buildDedupeKey({
   trigger,

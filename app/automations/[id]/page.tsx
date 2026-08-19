@@ -8,10 +8,15 @@ import { getAutomation, listRuns } from "@/lib/automations/queries";
 import {
   ACTION_LABELS,
   CONSEQUENTIAL_ACTIONS,
-  TRIGGER_AVAILABILITY,
   TRIGGER_LABELS,
+  TRIGGER_SOURCES,
+  checkExecutable,
+  contactsCandidate,
   describeRule,
+  isScheduledTrigger,
+  normalizeConditions,
 } from "@/lib/automations/catalog";
+import { listTeamMembers } from "@/lib/automations/queries";
 import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
 import { RunStatusBadge, StatusBadge } from "../AutomationBadges";
 import { ActivationPanel } from "./ActivationPanel";
@@ -121,17 +126,24 @@ export default async function AutomationDetailPage({
     actions: automation.actions ?? [],
   });
 
-  const contactsCandidates = (automation.actions ?? []).some(
-    (action) => action.type === "start_screening_call"
-  );
+  const contactsCandidates = contactsCandidate(automation.actions ?? []);
   const spendsMoney = (automation.actions ?? []).some((action) =>
     CONSEQUENTIAL_ACTIONS.includes(action.type)
   );
 
-  const availability = TRIGGER_AVAILABILITY[automation.trigger];
+  // Every trigger is wired now. What can still be unrunnable is a COMBINATION —
+  // a sessionless trigger paired with an action that needs a signed-in user — so
+  // the warning names the pairing rather than the trigger.
+  const executable = checkExecutable({
+    trigger: automation.trigger,
+    actions: automation.actions ?? [],
+  });
+
   const bolna = automation.required_integrations.includes("bolna")
     ? await getBolnaStatus(membership.organization.id)
     : null;
+
+  const teamMembers = canEdit ? await listTeamMembers(membership.organization.id) : [];
 
   return (
     <AppShell>
@@ -150,11 +162,42 @@ export default async function AutomationDetailPage({
         )}
       </div>
 
-      {availability && !availability.available && (
+      {!executable.ok && (
         <div className="card mb-4" style={{ borderColor: "var(--color-warning)" }}>
           <p style={{ fontSize: 14 }}>
-            <strong>{TRIGGER_LABELS[automation.trigger]}</strong> isn&apos;t wired up yet.{" "}
-            {availability.note}
+            <strong>This rule can&apos;t be activated as written.</strong> {executable.reason}
+          </p>
+        </div>
+      )}
+
+      {automation.status === "paused" && automation.paused_reason && (
+        <div className="card mb-4" style={{ borderColor: "var(--color-warning)" }}>
+          <p style={{ fontSize: 14 }}>
+            <strong>This rule paused itself.</strong> {automation.paused_reason} Activating it again
+            resets the count for today.
+          </p>
+        </div>
+      )}
+
+      {automation.requires_approval && (
+        <div className="card mb-4">
+          <p style={{ fontSize: 14 }}>
+            <strong>This rule proposes, it doesn&apos;t act.</strong> When its conditions match it
+            creates a request in{" "}
+            <Link href="/automations/approvals">the approval queue</Link> and waits for an Owner or
+            Admin. Nothing runs until somebody approves it, and a request that nobody decides
+            expires after seven days.
+          </p>
+        </div>
+      )}
+
+      {isScheduledTrigger(automation.trigger) && (
+        <div className="card mb-4">
+          <p style={{ fontSize: 14 }}>
+            <strong>{TRIGGER_LABELS[automation.trigger]}</strong> — fires{" "}
+            {TRIGGER_SOURCES[automation.trigger]}. Whether the scheduler is running is shown on{" "}
+            <Link href="/automations">the Automations page</Link>; if it isn&apos;t, this rule does
+            nothing however healthy it looks here.
           </p>
         </div>
       )}
@@ -192,6 +235,9 @@ export default async function AutomationDetailPage({
         <p className="has-text-secondary mb-4" style={{ fontSize: 13 }}>
           Activated {formatWhen(automation.activated_at)}
           {spendsMoney ? " · this rule spends AI or calling budget when it runs" : ""}
+          {automation.daily_run_cap
+            ? ` · at most ${automation.daily_run_cap} runs a day`
+            : ""}
         </p>
       )}
 
@@ -201,15 +247,22 @@ export default async function AutomationDetailPage({
           <AutomationForm
             mode="edit"
             canUseAi
+            teamMembers={teamMembers}
             initial={{
               id: automation.id,
               name: automation.name,
               description: automation.description,
               trigger: automation.trigger,
-              conditions: automation.conditions ?? [],
+              // Normalised on the way in, so a rule stored before condition
+              // groups existed edits as a single "all of these" group rather
+              // than rendering nothing.
+              conditions: normalizeConditions(automation.conditions ?? []),
               actions: automation.actions ?? [],
               status: automation.status,
               drafted_by_ai: automation.drafted_by_ai,
+              requires_approval: automation.requires_approval,
+              daily_run_cap: automation.daily_run_cap,
+              version: automation.version,
             }}
           />
         </div>

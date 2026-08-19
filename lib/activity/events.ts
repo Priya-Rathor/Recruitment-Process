@@ -404,6 +404,29 @@ export const EVENT_CATALOGUE = {
     label: "Automation deleted",
     describe: (m) => `Deleted the automation "${text(m.name, "untitled")}"`,
   },
+  /**
+   * The oversight decisions. Sensitive, like activation, and for the same
+   * reason: this is a person choosing that the system acts on a candidate.
+   *
+   * Both are kept even though a rejection changes nothing — "we considered this
+   * and declined" is the record that makes human oversight auditable, and it is
+   * the half that would otherwise leave no trace at all.
+   */
+  "automation.approved": {
+    entity: "automation",
+    sensitive: true,
+    label: "Automation actions approved",
+    describe: (m) =>
+      `Approved ${num(m.action_count) ?? "the"} proposed action${
+        num(m.action_count) === 1 ? "" : "s"
+      } from "${text(m.name, "an automation")}"`,
+  },
+  "automation.rejected": {
+    entity: "automation",
+    sensitive: true,
+    label: "Automation actions rejected",
+    describe: (m) => `Declined the actions proposed by "${text(m.name, "an automation")}"`,
+  },
   "automation.run": {
     entity: "application",
     label: "Automation ran",
@@ -413,6 +436,7 @@ export const EVENT_CATALOGUE = {
       if (status === "success") return `${name} ran successfully`;
       if (status === "skipped") return `${name} was skipped: ${text(m.reason, "conditions not met")}`;
       if (status === "blocked") return `${name} was blocked: ${text(m.reason, "integration unavailable")}`;
+      if (status === "awaiting_approval") return `${name} is waiting for someone to approve its actions`;
       return `${name} failed: ${text(m.reason, "see the run history")}`;
     },
   },

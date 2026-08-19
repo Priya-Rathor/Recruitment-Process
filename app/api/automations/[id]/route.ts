@@ -4,9 +4,10 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { getAutomation, type AutomationRow } from "@/lib/automations/queries";
 import {
+  approvalIsMandatory,
+  checkExecutable,
   requiredIntegrationsFor,
   validateRule,
-  TRIGGER_AVAILABILITY,
 } from "@/lib/automations/catalog";
 import { checkIntegrations } from "@/lib/automations/engine";
 import { logActivity } from "@/lib/activity/log";
@@ -44,6 +45,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
  * Editing an ACTIVE rule silently changes what the product does to candidates
  * without anyone re-approving it, so a structural edit sends the rule back to
  * draft. Renaming does not.
+ *
+ * CONCURRENT EDITS. `expected_version` is compared against the row's `version`,
+ * which a trigger bumps on every write (migration 0029). Two admins editing the
+ * same rule used to overwrite each other with no sign that anything happened;
+ * now the second one is told. The check is optional — a client that sends no
+ * version gets last-write-wins, which is what the activation and pause calls
+ * want, since those change one field and do not depend on the rest.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -67,6 +75,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       automationId: id,
     });
     if (!existing) return jsonError("Automation not found.", 404);
+
+    /**
+     * The stale-edit check.
+     *
+     * Compared here rather than relied on in the WHERE clause because the
+     * message matters: "somebody else changed this" tells an admin to reload,
+     * where a silent zero-row update tells them nothing and looks like success.
+     * The version itself is trustworthy because a database trigger maintains it,
+     * so a direct PostgREST write cannot leave it behind.
+     */
+    if ("expected_version" in payload) {
+      const expected = payload.expected_version;
+      if (typeof expected !== "number" || !Number.isInteger(expected)) {
+        return jsonError("Invalid version.", 400);
+      }
+      if (expected !== existing.version) {
+        return NextResponse.json(
+          {
+            error:
+              "Somebody else changed this automation while you were editing it. Reload the page to see their version before saving.",
+            code: "stale_version",
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     const updates: Record<string, unknown> = {};
 
@@ -96,11 +130,43 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updates.actions = validated.rule.actions;
       updates.required_integrations = requiredIntegrationsFor(validated.rule.actions);
 
+      // Adding a candidate-facing action to an existing rule turns approval on,
+      // even if the rule had it off and the client did not mention it. The
+      // constraint belongs to the action, not to how the rule was created.
+      if (approvalIsMandatory(validated.rule.actions)) updates.requires_approval = true;
+
       // Back to draft, unless this same request re-activates it deliberately.
       if (existing.status === "active" && payload.status !== "active") {
         updates.status = "draft";
         updates.activated_by = null;
         updates.activated_at = null;
+      }
+    }
+
+    if ("requires_approval" in payload) {
+      const wanted = payload.requires_approval;
+      if (typeof wanted !== "boolean") {
+        return jsonError("requires_approval must be true or false.", 400);
+      }
+
+      const actions = (updates.actions ?? existing.actions) as AutomationRow["actions"];
+      if (!wanted && approvalIsMandatory(actions)) {
+        return jsonError(
+          "This rule emails candidates, so its actions always need a person to approve them first.",
+          409
+        );
+      }
+      updates.requires_approval = wanted;
+    }
+
+    if ("daily_run_cap" in payload) {
+      const raw = payload.daily_run_cap;
+      if (raw === null) {
+        updates.daily_run_cap = null;
+      } else if (typeof raw === "number" && Number.isInteger(raw) && raw > 0) {
+        updates.daily_run_cap = Math.min(raw, 10_000);
+      } else {
+        return jsonError("A daily limit must be a whole number above zero, or empty.", 400);
       }
     }
 
@@ -111,19 +177,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
 
       if (status === "active") {
-        // Refuse to activate a rule on a trigger nothing dispatches yet. An
-        // "active" rule that can never fire is a false statement about what the
-        // product is doing.
-        const trigger = (updates.trigger ?? existing.trigger) as keyof typeof TRIGGER_AVAILABILITY;
-        const availability = TRIGGER_AVAILABILITY[trigger];
-        if (availability && !availability.available) {
+        const actions = (updates.actions ?? existing.actions) as AutomationRow["actions"];
+        const trigger = (updates.trigger ?? existing.trigger) as AutomationRow["trigger"];
+
+        /**
+         * Refuse to activate a rule that cannot actually run.
+         *
+         * Every trigger is now wired — including `screening_call_completed`,
+         * which the upgrade's service-role execution path made possible. What can
+         * still be unrunnable is a COMBINATION: a sessionless trigger paired with
+         * an action that needs a signed-in user. An "active" rule that can never
+         * fire is a false statement about what the product is doing, so it is
+         * refused with the reason spelled out rather than accepted and silently
+         * inert.
+         */
+        const executable = checkExecutable({ trigger, actions });
+        if (!executable.ok) {
           return NextResponse.json(
-            { error: availability.note ?? "That trigger isn't available yet.", code: "trigger_unavailable" },
+            { error: executable.reason, code: "not_executable" },
             { status: 409 }
           );
         }
 
-        const actions = (updates.actions ?? existing.actions) as AutomationRow["actions"];
         const required =
           (updates.required_integrations as string[] | undefined) ??
           requiredIntegrationsFor(actions);
@@ -142,12 +217,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         updates.status = "active";
         updates.activated_by = user.id;
         updates.activated_at = new Date().toISOString();
+        // Cleared on activation: a rule that paused itself over a cap and has now
+        // been turned back on is not still paused for that reason.
+        updates.paused_reason = null;
       } else {
         // draft or paused — clear the activation record, so re-activating always
         // names whoever turned it back on rather than the last person to do so.
         updates.status = status;
         updates.activated_by = null;
         updates.activated_at = null;
+        // A person pausing a rule replaces whatever reason the engine recorded.
+        updates.paused_reason = null;
       }
     }
 

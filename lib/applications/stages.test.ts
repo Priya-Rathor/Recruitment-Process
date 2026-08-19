@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   APPLICATION_STAGES,
   CONFIGURABLE_STAGES,
+  DEFAULT_APPLICATION_STAGE,
   PIPELINE_STAGES,
   STAGE_LABELS,
   availableTransitions,
@@ -275,5 +276,32 @@ describe("current stage", () => {
 
   it("returns null for days-in-stage when nothing is open", () => {
     expect(daysInCurrentStage([stages[0]], new Date("2026-08-09T10:00:00Z"))).toBeNull();
+  });
+});
+
+describe("the default starting stage", () => {
+  /**
+   * The regression this exists for.
+   *
+   * Migration 0021 renamed the enum label 'new' to 'applied'. Two creation
+   * paths wrote a bare string into an untyped Supabase insert, so nothing
+   * caught it: every bulk-intake upload created a candidate, had its
+   * application rejected by the database, and reported success anyway.
+   */
+  it("is a stage the database will actually accept", () => {
+    expect(isApplicationStage(DEFAULT_APPLICATION_STAGE)).toBe(true);
+    expect(APPLICATION_STAGES).toContain(DEFAULT_APPLICATION_STAGE);
+  });
+
+  it("is the first stage on the board, not a terminal exit", () => {
+    // Starting anywhere else would skip the stages before it for every
+    // application created without an explicit one.
+    expect(DEFAULT_APPLICATION_STAGE).toBe(PIPELINE_STAGES[0]);
+    expect(isTerminalStage(DEFAULT_APPLICATION_STAGE)).toBe(false);
+  });
+
+  it("is not the retired label", () => {
+    expect(DEFAULT_APPLICATION_STAGE).not.toBe("new");
+    expect(isApplicationStage("new")).toBe(false);
   });
 });

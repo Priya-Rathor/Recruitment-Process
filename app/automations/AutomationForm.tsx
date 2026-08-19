@@ -7,19 +7,27 @@ import {
   ACTIONS,
   ACTION_INTEGRATIONS,
   ACTION_LABELS,
+  ACTION_MODES,
   CONDITION_FIELDS,
   CONSEQUENTIAL_ACTIONS,
   FIELD_LABELS,
   FIELD_OPERATORS,
+  FIELD_VALUE_OPTIONS,
   OPERATOR_LABELS,
   TRIGGERS,
-  TRIGGER_AVAILABILITY,
   TRIGGER_LABELS,
+  TRIGGER_MODES,
+  TRIGGER_SOURCES,
+  approvalIsMandatory,
+  checkExecutable,
   describeRule,
+  isScheduledTrigger,
+  normalizeConditions,
   type Action,
   type ActionType,
   type Condition,
   type ConditionField,
+  type ConditionGroup,
   type Operator,
   type TriggerType,
 } from "@/lib/automations/catalog";
@@ -30,11 +38,16 @@ export type AutomationFormValues = {
   name: string;
   description: string | null;
   trigger: TriggerType;
-  conditions: Condition[];
+  conditions: ConditionGroup[];
   actions: Action[];
   status: "draft" | "active" | "paused";
   drafted_by_ai: boolean;
+  requires_approval: boolean;
+  daily_run_cap: number | null;
+  version?: number;
 };
+
+export type TeamMember = { id: string; label: string };
 
 const NEW_AUTOMATION: AutomationFormValues = {
   name: "",
@@ -44,6 +57,8 @@ const NEW_AUTOMATION: AutomationFormValues = {
   actions: [],
   status: "draft",
   drafted_by_ai: false,
+  requires_approval: false,
+  daily_run_cap: null,
 };
 
 function needsValue(operator: Operator) {
@@ -56,15 +71,35 @@ function needsValue(operator: Operator) {
  * Explicit Save throughout — nothing here auto-saves, per the design system, and
  * a rule that quietly saved itself while being typed could become active with
  * half a condition set.
+ *
+ * THREE THINGS THE UPGRADE ADDED TO THIS SCREEN, and the reasoning each carries:
+ *
+ *   - CONDITION GROUPS. "(Java or Kotlin) and score above 75" was inexpressible
+ *     and the workaround was duplicating the whole rule per language. Groups are
+ *     ANDed; each group is an ANY or an ALL. The plain-English panel parenthesises
+ *     ANY groups so the sentence cannot be read two ways.
+ *
+ *   - EXECUTABILITY, shown while building rather than discovered on activation. A
+ *     scheduled trigger cannot run the AI actions, and being told that at the
+ *     moment you pick the combination is the difference between a two-second fix
+ *     and a rule someone believes is working.
+ *
+ *   - APPROVAL AND A DAILY LIMIT. Both are guardrails, so both are visible where
+ *     the rule is written instead of buried in settings. Approval is FORCED for a
+ *     candidate email and the checkbox says so rather than silently ignoring a
+ *     click.
  */
 export function AutomationForm({
   mode,
   initial,
   canUseAi,
+  teamMembers = [],
 }: {
   mode: "create" | "edit";
   initial?: AutomationFormValues;
   canUseAi: boolean;
+  /** For "assign a specific recruiter". Empty is handled, not assumed away. */
+  teamMembers?: TeamMember[];
 }) {
   const router = useRouter();
   const [values, setValues] = useState<AutomationFormValues>(initial ?? NEW_AUTOMATION);
@@ -82,6 +117,26 @@ export function AutomationForm({
     setDirty(true);
   };
 
+  const groups = values.conditions;
+
+  const updateGroup = (index: number, patch: Partial<ConditionGroup>) => {
+    const next = [...groups];
+    next[index] = { ...next[index], ...patch };
+    update({ conditions: next });
+  };
+
+  const updateCondition = (
+    groupIndex: number,
+    conditionIndex: number,
+    patch: Partial<Condition>
+  ) => {
+    const next = [...groups];
+    const conditions = [...next[groupIndex].conditions];
+    conditions[conditionIndex] = { ...conditions[conditionIndex], ...patch };
+    next[groupIndex] = { ...next[groupIndex], conditions };
+    update({ conditions: next });
+  };
+
   const summary = useMemo(
     () =>
       values.actions.length > 0
@@ -94,7 +149,21 @@ export function AutomationForm({
     [values.trigger, values.conditions, values.actions]
   );
 
-  const triggerAvailability = TRIGGER_AVAILABILITY[values.trigger];
+  const executable = useMemo(
+    () => checkExecutable({ trigger: values.trigger, actions: values.actions }),
+    [values.trigger, values.actions]
+  );
+
+  const approvalForced = approvalIsMandatory(values.actions);
+  const scheduled = isScheduledTrigger(values.trigger);
+
+  const hasStageAgeCondition = groups.some((group) =>
+    group.conditions.some(
+      (condition) =>
+        condition.field === "days_in_stage" &&
+        (condition.operator === "gt" || condition.operator === "gte")
+    )
+  );
 
   const consequential = values.actions.filter((action) =>
     CONSEQUENTIAL_ACTIONS.includes(action.type)
@@ -122,7 +191,7 @@ export function AutomationForm({
       // still has to press Save, and activation is another step after that.
       const draft = payload.data as {
         name: string;
-        rule: { trigger: TriggerType; conditions: Condition[]; actions: Action[] };
+        rule: { trigger: TriggerType; conditions: ConditionGroup[]; actions: Action[] };
         rationale: string | null;
       };
 
@@ -130,9 +199,14 @@ export function AutomationForm({
         ...previous,
         name: previous.name.trim().length > 0 ? previous.name : draft.name,
         trigger: draft.rule.trigger,
-        conditions: draft.rule.conditions,
+        conditions: normalizeConditions(draft.rule.conditions),
         actions: draft.rule.actions,
         drafted_by_ai: true,
+        // Recomputed from the drafted actions, so an AI-proposed candidate email
+        // arrives with approval already on rather than needing the server to
+        // correct it silently.
+        requires_approval:
+          previous.requires_approval || approvalIsMandatory(draft.rule.actions),
       }));
       setAiRationale(draft.rationale);
       setDirty(true);
@@ -160,6 +234,13 @@ export function AutomationForm({
             conditions: values.conditions,
             actions: values.actions,
             drafted_by_ai: values.drafted_by_ai,
+            requires_approval: values.requires_approval,
+            daily_run_cap: values.daily_run_cap,
+            // Only on edit. The server compares it and refuses a stale save
+            // rather than overwriting a colleague's change unannounced.
+            ...(mode === "edit" && values.version !== undefined
+              ? { expected_version: values.version }
+              : {}),
           }),
         }
       );
@@ -247,16 +328,36 @@ export function AutomationForm({
             {TRIGGERS.map((trigger) => (
               <option key={trigger} value={trigger}>
                 {TRIGGER_LABELS[trigger]}
-                {TRIGGER_AVAILABILITY[trigger].available ? "" : " (not available yet)"}
               </option>
             ))}
           </select>
         </div>
 
-        {triggerAvailability && !triggerAvailability.available && (
-          <p className="mt-3" style={{ fontSize: 13, color: "var(--status-attention-text, #B45309)" }}>
-            {triggerAvailability.note} You can save this as a draft, but it can&apos;t be activated.
-          </p>
+        <p className="has-text-secondary mt-2" style={{ fontSize: 13 }}>
+          Fires {TRIGGER_SOURCES[values.trigger]}.
+        </p>
+
+        {scheduled && (
+          <div
+            className="mt-3"
+            style={{
+              fontSize: 13,
+              padding: "0.75rem",
+              borderRadius: 8,
+              background: "var(--color-background)",
+            }}
+          >
+            <strong>This one runs on a schedule.</strong> The scheduler checks for applications
+            that have been sitting too long, so this rule needs a{" "}
+            <em>Days in current stage is at least&nbsp;…</em> condition — without one it would match
+            every open application at once. The Automations page shows whether the scheduler is
+            actually running.
+            {!hasStageAgeCondition && (
+              <div className="mt-2" style={{ color: "var(--color-error)" }}>
+                No time condition yet, so this can&apos;t be saved.
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -270,124 +371,225 @@ export function AutomationForm({
             onClick={() =>
               update({
                 conditions: [
-                  ...values.conditions,
-                  { field: "match_score", operator: "gt", value: 75 },
+                  ...groups,
+                  {
+                    match: "all",
+                    conditions: [{ field: "match_score", operator: "gt", value: 75 }],
+                  },
                 ],
               })
             }
           >
-            Add condition
+            Add condition group
           </button>
         </div>
 
-        {values.conditions.length === 0 ? (
+        {groups.length === 0 ? (
           <p className="has-text-secondary" style={{ fontSize: 13 }}>
             No conditions — this runs every time the trigger fires.
           </p>
         ) : (
-          <>
-            {values.conditions.map((condition, index) => {
-              const operators = FIELD_OPERATORS[condition.field];
-              return (
-                <div
-                  key={index}
-                  className="is-flex mb-2"
-                  style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}
+          groups.map((group, groupIndex) => (
+            <div
+              key={groupIndex}
+              className="mb-3"
+              style={{
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: "0.75rem",
+              }}
+            >
+              {groupIndex > 0 && (
+                <p
+                  className="has-text-secondary mb-2"
+                  style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.04em" }}
                 >
-                  {index > 0 && (
-                    <span className="has-text-secondary" style={{ fontSize: 13 }}>
-                      and
-                    </span>
-                  )}
+                  and
+                </p>
+              )}
 
-                  <div className="select is-small">
-                    <select
-                      value={condition.field}
-                      onChange={(event) => {
-                        const field = event.target.value as ConditionField;
-                        const next = [...values.conditions];
-                        // Reset the operator: the old one may not apply here.
-                        next[index] = { field, operator: FIELD_OPERATORS[field][0], value: null };
-                        update({ conditions: next });
-                      }}
-                    >
-                      {CONDITION_FIELDS.map((field) => (
-                        <option key={field} value={field}>
-                          {FIELD_LABELS[field]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="select is-small">
-                    <select
-                      value={condition.operator}
-                      onChange={(event) => {
-                        const operator = event.target.value as Operator;
-                        const next = [...values.conditions];
-                        next[index] = {
-                          ...condition,
-                          operator,
-                          value: needsValue(operator) ? condition.value ?? "" : null,
-                        };
-                        update({ conditions: next });
-                      }}
-                    >
-                      {operators.map((operator) => (
-                        <option key={operator} value={operator}>
-                          {OPERATOR_LABELS[operator]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {needsValue(condition.operator) &&
-                    (condition.field === "stage" ? (
-                      <div className="select is-small">
-                        <select
-                          value={String(condition.value ?? "")}
-                          onChange={(event) => {
-                            const next = [...values.conditions];
-                            next[index] = { ...condition, value: event.target.value };
-                            update({ conditions: next });
-                          }}
-                        >
-                          <option value="">Choose a stage</option>
-                          {APPLICATION_STAGES.map((stage) => (
-                            <option key={stage} value={stage}>
-                              {STAGE_LABELS[stage]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : (
-                      <input
-                        className="input is-small"
-                        style={{ maxWidth: 140 }}
-                        value={String(condition.value ?? "")}
-                        onChange={(event) => {
-                          const next = [...values.conditions];
-                          next[index] = { ...condition, value: event.target.value };
-                          update({ conditions: next });
-                        }}
-                      />
-                    ))}
-
-                  <button
-                    type="button"
-                    className="button is-small"
-                    onClick={() =>
-                      update({
-                        conditions: values.conditions.filter((_, i) => i !== index),
-                      })
+              <div
+                className="is-flex is-align-items-center mb-2"
+                style={{ gap: "0.5rem", flexWrap: "wrap" }}
+              >
+                <span className="has-text-secondary" style={{ fontSize: 13 }}>
+                  Match
+                </span>
+                <div className="select is-small">
+                  <select
+                    value={group.match}
+                    onChange={(event) =>
+                      updateGroup(groupIndex, { match: event.target.value as "all" | "any" })
                     }
                   >
-                    Remove
-                  </button>
+                    <option value="all">all of these</option>
+                    <option value="any">any of these</option>
+                  </select>
                 </div>
-              );
-            })}
-          </>
+
+                <button
+                  type="button"
+                  className="button is-small"
+                  onClick={() =>
+                    update({ conditions: groups.filter((_, i) => i !== groupIndex) })
+                  }
+                >
+                  Remove group
+                </button>
+              </div>
+
+              {group.conditions.map((condition, conditionIndex) => {
+                const operators = FIELD_OPERATORS[condition.field];
+                const options = FIELD_VALUE_OPTIONS[condition.field];
+
+                return (
+                  <div
+                    key={conditionIndex}
+                    className="is-flex mb-2"
+                    style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}
+                  >
+                    {conditionIndex > 0 && (
+                      <span className="has-text-secondary" style={{ fontSize: 13 }}>
+                        {group.match === "any" ? "or" : "and"}
+                      </span>
+                    )}
+
+                    <div className="select is-small">
+                      <select
+                        value={condition.field}
+                        onChange={(event) => {
+                          const field = event.target.value as ConditionField;
+                          // Reset the operator and value: neither may apply here.
+                          updateCondition(groupIndex, conditionIndex, {
+                            field,
+                            operator: FIELD_OPERATORS[field][0],
+                            value: null,
+                          });
+                        }}
+                      >
+                        {CONDITION_FIELDS.map((field) => (
+                          <option key={field} value={field}>
+                            {FIELD_LABELS[field]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="select is-small">
+                      <select
+                        value={condition.operator}
+                        onChange={(event) => {
+                          const operator = event.target.value as Operator;
+                          updateCondition(groupIndex, conditionIndex, {
+                            operator,
+                            value: needsValue(operator) ? (condition.value ?? "") : null,
+                          });
+                        }}
+                      >
+                        {operators.map((operator) => (
+                          <option key={operator} value={operator}>
+                            {OPERATOR_LABELS[operator]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {needsValue(condition.operator) &&
+                      (condition.field === "stage" ? (
+                        <div className="select is-small">
+                          <select
+                            value={String(condition.value ?? "")}
+                            onChange={(event) =>
+                              updateCondition(groupIndex, conditionIndex, {
+                                value: event.target.value,
+                              })
+                            }
+                          >
+                            <option value="">Choose a stage</option>
+                            {APPLICATION_STAGES.map((stage) => (
+                              <option key={stage} value={stage}>
+                                {STAGE_LABELS[stage]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : options ? (
+                        // A fixed vocabulary gets a select, not a text box. A typo
+                        // here used to save fine and then never match.
+                        <div className="select is-small">
+                          <select
+                            value={String(condition.value ?? "")}
+                            onChange={(event) =>
+                              updateCondition(groupIndex, conditionIndex, {
+                                value: event.target.value,
+                              })
+                            }
+                          >
+                            <option value="">Choose one</option>
+                            {options.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <input
+                          className="input is-small"
+                          style={{ maxWidth: 140 }}
+                          value={String(condition.value ?? "")}
+                          onChange={(event) =>
+                            updateCondition(groupIndex, conditionIndex, {
+                              value: event.target.value,
+                            })
+                          }
+                        />
+                      ))}
+
+                    <button
+                      type="button"
+                      className="button is-small"
+                      onClick={() => {
+                        const next = [...groups];
+                        next[groupIndex] = {
+                          ...group,
+                          conditions: group.conditions.filter((_, i) => i !== conditionIndex),
+                        };
+                        // An empty group means nothing, so it goes with its last
+                        // condition rather than lingering as a no-op.
+                        update({
+                          conditions: next.filter((entry) => entry.conditions.length > 0),
+                        });
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+
+              <button
+                type="button"
+                className="button is-small mt-1"
+                onClick={() =>
+                  updateGroup(groupIndex, {
+                    conditions: [
+                      ...group.conditions,
+                      { field: "match_score", operator: "gt", value: 75 },
+                    ],
+                  })
+                }
+              >
+                {group.match === "any" ? "Add an alternative" : "Add condition"}
+              </button>
+            </div>
+          ))
+        )}
+
+        {groups.length > 1 && (
+          <p className="has-text-secondary" style={{ fontSize: 12 }}>
+            Groups are combined with <strong>and</strong>. Inside a group, the choice above decides.
+          </p>
         )}
       </div>
 
@@ -401,70 +603,185 @@ export function AutomationForm({
           </p>
         )}
 
-        {values.actions.map((action, index) => (
-          <div
-            key={index}
-            className="is-flex mb-2"
-            style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}
-          >
-            <div className="select is-small">
-              <select
-                value={action.type}
-                onChange={(event) => {
-                  const next = [...values.actions];
-                  next[index] = { type: event.target.value as ActionType, config: {} };
-                  update({ actions: next });
-                }}
-              >
-                {ACTIONS.map((type) => (
-                  <option key={type} value={type}>
-                    {ACTION_LABELS[type]}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {values.actions.map((action, index) => {
+          const runsHere = ACTION_MODES[action.type]?.includes(TRIGGER_MODES[values.trigger]);
 
-            {action.type === "move_to_stage" && (
-              <div className="select is-small">
-                <select
-                  value={String(action.config?.stage ?? "")}
-                  onChange={(event) => {
-                    const next = [...values.actions];
-                    next[index] = { ...action, config: { stage: event.target.value } };
+          return (
+            <div key={index} className="mb-2">
+              <div
+                className="is-flex"
+                style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}
+              >
+                <div className="select is-small">
+                  <select
+                    value={action.type}
+                    onChange={(event) => {
+                      const next = [...values.actions];
+                      const type = event.target.value as ActionType;
+                      next[index] = {
+                        type,
+                        // Sensible starting config, so a freshly picked action is
+                        // not immediately invalid.
+                        config:
+                          type === "assign_recruiter"
+                            ? { strategy: "job_owner" }
+                            : type === "send_candidate_email"
+                              ? { template: "candidate_stage_update" }
+                              : {},
+                      };
+                      update({
+                        actions: next,
+                        requires_approval:
+                          values.requires_approval || approvalIsMandatory(next),
+                      });
+                    }}
+                  >
+                    {ACTIONS.map((type) => (
+                      <option key={type} value={type}>
+                        {ACTION_LABELS[type]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {action.type === "move_to_stage" && (
+                  <div className="select is-small">
+                    <select
+                      value={String(action.config?.stage ?? "")}
+                      onChange={(event) => {
+                        const next = [...values.actions];
+                        next[index] = { ...action, config: { stage: event.target.value } };
+                        update({ actions: next });
+                      }}
+                    >
+                      <option value="">Choose a stage</option>
+                      {APPLICATION_STAGES.map((stage) => (
+                        <option key={stage} value={stage}>
+                          {STAGE_LABELS[stage]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {action.type === "assign_recruiter" && (
+                  <>
+                    <div className="select is-small">
+                      <select
+                        value={String(action.config?.strategy ?? "job_owner")}
+                        onChange={(event) => {
+                          const next = [...values.actions];
+                          next[index] = {
+                            ...action,
+                            config: { strategy: event.target.value },
+                          };
+                          update({ actions: next });
+                        }}
+                      >
+                        <option value="job_owner">the job&apos;s owning recruiter</option>
+                        <option value="specific_user">a specific person</option>
+                      </select>
+                    </div>
+
+                    {action.config?.strategy === "specific_user" && (
+                      <div className="select is-small">
+                        <select
+                          value={String(action.config?.user_id ?? "")}
+                          onChange={(event) => {
+                            const next = [...values.actions];
+                            next[index] = {
+                              ...action,
+                              config: { strategy: "specific_user", user_id: event.target.value },
+                            };
+                            update({ actions: next });
+                          }}
+                        >
+                          <option value="">Choose someone</option>
+                          {teamMembers.map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {action.type === "call_n8n_webhook" && (
+                  <input
+                    className="input is-small"
+                    style={{ maxWidth: 240 }}
+                    placeholder="webhook path, e.g. recruitment/hired"
+                    value={String(action.config?.path ?? "")}
+                    onChange={(event) => {
+                      const next = [...values.actions];
+                      next[index] = { ...action, config: { path: event.target.value } };
+                      update({ actions: next });
+                    }}
+                  />
+                )}
+
+                {action.type === "add_note" && (
+                  <input
+                    className="input is-small"
+                    style={{ maxWidth: 280 }}
+                    placeholder="Optional note text"
+                    value={String(action.config?.text ?? "")}
+                    onChange={(event) => {
+                      const next = [...values.actions];
+                      next[index] = { ...action, config: { text: event.target.value } };
+                      update({ actions: next });
+                    }}
+                  />
+                )}
+
+                {ACTION_INTEGRATIONS[action.type] && (
+                  <span className="has-text-secondary" style={{ fontSize: 12 }}>
+                    needs {ACTION_INTEGRATIONS[action.type]}
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  className="button is-small"
+                  onClick={() => {
+                    const next = values.actions.filter((_, i) => i !== index);
                     update({ actions: next });
                   }}
                 >
-                  <option value="">Choose a stage</option>
-                  {APPLICATION_STAGES.map((stage) => (
-                    <option key={stage} value={stage}>
-                      {STAGE_LABELS[stage]}
-                    </option>
-                  ))}
-                </select>
+                  Remove
+                </button>
               </div>
-            )}
 
-            {ACTION_INTEGRATIONS[action.type] && (
-              <span className="has-text-secondary" style={{ fontSize: 12 }}>
-                needs {ACTION_INTEGRATIONS[action.type]}
-              </span>
-            )}
+              {!runsHere && (
+                <p className="mt-1" style={{ fontSize: 12, color: "var(--color-error)" }}>
+                  This action can&apos;t run on the trigger you picked.
+                </p>
+              )}
 
-            {action.type === "notify_recruiter" && (
-              <span className="has-text-secondary" style={{ fontSize: 12 }}>
-                notifies the assigned recruiter
-              </span>
-            )}
+              {action.type === "notify_recruiter" && (
+                <p className="has-text-secondary mt-1" style={{ fontSize: 12 }}>
+                  Goes to the assigned recruiter. Skipped when nobody is assigned.
+                </p>
+              )}
 
-            <button
-              type="button"
-              className="button is-small"
-              onClick={() => update({ actions: values.actions.filter((_, i) => i !== index) })}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
+              {action.type === "send_candidate_email" && (
+                <p className="has-text-secondary mt-1" style={{ fontSize: 12 }}>
+                  Sends one approved template — a stage update with no free text. Always needs
+                  approval first.
+                </p>
+              )}
+
+              {action.type === "call_n8n_webhook" && (
+                <p className="has-text-secondary mt-1" style={{ fontSize: 12 }}>
+                  Posts ids and the stage to a workflow in your own n8n instance. No candidate
+                  name, email or phone is sent.
+                </p>
+              )}
+            </div>
+          );
+        })}
 
         <button
           type="button"
@@ -473,6 +790,74 @@ export function AutomationForm({
         >
           Add action
         </button>
+
+        {!executable.ok && (
+          <div className="mt-3" style={{ fontSize: 13, color: "var(--color-error)" }}>
+            {executable.reason}
+          </div>
+        )}
+      </div>
+
+      {/* GUARDRAILS */}
+      <div className="card mb-4">
+        <h2 className="title is-5 mb-1">Guardrails</h2>
+        <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>
+          A rule already runs at most once per application per stage-entry. These two bound what it
+          can do across <em>all</em> your applications.
+        </p>
+
+        <label className="is-flex mb-1" style={{ gap: "0.5rem", alignItems: "flex-start" }}>
+          <input
+            type="checkbox"
+            checked={values.requires_approval || approvalForced}
+            disabled={approvalForced}
+            onChange={(event) => update({ requires_approval: event.target.checked })}
+            style={{ marginTop: 3 }}
+          />
+          <span style={{ fontSize: 14 }}>
+            A person must approve the actions before they run
+            {approvalForced && (
+              <span className="has-text-secondary">
+                {" "}
+                — required, because this rule emails candidates
+              </span>
+            )}
+          </span>
+        </label>
+
+        <p className="has-text-secondary mb-4" style={{ fontSize: 12, marginLeft: "1.6rem" }}>
+          The rule still evaluates on its own; when it matches, it proposes and waits. Proposals
+          expire after seven days.
+        </p>
+
+        <div className="is-flex is-align-items-center" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 14 }}>Run at most</span>
+          <input
+            className="input is-small"
+            style={{ maxWidth: 90 }}
+            type="number"
+            min={1}
+            placeholder="∞"
+            value={values.daily_run_cap ?? ""}
+            onChange={(event) => {
+              const raw = event.target.value.trim();
+              if (raw === "") {
+                update({ daily_run_cap: null });
+                return;
+              }
+              const parsed = Number(raw);
+              update({
+                daily_run_cap: Number.isInteger(parsed) && parsed > 0 ? parsed : null,
+              });
+            }}
+          />
+          <span style={{ fontSize: 14 }}>times per day</span>
+        </div>
+
+        <p className="has-text-secondary mt-1" style={{ fontSize: 12 }}>
+          Leave empty for no limit. Counted in your organization&apos;s timezone. Hitting the limit
+          pauses the rule and tells your Owners and Admins why — it does not keep trying quietly.
+        </p>
       </div>
 
       {summary && (
@@ -486,7 +871,8 @@ export function AutomationForm({
               {consequential.some((action) => action.type === "start_screening_call")
                 ? " and telephones candidates"
                 : ""}
-              . It runs at most once per application per stage-entry.
+              . It runs at most once per application per stage-entry
+              {values.daily_run_cap ? `, and at most ${values.daily_run_cap} times a day` : ""}.
             </p>
           )}
         </div>
@@ -499,7 +885,12 @@ export function AutomationForm({
           type="button"
           className={`button is-primary ${saving ? "is-loading" : ""}`}
           onClick={save}
-          disabled={saving || values.name.trim().length === 0 || values.actions.length === 0}
+          disabled={
+            saving ||
+            values.name.trim().length === 0 ||
+            values.actions.length === 0 ||
+            (scheduled && !hasStageAgeCondition)
+          }
         >
           {mode === "create" ? "Save as draft" : "Save changes"}
         </button>

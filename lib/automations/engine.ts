@@ -3,16 +3,20 @@
 //
 // Dispatch order, and why:
 //
-//   1. Load the ACTIVE rules for this trigger. Drafts and paused rules never
+//   1. Check the ORGANIZATION KILL SWITCH. Before a single rule is loaded, so
+//      "turn all of it off" is one column and takes effect immediately.
+//   2. Load the ACTIVE rules for this trigger. Drafts and paused rules never
 //      execute — that is the whole point of them.
-//   2. Build the evaluation context once, from the database, for all rules.
-//   3. CLAIM THE RUN before doing anything. The run row is inserted first, and
+//   3. Build the evaluation context once, from the database, for all rules.
+//   4. CLAIM THE RUN before doing anything. The run row is inserted first, and
 //      the unique index on (automation_id, application_id, dedupe_key) is what
 //      makes concurrent triggers safe. If the insert conflicts, this occasion
 //      has already been handled and we stop — no call, no AI spend.
-//   4. Evaluate conditions. Not matching is a SKIP, not a failure.
-//   5. Check integration health. Missing integration is BLOCKED, not failed.
-//   6. Execute actions, each recording its own outcome.
+//   5. Evaluate conditions. Not matching is a SKIP, not a failure.
+//   6. Check the DAILY CAP. Over it is BLOCKED, and the rule pauses itself.
+//   7. Check integration health. Missing integration is BLOCKED, not failed.
+//   8. If the rule requires approval, PROPOSE and stop. Nothing is executed.
+//   9. Otherwise execute actions, each recording its own outcome.
 //
 // Claiming before evaluating means a skipped run also consumes the dedupe key.
 // That is deliberate: a rule that did not match on this stage-entry will not
@@ -20,13 +24,41 @@
 // database work for no benefit. It also means the run history shows every
 // occasion the engine considered, which is what makes "why didn't my automation
 // fire?" answerable.
+//
+// -----------------------------------------------------------------------------
+// THE CLIENT IS NOW A PARAMETER, AND THAT IS THE UPGRADE'S CENTRAL CHANGE.
+//
+// Every query used to call `await createClient()` — the session-bound client. So
+// any trigger arriving without a session (Bolna's webhook, the scheduler's cron)
+// would have every query denied by RLS: the rule would look active and quietly
+// never fire, which is why `screening_call_completed` was refused at activation
+// rather than offered.
+//
+// The engine now takes an `ExecutionMode`, resolves the right client once, and
+// threads it through every query and every action it performs itself. That makes
+// the webhook trigger and the whole scheduler possible.
+//
+// It does NOT make the Module 7-9 actions possible: `startScreeningCall`,
+// `calculateAndStoreMatch` and `generateReportForApplication` each construct
+// their own session client deep inside those modules. `ACTION_MODES` in the
+// catalogue records that, and activation refuses a rule that pairs them with a
+// sessionless trigger — same honesty rule, applied one level finer.
 // =============================================================================
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  ACTION_LABELS,
+  CONSEQUENTIAL_ACTIONS,
+  approvalIsMandatory,
+  countChargeable,
+  describeRule,
+  normalizeConditions,
   requiredIntegrationsFor,
+  TRIGGER_MODES,
   type Action,
   type ActionType,
-  type Condition,
+  type ConditionGroup,
+  type ExecutionMode,
   type TriggerType,
 } from "@/lib/automations/catalog";
 import { buildDedupeKey, evaluateConditions, type EvaluationContext } from "@/lib/automations/evaluate";
@@ -34,25 +66,37 @@ import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
 import { getStatus as getEmailStatus } from "@/lib/integrations/email";
 import { getStatus as getCalendarStatus } from "@/lib/integrations/calendar";
 import { getStatus as getLlmStatus } from "@/lib/integrations/llm";
-import { getStatus as getN8nStatus } from "@/lib/integrations/n8n";
+import { getStatus as getN8nStatus, triggerWorkflow } from "@/lib/integrations/n8n";
 import { startScreeningCall } from "@/lib/screening/queries";
 import { calculateAndStoreMatch } from "@/lib/matching/queries";
 import { generateReportForApplication } from "@/lib/screening/reportQueries";
-import { canTransition, isApplicationStage, type ApplicationStage } from "@/lib/applications/stages";
+import { canTransition, isApplicationStage, STAGE_LABELS, type ApplicationStage } from "@/lib/applications/stages";
 import { logActivity } from "@/lib/activity/log";
 import { notify, notifyMany } from "@/lib/notifications/notify";
 import { findOwnersAndAdmins } from "@/lib/notifications/queries";
+import { startOfDayInZone, resolveTimeZone } from "@/lib/time";
 import { formatDbError } from "@/lib/supabase/errors";
+
+/**
+ * Either Supabase client. The union, not `any` — every call in this file is
+ * checked against both, which is what stops a service-mode path quietly
+ * depending on something only the session client has.
+ */
+export type EngineClient =
+  | NonNullable<ReturnType<typeof createAdminClient>>
+  | Awaited<ReturnType<typeof createClient>>;
 
 export type StoredAutomation = {
   id: string;
   organization_id: string;
   name: string;
   trigger: TriggerType;
-  conditions: Condition[];
+  conditions: ConditionGroup[];
   actions: Action[];
   status: "draft" | "active" | "paused";
   required_integrations: string[];
+  requires_approval: boolean;
+  daily_run_cap: number | null;
 };
 
 export type ActionResult = {
@@ -64,13 +108,59 @@ export type ActionResult = {
 export type RunOutcome = {
   automationId: string;
   automationName: string;
-  status: "success" | "failed" | "skipped" | "blocked" | "deduped";
+  status: "success" | "failed" | "skipped" | "blocked" | "deduped" | "awaiting_approval";
   reason: string | null;
   actionResults: ActionResult[];
 };
 
 const AUTOMATION_COLUMNS =
-  "id, organization_id, name, trigger, conditions, actions, status, required_integrations";
+  "id, organization_id, name, trigger, conditions, actions, status, required_integrations, " +
+  "requires_approval, daily_run_cap";
+
+/**
+ * Resolves the client for a mode.
+ *
+ * Returns null in service mode when no service-role key is configured, which is
+ * a real deployment state and must degrade to "the scheduler cannot run" rather
+ * than to a crash or, worse, to silence.
+ */
+export async function clientFor(mode: ExecutionMode): Promise<EngineClient | null> {
+  if (mode === "service") return createAdminClient();
+  return await createClient();
+}
+
+/**
+ * Is this organization's automation engine switched on?
+ *
+ * Read before any rule is loaded. Returns `unknown` on a failed read rather than
+ * defaulting either way: assuming ON would run rules an admin may have disabled,
+ * and assuming OFF would silently stop an organization's automation because of a
+ * transient database error. Unknown blocks and says so.
+ */
+export async function readOrganizationGate({
+  client,
+  organizationId,
+}: {
+  client: EngineClient;
+  organizationId: string;
+}): Promise<{ enabled: boolean | null; timeZone: string }> {
+  const { data, error } = await client
+    .from("organizations")
+    .select("automations_enabled, timezone")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error(`[automation] org gate read failed: ${formatDbError(error)}`);
+    return { enabled: null, timeZone: resolveTimeZone(null) };
+  }
+
+  const row = data as { automations_enabled: boolean | null; timezone: string | null };
+  return {
+    enabled: row.automations_enabled ?? true,
+    timeZone: resolveTimeZone(row.timezone),
+  };
+}
 
 /**
  * Builds the evaluation context for one application.
@@ -80,18 +170,19 @@ const AUTOMATION_COLUMNS =
  * cautious, never reckless.
  */
 export async function buildContext({
+  client,
   organizationId,
   applicationId,
 }: {
+  client: EngineClient;
   organizationId: string;
   applicationId: string;
 }): Promise<{ context: EvaluationContext; stageEnteredAt: string | null } | null> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("applications")
     .select(
-      "id, stage, match_score, job_id, candidate:candidates(phone, email), job:jobs(id)"
+      "id, stage, match_score, job_id, source, assigned_recruiter_id, created_at, " +
+        "candidate:candidates(phone, email), job:jobs(id, status)"
     )
     .eq("id", applicationId)
     .eq("organization_id", organizationId)
@@ -103,12 +194,16 @@ export async function buildContext({
     stage: string;
     match_score: number | null;
     job_id: string | null;
+    source: string | null;
+    assigned_recruiter_id: string | null;
+    created_at: string | null;
     candidate: { phone: string | null; email: string | null } | null;
+    job: { id: string; status: string | null } | null;
   };
 
   // Stage entry, from the trigger-written history. This is both the dedupe key's
   // basis and the source of days_in_stage.
-  const { data: stageRow } = await supabase
+  const { data: stageRow } = await client
     .from("application_stage_history")
     .select("entered_at")
     .eq("application_id", applicationId)
@@ -123,9 +218,13 @@ export async function buildContext({
     ? Math.floor((Date.now() - new Date(stageEnteredAt).getTime()) / 86_400_000)
     : null;
 
+  const daysSinceApplied = application.created_at
+    ? Math.floor((Date.now() - new Date(application.created_at).getTime()) / 86_400_000)
+    : null;
+
   let jobHasScreeningQuestions: boolean | null = null;
   if (application.job_id) {
-    const { count, error: questionError } = await supabase
+    const { count, error: questionError } = await client
       .from("job_screening_questions")
       .select("id", { count: "exact", head: true })
       .eq("job_id", application.job_id);
@@ -133,7 +232,7 @@ export async function buildContext({
     if (!questionError) jobHasScreeningQuestions = (count ?? 0) > 0;
   }
 
-  const { data: callRow } = await supabase
+  const { data: callRow } = await client
     .from("screening_calls")
     .select("consent_confirmed")
     .eq("organization_id", organizationId)
@@ -148,16 +247,56 @@ export async function buildContext({
   // `reviewed_interest_level` column that has never existed, which made the
   // whole select fail and left every interest_level condition permanently
   // "unknown" — so any rule using it silently never matched.
-  const { data: reportRow } = await supabase
+  const { data: reportRow } = await client
     .from("screening_reports")
     .select("interest_level")
     .eq("organization_id", organizationId)
     .eq("application_id", applicationId)
     .maybeSingle();
 
-  const report = reportRow as unknown as {
-    interest_level: string | null;
-  } | null;
+  const report = reportRow as unknown as { interest_level: string | null } | null;
+
+  // Resume presence. A failed read stays null for the same reason as the
+  // question count: "we could not tell" is not "they have no resume", and a rule
+  // gating an email on having one must not fire on a database hiccup.
+  let candidateHasResume: boolean | null = null;
+  {
+    const { data: appRow } = await client
+      .from("applications")
+      .select("candidate_id")
+      .eq("id", applicationId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    const candidateId = (appRow as { candidate_id: string } | null)?.candidate_id ?? null;
+    if (candidateId) {
+      const { count, error: resumeError } = await client
+        .from("resumes")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("candidate_id", candidateId);
+      if (!resumeError) candidateHasResume = (count ?? 0) > 0;
+    }
+  }
+
+  // The most recent evaluation's outcome. Ordered by when the thing HAPPENED,
+  // matching how Module 11's list is ordered — a call written up late is still
+  // the older evaluation.
+  let evaluationOutcome: string | null = null;
+  {
+    const { data: evaluationRow, error: evaluationError } = await client
+      .from("application_evaluations")
+      .select("outcome")
+      .eq("organization_id", organizationId)
+      .eq("application_id", applicationId)
+      .order("occurred_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!evaluationError) {
+      evaluationOutcome = (evaluationRow as { outcome: string } | null)?.outcome ?? null;
+    }
+  }
 
   return {
     stageEnteredAt,
@@ -176,6 +315,15 @@ export async function buildContext({
       jobHasScreeningQuestions,
       daysInStage,
       interestLevel: report?.interest_level ?? null,
+      applicationSource: application.source ?? null,
+      candidateHasResume,
+      daysSinceApplied,
+      // A boolean about our OWN column, so absence is a real answer: nobody is
+      // assigned. Unlike the counts above, this cannot be "unknown" once the
+      // application row loaded at all.
+      assignedRecruiterPresent: Boolean(application.assigned_recruiter_id),
+      jobIsOpen: application.job ? application.job.status === "open" : null,
+      evaluationOutcome,
     },
   };
 }
@@ -251,24 +399,68 @@ export async function checkIntegrations({
   return { ok: true };
 }
 
-/** Executes one action. Never throws — a thrown action would lose the run record. */
-async function executeAction({
-  action,
-  organizationId,
-  organizationName,
-  applicationId,
-  triggeredBy,
-  webhookUrl,
-  automationName,
+/**
+ * Runs today, for one rule, in the ORGANIZATION's day.
+ *
+ * The project rule is that every "today" uses lib/time.ts with the org's
+ * configured timezone. A cap counted on the server's midnight would reset in the
+ * middle of an Indian working afternoon, which is the sort of thing nobody
+ * notices until a rule spends twice its budget on one day.
+ */
+async function countRunsToday({
+  client,
+  automationId,
+  timeZone,
 }: {
+  client: EngineClient;
+  automationId: string;
+  timeZone: string;
+}): Promise<number | null> {
+  const since = startOfDayInZone(timeZone).toISOString();
+
+  const { count, error } = await client
+    .from("automation_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("automation_id", automationId)
+    .gte("started_at", since);
+
+  // null, not 0. A failed count must never be read as "well under the cap".
+  if (error) {
+    console.error(`[automation] cap count failed: ${formatDbError(error)}`);
+    return null;
+  }
+  return count ?? 0;
+}
+
+export type ExecuteActionInput = {
   action: Action;
+  client: EngineClient;
+  mode: ExecutionMode;
   organizationId: string;
   organizationName: string;
   applicationId: string;
-  triggeredBy: string;
+  /** The user whose action triggered the rule. Null for a scheduled run. */
+  triggeredBy: string | null;
   webhookUrl: string;
   automationName: string;
-}): Promise<ActionResult> {
+};
+
+/** Executes one action. Never throws — a thrown action would lose the run record. */
+async function executeAction(input: ExecuteActionInput): Promise<ActionResult> {
+  const {
+    action,
+    client,
+    mode,
+    organizationId,
+    organizationName,
+    applicationId,
+    triggeredBy,
+    webhookUrl,
+    automationName,
+  } = input;
+
+  const useAdminClient = mode === "service";
+
   try {
     switch (action.type) {
       case "start_screening_call": {
@@ -277,6 +469,19 @@ async function executeAction({
         // startScreeningCall() also inherits the retry cap, the consent
         // disclosure and the "candidate asked for a callback" refusal — an
         // automation must not have a weaker safety path than the manual button.
+        //
+        // Session-only: it builds its own session client internally. The
+        // catalogue records that and activation refuses the bad pairing, so
+        // reaching here in service mode would be a bug — hence the explicit
+        // refusal rather than an attempt that RLS would deny with no explanation.
+        if (mode === "service" || !triggeredBy) {
+          return {
+            action: action.type,
+            status: "failed",
+            detail: "Screening calls can't be placed by the scheduler or a webhook.",
+          };
+        }
+
         const result = await startScreeningCall({
           organizationId,
           applicationId,
@@ -306,6 +511,14 @@ async function executeAction({
       }
 
       case "calculate_match": {
+        if (mode === "service") {
+          return {
+            action: action.type,
+            status: "failed",
+            detail: "Match scoring can't run without a signed-in user.",
+          };
+        }
+
         const result = await calculateAndStoreMatch({ organizationId, applicationId });
 
         // Module 14, same reasoning as above.
@@ -331,6 +544,14 @@ async function executeAction({
       }
 
       case "generate_screening_report": {
+        if (mode === "service") {
+          return {
+            action: action.type,
+            status: "failed",
+            detail: "Report generation can't run without a signed-in user.",
+          };
+        }
+
         const result = await generateReportForApplication({ organizationId, applicationId });
 
         // Module 14, same reasoning as above.
@@ -361,8 +582,7 @@ async function executeAction({
           return { action: action.type, status: "failed", detail: "That stage no longer exists." };
         }
 
-        const supabase = await createClient();
-        const { data: existing } = await supabase
+        const { data: existing } = await client
           .from("applications")
           .select("stage")
           .eq("id", applicationId)
@@ -386,7 +606,7 @@ async function executeAction({
           };
         }
 
-        const { error } = await supabase
+        const { error } = await client
           .from("applications")
           .update({ stage: target })
           .eq("id", applicationId)
@@ -404,6 +624,7 @@ async function executeAction({
             actorId: triggeredBy,
             actorLabel: `Automation: ${automationName}`,
             metadata: { from: current, to: target },
+            useAdminClient,
           });
         }
 
@@ -413,12 +634,11 @@ async function executeAction({
       }
 
       case "add_note": {
-        const supabase = await createClient();
         const text =
           (action.config?.text as string)?.trim() ||
           `Automation "${automationName}" ran on this application.`;
 
-        const { error } = await supabase.from("application_notes").insert({
+        const { error } = await client.from("application_notes").insert({
           organization_id: organizationId,
           application_id: applicationId,
           author_id: triggeredBy,
@@ -436,6 +656,7 @@ async function executeAction({
             actorId: triggeredBy,
             actorLabel: `Automation: ${automationName}`,
             metadata: {},
+            useAdminClient,
           });
         }
 
@@ -452,8 +673,7 @@ async function executeAction({
         // whose action triggered the rule — telling someone their own action
         // happened is not a notification. Falls back to the triggering user only
         // when nobody is assigned, so the alert reaches a human either way.
-        const supabase = await createClient();
-        const { data: assignment } = await supabase
+        const { data: assignment } = await client
           .from("applications")
           .select("assigned_recruiter_id, candidate:candidates(name), job:jobs(title)")
           .eq("id", applicationId)
@@ -468,6 +688,18 @@ async function executeAction({
 
         const recipient = row?.assigned_recruiter_id ?? triggeredBy;
 
+        // A SCHEDULED run has no triggering user to fall back on. Rather than
+        // pick someone, it says nobody was assigned — which is both true and the
+        // thing to fix. Broadcasting to the whole team is how a notification
+        // centre becomes noise (Module 19's reminders make the same call).
+        if (!recipient) {
+          return {
+            action: action.type,
+            status: "skipped",
+            detail: "Nobody is assigned to this application, so there was no one to notify.",
+          };
+        }
+
         const result = await notify({
           organizationId,
           userId: recipient,
@@ -477,6 +709,7 @@ async function executeAction({
             job_title: row?.job?.title ?? null,
           },
           linkPath: `/applications/${applicationId}`,
+          useAdminClient,
         });
 
         // A muted or unrenderable notification is a skip, not a failure — the
@@ -499,6 +732,261 @@ async function executeAction({
         };
       }
 
+      /**
+       * THE ONLY ACTION THAT SPEAKS TO A CANDIDATE IN WRITING.
+       *
+       * Three constraints, all of them structural rather than a matter of the
+       * template's wording:
+       *
+       *   - It goes through Module 15's notify() with an approved EXTERNAL
+       *     template. The facts (candidate name, job title, stage) are fixed
+       *     placeholders; there is no free-text field a rule can fill.
+       *   - A rule containing it CANNOT have approval switched off
+       *     (`approvalIsMandatory`), so a person reads the proposal first.
+       *   - No email address, no send. Not a guess, not a fallback to the
+       *     recruiter — that would mail a colleague a message addressed to a
+       *     candidate.
+       */
+      case "send_candidate_email": {
+        const { data: row } = await client
+          .from("applications")
+          .select("stage, candidate:candidates(name, email), job:jobs(title)")
+          .eq("id", applicationId)
+          .eq("organization_id", organizationId)
+          .maybeSingle();
+
+        const application = row as unknown as {
+          stage: string;
+          candidate: { name: string | null; email: string | null } | null;
+          job: { title: string | null } | null;
+        } | null;
+
+        const address = application?.candidate?.email?.trim();
+        if (!address) {
+          return {
+            action: action.type,
+            status: "skipped",
+            detail: "The candidate has no email address on file, so nothing was sent.",
+          };
+        }
+
+        // The recipient of the notification ROW is still an internal user — the
+        // in-app copy is the recruiter's record that it went out. emailOverride
+        // is what sends the message itself to the candidate.
+        const { data: assignment } = await client
+          .from("applications")
+          .select("assigned_recruiter_id")
+          .eq("id", applicationId)
+          .eq("organization_id", organizationId)
+          .maybeSingle();
+
+        const owner =
+          (assignment as { assigned_recruiter_id: string | null } | null)?.assigned_recruiter_id ??
+          triggeredBy;
+
+        if (!owner) {
+          return {
+            action: action.type,
+            status: "skipped",
+            detail:
+              "Nobody is assigned to this application, so there is no recruiter to record the email against.",
+          };
+        }
+
+        const rawStage = application?.stage ?? null;
+        const stageLabel = isApplicationStage(rawStage) ? STAGE_LABELS[rawStage] : rawStage;
+
+        const result = await notify({
+          organizationId,
+          userId: owner,
+          type: "candidate_stage_update",
+          values: {
+            candidate_name: application?.candidate?.name ?? null,
+            job_title: application?.job?.title ?? null,
+            stage_name: stageLabel,
+            organization_name: organizationName,
+          },
+          linkPath: `/applications/${applicationId}`,
+          emailOverride: address,
+          useAdminClient,
+        });
+
+        if (result.emailStatus !== "sent") {
+          return {
+            action: action.type,
+            status: "failed",
+            detail:
+              result.detail ??
+              "The email could not be sent. The candidate has not been contacted.",
+          };
+        }
+
+        return {
+          action: action.type,
+          status: "success",
+          detail: "Stage update emailed to the candidate.",
+        };
+      }
+
+      case "assign_recruiter": {
+        const strategy = action.config?.strategy;
+
+        let assignee: string | null = null;
+        if (strategy === "specific_user") {
+          assignee = (action.config?.user_id as string) ?? null;
+
+          // Membership is verified before writing. A user id in a rule's config
+          // is client-authored data, and assigning a stranger's id would leak an
+          // application into someone else's queue — the exact thing
+          // organization_members' wide SELECT policy makes easy to get wrong.
+          if (assignee) {
+            const { data: member } = await client
+              .from("organization_members")
+              .select("user_id")
+              .eq("organization_id", organizationId)
+              .eq("user_id", assignee)
+              .maybeSingle();
+
+            if (!member) {
+              return {
+                action: action.type,
+                status: "failed",
+                detail: "That recruiter is no longer a member of this organization.",
+              };
+            }
+          }
+        }
+
+        const { data: current } = await client
+          .from("applications")
+          .select(
+            "assigned_recruiter_id, candidate:candidates(name), job:jobs(title, owner_recruiter_id)"
+          )
+          .eq("id", applicationId)
+          .eq("organization_id", organizationId)
+          .maybeSingle();
+
+        const row = current as unknown as {
+          assigned_recruiter_id: string | null;
+          candidate: { name: string | null } | null;
+          job: { title: string | null; owner_recruiter_id: string | null } | null;
+        } | null;
+
+        // 'job_owner' means the job's owning recruiter. Resolved from the same
+        // read as the current assignee so the two cannot disagree.
+        if (strategy !== "specific_user") {
+          assignee = row?.job?.owner_recruiter_id ?? null;
+        }
+
+        if (!assignee) {
+          return {
+            action: action.type,
+            status: "skipped",
+            detail: "There was nobody to assign — the job has no owning recruiter recorded.",
+          };
+        }
+
+        const existingAssignee = row?.assigned_recruiter_id ?? null;
+
+        // Never reassign over a person. A recruiter working an application must
+        // not have it taken off them by a rule; "already assigned" is a skip.
+        if (existingAssignee) {
+          return {
+            action: action.type,
+            status: "skipped",
+            detail:
+              existingAssignee === assignee
+                ? "Already assigned to that recruiter."
+                : "Somebody is already assigned, so this was left alone.",
+          };
+        }
+
+        const { error } = await client
+          .from("applications")
+          .update({ assigned_recruiter_id: assignee })
+          .eq("id", applicationId)
+          .eq("organization_id", organizationId);
+
+        if (error) {
+          return { action: action.type, status: "failed", detail: "Could not assign a recruiter." };
+        }
+
+        await logActivity({
+          organizationId,
+          entityType: "application",
+          entityId: applicationId,
+          eventType: "application.recruiter_assigned",
+          actorId: triggeredBy,
+          actorLabel: `Automation: ${automationName}`,
+          metadata: { assigned_to: assignee },
+          useAdminClient,
+        });
+
+        // The assignee learns about it, because an application appearing in
+        // somebody's queue silently is how work gets dropped. The names are real
+        // values, not nulls: notify() treats a missing fixed fact as a hard
+        // failure rather than rendering "You've been assigned not recorded".
+        await notify({
+          organizationId,
+          userId: assignee,
+          type: "assigned_to_application",
+          values: {
+            candidate_name: row?.candidate?.name ?? null,
+            job_title: row?.job?.title ?? null,
+          },
+          linkPath: `/applications/${applicationId}`,
+          useAdminClient,
+        });
+
+        return { action: action.type, status: "success", detail: "Recruiter assigned." };
+      }
+
+      /**
+       * The n8n hand-off — and the point at which the adapter stops being
+       * decorative.
+       *
+       * The engine still executes rules in-process; this does not change that.
+       * What it does is give a rule a way to reach the workflows an organization
+       * has already built in n8n, with the org's own credentials, over a path
+       * inside their own instance (validated in the catalogue — a rule cannot
+       * name an arbitrary host).
+       *
+       * The payload is IDS AND STAGE ONLY. No candidate name, email or phone: the
+       * moment this posts personal data to a third-party workflow engine it
+       * becomes a data-processing decision an admin never made.
+       */
+      case "call_n8n_webhook": {
+        const { data: row } = await client
+          .from("applications")
+          .select("stage, candidate_id, job_id")
+          .eq("id", applicationId)
+          .eq("organization_id", organizationId)
+          .maybeSingle();
+
+        const application = row as {
+          stage: string;
+          candidate_id: string;
+          job_id: string;
+        } | null;
+
+        const result = await triggerWorkflow({
+          organizationId,
+          path: (action.config?.path as string) ?? "",
+          payload: {
+            event: "automation",
+            automation: automationName,
+            application_id: applicationId,
+            candidate_id: application?.candidate_id ?? null,
+            job_id: application?.job_id ?? null,
+            stage: application?.stage ?? null,
+          },
+        });
+
+        return result.ok
+          ? { action: action.type, status: "success", detail: result.data }
+          : { action: action.type, status: "failed", detail: result.error };
+      }
+
       default:
         return { action: action.type, status: "failed", detail: "Unknown action." };
     }
@@ -513,13 +1001,24 @@ export type DispatchInput = {
   organizationName: string;
   applicationId: string;
   trigger: TriggerType;
-  /** The user whose action caused the trigger; recorded as the actor. */
-  triggeredBy: string;
+  /** The user whose action caused the trigger. Null for webhook/scheduled runs. */
+  triggeredBy: string | null;
   webhookUrl: string;
   /** True for the "test this rule" path: evaluate and report, execute nothing. */
   dryRun?: boolean;
   /** Restricts dispatch to one rule, for the test button. */
   onlyAutomationId?: string;
+  /**
+   * Which client to use. Defaults to the trigger's declared mode, which is what
+   * every route caller wants; the sweep passes it explicitly.
+   */
+  mode?: ExecutionMode;
+  /** Reuses a client the caller already resolved — the sweep, per application. */
+  client?: EngineClient;
+  /** Org timezone, when the caller already read it. Saves a query per dispatch. */
+  timeZone?: string;
+  /** Set by the sweep so the run records that nobody was there. */
+  scheduled?: boolean;
 };
 
 /**
@@ -532,9 +1031,34 @@ export type DispatchInput = {
  */
 export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
   try {
-    const supabase = await createClient();
+    const mode = input.mode ?? TRIGGER_MODES[input.trigger] ?? "session";
 
-    let query = supabase
+    const client = input.client ?? (await clientFor(mode));
+    if (!client) {
+      // Service mode with no service-role key. Loud, because it means the
+      // scheduler and the Bolna webhook cannot run any rule at all.
+      console.error(
+        "[automation] no service-role client configured; sessionless triggers cannot run"
+      );
+      return [];
+    }
+
+    const gate =
+      input.timeZone !== undefined
+        ? { enabled: true as boolean | null, timeZone: input.timeZone }
+        : await readOrganizationGate({ client, organizationId: input.organizationId });
+
+    if (gate.enabled !== true) {
+      // Nothing is claimed and nothing is recorded: with the engine switched off
+      // there was no occasion, and filling the run history with "the switch is
+      // off" rows would bury the runs that matter.
+      if (gate.enabled === null) {
+        console.error("[automation] could not read the organization's automation switch; stopping");
+      }
+      return [];
+    }
+
+    let query = client
       .from("automations")
       .select(AUTOMATION_COLUMNS)
       .eq("organization_id", input.organizationId)
@@ -553,6 +1077,7 @@ export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
     if (automations.length === 0) return [];
 
     const built = await buildContext({
+      client,
       organizationId: input.organizationId,
       applicationId: input.applicationId,
     });
@@ -568,6 +1093,9 @@ export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
         await runOne({
           automation,
           input,
+          client,
+          mode,
+          timeZone: gate.timeZone,
           context: built.context,
           stageEnteredAt: built.stageEnteredAt,
         })
@@ -584,23 +1112,27 @@ export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
 async function runOne({
   automation,
   input,
+  client,
+  mode,
+  timeZone,
   context,
   stageEnteredAt,
 }: {
   automation: StoredAutomation;
   input: DispatchInput;
+  client: EngineClient;
+  mode: ExecutionMode;
+  timeZone: string;
   context: EvaluationContext;
   stageEnteredAt: string | null;
 }): Promise<RunOutcome> {
-  const supabase = await createClient();
-
   const dedupeKey = buildDedupeKey({
     trigger: input.trigger,
     stage: context.stage,
     stageEnteredAt,
   });
 
-  const evaluation = evaluateConditions(automation.conditions ?? [], context);
+  const evaluation = evaluateConditions(normalizeConditions(automation.conditions), context);
 
   if (input.dryRun) {
     return {
@@ -614,7 +1146,7 @@ async function runOne({
 
   // CLAIM FIRST. The insert is the lock: the unique index rejects a second run
   // for the same occasion, so a duplicated event cannot produce a second call.
-  const { data: claimed, error: claimError } = await supabase
+  const { data: claimed, error: claimError } = await client
     .from("automation_runs")
     .insert({
       organization_id: input.organizationId,
@@ -623,6 +1155,9 @@ async function runOne({
       status: "skipped",
       dedupe_key: dedupeKey,
       reason: "Running…",
+      trigger: input.trigger,
+      scheduled: input.scheduled === true,
+      triggered_by: input.triggeredBy,
     })
     .select("id")
     .single();
@@ -645,6 +1180,7 @@ async function runOne({
   }
 
   const runId = (claimed as { id: string }).id;
+  const useAdminClient = mode === "service";
 
   const finish = async (
     status: RunOutcome["status"],
@@ -652,7 +1188,15 @@ async function runOne({
     actionResults: ActionResult[],
     errorMessage: string | null = null
   ): Promise<RunOutcome> => {
-    await supabase
+    const chargeable = actionResults.filter(
+      (result) => result.status === "success" && CONSEQUENTIAL_ACTIONS.includes(result.action)
+    ).length;
+
+    // awaiting_approval leaves finished_at NULL: the run is not over, and
+    // migration 0029's trigger allows exactly one later completion.
+    const terminal = status !== "awaiting_approval";
+
+    const { error: updateError } = await client
       .from("automation_runs")
       .update({
         // 'deduped' never reaches here; the enum has no such value by design.
@@ -660,10 +1204,20 @@ async function runOne({
         reason,
         error_message: errorMessage,
         action_results: actionResults,
-        finished_at: new Date().toISOString(),
+        chargeable_actions: chargeable,
+        finished_at: terminal ? new Date().toISOString() : null,
       })
       .eq("id", runId)
       .eq("organization_id", input.organizationId);
+
+    // Loud, because this is what broke silently before migration 0029: the
+    // claim succeeded, the completion was discarded by RLS, and every run in the
+    // product read "Running…" forever. If it happens again it must be visible.
+    if (updateError) {
+      console.error(
+        `[automation] could not complete run ${runId}: ${formatDbError(updateError)}`
+      );
+    }
 
     // Module 14. Logged in finish() rather than at each call-site, so every
     // outcome is captured exactly once however dispatch was reached — including
@@ -685,7 +1239,9 @@ async function runOne({
         automation_id: automation.id,
         status: status === "deduped" ? "skipped" : status,
         reason: reason ?? undefined,
+        scheduled: input.scheduled === true,
       },
+      useAdminClient,
     });
 
     // MODULE 15 RETROFIT — automation failure alerts.
@@ -709,6 +1265,7 @@ async function runOne({
             reason: reason ?? errorMessage ?? "no reason recorded",
           },
           linkPath: `/automations/${automation.id}`,
+          useAdminClient,
         }))
       );
     }
@@ -726,6 +1283,63 @@ async function runOne({
     return finish("skipped", evaluation.reason, []);
   }
 
+  /**
+   * THE DAILY CAP.
+   *
+   * 0012's dedupe index bounds a rule to one run per application per occasion.
+   * That says nothing about a rule loose across a thousand applications — a
+   * mis-set condition on a bulk import, and the cap is the only thing between
+   * that and a thousand screening calls.
+   *
+   * Hitting it PAUSES the rule and records why. Blocking the run alone would
+   * mean the rule keeps trying all day and the admin finds out from the invoice.
+   */
+  if (automation.daily_run_cap !== null && automation.daily_run_cap > 0) {
+    const runsToday = await countRunsToday({
+      client,
+      automationId: automation.id,
+      timeZone,
+    });
+
+    if (runsToday === null) {
+      return finish(
+        "blocked",
+        "Couldn't check this rule's daily limit, so it didn't run. Nothing was spent.",
+        []
+      );
+    }
+
+    // Strictly greater: this run's own claim is already counted.
+    if (runsToday > automation.daily_run_cap) {
+      const reason = `Daily limit of ${automation.daily_run_cap} reached, so this rule paused itself.`;
+
+      await client
+        .from("automations")
+        .update({
+          status: "paused",
+          activated_by: null,
+          activated_at: null,
+          paused_reason: reason,
+        })
+        .eq("id", automation.id)
+        .eq("organization_id", input.organizationId);
+
+      const admins = await findOwnersAndAdmins(input.organizationId);
+      await notifyMany(
+        admins.map((userId) => ({
+          organizationId: input.organizationId,
+          userId,
+          type: "automation_failed" as const,
+          values: { automation_name: automation.name, reason },
+          linkPath: `/automations/${automation.id}`,
+          useAdminClient,
+        }))
+      );
+
+      return finish("blocked", reason, []);
+    }
+  }
+
   const required =
     automation.required_integrations?.length > 0
       ? automation.required_integrations
@@ -736,11 +1350,68 @@ async function runOne({
     return finish("blocked", health.reason, []);
   }
 
+  /**
+   * HUMAN OVERSIGHT.
+   *
+   * A rule marked requires_approval does not act — it PROPOSES. The actions are
+   * snapshotted into automation_approvals and the run parks at
+   * awaiting_approval, which is a distinct status precisely so it does not read
+   * as a success (it did nothing) or a failure (nothing is wrong).
+   *
+   * The dedupe key is still consumed. A proposal per occasion, not a proposal
+   * per delivery of the same event.
+   */
+  if (automation.requires_approval || approvalIsMandatory(automation.actions ?? [])) {
+    const summary = describeRule({
+      trigger: automation.trigger,
+      conditions: normalizeConditions(automation.conditions),
+      actions: automation.actions ?? [],
+    });
+
+    const { error: approvalError } = await client.from("automation_approvals").insert({
+      organization_id: input.organizationId,
+      automation_id: automation.id,
+      run_id: runId,
+      application_id: input.applicationId,
+      actions: automation.actions ?? [],
+      summary,
+    });
+
+    if (approvalError) {
+      return finish(
+        "failed",
+        "Couldn't create the approval request, so nothing was done.",
+        [],
+        formatDbError(approvalError)
+      );
+    }
+
+    const admins = await findOwnersAndAdmins(input.organizationId);
+    await notifyMany(
+      admins.map((userId) => ({
+        organizationId: input.organizationId,
+        userId,
+        type: "automation_needs_approval" as const,
+        values: { automation_name: automation.name },
+        linkPath: `/automations/approvals`,
+        useAdminClient,
+      }))
+    );
+
+    return finish(
+      "awaiting_approval",
+      "Conditions matched. Waiting for someone to approve these actions — nothing has run.",
+      []
+    );
+  }
+
   const actionResults: ActionResult[] = [];
   for (const action of automation.actions ?? []) {
     actionResults.push(
       await executeAction({
         action,
+        client,
+        mode,
         organizationId: input.organizationId,
         organizationName: input.organizationName,
         applicationId: input.applicationId,
@@ -761,4 +1432,113 @@ async function runOne({
     actionResults,
     failed.length > 0 ? failed.map((result) => result.detail).join(" ") : null
   );
+}
+
+/**
+ * Executes the actions a human just approved.
+ *
+ * Runs the SNAPSHOT from the approval row, not the rule's current actions. If
+ * somebody edited the rule between proposal and approval, the approver's click
+ * still means what they were shown — the same reasoning as Module 19's document
+ * snapshots.
+ *
+ * Always session mode: a person is pressing the button, so every action is
+ * available, including the ones the scheduler cannot run. That is a genuine
+ * feature of the approval path rather than an accident of it — "propose at 3am,
+ * a human approves at 9am and the call goes out" is exactly how a time-based
+ * screening rule works.
+ */
+export async function executeApprovedActions({
+  organizationId,
+  organizationName,
+  applicationId,
+  runId,
+  actions,
+  automationName,
+  approvedBy,
+  webhookUrl,
+}: {
+  organizationId: string;
+  organizationName: string;
+  applicationId: string;
+  runId: string;
+  actions: Action[];
+  automationName: string;
+  approvedBy: string;
+  webhookUrl: string;
+}): Promise<{ status: "success" | "failed"; actionResults: ActionResult[] }> {
+  const client = await createClient();
+
+  const actionResults: ActionResult[] = [];
+  for (const action of actions) {
+    actionResults.push(
+      await executeAction({
+        action,
+        client,
+        mode: "session",
+        organizationId,
+        organizationName,
+        applicationId,
+        // The approver is the actor. They are the person who decided this
+        // happens, which is the whole point of recording an approval.
+        triggeredBy: approvedBy,
+        webhookUrl,
+        automationName,
+      })
+    );
+  }
+
+  const failed = actionResults.filter((result) => result.status === "failed");
+  const status = failed.length > 0 ? "failed" : "success";
+
+  const chargeable = actionResults.filter(
+    (result) => result.status === "success" && CONSEQUENTIAL_ACTIONS.includes(result.action)
+  ).length;
+
+  // Completes the parked run. Migration 0029's trigger permits this exactly once
+  // — finished_at was null while the proposal stood, and is set here.
+  const { error } = await client
+    .from("automation_runs")
+    .update({
+      status,
+      reason:
+        failed.length > 0
+          ? `Approved, then ${failed.length} of ${actionResults.length} actions failed.`
+          : `Approved and completed.`,
+      error_message: failed.length > 0 ? failed.map((result) => result.detail).join(" ") : null,
+      action_results: actionResults,
+      chargeable_actions: chargeable,
+      finished_at: new Date().toISOString(),
+    })
+    .eq("id", runId)
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    console.error(`[automation] could not complete approved run: ${formatDbError(error)}`);
+  }
+
+  await logActivity({
+    organizationId,
+    entityType: "application",
+    entityId: applicationId,
+    eventType: "automation.run",
+    actorId: approvedBy,
+    actorLabel: `Automation: ${automationName}`,
+    metadata: {
+      name: automationName,
+      status,
+      reason: `Approved by a person, then ${status === "success" ? "completed" : "failed"}.`,
+      approved: true,
+    },
+  });
+
+  return { status, actionResults };
+}
+
+/** Human-readable summary of what a run's actions did, for the UI. */
+export function summarizeActionResults(results: ActionResult[]): string {
+  if (results.length === 0) return "No actions ran.";
+  return results
+    .map((result) => `${ACTION_LABELS[result.action] ?? result.action}: ${result.detail}`)
+    .join(" ");
 }

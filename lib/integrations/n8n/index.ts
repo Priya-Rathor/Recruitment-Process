@@ -162,3 +162,91 @@ export async function disconnect(organizationId: string): Promise<AdapterResult<
   if (!result.ok) return { ok: false, error: result.error ?? "Could not disconnect." };
   return { ok: true, data: null };
 }
+
+/**
+ * Posts a payload to a webhook inside the organization's own n8n instance.
+ *
+ * WHAT THIS DOES AND DOES NOT CHANGE.
+ *
+ * It does not make n8n the executor. Module 13's engine still runs rules
+ * in-process, deliberately, and `notUsedForExecution` above stays true: n8n does
+ * not decide anything and nothing waits on its answer. What this adds is a
+ * HAND-OFF — a rule can hand an event to a workflow the organization has already
+ * built, which is the thing the spec's stack always implied and the adapter never
+ * delivered.
+ *
+ * FOUR CONSTRAINTS, each one because of what could otherwise go wrong:
+ *
+ *   - THE HOST IS OURS TO CHOOSE, NOT THE RULE'S. The base URL comes from the
+ *     stored integration; the caller supplies a path within it. Anyone who can
+ *     edit an automation could otherwise make the server POST to any host on the
+ *     internet, authored entirely from the browser.
+ *
+ *   - PATH TRAVERSAL IS REFUSED, not sanitised. `..` in a path is either a
+ *     mistake or an attempt; both deserve an error rather than a quiet rewrite.
+ *
+ *   - A SHORT TIMEOUT. This runs inside a request that a person is waiting on, or
+ *     inside a sweep with many applications left to process. A hanging n8n
+ *     instance must cost seconds, not the whole run.
+ *
+ *   - IT NEVER THROWS. Same contract as every action: a failure is a recorded
+ *     failed action, not an exception that loses the run record.
+ */
+export async function triggerWorkflow({
+  organizationId,
+  path,
+  payload,
+}: {
+  organizationId: string;
+  /** Relative to the instance URL. Empty means the instance's own webhook root. */
+  path: string;
+  payload: Record<string, unknown>;
+}): Promise<AdapterResult<string>> {
+  const integration = await loadIntegration(organizationId, N8N_PROVIDER);
+  const credentials = await readCredentials<N8nCredentials>(integration);
+  const instanceUrl = integration?.settings?.instanceUrl as string | undefined;
+
+  if (!credentials || !instanceUrl) {
+    return { ok: false, error: "n8n isn't connected, so the workflow wasn't called." };
+  }
+
+  const cleanPath = path.trim().replace(/^\/+/, "");
+  if (cleanPath.includes("..")) {
+    return { ok: false, error: "That n8n path isn't valid." };
+  }
+
+  // n8n serves production webhooks under /webhook/. Spelling it out here rather
+  // than asking a rule author to remember it — and so a rule cannot reach the
+  // management API under /api/v1/ with the org's own key.
+  const target = `${instanceUrl.replace(/\/+$/, "")}/webhook/${cleanPath}`;
+
+  try {
+    const response = await fetch(target, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-N8N-API-KEY": credentials.apiKey,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!response.ok) {
+      // 404 is the common real-world case: the workflow exists but is not
+      // active, or the path is wrong. Worth its own sentence, because "n8n
+      // returned 404" sends someone looking in the wrong place.
+      if (response.status === 404) {
+        return {
+          ok: false,
+          error: `n8n has no active workflow at "${cleanPath}". Check the webhook path and that the workflow is active.`,
+        };
+      }
+      return { ok: false, error: `n8n returned an error (${response.status}).` };
+    }
+
+    return { ok: true, data: `Handed off to the n8n workflow at "${cleanPath}".` };
+  } catch (error) {
+    console.error(`[n8n] workflow trigger failed: ${formatDbError(error)}`);
+    return { ok: false, error: "Could not reach n8n, so the workflow wasn't called." };
+  }
+}

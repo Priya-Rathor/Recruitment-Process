@@ -42,6 +42,20 @@ export function isApplicationStage(value: unknown): value is ApplicationStage {
   return typeof value === "string" && (APPLICATION_STAGES as readonly string[]).includes(value);
 }
 
+/**
+ * Where an application starts when nobody chose a stage.
+ *
+ * TYPED, and referenced by every creation path, because the Supabase client has
+ * no generated row types in this project: `.insert({ stage: "..." })` is not
+ * type-checked at all, so a string literal that stopped being valid keeps
+ * compiling and fails only at runtime, inside a catch. That is exactly what
+ * happened when migration 0021 renamed 'new' to 'applied' — the bulk-intake
+ * insert kept saying 'new', the database rejected every one of them, and the
+ * error was swallowed into "application could not be created". Naming it here
+ * means the next rename is a compile error instead.
+ */
+export const DEFAULT_APPLICATION_STAGE: ApplicationStage = "applied";
+
 export const STAGE_LABELS: Record<ApplicationStage, string> = {
   applied: "Applied",
   shortlisted: "Shortlisted",

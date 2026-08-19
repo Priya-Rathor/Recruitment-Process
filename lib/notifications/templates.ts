@@ -33,6 +33,10 @@ export const NOTIFICATION_TYPES = [
   // Module 19.
   "onboarding_document_uploaded",
   "onboarding_document_pending",
+  // Module 13 upgrade — the automation engine's oversight queue, and the one
+  // candidate-facing message an automation may send.
+  "automation_needs_approval",
+  "candidate_stage_update",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -239,6 +243,60 @@ export const TEMPLATES: Record<NotificationType, TemplateDefinition> = {
       "completed until it is verified.",
     defaultInApp: true,
     defaultEmail: false,
+    priority: "normal",
+  },
+
+  // ---------------------------------------------------------------------------
+  // MODULE 13 UPGRADE — human oversight.
+  //
+  // HIGH priority and email on by default, which is unusual here. The reason: a
+  // proposal that nobody reads is not oversight, and automation_approvals rows
+  // expire after seven days. An unnoticed proposal becomes a candidate who was
+  // never contacted, with the system reporting that it asked.
+  // ---------------------------------------------------------------------------
+  automation_needs_approval: {
+    audience: "internal",
+    label: "Automation waiting for approval",
+    description:
+      "Tells Owners and Admins when a rule has proposed actions and is waiting for a decision.",
+    fixedFacts: ["automation_name"],
+    placeholders: ["automation_name"],
+    title: "{{automation_name}} needs your approval",
+    body:
+      "The automation \"{{automation_name}}\" matched an application and is waiting for " +
+      "someone to approve its actions. Nothing has run yet, and the request expires in " +
+      "seven days.",
+    defaultInApp: true,
+    defaultEmail: true,
+    priority: "high",
+  },
+
+  /**
+   * THE ONLY EXTERNAL TEMPLATE AN AUTOMATION CAN SEND.
+   *
+   * Every substituted value is a FIXED FACT, so there is nothing in this message
+   * an AI rewrite may reword and nothing a rule's config may fill. A rule cannot
+   * compose a sentence to a candidate; it can only choose to send this one.
+   *
+   * It also deliberately promises nothing. "You have moved to <stage>" is true
+   * and useful; "we will be in touch shortly" is a commitment made on a
+   * recruiter's behalf by a rule, and nobody in the loop agreed to it.
+   */
+  candidate_stage_update: {
+    audience: "external",
+    label: "Candidate stage update",
+    description:
+      "Tells a candidate their application has moved to a new stage. Sent only by an approved automation.",
+    fixedFacts: ["candidate_name", "job_title", "stage_name", "organization_name"],
+    placeholders: ["candidate_name", "job_title", "stage_name", "organization_name"],
+    title: "Update on your application for {{job_title}}",
+    body:
+      "Hi {{candidate_name}}, your application for the {{job_title}} role at " +
+      "{{organization_name}} has moved to the {{stage_name}} stage. " +
+      "You do not need to do anything right now — we will contact you if we need " +
+      "something from you.",
+    defaultInApp: true,
+    defaultEmail: true,
     priority: "normal",
   },
 };

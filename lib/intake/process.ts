@@ -31,6 +31,7 @@ import {
   resolveCandidateMatch,
 } from "@/lib/intake/match";
 import type { IntakeStatus } from "@/lib/intake/status";
+import { DEFAULT_APPLICATION_STAGE } from "@/lib/applications/stages";
 import { logActivity, logAiCall } from "@/lib/activity/log";
 import { dispatch } from "@/lib/automations/engine";
 import type { Candidate } from "@/lib/types";
@@ -245,6 +246,27 @@ export async function processIntakeFile(input: ProcessInput): Promise<ProcessOut
   // appeared in the job's list.
   if (application.alreadyExisted) {
     return { ...base, status: "already_applied" };
+  }
+
+  /*
+    THE APPLICATION IS THE POINT OF THE UPLOAD, so a row must not report success
+    without one.
+
+    This is how the stage-name bug above stayed invisible: the insert failed,
+    ensureApplicationForCandidate returned a null id, and the row still said
+    "Candidate created" — true, but not what the recruiter asked for. They saw a
+    green chip and no application.
+
+    The candidate and the resume are real work and are kept; the row says what
+    is missing and offers Retry, which now finds the candidate by email or phone
+    and creates only the application.
+  */
+  if (!application.applicationId) {
+    return {
+      ...base,
+      status: "failed",
+      errorMessage: `${candidate.name ?? "The candidate"} was saved, but adding them to this job failed. Retry to finish it.`,
+    };
   }
 
   return {
@@ -584,7 +606,10 @@ export async function ensureApplicationForCandidate({
       organization_id: organizationId,
       candidate_id: candidateId,
       job_id: jobId,
-      stage: "new",
+      // NOT the literal 'new'. Migration 0021 renamed that enum label to
+      // 'applied'; this insert kept the old spelling and every intake
+      // application was rejected by the database from that migration onward.
+      stage: DEFAULT_APPLICATION_STAGE,
       source: "resume_upload",
       assigned_recruiter_id: actorId,
     })
@@ -618,7 +643,7 @@ export async function ensureApplicationForCandidate({
     entityId: applicationId,
     eventType: "application.created",
     actorId,
-    metadata: { stage: "new", source: "resume_upload", via: "bulk_intake" },
+    metadata: { stage: DEFAULT_APPLICATION_STAGE, source: "resume_upload", via: "bulk_intake" },
   });
 
   // Module 13, same as every other application-creation path. Wrapped so a

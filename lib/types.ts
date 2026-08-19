@@ -22,6 +22,12 @@ export type Organization = {
    * agency rather than as an in-house team.
    */
   agency_mode: boolean;
+  /**
+   * The automation kill switch (migration 0029). Read through
+   * lib/organizations/automationSwitch.ts, never directly — an unmigrated row
+   * must read as ON, not OFF.
+   */
+  automations_enabled: boolean;
   onboarding_answer: string | null;
   onboarding_completed_at: string | null;
   created_at: string;
