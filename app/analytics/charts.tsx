@@ -12,12 +12,17 @@
 //   value-ramp on unordered categories would be wrong — it double-encodes bar
 //   length as hue and burns the only free channel).
 //
-//   The steps were generated in OKLCH at a fixed hue and VALIDATED, not
-//   eyeballed: monotone lightness, adjacent ΔL ≥ 0.06, and the lightest step
-//   clearing 2:1 contrast against the white card. The obvious ramp
-//   (#C7D2FE…#4338CA, straight from the Tailwind indigo scale) FAILS both the
-//   step-gap and light-end checks — its lightest step sits at 1.49:1 on white,
-//   effectively invisible.
+//   The steps were generated in OKLCH at the BRAND hue (263°, read off the
+//   logo's blue) and VALIDATED, not eyeballed: monotone lightness, adjacent
+//   ΔL ≥ 0.06, and the lightest step clearing 2:1 contrast against the white
+//   card. Sampling the logo gradient directly does NOT work — its stops run
+//   blue → near-black → azure, which is non-monotonic in lightness and would
+//   put the palest step in the middle of the funnel. The ramp therefore takes
+//   the logo's HUE and generates its own lightness sequence.
+//
+//   The naive alternative — a stock Tailwind ramp such as #C7D2FE…#4338CA —
+//   FAILS both the step-gap and light-end checks: its lightest step sits at
+//   1.49:1 on white, effectively invisible.
 //
 // - Bar charts are SINGLE-SERIES, so every bar is the same colour. Colouring
 //   bars darker-where-bigger would double-encode the length.
@@ -32,8 +37,10 @@
 /**
  * The validated funnel ramp, LIGHT → DARK down the funnel.
  *
- * Generated at OKLCH hue 274, L from 0.74 to 0.40. Regenerate and re-validate
- * (skill `dataviz`, scripts/validate_palette.js --ordinal) before changing it.
+ * Generated at OKLCH hue 263 — the logo blue's hue — L from 0.74 to 0.40, so
+ * the funnel reads as the brand's blue rather than a neighbouring indigo.
+ * Regenerate and re-validate (skill `dataviz`,
+ * scripts/validate_palette.js --ordinal) before changing it.
  *
  * The direction was chosen after rendering it. Dark→light looked conventional
  * but compounded two weaknesses: bars get SHORTER down a funnel, so the last
@@ -43,12 +50,12 @@
  * which is both more legible and the right emphasis.
  */
 export const FUNNEL_RAMP = [
-  "#98A7E6",
-  "#8190D9",
-  "#6B7ACB",
-  "#5664BD",
-  "#424DAF",
-  "#3135A1",
+  "#7EA9FF",
+  "#6292F4",
+  "#4E7DDD",
+  "#3B68C6",
+  "#2853B0",
+  "#163F99",
 ] as const;
 
 export function rampStep(index: number): string {

@@ -7,16 +7,16 @@
 
 @use "bulma/sass" with (
   $family-primary: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-  $primary: #4f46e5,
-  $link: #4f46e5,
+  $primary: #004cf5,
+  $link: #004cf5,
   $success: #16a34a,
   $warning: #f59e0b,
   $danger: #dc2626,
-  $info: #2563eb,
-  $text: #0f172a,
-  $text-strong: #0f172a,
+  $info: #0067aa,
+  $text: #010c27,
+  $text-strong: #010c27,
   $border: #e2e8f0,
-  $body-background-color: #f8fafc
+  $body-background-color: #f7faff
 );
 
 // -----------------------------------------------------------------------------
@@ -25,25 +25,75 @@
 // hex values, so a future rebrand only touches this file.
 // -----------------------------------------------------------------------------
 :root {
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  // The brand hue at ~10% — the one tint allowed for icon wells and soft
-  // surfaces. Written as a literal rather than an alpha layer so it composites
-  // identically over the page background and over a white card.
-  --color-primary-tint: #eef2ff;
+  // ---------------------------------------------------------------------------
+  // BRAND — SAMPLED FROM THE LOGO, not picked to taste.
+  //
+  // The monogram in public/brand/mark.png is one gradient running deep blue →
+  // near-black navy core → azure, and these are the pixel values read off its
+  // stops. The wordmark uses two of them flat: "My" in the blue, "Recruiter" in
+  // the navy.
+  //
+  // These five are the RAW brand colours. Nothing in the app should reference
+  // them directly except brand surfaces (the gradient rule, an accent bar, a
+  // dark panel) — everything else goes through the --color-* ROLE tokens below,
+  // so a component says "primary", not "blue".
+  // ---------------------------------------------------------------------------
+  --brand-blue: #004cf5;   // "My" wordmark and the M/R strokes — the primary
+  --brand-deep: #012a85;   // the gradient's shadow, mid-monogram
+  --brand-navy: #010c27;   // "Recruiter" wordmark, and the gradient's dark core
+  --brand-azure: #0099f8;  // the gradient's light end
+  --brand-sky: #00abf8;    // brightest tip, lower-left of the mark
+
+  // The logo's gradient, in the logo's own direction and stop order.
+  //
+  // DECORATION ONLY. Contrast against it runs from 6.3:1 at the blue end to
+  // 2.6:1 at the sky end, so no text may sit on top of it — a label that is
+  // readable over one stop is unreadable over another, and which stop it lands
+  // on depends on the element's width. Text goes beside it, never on it.
+  --brand-gradient: linear-gradient(
+    100deg,
+    var(--brand-blue) 0%,
+    var(--brand-navy) 42%,
+    var(--brand-blue) 68%,
+    var(--brand-azure) 100%
+  );
+
+  // ---------------------------------------------------------------------------
+  // ROLES
+  //
+  // The primary is the logo blue unchanged. It landed at OKLCH L=0.508 against
+  // the previous indigo's L=0.511 — 6.26:1 vs 6.29:1 white-on-fill — so this
+  // was a hue swap at constant lightness, and every contrast pair the old
+  // palette had been checked for still holds. The derived steps below were
+  // regenerated at the brand hue (263°) rather than reused from the indigo
+  // scale, and each one is measured in the comment that follows it.
+  // ---------------------------------------------------------------------------
+  --color-primary: #004cf5;        // = --brand-blue; 6.26:1 under white text
+  --color-primary-hover: #003ed6;  // same hue, L-0.054; 7.89:1 under white
+  // The brand hue at ~7.5% over white — the one tint allowed for icon wells and
+  // soft surfaces. Written as a literal rather than an alpha layer so it
+  // composites identically over the page background and over a white card.
+  // Primary text on it is 5.58:1.
+  --color-primary-tint: #ecf2fe;
   // The disabled fill for a primary button. NOT a lighter default state: this
   // colour is reserved for "this control genuinely cannot run yet", which is
-  // why the ready state stays full-strength #4f46e5.
-  --color-primary-muted: #c7d2fe;
-  --color-background: #f8fafc;
+  // why the ready state stays full-strength #004cf5.
+  --color-primary-muted: #bfd5ff;
+  --color-background: #f7faff;
   --color-card: #ffffff;
   --color-border: #e2e8f0;
-  --color-text: #0f172a;
+  --color-text: #010c27;           // = --brand-navy; 19.4:1 on white
   --color-text-secondary: #64748b;
   --color-success: #16a34a;
   --color-warning: #f59e0b;
   --color-error: #dc2626;
-  --color-info: #2563eb;
+  // NOT the old #2563eb. That sat at hue 262.9° — 0.2° from the logo blue, so
+  // once the primary became the brand blue an info chip and a primary button
+  // were the same colour at different lightness, which is not a distinction
+  // anyone reads. This is the logo's AZURE stop darkened until it carries 13px
+  // text: hue 247°, ~16° of separation from the primary, 5.96:1 on white and
+  // 5.48:1 on the #eff6ff chip fill it is used against.
+  --color-info: #0067aa;
 
   // Integration status chips (Module 17 spec)
   --status-connected-bg: #dcfce7;
@@ -199,9 +249,11 @@ a.is-primary:focus {
 // FORCE THE LIGHT SCHEME.
 //
 // Bulma 1.x ships an automatic dark theme keyed off `prefers-color-scheme`.
-// This product is designed light-only — the spec fixes every surface
-// (#FFFFFF cards on an #F8FAFC page) and every text colour (#0F172A) as a
-// literal hex value, with no dark equivalents.
+// This product is designed light-only — the spec fixes every surface (white
+// cards on a tinted page) and every text colour (the brand navy) with no dark
+// equivalents. The pins below reference the --color-* tokens rather than
+// repeating their hex values, so a rebrand touches the token block alone —
+// which is the whole point of having one.
 //
 // On a machine set to dark mode Bulma flipped its own variables while our
 // tokens stayed light, producing unreadable combinations: black inputs with
@@ -222,52 +274,52 @@ html {
 }
 
 :root {
-  --bulma-scheme-main: #ffffff;
-  --bulma-scheme-main-bis: #f8fafc;
+  --bulma-scheme-main: var(--color-card);
+  --bulma-scheme-main-bis: var(--color-background);
   --bulma-scheme-main-ter: #f1f5f9;
-  --bulma-scheme-invert: #0f172a;
-  --bulma-background: #f8fafc;
-  --bulma-border: #e2e8f0;
+  --bulma-scheme-invert: var(--color-text);
+  --bulma-background: var(--color-background);
+  --bulma-border: var(--color-border);
   --bulma-border-weak: #eef2f7;
-  --bulma-text: #0f172a;
-  --bulma-text-weak: #64748b;
-  --bulma-text-strong: #0f172a;
+  --bulma-text: var(--color-text);
+  --bulma-text-weak: var(--color-text-secondary);
+  --bulma-text-strong: var(--color-text);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     // Repeated inside the media query so they beat Bulma's dark block, which
     // is itself defined here and would otherwise take precedence.
-    --bulma-scheme-main: #ffffff;
-    --bulma-scheme-main-bis: #f8fafc;
+    --bulma-scheme-main: var(--color-card);
+    --bulma-scheme-main-bis: var(--color-background);
     --bulma-scheme-main-ter: #f1f5f9;
-    --bulma-scheme-invert: #0f172a;
-    --bulma-background: #f8fafc;
-    --bulma-border: #e2e8f0;
+    --bulma-scheme-invert: var(--color-text);
+    --bulma-background: var(--color-background);
+    --bulma-border: var(--color-border);
     --bulma-border-weak: #eef2f7;
-    --bulma-text: #0f172a;
-    --bulma-text-weak: #64748b;
-    --bulma-text-strong: #0f172a;
-    --bulma-title-color: #0f172a;
-    --bulma-subtitle-color: #64748b;
-    --bulma-label-color: #0f172a;
-    --bulma-body-color: #0f172a;
+    --bulma-text: var(--color-text);
+    --bulma-text-weak: var(--color-text-secondary);
+    --bulma-text-strong: var(--color-text);
+    --bulma-title-color: var(--color-text);
+    --bulma-subtitle-color: var(--color-text-secondary);
+    --bulma-label-color: var(--color-text);
+    --bulma-body-color: var(--color-text);
 
-    --bulma-input-background-color: #ffffff;
-    --bulma-input-color: #0f172a;
-    --bulma-input-border-color: #e2e8f0;
+    --bulma-input-background-color: var(--color-card);
+    --bulma-input-color: var(--color-text);
+    --bulma-input-border-color: var(--color-border);
     --bulma-input-placeholder-color: #94a3b8;
     --bulma-input-hover-border-color: #cbd5e1;
 
-    --bulma-table-background-color: #ffffff;
-    --bulma-table-color: #0f172a;
-    --bulma-table-cell-border-color: #e2e8f0;
-    --bulma-table-head-cell-color: #0f172a;
-    --bulma-table-row-hover-background-color: #f8fafc;
-    --bulma-table-striped-row-even-background-color: #f8fafc;
+    --bulma-table-background-color: var(--color-card);
+    --bulma-table-color: var(--color-text);
+    --bulma-table-cell-border-color: var(--color-border);
+    --bulma-table-head-cell-color: var(--color-text);
+    --bulma-table-row-hover-background-color: var(--color-background);
+    --bulma-table-striped-row-even-background-color: var(--color-background);
 
-    --bulma-select-color: #0f172a;
-    --bulma-select-background-color: #ffffff;
+    --bulma-select-color: var(--color-text);
+    --bulma-select-background-color: var(--color-card);
   }
 }
 
@@ -307,8 +359,8 @@ html {
 // white card — "Team", "Invite a teammate", "Members" were all barely legible.
 //
 // Pinned to the spec's tokens instead of Bulma's fallbacks:
-//   Section headings: 18-20px, semibold, #0F172A
-//   Main text: #0F172A
+//   Section headings: 18-20px, semibold, --color-text
+//   Main text: --color-text
 // Setting the Bulma variables themselves (rather than only the selectors) means
 // any Bulma component that derives from them is fixed too, not just these three.
 // -----------------------------------------------------------------------------
@@ -350,7 +402,7 @@ th {
 // matching the shape of the eventual content, never one full-page spinner.
 // -----------------------------------------------------------------------------
 .skeleton {
-  background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+  background: linear-gradient(90deg, #eef2f7 25%, var(--color-background) 50%, #eef2f7 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
@@ -389,6 +441,28 @@ th {
 // out" button was the only black element in the product and read as a different
 // design system bolted on.
 // =============================================================================
+// The one place the logo's gradient appears in the app chrome: a 3px ribbon
+// along the very top of the sticky bar, running the mark's own colour sequence.
+// It makes the bar identifiably this product's before the logo in it is read,
+// and it costs nothing — the bar is already pinned to top: 0.
+//
+// A block ::before rather than an absolutely-positioned one, so the ribbon
+// occupies real space (bar height 60px + 3px) instead of overlapping the first
+// 3px of the nav links. Nothing in the layout offsets against the bar's height,
+// so growing it is free.
+//
+// Decoration only, and deliberately the ONE gradient in the chrome. Repeated on
+// cards and buttons it would stop reading as the brand and start reading as a
+// theme; carrying state or text it would break the contrast rule on
+// --brand-gradient. An empty ::before is not exposed to assistive tech, which
+// is correct here — it says nothing a screen reader needs.
+.topnav::before {
+  content: "";
+  display: block;
+  height: 3px;
+  background: var(--brand-gradient);
+}
+
 .topnav {
   background-color: var(--color-card);
   // ONE border for the whole bar, not one per row.
@@ -870,6 +944,36 @@ th {
 .auth-card {
   width: 100%;
   max-width: 440px;
+}
+
+// The signed-out card gets the same 3px brand ribbon as the nav, seated on the
+// card's top edge. The sign-in screen is the one page with no nav bar, so
+// without this the brand gradient is absent from exactly the moment it does the
+// most work — a visitor arriving from a link, deciding whose login this is.
+//
+// `overflow: hidden` clips the ribbon to the card's 12px radius; without it the
+// strip runs square across rounded corners. The card keeps its 1px border, so
+// this reads as a detail on a flat card rather than a filled header.
+.auth-card > .card {
+  overflow: hidden;
+  position: relative;
+  padding-top: calc(var(--card-padding) + 3px);
+}
+
+.auth-card > .card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--brand-gradient);
+}
+
+@media (max-width: 767px) {
+  .auth-card > .card {
+    padding-top: calc(var(--card-padding-mobile) + 3px);
+  }
 }
 
 // AI-generated content is always visually marked as such (Info token).
@@ -1401,7 +1505,7 @@ a {
 // Waiting: the blue tint drops back so an idle brief does not look identical to
 // one holding real content.
 .ai-panel.is-waiting {
-  background-color: #f8fafc;
+  background-color: var(--color-background);
   border-color: var(--color-border);
 
   .ai-panel__title { color: var(--color-text-secondary); }
@@ -1575,16 +1679,16 @@ a {
 //
 // Written as three classes on purpose. Bulma emits `.button.is-primary[disabled]`
 // at specificity (0,3,0); `.nl-search__submit:disabled` is (0,2,0) and lost
-// silently, leaving the disabled button full-strength indigo — indistinguishable
-// from the ready one, which is the opposite of the fix.
+// silently, leaving the disabled button full-strength brand blue —
+// indistinguishable from the ready one, which is the opposite of the fix.
 .nl-search .button.is-primary:disabled,
 .nl-search .button.is-primary[disabled] {
   background-color: var(--color-primary-muted);
   border-color: var(--color-primary-muted);
-  // Indigo ink, not white. White on #c7d2fe is ~1.6:1 — the label would be the
-  // washed-out thing the user complained about, just moved from the fill to the
-  // text. #4338ca on that fill is ~4.9:1: plainly readable, plainly not the
-  // ready state (which is white on solid indigo).
+  // Brand-blue ink, not white. White on #bfd5ff is 1.48:1 — the label would be
+  // the washed-out thing the user complained about, just moved from the fill to
+  // the text. #003ed6 on that fill is 5.33:1: plainly readable, plainly not the
+  // ready state (which is white on solid blue).
   color: var(--color-primary-hover);
   opacity: 1;
 }

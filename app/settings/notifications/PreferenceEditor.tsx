@@ -171,7 +171,7 @@ export function PreferenceEditor({
                     {preference.audience === "external" && (
                       <span
                         className="ml-2"
-                        style={{ fontSize: 12, fontWeight: 400, color: "var(--color-info, #2563EB)" }}
+                        style={{ fontSize: 12, fontWeight: 400, color: "var(--color-info, #0067AA)" }}
                       >
                         goes to a candidate
                       </span>

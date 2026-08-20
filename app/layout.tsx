@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Bricolage_Grotesque } from "next/font/google";
 import "./globals.scss";
 
@@ -44,6 +44,18 @@ export const metadata: Metadata = {
   // app/icon.png and app/apple-icon.png are picked up automatically by the App
   // Router; declared here only so the manifest name matches the brand.
   applicationName: "MyRecruiter Partner",
+};
+
+// The logo blue, so the browser's OWN chrome takes the brand colour — the
+// address bar on Android Chrome, the status bar on an installed PWA. Without it
+// those surfaces render default grey directly above a branded page, which is
+// the one piece of the frame the CSS tokens cannot reach.
+//
+// Exported as the static `viewport` object rather than via `generateViewport`
+// (it depends on nothing in the request), and on `viewport` rather than
+// `metadata` because that is where `themeColor` now lives.
+export const viewport: Viewport = {
+  themeColor: "#004CF5",
 };
 
 // Explicit props type rather than Next's generated `LayoutProps` global, so

@@ -286,7 +286,11 @@ export async function listTeamMembers(
 
   const { data, error } = await supabase
     .from("organization_members")
-    .select("user_id, role, user:users(name, email)")
+    // Explicit FK: organization_members has two references to users (user_id and
+    // invited_by), so an unqualified embed is ambiguous and PostgREST refuses it
+    // outright (PGRST201). The same fix lib/jobs/queries.ts and
+    // app/api/members/route.ts already carry.
+    .select("user_id, role, user:users!organization_members_user_id_fkey(name, email)")
     .eq("organization_id", organizationId)
     .eq("status", "active")
     .in("role", ["owner", "admin", "recruiter"]);

@@ -1,0 +1,1029 @@
+Yes. Copy this entire prompt and give it to Claude Code. It tells Claude to **first inspect your existing project**, verify the current interview/candidate flow, and then implement the coding interview feature without breaking anything.
+
+I want you to implement a new **Live Coding Interview feature** inside my existing application.
+
+IMPORTANT: Before writing or changing any code, first analyze my existing project completely, especially:
+
+* Candidate module
+* Interview module
+* Interview creation flow
+* Candidate profile/details page
+* Existing database models/schema
+* Existing APIs
+* Authentication and authorization
+* User roles
+* Existing UI components and design system
+* Routing
+* State management
+* Any existing Google Meet integration or interview meeting link functionality
+
+Do NOT immediately start coding.
+
+First understand how the current application works and verify where this feature should be integrated.
+
+# IMPORTANT WORKFLOW
+
+Follow these phases strictly:
+
+## PHASE 1 — ANALYZE EXISTING PROJECT
+
+Inspect the relevant codebase and identify:
+
+1. How a candidate is created.
+2. Where candidate data is stored.
+3. How an interview is created.
+4. Where interview information is stored.
+5. How an interviewer starts or manages an interview.
+6. Whether a Google Meet link already exists.
+7. How the Candidate Details/Profile page works.
+8. Where interview history is currently displayed.
+9. Which database tables/collections are related to:
+
+   * Candidates
+   * Interviews
+   * Users
+   * Jobs/Job Openings
+   * Interviewers
+
+Do not change any code during this phase.
+
+After analyzing, provide me with a short implementation plan explaining:
+
+* Which existing files/modules will be affected.
+* Which new files/modules need to be created.
+* Where the Live Coding feature should be added.
+* How the new feature connects to the existing interview flow.
+* How the final coding submission will be connected to the candidate.
+
+IMPORTANT:
+
+Reuse the existing architecture and patterns wherever possible.
+
+Do not create duplicate authentication, candidate, interview, or database systems if they already exist.
+
+---
+
+# PHASE 2 — VERIFY THE IMPLEMENTATION PLAN
+
+Before implementing, verify that the proposed implementation follows this flow:
+
+INTERVIEWER
+↓
+Opens Candidate
+↓
+Creates/Starts Interview
+↓
+Uses existing Google Meet link or meeting process
+↓
+Clicks "Start Coding Round"
+↓
+System creates a unique Coding Session
+↓
+System generates a secure Candidate Access Link
+↓
+System generates a QR Code
+↓
+Interviewer shares the QR code with the candidate on Google Meet
+↓
+Candidate scans QR code
+↓
+Candidate opens Coding Interview page
+↓
+Candidate writes code
+↓
+Code is automatically saved periodically
+↓
+Candidate can manually save
+↓
+Candidate clicks Submit
+↓
+Final submission is saved
+↓
+Coding session is marked Completed
+↓
+Submission is linked to the existing Candidate
+↓
+Interviewer can see the coding result in Candidate Details/Interview History
+
+If the current project architecture requires a slightly different implementation, adapt the implementation while preserving this business flow.
+
+Do not break existing functionality.
+
+---
+
+# PHASE 3 — IMPLEMENT THE LIVE CODING FEATURE
+
+Implement the feature in a modular and scalable way.
+
+## FEATURE 1 — START CODING ROUND
+
+Inside the existing Interview screen or Interview Details screen, add a button:
+
+"Start Coding Round"
+
+The button should only be available to authorized interviewers/users according to the existing application permission system.
+
+When the interviewer clicks:
+
+START CODING ROUND
+
+The system should:
+
+1. Create a unique Coding Session.
+
+2. Connect it to the existing Interview.
+
+3. Connect it to the existing Candidate.
+
+4. Generate a secure unique access token/link.
+
+5. Set the session status to:
+
+   CREATED
+
+6. Generate a QR code for the candidate access link.
+
+The interviewer should then see a modal, drawer, or suitable UI based on the existing design system.
+
+Example:
+
+---
+
+Coding Round
+
+Candidate: [Candidate Name]
+
+Status: Ready
+
+[ QR CODE ]
+
+Candidate Access Link:
+
+[ Copy Link ]
+
+[ Open Live Monitor ]
+
+[ Close ]
+
+---
+
+IMPORTANT:
+
+Do not invent a completely new design language.
+
+Follow the existing UI components, spacing, colors, buttons, cards, modals, and patterns already used in the application.
+
+---
+
+# FEATURE 2 — SECURE CANDIDATE ACCESS LINK
+
+Generate a secure unique URL.
+
+Example structure:
+
+/coding-session/{secure-token}
+
+The candidate should be able to access the coding session by:
+
+1. Scanning the QR code.
+2. Opening the generated link.
+
+The candidate should NOT need access to the complete interviewer/admin dashboard.
+
+The access token must:
+
+* Be unique.
+* Be difficult to guess.
+* Be connected to the correct coding session.
+* Be connected to the correct candidate.
+* Become invalid when appropriate.
+* Not expose sensitive internal IDs unnecessarily.
+
+When the candidate opens the link:
+
+Validate:
+
+* Token exists.
+* Session exists.
+* Session is active or available.
+* Session has not expired.
+* Session has not already been permanently closed.
+
+Handle errors gracefully.
+
+Examples:
+
+"Invalid coding session."
+
+"This coding session has expired."
+
+"This coding session has already been completed."
+
+Use the existing application's error UI patterns.
+
+---
+
+# FEATURE 3 — CANDIDATE CODING SCREEN
+
+Create a dedicated coding interface for the candidate.
+
+The candidate should see:
+
+1. Interview/Coding Round title.
+2. Candidate name if appropriate.
+3. Coding question/instructions.
+4. Programming language selector.
+5. Code editor.
+6. Save status.
+7. Manual Save button.
+8. Submit button.
+
+Example structure:
+
+---
+
+Technical Interview
+
+Question
+
+[ Question or coding instructions ]
+
+Language:
+[ Python ▼ ]
+
+---
+
+CODE EDITOR
+
+def solution():
+pass
+
+---
+
+Save Status: Saved
+
+[ Save Draft ]        [ Submit Code ]
+
+---
+
+Use a proper code editor component/library if one already exists in the project.
+
+If the project does not have one, use a stable, appropriate code editor implementation compatible with the existing stack.
+
+Do not unnecessarily add multiple heavy dependencies.
+
+The code editor should support syntax highlighting for the languages actually supported.
+
+For the first implementation, determine the minimum supported languages based on the existing project requirements.
+
+At minimum, support only what makes sense for the current application architecture.
+
+---
+
+# FEATURE 4 — CODING QUESTION
+
+The interviewer should be able to provide or select the coding question.
+
+First inspect whether the existing interview system already has:
+
+* Questions
+* Assessments
+* Interview questions
+* Question banks
+
+If such functionality already exists, reuse it.
+
+Do NOT create duplicate question management unnecessarily.
+
+If no question system exists, implement a simple initial approach:
+
+The interviewer enters:
+
+* Question title
+* Problem description
+* Optional instructions
+
+This question should be attached to the Coding Session.
+
+The candidate should only see the question assigned to their own coding session.
+
+---
+
+# FEATURE 5 — AUTO SAVE
+
+Implement automatic code saving.
+
+When the candidate changes code:
+
+Candidate Types
+↓
+Detect Code Change
+↓
+Wait briefly using debounce
+↓
+Save latest code
+↓
+Update save status
+
+Do NOT send an API request for every keystroke.
+
+Use an appropriate debounce mechanism.
+
+Example:
+
+Candidate types
+↓
+Wait 1–3 seconds after typing stops
+↓
+Save draft
+
+The exact implementation should follow the project's existing frontend patterns.
+
+The UI should clearly show:
+
+* Saving...
+* Saved
+* Save failed
+
+Example:
+
+"Saving..."
+
+then:
+
+"All changes saved"
+
+If saving fails:
+
+"Unable to save. Please try again."
+
+The candidate should also have a manual:
+
+"Save Draft"
+
+button.
+
+---
+
+# FEATURE 6 — LIVE CODING MONITOR
+
+Implement a way for the interviewer to monitor the candidate's current code.
+
+The interviewer should be able to click:
+
+"Open Live Monitor"
+
+The interviewer sees:
+
+---
+
+Candidate: John Doe
+
+Status: Coding
+
+Language: Python
+
+---
+
+LIVE CODE
+
+def solution():
+...
+
+---
+
+Last Updated: Just now
+
+---
+
+For Version 1:
+
+Implement this using the simplest reliable architecture based on the existing application.
+
+Prefer the existing realtime infrastructure if the project already has one.
+
+Otherwise, choose an appropriate approach.
+
+Possible options include:
+
+* WebSockets
+* Socket.IO
+* Server-Sent Events
+* Controlled polling
+
+Do NOT introduce unnecessary infrastructure if periodic updates are sufficient for the existing application.
+
+The interviewer view should update when the candidate saves or auto-saves code.
+
+The interviewer should have read-only access.
+
+The interviewer must not accidentally overwrite the candidate's code.
+
+---
+
+# FEATURE 7 — MANUAL SAVE
+
+When the candidate clicks:
+
+"Save Draft"
+
+Perform the following:
+
+Validate session
+↓
+Validate candidate access
+↓
+Save current code
+↓
+Save selected programming language
+↓
+Update last saved timestamp
+↓
+Return success response
+
+Store the draft against the existing interview and candidate.
+
+The candidate should receive clear feedback.
+
+---
+
+# FEATURE 8 — SUBMIT CODE
+
+When the candidate clicks:
+
+"Submit Code"
+
+First show a confirmation dialog.
+
+Example:
+
+"Are you sure you want to submit your code?
+
+After submission, editing may be disabled."
+
+Buttons:
+
+[ Cancel ] [ Submit ]
+
+After confirmation:
+
+1. Save the latest code.
+
+2. Save selected programming language.
+
+3. Save submission timestamp.
+
+4. Mark coding session status as:
+
+   SUBMITTED
+
+5. Connect final submission to the existing interview.
+
+6. Ensure it is visible from the Candidate Details page.
+
+7. Stop or disable candidate editing if that is the intended final state.
+
+Show:
+
+"Your coding submission has been successfully submitted."
+
+After submission, handle page refresh correctly.
+
+The candidate should not lose the submitted state.
+
+---
+
+# FEATURE 9 — CODING SESSION STATUS
+
+Implement clear session statuses.
+
+Use existing conventions if the project already has similar status handling.
+
+Suggested statuses:
+
+CREATED
+ACTIVE
+IN_PROGRESS
+SUBMITTED
+COMPLETED
+EXPIRED
+CANCELLED
+
+Do not blindly create all statuses if a simpler structure fits the existing application.
+
+Ensure valid status transitions.
+
+For example:
+
+CREATED
+↓
+ACTIVE
+↓
+IN_PROGRESS
+↓
+SUBMITTED
+↓
+COMPLETED
+
+Handle cancellation and expiration separately.
+
+---
+
+# FEATURE 10 — SAVE RESULT IN CANDIDATE PROFILE
+
+This is one of the most important requirements.
+
+After the candidate submits code, the result must be available inside the existing Candidate Details/Profile page.
+
+Find the existing candidate interview history or activity section.
+
+Add the coding round information there in a way consistent with the existing UI.
+
+Example:
+
+---
+
+Interview History
+
+Technical Interview
+Date: [Date]
+
+Status: Completed
+
+Coding Round: Submitted
+
+Language: Python
+
+[ View Coding Submission ]
+
+---
+
+When the interviewer clicks:
+
+"View Coding Submission"
+
+Show:
+
+---
+
+Coding Round Submission
+
+Candidate:
+[ Candidate Name ]
+
+Interview:
+[ Interview Name/Details ]
+
+Question:
+
+[ Question Title ]
+
+[ Full Question Description ]
+
+Language:
+Python
+
+Submitted Code:
+
+---
+
+def solution():
+...
+
+---
+
+Last Saved:
+[ Timestamp ]
+
+Submitted:
+[ Timestamp ]
+
+Status:
+Submitted
+
+---
+
+Use the existing application's UI patterns.
+
+Do not create a disconnected page if the existing Candidate Profile is the correct place for interview history.
+
+---
+
+# FEATURE 11 — GOOGLE MEET FLOW
+
+IMPORTANT:
+
+Do not overcomplicate or unnecessarily modify Google Meet integration.
+
+The intended flow is:
+
+1. Interviewer and candidate are already connected through the existing interview/Google Meet process.
+2. Interviewer clicks "Start Coding Round" inside our application.
+3. Our application generates a QR code.
+4. Interviewer shares the QR code on the Google Meet screen.
+5. Candidate scans the QR code using their device.
+6. Candidate opens the coding environment.
+7. Interviewer continues the verbal interview through Google Meet while monitoring the code in our application.
+
+The QR code does NOT need to be embedded inside Google Meet unless the existing architecture already supports such integration.
+
+The coding system should work independently from Google Meet while being connected to the same interview record.
+
+---
+
+# FEATURE 12 — DATABASE DESIGN
+
+Before creating new database models/tables/collections, inspect the existing schema.
+
+Reuse existing relationships where possible.
+
+The data model should logically support:
+
+Candidate
+↓
+Interview
+↓
+Coding Session
+↓
+Coding Submission / Current Code
+
+A suggested conceptual structure is:
+
+CODING SESSION
+
+* id
+* interview_id
+* candidate_id
+* interviewer_id
+* secure_access_token
+* question_title
+* question_description
+* status
+* created_at
+* started_at
+* submitted_at
+* expires_at
+
+CODING SUBMISSION
+
+* id
+* coding_session_id
+* programming_language
+* code
+* last_saved_at
+* submitted_at
+* created_at
+* updated_at
+
+However:
+
+IMPORTANT:
+
+Do not blindly use this schema.
+
+Adapt it to the existing database architecture.
+
+If the project already uses related models or JSON structures that are more appropriate, integrate cleanly with those.
+
+Avoid duplicate candidate IDs, interview IDs, or unnecessary data.
+
+---
+
+# FEATURE 13 — API DESIGN
+
+Inspect the existing API patterns before creating endpoints.
+
+Use existing:
+
+* Authentication middleware
+* Validation
+* Error response format
+* Naming conventions
+* Controllers/services
+* Database patterns
+
+Potential functionality may include:
+
+Create Coding Session
+
+Get Coding Session
+
+Validate Candidate Access Token
+
+Save Code Draft
+
+Get Latest Code
+
+Submit Code
+
+Get Coding Submission
+
+Get Candidate Coding History
+
+Live Monitor Updates
+
+Do not create duplicate APIs if equivalent functionality already exists.
+
+Document every new endpoint you create.
+
+For each endpoint explain:
+
+* Method
+* URL
+* Purpose
+* Authentication
+* Request body
+* Response
+* Error responses
+
+---
+
+# FEATURE 14 — SECURITY
+
+Implement reasonable security.
+
+Ensure:
+
+1. Candidate QR links cannot expose another candidate's session.
+2. Access tokens are not easily guessable.
+3. Candidate cannot access admin/interviewer pages.
+4. Candidate cannot modify another candidate's coding session.
+5. Interviewer permissions follow existing authorization rules.
+6. Final submissions cannot be modified after completion unless explicitly allowed.
+7. Sensitive internal information is not exposed in the candidate URL.
+
+Reuse the existing security and authentication architecture wherever possible.
+
+---
+
+# FEATURE 15 — ERROR HANDLING
+
+Implement proper handling for:
+
+* Invalid QR code.
+* Invalid token.
+* Expired session.
+* Completed session.
+* Cancelled session.
+* Network failure.
+* Auto-save failure.
+* Manual save failure.
+* Submit failure.
+* Page refresh.
+* Candidate opening the same link multiple times.
+* Interviewer refreshing the Live Monitor.
+* Candidate closing and reopening the browser.
+
+The candidate should not lose already saved code after a refresh or reconnect.
+
+Use appropriate loading, error, and empty states.
+
+---
+
+# FEATURE 16 — UI/UX REQUIREMENTS
+
+Follow the current application's design system.
+
+Do not redesign unrelated pages.
+
+For every new screen or component include:
+
+* Loading state
+* Empty state where relevant
+* Error state
+* Success feedback
+* Disabled button states
+* Confirmation before final submission
+* Responsive layout
+
+Test on:
+
+* Desktop
+* Tablet
+* Mobile
+
+The QR scanning flow must work properly on mobile devices.
+
+The candidate coding screen should be usable on both:
+
+* Mobile
+* Desktop
+
+If the code editor experience is limited on small screens, ensure the UI remains functional and does not break.
+
+---
+
+# FEATURE 17 — DO NOT BREAK EXISTING FEATURES
+
+Before making changes:
+
+1. Understand existing routes.
+2. Understand existing APIs.
+3. Understand database relationships.
+4. Identify affected modules.
+
+After implementation, verify that the following existing features still work:
+
+* Candidate creation
+* Candidate listing
+* Candidate details
+* Interview creation
+* Interview management
+* Existing Google Meet flow
+* Existing authentication
+* Existing authorization
+* Existing dashboard
+* Existing navigation
+
+Do not refactor unrelated code.
+
+Do not remove existing functionality.
+
+Keep changes focused on the Live Coding Interview feature.
+
+---
+
+# PHASE 4 — IMPLEMENTATION OUTPUT
+
+After implementation, provide a complete summary.
+
+Create or update a documentation file inside the project, for example:
+
+docs/live-coding-interview.md
+
+The documentation must include:
+
+# Live Coding Interview Feature
+
+## 1. Overview
+
+Explain what was implemented.
+
+## 2. Complete User Flow
+
+INTERVIEWER
+↓
+Candidate Interview
+↓
+Start Coding Round
+↓
+QR Code Generated
+↓
+Candidate Scans QR
+↓
+Candidate Opens Coding Screen
+↓
+Candidate Writes Code
+↓
+Auto Save
+↓
+Interviewer Monitors Code
+↓
+Candidate Submits
+↓
+Submission Saved
+↓
+Candidate Profile Updated
+
+## 3. Architecture
+
+Explain:
+
+Frontend
+↓
+API
+↓
+Backend
+↓
+Database
+
+## 4. Files Changed
+
+List:
+
+* Existing files modified.
+* New files created.
+* Purpose of each file.
+
+## 5. Database Changes
+
+Document all schema changes.
+
+## 6. API Documentation
+
+Document all new/modified APIs.
+
+## 7. Routes
+
+Document all new routes.
+
+## 8. Manual Testing Guide
+
+Provide step-by-step instructions for testing.
+
+Example:
+
+TEST 1 — Start Coding Round
+
+1. Login as interviewer.
+2. Open a candidate.
+3. Open or start an interview.
+4. Click "Start Coding Round".
+5. Verify QR code appears.
+6. Scan QR code.
+7. Verify candidate coding page opens.
+
+Expected Result:
+A secure coding session should open for the correct candidate.
+
+Continue with test cases for:
+
+* QR code access
+* Invalid QR link
+* Candidate coding
+* Auto-save
+* Manual save
+* Page refresh
+* Live monitor
+* Submission
+* Candidate profile history
+* Completed session
+* Unauthorized access
+
+## 9. Known Limitations
+
+Clearly mention anything intentionally not implemented.
+
+## 10. Future Improvements
+
+Suggest possible future features:
+
+* Run code
+* Test cases
+* Automatic scoring
+* AI code evaluation
+* Interview timer
+* Multiple questions
+* Screen sharing
+* Collaborative coding
+* Code execution sandbox
+* Interview analytics
+
+---
+
+# FINAL VERIFICATION
+
+Before considering the task complete:
+
+1. Verify the project builds successfully.
+2. Run existing tests if available.
+3. Verify no unrelated functionality was broken.
+4. Check for TypeScript/build/lint errors if applicable.
+5. Test all new routes.
+6. Test the complete end-to-end flow.
+
+The end-to-end flow must be:
+
+Create/Open Candidate
+↓
+Create/Start Interview
+↓
+Join Google Meet using existing flow
+↓
+Start Coding Round
+↓
+Generate QR Code
+↓
+Candidate scans QR
+↓
+Candidate opens secure coding page
+↓
+Candidate writes code
+↓
+Code auto-saves
+↓
+Candidate manually saves
+↓
+Interviewer sees latest code
+↓
+Candidate submits final code
+↓
+Submission is locked/completed
+↓
+Coding result appears in Candidate Details/Interview History
+
+IMPORTANT FINAL RULE:
+
+First ANALYZE the existing project and understand the current architecture.
+
+Then explain the proposed implementation plan.
+
+Then implement the feature in the correct existing modules.
+
+Do not blindly create a separate system.
+
+Do not break existing functionality.
+
+Reuse existing patterns, components, authentication, database relationships, APIs, and UI design wherever possible.
+
+After implementation, create the complete documentation and manual testing guide.
