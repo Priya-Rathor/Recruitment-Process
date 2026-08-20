@@ -333,6 +333,57 @@ export function IntegrationCard({
             </>
           )}
 
+          {provider === "whatsapp" && (
+            <>
+              <input
+                className="input mb-2"
+                type="password"
+                placeholder="Meta permanent access token"
+                value={field("accessToken")}
+                onChange={(event) => setField("accessToken", event.target.value)}
+              />
+              <input
+                className="input mb-2"
+                placeholder="Phone number ID (the numeric ID from Meta)"
+                value={field("phoneNumberId")}
+                onChange={(event) => setField("phoneNumberId", event.target.value)}
+              />
+              <input
+                className="input mb-2"
+                placeholder="Business number as candidates see it (optional)"
+                value={field("displayNumber")}
+                onChange={(event) => setField("displayNumber", event.target.value)}
+              />
+              <input
+                className="input mb-2"
+                placeholder="Approved WhatsApp template name (optional)"
+                value={field("messagingTemplate")}
+                onChange={(event) => setField("messagingTemplate", event.target.value)}
+              />
+              <input
+                className="input mb-2"
+                placeholder="Template language code (default en)"
+                value={field("messagingTemplateLanguage")}
+                onChange={(event) => setField("messagingTemplateLanguage", event.target.value)}
+              />
+              {/*
+                Said here, before connecting, rather than discovered as a failed
+                send: Meta only allows free-form text to somebody who messaged the
+                business in the last 24 hours. A recruitment pipeline almost never
+                is, so without an approved template name most messages will be
+                refused by Meta — and the error would look like our bug.
+              */}
+              <p className="has-text-secondary mb-3" style={{ fontSize: 12 }}>
+                WhatsApp only delivers free-form messages to candidates who wrote to you in the
+                last 24 hours. To message anyone else, get a message template approved in Meta
+                Business Manager and put its name above — your template body is then sent as that
+                template&apos;s single parameter. Opt-out follows WhatsApp&apos;s convention: every
+                automatic message tells the candidate to reply STOP, and a reply is read by a
+                person and recorded on the candidate&apos;s page. There is no inbound webhook yet.
+              </p>
+            </>
+          )}
+
           <p className="has-text-secondary mb-3" style={{ fontSize: 12 }}>
             The key is encrypted before it&apos;s stored and is never shown again — only the last
             four characters.

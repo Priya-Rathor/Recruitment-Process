@@ -57,6 +57,12 @@ const SECTIONS: SettingsSection[] = [
     roles: ["owner", "admin"],
   },
   {
+    href: "/settings/templates",
+    label: "Message templates",
+    description: "What candidates are told, and when",
+    roles: ["owner", "admin"],
+  },
+  {
     href: "/settings/notifications",
     label: "Notifications",
     description: "What reaches you, and how",
@@ -64,7 +70,7 @@ const SECTIONS: SettingsSection[] = [
   {
     href: "/settings/integrations",
     label: "Integrations",
-    description: "Bolna, Calendar, Email, AI, n8n",
+    description: "Bolna, Calendar, Email, WhatsApp, AI, n8n",
     roles: ["owner", "admin"],
   },
   {

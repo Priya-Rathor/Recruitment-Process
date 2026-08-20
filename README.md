@@ -71,7 +71,8 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/clients/` | Module 12's client records and feedback turnaround |
 | `lib/automations/` | Module 13's rule catalogue, evaluator, and execution engine |
 | `lib/activity/` | Module 14's event catalogue, append-only logger, and narrative grounding |
-| `lib/notifications/` | Module 15's templates, fixed-fact guard, send pipeline, and reminders |
+| `lib/notifications/` | Module 15's internal templates, fixed-fact guard, send pipeline, and reminders |
+| `lib/communications/` | Module 15's candidate-facing half — template library, pipeline-event triggers, email/WhatsApp send pipeline, opt-out (see `docs/modules/15-notifications-notes.md`) |
 | `lib/analytics/` | Module 16's metric calculators, trend direction, filters, and CSV export |
 | `lib/settings/` | Module 17's organization settings, preferences, and integration health |
 | `lib/hiring-stages/` | Per-job hiring stages, placeholder tokens (see `docs/modules/03-hiring-stages.md`) |

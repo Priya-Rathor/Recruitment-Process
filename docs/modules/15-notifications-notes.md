@@ -210,3 +210,306 @@ mistake. A missed reminder is recoverable; a reputation for spam is not.
   there is no webhook consuming provider events.
 - ☐ **No digest or batching.** Ten stage changes produce ten notifications.
 - ☐ **SMS/WhatsApp** is explicitly Build Later.
+
+---
+
+# Module 15, part two — candidate communication
+
+The first half of this module built an **internal** notification pipeline:
+`notifications`, `notification_deliveries`, `notification_preferences`, the
+fixed-fact guard, and one approved external template (`candidate_stage_update`)
+that an automation may send. Its own follow-up list said the plumbing for
+candidate-facing sends was complete and *"no page composes one yet"*, and that
+SMS/WhatsApp was Build Later.
+
+This part builds the composing, the library, the second channel, and the record.
+
+## Why `lib/communications/` rather than more of `lib/notifications/`
+
+They are different products sharing a verb.
+
+`notify()` addresses **one colleague**, is governed by that person's own
+preferences, and its read policy is the strictest in the codebase — *a
+notification is readable only by its recipient*. A candidate message addresses
+**a member of the public**, is governed by their opt-out, must carry a working
+unsubscribe, and is **team knowledge**: a Viewer reading the pipeline needs to
+know the candidate has already been told they were rejected.
+
+Every one of those four properties is opposite. Folding the second into the first
+would have meant a `notify()` whose preference lookup, audience, read policy and
+legal obligations all branched on a channel flag. So: two pipelines, one
+integration layer underneath, and `sendEmail()` shared rather than duplicated —
+which is what the spec asked for ("don't build a second email sending path").
+
+## The log stores what was said, not where it came from
+
+`message_log.body_sent` holds the fully-resolved text, footer included,
+byte-for-byte what the provider was handed. `template_id` sits beside it,
+nullable, `on delete set null`.
+
+That ordering is the whole design. A log that pointed at a template would start
+lying the first time somebody edited that template — and *"what did we tell this
+candidate?"* is the only question a communication log exists to answer. It also
+makes deleting a template safe, which is why the delete route can be a real
+delete rather than an archive.
+
+## Three decisions the schema enforces rather than the UI
+
+**One active template per event, by partial unique index.** Two active
+templates for `hired` would send a candidate two messages, and *which* two would
+depend on row order. The `both` channel exists so one template can cover email
+and WhatsApp, so nothing legitimate is lost. The API turns the resulting 23505
+into *"'X' is already the active template for this event"* — a sentence naming
+the row somebody has to go and switch off.
+
+**The log is append-only to every browser.** The permission is *"read-only for
+everyone (it's a record, not an editable thing)"*, and the browser holds an
+authenticated PostgREST client, so that cannot live in a route handler. There is
+a SELECT policy, an INSERT policy, and deliberately **no UPDATE and no DELETE
+policy at all**. Delivery callbacks (`delivered`, `opened`, `bounced`) arrive
+without a session and would be written with the service-role client, which
+bypasses RLS — so the honest claim is that nobody holding a session can rewrite
+history.
+
+**`opted_out_at` is stamped by a trigger, not accepted from a caller.** It is
+the evidence that a candidate asked not to be contacted. It is also cleared when
+both flags go back to false, so *"opted out on 4 March"* never outlives the
+opt-out itself.
+
+## `skipped` is a status the spec did not ask for
+
+The spec lists queued / sent / delivered / opened / failed / bounced. There is a
+seventh, for the same reason migration 0014 added `skipped` to
+`notification_delivery_status`: **the candidate opted out, or has no address, or
+the channel isn't connected**. None of those is a malfunction.
+
+`failed` means *something broke, look at it*. Rendering a correct policy decision
+in error red teaches a team to ignore the colour, and then they ignore the real
+ones. The chip is neutral, the reason is shown inline (not on hover — invisible
+on a phone and to a keyboard), and `error_message` says which of the three it was.
+
+A skipped attempt also **does not consume the once-per-application guard**: a
+disconnected integration must not permanently spend the one chance to send a
+message.
+
+## Where each event fires, and the two that cannot
+
+Ten of the twelve events fire at the exact moment the spec asked for. Two do not,
+and `firesWhen: null` in the catalogue says so on the settings screen rather than
+showing a switch that does nothing:
+
+- **`offer_extended`** — there is no offer stage. `lib/applications/stages.ts`
+  runs Director Round straight to Hired, and Module 19 files the signed offer as
+  an onboarding document *after* the hire. Picking a stage move to mean "an offer
+  went out" would email an offer to somebody who has not been offered anything.
+- **`unqualified`** — nothing in the schema distinguishes *rejected because they
+  did not meet the requirements* from *rejected because somebody else was
+  better*. `rejected` covers the move. Splitting it would need the product to
+  decide, per rejection, which it was, and it does not know.
+
+Both remain fully usable by hand and from an automation. What they lack is an
+automatic trigger.
+
+**The two interview events fire from the scheduling action, not from a stage
+move**, and `EVENT_FOR_STAGE` has no entry for those stages. Their messages state
+a *time*; a stage change does not have one. A stage-triggered "your interview is
+scheduled" with no time in it would send the candidate looking for a message
+nobody sent. The interview is also **re-read** after scheduling rather than built
+from the request body, because the calendar step writes `meeting_url`
+afterwards — building from the payload would send a video interview with no
+joining link.
+
+**`withdrawn` is deliberately unmapped.** The candidate ended it; telling them so
+reads as a rejection for their own decision.
+
+## The message fires BEFORE the automation dispatch
+
+In both the stage-change route and application creation. A rule can move the
+application on again (Shortlisted → AI Screening Call), and if the automation ran
+first the candidate would be told about the stage they ended up in and never
+about the one a person actually moved them to.
+
+## The placeholder editor was extracted, not rebuilt
+
+`components/PlaceholderEditor.tsx` is the editor `app/jobs/StageConfigModal.tsx`
+already had — same picker and search, same caret-preserving `insertToken()`, same
+chip list, same unknown-token warning, same "Preview with sample data", same CSS.
+The stage modal now imports it.
+
+The one parameter that matters is `fields`. A message may say
+`{{interview.time}}` and `{{organization.name}}`; a screening script cannot
+resolve either, because there is no interview when a call runs. Widening
+`PLACEHOLDER_FIELDS` itself would have offered those tokens in the stage picker,
+where they render as nothing — and the failure surfaces as a sentence read aloud
+to a candidate with a hole in it. So `splitTokens`, `renderTemplate` and
+`renderPreview` take an optional catalogue, and each caller passes the vocabulary
+that is true where it renders. There is a test asserting the two lists stay
+separate.
+
+## `send_templated_message` recommends approval; it does not force it
+
+`send_candidate_email` forces approval on every run, and still does. The new
+action does not, and the difference is **where the human review happened**:
+
+- `send_candidate_email` sends wording that lives in this codebase. Nobody in the
+  organization ever read it, so a person reads each proposal.
+- `send_templated_message` sends wording an Owner or Admin **wrote and
+  deliberately activated** — the default library ships inactive precisely so that
+  switch is a decision. The review happened once, over the words.
+
+Forcing per-run approval would also make an automation strictly *worse* than the
+built-in event triggers, which send the very same template with no approval step.
+So approval defaults on and can be switched off by somebody who has read the
+words. The approvals queue **names the template** in the proposal — "Send
+templated message" alone asks a person to approve wording they cannot see, which
+is a rubber stamp with extra steps.
+
+Its required integrations are computed **from its config**, not from a fixed
+table entry, because they depend on the template: email-only needs `email`,
+WhatsApp-only needs `whatsapp`, and a `both` template requires **neither** —
+whichever channel is connected sends, and requiring both would stop an
+organization that has never configured WhatsApp from activating a rule whose
+email half works perfectly.
+
+The AI rule-drafter is **not shown this action**. It names a template by UUID and
+the model cannot know which templates exist, so anything it proposed would be a
+fabricated id — and `validateRule()` would reject the whole draft over it, losing
+every other part of a rule that was fine. The prompt asks it to say plainly that
+this part needs a person.
+
+## The interview reminder extends the one dispatcher
+
+The spec said to *"reuse Module 11's existing reminder timing config, add channel
+choice to it rather than creating a second reminder system"*. **Module 11 never
+built one** — its feedback queue is computed on read and hard-codes
+`FEEDBACK_DUE_HOURS`. So the nearest honest reading was: one reminder system, one
+config, one trigger point. The timing and channels live in
+`organization_settings.communication_settings`, edited under Settings →
+Recruitment beside the other interview defaults, and `sendInterviewReminders()`
+sits in `lib/notifications/reminders.ts` alongside the three that were already
+there.
+
+It is the **one** caller that bounds the dedupe rather than checking forever. Every
+other event sends once per application, ever — "you were rejected" is said one
+time. A reminder is not like that: a rescheduled interview earns a new one, so the
+guard is bounded by the reminder window itself.
+
+**It still has no scheduler.** That limitation is unchanged and is the module's
+original one. `/notifications` dispatches it, and the settings screen says so
+rather than implying a fixed hour.
+
+## The unsubscribe link, and the two ways it fails safely
+
+A candidate is not a user of this product. They have no login, so
+`/unsubscribe` is in the proxy's public allowlist and **the link itself is the
+authorisation**: an HMAC over `(candidate id, channel)`, signed with
+`INTEGRATION_ENCRYPTION_KEY`.
+
+- A tampered candidate id does not verify, so one link cannot be pointed at
+  anybody else.
+- A tampered channel does not verify, so an email link cannot silence WhatsApp.
+- **The link can only ever opt out.** There is no code path that sets a flag to
+  false. A URL somebody could be tricked into opening must not be able to restore
+  contact with a person who asked us to stop.
+
+**With no signing key, no link is issued at all** and the footer says "reply and
+we'll remove you" instead. A dead unsubscribe link is worse than an instruction
+to a human: the candidate believes they have opted out, and nothing happened.
+
+**The opt-out happens on a POST, never on the GET.** Mail clients and corporate
+link scanners fetch every URL in an email. If the GET did the work, a scanner
+would silently unsubscribe candidates who never clicked anything, and the team
+would have no idea why their messages stopped.
+
+The footer is appended **after** the body renders, so no template can edit it
+away — the same structural approach Module 8 takes with the call-recording
+disclosure. Manual messages get no footer: a recruiter replying to a candidate's
+own question is a conversation, and it would be contradictory on a message that
+deliberately overrides an opt-out.
+
+## Opt-out binds automatic sends absolutely; humans are warned, never blocked
+
+The spec: *"never silently block a human-initiated message, but do warn them
+first."* So `POST /api/messages` returns **409 with `code: "opted_out"`** and the
+reason on the first attempt; the UI shows the warning and the button changes; only
+then does the request carry `acknowledge_opt_out: true`. The flag is what makes
+the warning unskippable rather than decorative, and the activity log records that
+a human deliberately overrode it.
+
+A **failed** opt-out read is `unknown`, not "not opted out", and the two
+directions differ deliberately: an automatic send treats unknown as opted out and
+stays silent, because emailing somebody who asked us not to is a complaint and
+possibly a fine while a delayed pipeline update is recoverable. A manual send
+surfaces it to the human, who can decide.
+
+## WhatsApp: the two provider facts that shaped the adapter
+
+**The 24-hour window.** Meta only delivers free-form text to somebody who has
+messaged the business in the last 24 hours. A recruitment pipeline almost never
+is, so an organization names a **Meta-approved template** on the integration and
+the resolved body is sent as its single body parameter. Without one, free-form is
+attempted and Meta's own refusal (error 131047) is surfaced with the actual
+remedy, because nobody would guess it from "could not send". The connect form says
+this *before* connecting rather than leaving it to be discovered as a failed send.
+
+**Opt-out is "reply STOP", and nobody is listening yet.** There is no inbound
+WhatsApp webhook, so a reply is read by a human who records it on the candidate
+page. That is stated in the integration copy rather than implied away.
+
+`normalizeWhatsAppNumber()` **refuses** a local number when the country is
+unknown rather than guessing. An Indian ten-digit number sent without a country
+code is either rejected by Meta or delivered to whoever holds that number in the
+United States. The organization's own country supplies the code when it has one;
+`dialCodeFor()` covers only the countries this product is sold into and returns
+null for anything else.
+
+## The default template set
+
+Twelve templates, one per event, seeded **inactive**, and the wording lives in
+migration 0030 and **only** there. Mirroring twelve message bodies in TypeScript
+would be two copies of the words this product says to candidates, and the drift
+would show up as a candidate receiving wording nobody approved. Module 19 has a
+test whose entire job is catching exactly that drift for its document checklist;
+here there is one copy, in the place that creates the rows.
+
+Seeded for existing organizations as well as new ones, so "ships with a default
+set" is not true only for organizations created after today.
+
+What the wording deliberately avoids: promising a timeline (nobody in the loop
+agreed to it, and an automatic message cannot know), stating a reason for
+rejection (a templated reason applied to everybody is both untrue and, in several
+jurisdictions, evidence), and asking a question (these send automatically; a
+question implies somebody is watching the reply, and until an inbound channel
+exists, nobody is).
+
+## Email-only works completely without WhatsApp
+
+Not an aspiration — a property of the code. `sendWhatsApp()` is reached from
+exactly one place, inside the `channel === "whatsapp"` branch of
+`sendOnChannel()`. An email-only template never reads the WhatsApp integration
+row. `requiredIntegrationsFor()` never demands `whatsapp` for a `both` template.
+The two channels of a `both` template get independent log rows, so a WhatsApp
+failure cannot cost the email. Tests cover each of those.
+
+## Follow-ups
+
+- ☐ **No delivery webhooks.** `delivered`, `opened` and `bounced` are in the
+  schema, indexed on `provider_message_id`, and nothing consumes provider events
+  yet — so a real send today rests at `sent`. The same gap Module 15 part one
+  recorded for `notification_deliveries`, now with a second provider behind it.
+- ☐ **No inbound channel.** A candidate replying to an email or sending STOP on
+  WhatsApp reaches a human, not this product. The WhatsApp opt-out instruction is
+  therefore honoured by a person, and the settings copy says so.
+- ☐ **Still no scheduler.** Interview reminders go out when somebody dispatches
+  them.
+- ☐ **`offer_extended` and `unqualified` have no automatic trigger**, for the
+  schema reasons above. Giving them one means a real offer stage and a recorded
+  rejection reason — both product decisions, not plumbing.
+- ☐ **Per-job templates.** `event_key` is organization-wide; the spec's
+  parenthetical "(matching the application's job/organization)" would allow a
+  per-job override. Not built: it needs a resolution order and a UI to explain
+  it, and one active template per event is the honest starting point.
+- ☐ **No AI tone assistance on candidate templates.** Part one's fixed-fact guard
+  works on the internal template set; wiring it to this library needs each
+  template to declare which of its placeholders are facts, which is a schema
+  change and a real design question.

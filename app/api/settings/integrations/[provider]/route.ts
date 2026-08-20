@@ -9,6 +9,7 @@ import * as email from "@/lib/integrations/email";
 import * as calendar from "@/lib/integrations/calendar";
 import * as llm from "@/lib/integrations/llm";
 import * as n8n from "@/lib/integrations/n8n";
+import * as whatsapp from "@/lib/integrations/whatsapp";
 
 // Connect and Test both make a provider round trip.
 export const maxDuration = 60;
@@ -205,6 +206,10 @@ async function runTest(
       const result = await n8n.test(organizationId);
       return result.ok ? { ok: true } : { ok: false, error: result.error };
     }
+    case "whatsapp": {
+      const result = await whatsapp.test(organizationId);
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
+    }
   }
 }
 
@@ -268,6 +273,22 @@ async function runConnect({
         ? { ok: true, credentialHint: result.data.credentialHint }
         : { ok: false, error: result.error };
     }
+    case "whatsapp": {
+      const result = await whatsapp.connect({
+        organizationId,
+        accessToken: text("accessToken"),
+        phoneNumberId: text("phoneNumberId"),
+        displayNumber: text("displayNumber") || undefined,
+        // The Meta-approved template name. Optional, and the integration card
+        // says plainly what is lost without one.
+        messagingTemplate: text("messagingTemplate") || undefined,
+        messagingTemplateLanguage: text("messagingTemplateLanguage") || undefined,
+        connectedBy: userId,
+      });
+      return result.ok
+        ? { ok: true, credentialHint: result.data.credentialHint }
+        : { ok: false, error: result.error };
+    }
     case "calendar": {
       // Calendar is OAuth: there is no secret to post here. The browser is sent
       // to Google and the callback route stores the tokens. Accepting a
@@ -304,6 +325,10 @@ async function runDisconnect(
     }
     case "n8n": {
       const result = await n8n.disconnect(organizationId);
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
+    }
+    case "whatsapp": {
+      const result = await whatsapp.disconnect(organizationId);
       return result.ok ? { ok: true } : { ok: false, error: result.error };
     }
   }

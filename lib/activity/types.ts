@@ -14,6 +14,7 @@ export const ACTIVITY_ENTITY_TYPES = [
   "client",
   "automation",
   "integration",
+  "message_template",
 ] as const;
 
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
@@ -35,6 +36,7 @@ export const ENTITY_LABELS: Record<ActivityEntityType, string> = {
   client: "Client",
   automation: "Automation",
   integration: "Integration",
+  message_template: "Message template",
 };
 
 export type ActivityEvent = {

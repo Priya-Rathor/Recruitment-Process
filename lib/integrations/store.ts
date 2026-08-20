@@ -1,10 +1,11 @@
 // =============================================================================
 // Shared integration storage.
 //
-// Five adapters repeat the same mechanics: load the row through the service-role
+// Six adapters repeat the same mechanics: load the row through the service-role
 // client, decrypt, record a test result, clear on disconnect. Module 8 and
 // Module 15 each wrote their own copy; this is the one they should have shared,
-// extracted now that there are five rather than two.
+// extracted once there were five rather than two, and reused unchanged by the
+// sixth (WhatsApp) — which is the point of having extracted it.
 //
 // The adapters keep their own connect()/test()/getStatus()/disconnect() —
 // provider specifics stay provider-side. Only the storage is shared.
@@ -17,7 +18,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptSecret, encryptSecret, isEncryptionConfigured } from "@/lib/integrations/crypto";
 import { formatDbError } from "@/lib/supabase/errors";
 
-export const PROVIDERS = ["bolna", "calendar", "email", "llm", "n8n"] as const;
+export const PROVIDERS = ["bolna", "calendar", "email", "llm", "n8n", "whatsapp"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 export function isProvider(value: unknown): value is Provider {

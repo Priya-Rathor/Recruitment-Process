@@ -16,7 +16,15 @@
 // a prompt.
 // =============================================================================
 
-export type PlaceholderGroup = "job" | "candidate";
+/**
+ * Which section of the picker a field appears under.
+ *
+ * "interview" and "organization" were added for Module 15's message templates.
+ * Screening scripts never reference them — they are supplied by the catalogue a
+ * caller passes in, not by PLACEHOLDER_FIELDS below — so a stage script cannot
+ * accidentally offer a token that has no value at call time.
+ */
+export type PlaceholderGroup = "job" | "candidate" | "interview" | "organization";
 
 export type PlaceholderField = {
   /** The token written in a script, without braces: "job.title". */
@@ -107,12 +115,36 @@ export const PLACEHOLDER_FIELDS: PlaceholderField[] = [
 export const GROUP_LABELS: Record<PlaceholderGroup, string> = {
   job: "Job fields",
   candidate: "Candidate / application fields",
+  interview: "Interview fields",
+  organization: "Your organization",
 };
 
 const BY_TOKEN = new Map(PLACEHOLDER_FIELDS.map((field) => [field.token, field]));
 
-export function findPlaceholder(token: string): PlaceholderField | null {
-  return BY_TOKEN.get(token) ?? null;
+/**
+ * THE CATALOGUE IS NOW A PARAMETER, DEFAULTING TO THE STAGE-SCRIPT ONE.
+ *
+ * Module 15's message templates use this exact token vocabulary, editor and
+ * renderer — the spec's "reuse that exact component, don't rebuild it" — but
+ * they can also say {{interview.time}} and {{organization.name}}, which no
+ * screening script can resolve.
+ *
+ * Widening PLACEHOLDER_FIELDS itself would have offered those tokens in the
+ * stage-script picker, where they render as nothing and the failure is a
+ * sentence read aloud to a candidate with a hole in it. So the functions take an
+ * optional field list instead, and each caller passes the catalogue that is true
+ * where it renders.
+ */
+function lookupFor(fields?: PlaceholderField[]): Map<string, PlaceholderField> {
+  if (!fields) return BY_TOKEN;
+  return new Map(fields.map((field) => [field.token, field]));
+}
+
+export function findPlaceholder(
+  token: string,
+  fields?: PlaceholderField[]
+): PlaceholderField | null {
+  return lookupFor(fields).get(token) ?? null;
 }
 
 /** Wraps a token for insertion: "job.title" -> "{{job.title}}". */
@@ -158,12 +190,15 @@ export function extractTokens(template: string): string[] {
  * work over a typo is worse than showing them the typo. It IS surfaced, because
  * the alternative is an agent saying "{{candidate.naem}}" out loud.
  */
-export function splitTokens(template: string): { known: PlaceholderField[]; unknown: string[] } {
+export function splitTokens(
+  template: string,
+  fields?: PlaceholderField[]
+): { known: PlaceholderField[]; unknown: string[] } {
   const known: PlaceholderField[] = [];
   const unknown: string[] = [];
 
   for (const token of extractTokens(template)) {
-    const field = findPlaceholder(token);
+    const field = findPlaceholder(token, fields);
     if (field) known.push(field);
     else unknown.push(token);
   }
@@ -192,11 +227,13 @@ export type PlaceholderValues = Partial<Record<string, string | null>>;
 export function renderTemplate(
   template: string,
   values: PlaceholderValues,
-  { onMissing = "" }: { onMissing?: string } = {}
+  { onMissing = "", fields }: { onMissing?: string; fields?: PlaceholderField[] } = {}
 ): string {
+  const lookup = lookupFor(fields);
+
   return template.replace(TOKEN_PATTERN, (whole, rawToken: string) => {
     const token = rawToken.toLowerCase();
-    if (!BY_TOKEN.has(token)) return whole;
+    if (!lookup.has(token)) return whole;
 
     const value = values[token];
     if (value === undefined || value === null || value === "") return onMissing;
@@ -205,8 +242,8 @@ export function renderTemplate(
 }
 
 /** Realistic values for every catalogued field, for "Preview with sample data". */
-export function sampleValues(): PlaceholderValues {
-  return Object.fromEntries(PLACEHOLDER_FIELDS.map((field) => [field.token, field.sample]));
+export function sampleValues(fields: PlaceholderField[] = PLACEHOLDER_FIELDS): PlaceholderValues {
+  return Object.fromEntries(fields.map((field) => [field.token, field.sample]));
 }
 
 /**
@@ -216,8 +253,12 @@ export function sampleValues(): PlaceholderValues {
  * preview path — a preview that renders differently from production is worse
  * than no preview, because it is believed.
  */
-export function renderPreview(template: string): string {
-  return renderTemplate(template, sampleValues(), {
+export function renderPreview(
+  template: string,
+  fields: PlaceholderField[] = PLACEHOLDER_FIELDS
+): string {
+  return renderTemplate(template, sampleValues(fields), {
+    fields,
     // Sample values cover every catalogued token, so this only fires for a
     // field added to the catalogue without a sample — visible, not silent.
     onMissing: "—",

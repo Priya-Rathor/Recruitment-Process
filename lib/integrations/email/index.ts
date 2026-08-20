@@ -312,7 +312,19 @@ export async function sendEmail({
       return {
         ok: false,
         skipped: true,
-        reason: "Email isn't connected, so nothing was sent. The in-app notification was created.",
+        /**
+         * NEUTRAL WORDING, DELIBERATELY.
+         *
+         * This used to read "...The in-app notification was created", which was
+         * true when notify() was the only caller. Module 15's candidate messages
+         * now share this adapter, and there is no in-app notification behind one
+         * of those — the sentence would have appeared in a candidate's
+         * communication log as a plain falsehood.
+         *
+         * The adapter does not know who called it, so it states only what it
+         * knows. notify() appends its own half below.
+         */
+        reason: "Email isn't connected, so nothing was sent.",
       };
     }
 

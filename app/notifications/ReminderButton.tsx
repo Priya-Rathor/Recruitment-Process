@@ -14,6 +14,11 @@ import { useRouter } from "next/navigation";
  * Safe to press repeatedly: the dispatcher dedupes against the last 24 hours.
  * The result says how many were suppressed, so a second press reporting "0 sent,
  * 4 already sent recently" reads as working rather than broken.
+ *
+ * MODULE 15 ADDED CANDIDATE-FACING INTERVIEW REMINDERS to the same dispatcher, and
+ * this button now surfaces the one thing that queue can report which the other
+ * three cannot: that it is switched OFF. "Nothing is overdue" when reminders are
+ * disabled would send somebody looking for a bug that is not there.
  */
 export function ReminderButton() {
   const router = useRouter();
@@ -36,24 +41,29 @@ export function ReminderButton() {
         return;
       }
 
-      const { sent, suppressed, partialFailure } = payload.data as {
+      const { sent, suppressed, partialFailure, interviews } = payload.data as {
         sent: number;
         suppressed: number;
         partialFailure: boolean;
+        interviews?: { skipped: boolean; reason: string | null };
       };
+
+      // Appended rather than replacing the count: the internal reminders may well
+      // have gone out even while the candidate-facing one is off.
+      const note = interviews?.skipped && interviews.reason ? ` Candidate interview reminders: ${interviews.reason}` : "";
 
       if (partialFailure) {
         // Never let a failed read render as "nothing was due".
         setIsError(true);
         setResult(
-          `Sent ${sent}, but some queues couldn't be checked — the count may be incomplete.`
+          `Sent ${sent}, but some queues couldn't be checked — the count may be incomplete.${note}`
         );
       } else if (sent === 0 && suppressed === 0) {
-        setResult("Nothing is overdue.");
+        setResult(`Nothing is overdue.${note}`);
       } else if (sent === 0) {
-        setResult(`Nothing new — ${suppressed} already reminded in the last 24 hours.`);
+        setResult(`Nothing new — ${suppressed} already reminded in the last 24 hours.${note}`);
       } else {
-        setResult(`Sent ${sent} reminder${sent === 1 ? "" : "s"}.`);
+        setResult(`Sent ${sent} reminder${sent === 1 ? "" : "s"}.${note}`);
       }
 
       router.refresh();

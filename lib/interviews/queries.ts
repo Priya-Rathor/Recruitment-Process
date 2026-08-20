@@ -298,3 +298,50 @@ export async function listInterviewsAwaitingFeedback(organizationId: string) {
 
   return ((data ?? []) as unknown as EmbeddedRow[]).map(flatten).filter((row) => !row.has_feedback);
 }
+
+/**
+ * Scheduled interviews starting inside a window, for the candidate reminder.
+ *
+ * BOUNDED AT BOTH ENDS, and both bounds matter:
+ *
+ *   - the LOWER bound is now. An interview that has already started does not need
+ *     a reminder, and sending one is worse than sending nothing — it tells somebody
+ *     they are late.
+ *   - the UPPER bound is the organization's configured lead time. Without it the
+ *     dispatcher would remind every candidate about every interview in the diary
+ *     the first time anybody pressed the button.
+ *
+ * `status = scheduled` only: a cancelled or completed interview must never produce
+ * a reminder, and Module 11 already keeps that column truthful.
+ */
+export async function listInterviewsStartingWithin({
+  organizationId,
+  hours,
+  now = new Date(),
+}: {
+  organizationId: string;
+  hours: number;
+  /** Injected so the reminder logic is testable without freezing the clock. */
+  now?: Date;
+}): Promise<InterviewWithContext[]> {
+  const supabase = await createClient();
+
+  const until = new Date(now.getTime() + hours * 3_600_000).toISOString();
+
+  const { data, error } = await supabase
+    .from("interviews")
+    .select(WITH_CONTEXT)
+    .eq("organization_id", organizationId)
+    .eq("status", "scheduled")
+    .gte("scheduled_at", now.toISOString())
+    .lte("scheduled_at", until)
+    .order("scheduled_at", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    console.error(`[interviews] reminder window read failed: ${formatDbError(error)}`);
+    return [];
+  }
+
+  return ((data ?? []) as unknown as EmbeddedRow[]).map(flatten);
+}

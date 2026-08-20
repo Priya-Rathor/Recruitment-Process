@@ -319,18 +319,20 @@ export async function listTeamMembers(
  */
 export async function countChargeableActions({
   organizationId,
-  since,
+  days,
 }: {
   organizationId: string;
-  since: Date;
+  /** Rolling window, in days. The clock is read HERE, not in a component. */
+  days: number;
 }): Promise<number | null> {
   const supabase = await createClient();
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
 
   const { data, error } = await supabase
     .from("automation_runs")
     .select("chargeable_actions")
     .eq("organization_id", organizationId)
-    .gte("started_at", since.toISOString())
+    .gte("started_at", since)
     .limit(5000);
 
   if (error) {

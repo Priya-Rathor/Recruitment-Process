@@ -10,6 +10,7 @@ import {
 import { DEFAULT_APPLICATION_STAGE, isApplicationStage } from "@/lib/applications/stages";
 import { isCandidateSource, type Application } from "@/lib/types";
 import { dispatch } from "@/lib/automations/engine";
+import { trySendForEvent } from "@/lib/communications/triggers";
 import { logActivity } from "@/lib/activity/log";
 import { formatDbError } from "@/lib/supabase/errors";
 
@@ -156,6 +157,23 @@ export async function POST(request: NextRequest) {
       eventType: "application.created",
       actorId: membership.user_id,
       metadata: { stage: created.stage, source: created.source },
+    });
+
+    /**
+     * MODULE 15 — "we received your application".
+     *
+     * Before the automation dispatch, for the same reason the stage-change route
+     * sends first: a rule may move this application on immediately, and the
+     * acknowledgement should describe applying, not wherever a rule put them.
+     *
+     * Wrapped, like the dispatch below: the application exists either way, and a
+     * 500 here would make the caller retry into the duplicate constraint.
+     */
+    await trySendForEvent({
+      organizationId: membership.organization.id,
+      applicationId: created.id,
+      eventKey: "application_received",
+      origin: request.nextUrl.origin,
     });
 
     // Module 13. Wrapped so a failing rule cannot fail the creation — the

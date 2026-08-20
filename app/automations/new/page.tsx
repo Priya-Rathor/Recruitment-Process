@@ -2,6 +2,15 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { AutomationForm } from "../AutomationForm";
+import { TemplatePicker } from "./TemplatePicker";
+import { RULE_TEMPLATES } from "@/lib/automations/templates";
+import { listTeamMembers } from "@/lib/automations/queries";
+import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
+import { getStatus as getEmailStatus } from "@/lib/integrations/email";
+import { getStatus as getLlmStatus } from "@/lib/integrations/llm";
+import { getStatus as getN8nStatus } from "@/lib/integrations/n8n";
+import { getStatus as getWhatsAppStatus } from "@/lib/integrations/whatsapp";
+import { listMessageTemplates } from "@/lib/communications/queries";
 
 export const metadata = { title: "New automation" };
 export const dynamic = "force-dynamic";
@@ -28,6 +37,30 @@ export default async function NewAutomationPage() {
     );
   }
 
+  // Which integrations are missing, so a template can say so BEFORE it is picked
+  // rather than at activation. Read in parallel; a failed read reports the
+  // integration as not connected, which is the cautious direction for a warning.
+  const [teamMembers, bolna, email, llm, n8n, whatsapp, { templates }] = await Promise.all([
+    listTeamMembers(membership.organization.id),
+    getBolnaStatus(membership.organization.id),
+    getEmailStatus(membership.organization.id),
+    getLlmStatus(membership.organization.id),
+    getN8nStatus(membership.organization.id),
+    // Module 15's channel, so a rule using "Send templated message" is warned
+    // about a disconnected WhatsApp the same way one using a call is warned about
+    // Bolna.
+    getWhatsAppStatus(membership.organization.id),
+    listMessageTemplates(membership.organization.id),
+  ]);
+
+  const disconnected = [
+    bolna.status !== "connected" ? "bolna" : null,
+    email.status !== "connected" ? "email" : null,
+    llm.status !== "connected" ? "llm" : null,
+    n8n.status !== "connected" ? "n8n" : null,
+    whatsapp.status !== "connected" ? "whatsapp" : null,
+  ].filter((provider): provider is string => provider !== null);
+
   return (
     <AppShell>
       <div className="mb-5">
@@ -40,7 +73,14 @@ export default async function NewAutomationPage() {
         </p>
       </div>
 
-      <AutomationForm mode="create" canUseAi />
+      <TemplatePicker templates={RULE_TEMPLATES} disconnected={disconnected} />
+
+      <AutomationForm
+        mode="create"
+        canUseAi
+        teamMembers={teamMembers}
+        messageTemplates={templates}
+      />
     </AppShell>
   );
 }

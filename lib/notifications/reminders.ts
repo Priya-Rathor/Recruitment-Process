@@ -248,3 +248,154 @@ export async function sendClientFeedbackReminders(
 // than at 9am — which is a real limitation, recorded in
 // docs/modules/15-notifications-notes.md rather than papered over.
 // =============================================================================
+
+// =============================================================================
+// MODULE 15 (candidate communication) — the interview reminder.
+//
+// ADDED TO THIS FILE ON PURPOSE, rather than as a second reminder system. The
+// spec asked to "reuse Module 11's existing reminder timing config, add channel
+// choice to it rather than creating a second reminder system"; Module 11 never
+// built a timing config, so the nearest honest reading is one dispatcher, one
+// config (organization_settings.communication_settings), one trigger point.
+//
+// THE ONE THING THAT IS DIFFERENT FROM EVERY OTHER REMINDER HERE.
+//
+// The three above go to COLLEAGUES, through notify(). This one goes to a
+// CANDIDATE, so it goes through lib/communications/send.ts instead — which is
+// what enforces the opt-out, appends the unsubscribe footer, and records the
+// message in message_log. Routing a candidate-facing message through notify()
+// would bypass all three.
+//
+// THE DEDUPE IS DIFFERENT TOO, AND HAS TO BE.
+//
+// Every other event in this module sends once per application, ever: "you were
+// rejected" is said one time. A reminder is not like that — an interview can be
+// rescheduled, and the new time deserves its own reminder. So this is the single
+// caller that passes `dedupeSinceIso`, bounded by the reminder window itself: one
+// reminder per interview per window, and a rescheduled interview that leaves and
+// re-enters the window gets a fresh one.
+// =============================================================================
+import { getOrganizationSettings } from "@/lib/settings/queries";
+import { listInterviewsStartingWithin } from "@/lib/interviews/queries";
+import { findActiveTemplate, sendForEvent } from "@/lib/communications/triggers";
+import { channelsFor } from "@/lib/communications/templates";
+
+export type InterviewReminderSummary = ReminderSummary & {
+  /** True when the reminder is switched off, or has no active template. */
+  skipped: boolean;
+  /** Why it was skipped, for the dispatcher's response. */
+  reason: string | null;
+};
+
+const OFF = (reason: string): InterviewReminderSummary => ({
+  sent: 0,
+  suppressed: 0,
+  failed: false,
+  skipped: true,
+  reason,
+});
+
+/**
+ * Reminds candidates about interviews starting inside the configured window.
+ *
+ * THREE SEPARATE SWITCHES, each reported distinctly rather than as a plain zero:
+ * the hours setting, the channel list, and whether an interview_reminder template
+ * is active. "We did not run this" and "we ran it and there was nothing to send"
+ * are different answers, and a settings screen that showed the second when the
+ * first was true would send an admin looking for a bug that is not there.
+ */
+export async function sendInterviewReminders({
+  organizationId,
+  origin,
+  now = new Date(),
+}: {
+  organizationId: string;
+  /** For the unsubscribe link. See lib/communications/optout.ts. */
+  origin?: string | null;
+  now?: Date;
+}): Promise<InterviewReminderSummary> {
+  try {
+    const { settings } = await getOrganizationSettings(organizationId);
+    const { interviewReminderHours, interviewReminderChannels } = settings.communication_settings;
+
+    if (interviewReminderHours <= 0) {
+      return OFF("Interview reminders are switched off in Settings → Recruitment.");
+    }
+    if (interviewReminderChannels.length === 0) {
+      return OFF("No reminder channel is selected in Settings → Recruitment.");
+    }
+
+    const supabase = await createClient();
+
+    const template = await findActiveTemplate({
+      client: supabase,
+      organizationId,
+      eventKey: "interview_reminder",
+    });
+
+    if (!template) {
+      return OFF("No interview reminder template is switched on.");
+    }
+
+    /**
+     * THE ADMIN'S CHANNEL CHOICE AND THE TEMPLATE'S MUST AGREE.
+     *
+     * The template says which channels it has wording for; the setting says which
+     * channels this organization wants reminders on. Only the intersection can
+     * send. An email-only template with WhatsApp selected has nothing to send on
+     * WhatsApp, and saying so is better than a log full of "not sent" rows.
+     */
+    const usable = channelsFor(template.channel).filter((channel) =>
+      interviewReminderChannels.includes(channel)
+    );
+
+    if (usable.length === 0) {
+      return OFF(
+        `"${template.name}" doesn't cover the channel you chose for reminders. ` +
+          "Change the template's channel, or the reminder channel in Settings → Recruitment."
+      );
+    }
+
+    const interviews = await listInterviewsStartingWithin({
+      organizationId,
+      hours: interviewReminderHours,
+      now,
+    });
+
+    let sent = 0;
+    let suppressed = 0;
+
+    // One window back, so a rescheduled interview gets a new reminder while a
+    // second press of the button within the window sends nothing.
+    const dedupeSinceIso = new Date(
+      now.getTime() - interviewReminderHours * 3_600_000
+    ).toISOString();
+
+    for (const interview of interviews) {
+      const result = await sendForEvent({
+        organizationId,
+        applicationId: interview.application_id,
+        eventKey: "interview_reminder",
+        interview: {
+          scheduled_at: interview.scheduled_at,
+          mode: interview.mode,
+          location: interview.location,
+          meeting_url: interview.meeting_url,
+        },
+        origin,
+        client: supabase,
+        // The one caller that bounds the dedupe rather than checking forever —
+        // see the header. A rescheduled interview earns a second reminder.
+        dedupeSinceIso,
+      });
+
+      if (result.status === "sent") sent += 1;
+      else suppressed += 1;
+    }
+
+    return { sent, suppressed, failed: false, skipped: false, reason: null };
+  } catch (error) {
+    console.error(`[reminders] interview reminders failed: ${formatDbError(error)}`);
+    return { sent: 0, suppressed: 0, failed: true, skipped: false, reason: null };
+  }
+}

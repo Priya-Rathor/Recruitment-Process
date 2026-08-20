@@ -248,7 +248,16 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
       notificationId,
       inAppCreated,
       emailStatus: sent.ok ? "sent" : sent.skipped ? "skipped" : "failed",
-      detail: sent.ok ? null : sent.skipped ? sent.reason : sent.error,
+      // The adapter reports only what IT knows ("email isn't connected"). The
+      // reassurance that the notice survived anyway is this module's own fact, so
+      // it is added here — and only when the in-app row genuinely was created.
+      detail: sent.ok
+        ? null
+        : sent.skipped
+          ? inAppCreated
+            ? `${sent.reason} The in-app notification was created.`
+            : sent.reason
+          : sent.error,
     };
   } catch (error) {
     // The outermost net. Whatever happened, the caller's own work stands.

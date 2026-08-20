@@ -225,6 +225,10 @@ export const ACTIONS = [
   "send_candidate_email",
   "assign_recruiter",
   "call_n8n_webhook",
+  // Module 15's candidate communication. See the block comment above
+  // ACTION_INTEGRATIONS for why this one's required integrations are computed
+  // from its config rather than fixed.
+  "send_templated_message",
 ] as const;
 
 export type ActionType = (typeof ACTIONS)[number];
@@ -239,6 +243,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   send_candidate_email: "Email the candidate a stage update",
   assign_recruiter: "Assign a recruiter",
   call_n8n_webhook: "Hand off to an n8n workflow",
+  send_templated_message: "Send templated message",
 };
 
 /**
@@ -264,6 +269,9 @@ export const ACTION_MODES: Record<ActionType, ExecutionMode[]> = {
   send_candidate_email: ["session", "service"],
   assign_recruiter: ["session", "service"],
   call_n8n_webhook: ["session", "service"],
+  // The engine renders and sends this itself, with whichever client it holds, so
+  // a scheduled sweep and the Bolna webhook can both run it.
+  send_templated_message: ["session", "service"],
 };
 
 export function actionRunsIn(action: ActionType, mode: ExecutionMode): boolean {
@@ -284,7 +292,39 @@ export const ACTION_INTEGRATIONS: Partial<Record<ActionType, string>> = {
   // from activating over a channel it does not depend on.
   send_candidate_email: "email",
   call_n8n_webhook: "n8n",
+  /**
+   * send_templated_message is DELIBERATELY ABSENT.
+   *
+   * Its integrations depend on the template it names: an email-only template
+   * needs `email`, a WhatsApp one needs `whatsapp`, a `both` template needs
+   * either to be useful. A fixed entry here could only name one, and naming
+   * `email` would block an organization that runs WhatsApp-only from activating
+   * a rule that never touches email.
+   *
+   * requiredIntegrationsFor() reads the action's config instead — see below.
+   */
 };
+
+/**
+ * The channels a "Send templated message" action will use.
+ *
+ * Copied into the action's config from the template at SAVE time by the API,
+ * which is also where the template's ownership is verified. Stored rather than
+ * looked up so requiredIntegrationsFor() stays a pure function — the activation
+ * check, the settings page's dependency list and the builder all call it, and
+ * making it asynchronous would push a database read into three UI paths.
+ *
+ * A stale copy (somebody edits the template's channel afterwards) can only make
+ * the activation check more permissive than needed. It cannot make the send
+ * wrong: the engine reads the live template every time it runs.
+ */
+export function messageChannelsFor(action: Action): string[] {
+  const raw = action.config?.channels;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (channel): channel is string => channel === "email" || channel === "whatsapp"
+  );
+}
 
 /**
  * Actions that cost money or contact a person. Used to warn an admin before
@@ -296,6 +336,7 @@ export const CONSEQUENTIAL_ACTIONS: ActionType[] = [
   "generate_screening_report",
   "calculate_match",
   "send_candidate_email",
+  "send_templated_message",
 ];
 
 /**
@@ -309,6 +350,7 @@ export const CONSEQUENTIAL_ACTIONS: ActionType[] = [
 export const CANDIDATE_CONTACT_ACTIONS: ActionType[] = [
   "start_screening_call",
   "send_candidate_email",
+  "send_templated_message",
 ];
 
 export function contactsCandidate(actions: Action[]): boolean {
@@ -318,6 +360,30 @@ export function contactsCandidate(actions: Action[]): boolean {
 /** True when a rule's actions mean approval cannot be switched off. */
 export function approvalIsMandatory(actions: Action[]): boolean {
   return actions.some((action) => action.type === "send_candidate_email");
+}
+
+/**
+ * Actions where approval is switched ON by default but may be switched off.
+ *
+ * `send_templated_message` sits here rather than in approvalIsMandatory, and the
+ * difference is where the human review happened:
+ *
+ *   - send_candidate_email sends wording that lives in this codebase. Nobody in
+ *     the organization ever read it, so a person reads the proposal instead.
+ *   - send_templated_message sends a template an Owner or Admin wrote AND
+ *     explicitly activated — the default library ships inactive precisely so
+ *     that switch is a deliberate act. The review already happened, once, over
+ *     the words themselves.
+ *
+ * Forcing per-run approval would also make an automation strictly worse than the
+ * built-in event triggers, which send the very same template with no approval
+ * step. An admin who wants the extra gate keeps the default; one automating a
+ * hundred rejections a week can turn it off having read the words.
+ */
+export const APPROVAL_RECOMMENDED_ACTIONS: ActionType[] = ["send_templated_message"];
+
+export function approvalIsRecommended(actions: Action[]): boolean {
+  return actions.some((action) => APPROVAL_RECOMMENDED_ACTIONS.includes(action.type));
 }
 
 export type Condition = {
@@ -361,13 +427,30 @@ export function isConditionField(value: unknown): value is ConditionField {
   return typeof value === "string" && (CONDITION_FIELDS as readonly string[]).includes(value);
 }
 
-/** Integrations a rule needs, derived from its actions. */
+/** Integrations a rule needs, derived from its actions and their config. */
 export function requiredIntegrationsFor(actions: Action[]): string[] {
   const required = new Set<string>();
+
   for (const action of actions) {
     const integration = ACTION_INTEGRATIONS[action.type];
     if (integration) required.add(integration);
+
+    if (action.type === "send_templated_message") {
+      const channels = messageChannelsFor(action);
+      /**
+       * A `both` template requires NEITHER channel, not both of them.
+       *
+       * Requiring both would mean an organization that has never configured
+       * WhatsApp — the normal state — could not activate a rule whose email half
+       * works perfectly. The two channels are independent at send time, and the
+       * spec is explicit that email-only usage must work completely. So a rule
+       * naming one channel requires it, and a rule naming two requires nothing:
+       * whichever is connected sends, and the log records the other as skipped.
+       */
+      if (channels.length === 1) required.add(channels[0]);
+    }
   }
+
   return [...required];
 }
 
@@ -426,6 +509,8 @@ export function allConditions(groups: ConditionGroup[]): Condition[] {
 export type ValidationResult =
   | { ok: true; rule: AutomationRule }
   | { ok: false; error: string };
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const MAX_GROUPS = 5;
 const MAX_CONDITIONS_PER_GROUP = 6;
@@ -561,6 +646,35 @@ export function validateRule(value: unknown): ValidationResult {
         return { ok: false, error: "That candidate email template doesn't exist." };
       }
       config.template = template;
+    }
+
+    /**
+     * Module 15's "Send templated message".
+     *
+     * The rule names a template by id. The three derived fields — event_key and
+     * channels — are copied from the template by the API, which is also the only
+     * place that can prove the template belongs to the caller's organization: a
+     * pure validator cannot, and a rule whose template id came from another
+     * tenant would be a cross-tenant read dressed up as a configuration value.
+     *
+     * So the shape is checked here and the ownership is checked there, and the
+     * API overwrites whatever the client sent for the derived fields.
+     */
+    if (entry.type === "send_templated_message") {
+      const templateId = config.template_id;
+      if (typeof templateId !== "string" || !UUID_PATTERN.test(templateId)) {
+        return { ok: false, error: "Choose which message template to send." };
+      }
+
+      const channels = Array.isArray(config.channels)
+        ? config.channels.filter((channel) => channel === "email" || channel === "whatsapp")
+        : [];
+
+      config.template_id = templateId;
+      config.channels = channels;
+      // event_key is carried through untouched when present; the API sets it from
+      // the template. Absent, the engine falls back to reading the template.
+      if (typeof config.event_key !== "string") delete config.event_key;
     }
 
     if (entry.type === "call_n8n_webhook") {

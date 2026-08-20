@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { resolveTemplatedMessageActions } from "@/lib/communications/ruleActions";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { listAutomations, type AutomationRow } from "@/lib/automations/queries";
 import {
   approvalIsMandatory,
+  approvalIsRecommended,
   requiredIntegrationsFor,
   validateRule,
 } from "@/lib/automations/catalog";
@@ -93,6 +95,18 @@ export async function POST(request: NextRequest) {
     );
     if (!validated.ok) return jsonError(validated.error, 400);
 
+    /**
+     * MODULE 15 — verify any named message template belongs to us, and take its
+     * event_key and channels from the row rather than from the request body.
+     * See resolveTemplatedMessageActions().
+     */
+    const resolvedActions = await resolveTemplatedMessageActions({
+      organizationId: membership.organization.id,
+      actions: validated.rule.actions,
+    });
+    if (!resolvedActions.ok) return jsonError(resolvedActions.error, 422);
+    validated.rule.actions = resolvedActions.actions;
+
     // Null means uncapped, which is a real choice. Anything non-numeric or
     // non-positive is a mistake and is refused rather than silently uncapped.
     let dailyRunCap: number | null = template?.dailyRunCap ?? null;
@@ -110,7 +124,19 @@ export async function POST(request: NextRequest) {
     const requiresApproval =
       approvalIsMandatory(validated.rule.actions) ||
       payload.requires_approval === true ||
-      template?.requiresApproval === true;
+      template?.requiresApproval === true ||
+      /**
+       * "Send templated message" DEFAULTS approval on, and unlike the built-in
+       * candidate email it can be switched back off — the wording it sends was
+       * already written and deliberately activated by an Owner or Admin, so the
+       * human review has happened once, over the words. See
+       * APPROVAL_RECOMMENDED_ACTIONS.
+       *
+       * Only defaulted when the client did not say. An explicit `false` from
+       * somebody who read the words is respected, which is the difference between
+       * a default and a rule.
+       */
+      (!("requires_approval" in payload) && approvalIsRecommended(validated.rule.actions));
 
     const supabase = await createClient();
     const { data, error } = await supabase

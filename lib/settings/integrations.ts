@@ -1,8 +1,8 @@
 // =============================================================================
 // Integration health, and what depends on what.
 //
-// One place that knows about all five providers, so the settings page never
-// imports five adapters and the dependency warning never hardcodes a list.
+// One place that knows about all six providers, so the settings page never
+// imports six adapters and the dependency warning never hardcodes a list.
 // =============================================================================
 import { createClient } from "@/lib/supabase/server";
 import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
@@ -10,6 +10,7 @@ import { getStatus as getEmailStatus } from "@/lib/integrations/email";
 import { getStatus as getCalendarStatus } from "@/lib/integrations/calendar";
 import { getStatus as getLlmStatus } from "@/lib/integrations/llm";
 import { getStatus as getN8nStatus } from "@/lib/integrations/n8n";
+import { getStatus as getWhatsAppStatus } from "@/lib/integrations/whatsapp";
 import { isGoogleOAuthConfigured } from "@/lib/integrations/calendar/oauth";
 import type { IntegrationStatus, Provider } from "@/lib/integrations/store";
 import { ACTION_INTEGRATIONS, ACTION_LABELS, type ActionType } from "@/lib/automations/catalog";
@@ -73,6 +74,19 @@ export const PROVIDER_DESCRIPTORS: Record<Provider, ProviderDescriptor> = {
     connectStyle: "api_key",
     featureImpact: ["Nothing — automations do not run through n8n in this version"],
   },
+  whatsapp: {
+    provider: "whatsapp",
+    label: "WhatsApp Business",
+    description: "Sends candidate messages over WhatsApp, alongside email.",
+    connectStyle: "api_key",
+    featureImpact: [
+      // Deliberately specific about what does NOT break. WhatsApp is the newest
+      // and most optional dependency in the product, and an admin considering
+      // disconnecting it needs to know the pipeline keeps running.
+      "The WhatsApp half of any message template — the email half is unaffected",
+      "Nothing else: templates, triggers and the communication log all keep working",
+    ],
+  },
 };
 
 export type IntegrationHealth = {
@@ -104,12 +118,13 @@ export type IntegrationHealth = {
 export async function getAllIntegrationHealth(
   organizationId: string
 ): Promise<IntegrationHealth[]> {
-  const [bolna, calendar, email, llm, n8n] = await Promise.all([
+  const [bolna, calendar, email, llm, n8n, whatsapp] = await Promise.all([
     getBolnaStatus(organizationId).catch(() => null),
     getCalendarStatus(organizationId).catch(() => null),
     getEmailStatus(organizationId).catch(() => null),
     getLlmStatus(organizationId).catch(() => null),
     getN8nStatus(organizationId).catch(() => null),
+    getWhatsAppStatus(organizationId).catch(() => null),
   ]);
 
   const base = (provider: Provider): IntegrationHealth => ({
@@ -195,6 +210,24 @@ export async function getAllIntegrationHealth(
       detail: n8n?.instanceUrl
         ? `${n8n.instanceUrl} · monitored only, automations run in-process`
         : "Monitored only — automations run in-process in this version",
+    },
+    {
+      ...base("whatsapp"),
+      status: whatsapp?.status ?? "disconnected",
+      credentialHint: whatsapp?.credentialHint ?? null,
+      lastTestedAt: whatsapp?.lastTestedAt ?? null,
+      lastSuccessAt: whatsapp?.lastSuccessAt ?? null,
+      errorCode: whatsapp?.errorCode ?? null,
+      errorMessage: whatsapp?.errorMessage ?? null,
+      encryptionUnavailable: whatsapp?.encryptionUnavailable ?? false,
+      // Says which of the two sending modes is in force, because the difference
+      // decides whether a message to somebody who has never written to us will
+      // arrive at all — see fact 1 in lib/integrations/whatsapp/index.ts.
+      detail: whatsapp?.messagingTemplate
+        ? `Sends from ${whatsapp.displayNumber ?? "your business number"} using the approved template "${whatsapp.messagingTemplate}"`
+        : whatsapp?.status === "connected"
+          ? "No approved WhatsApp template configured — messages will only reach candidates who wrote to you in the last 24 hours"
+          : null,
     },
   ];
 }

@@ -3,10 +3,18 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/states";
 import { requireMembershipOrRedirect, requireCurrentUser, hasRole } from "@/lib/tenant";
-import { listAutomations, listRuns } from "@/lib/automations/queries";
+import {
+  countChargeableActions,
+  listAutomations,
+  listRuns,
+} from "@/lib/automations/queries";
+import { countPendingApprovals } from "@/lib/automations/approvals";
+import { getLatestSweep } from "@/lib/automations/sweep";
 import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
-import { describeRule } from "@/lib/automations/catalog";
+import { describeRule, isScheduledTrigger } from "@/lib/automations/catalog";
+import { automationsEnabled } from "@/lib/organizations/automationSwitch";
 import { RunStatusBadge, StatusBadge } from "./AutomationBadges";
+import { SchedulerPanel } from "./SchedulerPanel";
 import { Zap } from "lucide-react";
 
 export const metadata = { title: "Automations" };
@@ -25,9 +33,10 @@ async function AutomationsList() {
   const membership = await requireMembershipOrRedirect();
   const canEdit = hasRole(membership.role, ["owner", "admin"]);
 
-  const [{ automations, failed }, bolna] = await Promise.all([
+  const [{ automations, failed }, bolna, sweep] = await Promise.all([
     listAutomations(membership.organization.id),
     getBolnaStatus(membership.organization.id),
+    getLatestSweep(membership.organization.id),
   ]);
 
   if (failed) return <ErrorState message="Couldn't load automations." />;
@@ -37,8 +46,38 @@ async function AutomationsList() {
       automation.status === "active" && automation.required_integrations.includes("bolna")
   );
 
+  const scheduledRuleCount = automations.filter(
+    (automation) => automation.status === "active" && isScheduledTrigger(automation.trigger)
+  ).length;
+
+  const pausedByEngine = automations.filter(
+    (automation) => automation.status === "paused" && automation.paused_reason
+  );
+
   return (
     <>
+      <SchedulerPanel
+        sweep={sweep.sweep}
+        sweepReadFailed={sweep.failed}
+        enabled={automationsEnabled(membership.organization)}
+        scheduledRuleCount={scheduledRuleCount}
+        canControl={canEdit}
+      />
+
+      {pausedByEngine.length > 0 && (
+        <div className="card mb-4" style={{ borderColor: "var(--color-warning)" }}>
+          <p style={{ fontSize: 14 }}>
+            <strong>
+              {pausedByEngine.length} rule{pausedByEngine.length === 1 ? "" : "s"} paused
+              {pausedByEngine.length === 1 ? " itself" : " themselves"}.
+            </strong>{" "}
+            {pausedByEngine.map((automation) => automation.name).join(", ")} — a daily limit was
+            reached. Open{pausedByEngine.length === 1 ? " it" : " them"} to see why and turn
+            {pausedByEngine.length === 1 ? " it" : " them"} back on.
+          </p>
+        </div>
+      )}
+
       {bolna.status !== "connected" && activeNeedingBolna.length > 0 && (
         <div className="card mb-4" style={{ borderColor: "var(--color-error)" }}>
           <p style={{ fontSize: 14, color: "var(--color-error)" }}>
@@ -69,6 +108,7 @@ async function AutomationsList() {
                   <th>Automation</th>
                   <th>Status</th>
                   <th>Runs</th>
+                  <th>Chargeable actions</th>
                   <th>Last run</th>
                 </tr>
               </thead>
@@ -86,6 +126,11 @@ async function AutomationsList() {
                           actions: automation.actions ?? [],
                         })}
                       </div>
+                      {automation.requires_approval && (
+                        <div className="mt-1" style={{ fontSize: 12 }}>
+                          Needs approval before acting
+                        </div>
+                      )}
                       {automation.drafted_by_ai && (
                         <div
                           className="mt-1"
@@ -107,6 +152,17 @@ async function AutomationsList() {
                           · {automation.failureCount} failed
                         </span>
                       )}
+                      {automation.awaitingApprovalCount > 0 && (
+                        <div style={{ fontSize: 12, color: "var(--color-info, #2563EB)" }}>
+                          {automation.awaitingApprovalCount} waiting for approval
+                        </div>
+                      )}
+                    </td>
+                    {/* A COUNT, not a currency figure. Nothing here measures
+                        tokens or call minutes, so a rupee number would be
+                        invented — see migration 0029's column comment. */}
+                    <td className="has-text-secondary" style={{ fontSize: 13 }}>
+                      {automation.chargeableActions === 0 ? "—" : automation.chargeableActions}
                     </td>
                     <td className="has-text-secondary" style={{ fontSize: 13 }}>
                       {automation.lastRunAt ? formatWhen(automation.lastRunAt) : "Never"}
@@ -189,6 +245,11 @@ export default async function AutomationsPage() {
   const membership = await requireMembershipOrRedirect();
   const canEdit = hasRole(membership.role, ["owner", "admin"]);
 
+  const [pendingApprovals, chargeableThisWeek] = await Promise.all([
+    countPendingApprovals(membership.organization.id),
+    countChargeableActions({ organizationId: membership.organization.id, days: 7 }),
+  ]);
+
   return (
     <AppShell>
       <div className="is-flex is-justify-content-space-between is-align-items-flex-start mb-5">
@@ -198,13 +259,39 @@ export default async function AutomationsPage() {
             When something happens, if your conditions hold, then act.
           </p>
         </div>
-        {/* Hidden, not greyed out — the API refuses it independently. */}
-        {canEdit && (
-          <Link className="button is-primary" href="/automations/new">
-            New automation
+        <div className="is-flex" style={{ gap: "0.5rem" }}>
+          <Link className="button" href="/automations/approvals">
+            Approvals
+            {/* null means the count failed. Rendering it as 0 would say
+                "nothing is waiting", which is a claim we cannot make. */}
+            {pendingApprovals !== null && pendingApprovals > 0 ? ` (${pendingApprovals})` : ""}
           </Link>
-        )}
+          {/* Hidden, not greyed out — the API refuses it independently. */}
+          {canEdit && (
+            <Link className="button is-primary" href="/automations/new">
+              New automation
+            </Link>
+          )}
+        </div>
       </div>
+
+      {pendingApprovals === null && (
+        <div className="card mb-4" style={{ borderColor: "var(--color-warning)" }}>
+          <p style={{ fontSize: 14 }}>
+            Couldn&apos;t count what is waiting for approval. There may be proposals sitting
+            undecided — <Link href="/automations/approvals">open the queue</Link> to check.
+          </p>
+        </div>
+      )}
+
+      {chargeableThisWeek !== null && chargeableThisWeek > 0 && (
+        <p className="has-text-secondary mb-4" style={{ fontSize: 13 }}>
+          Automations have run <strong>{chargeableThisWeek}</strong> chargeable action
+          {chargeableThisWeek === 1 ? "" : "s"} in the last 7 days — screening calls, match scoring,
+          reports and candidate emails. This is a count of actions, not a bill: nothing here
+          measures call minutes or tokens yet.
+        </p>
+      )}
 
       <Suspense
         fallback={

@@ -35,6 +35,16 @@ import { getLatestParsedResume } from "@/lib/resumes/queries";
 import { resumeKeyPoints } from "@/lib/resumes/keyPoints";
 import { ApplicationStageSection } from "./ApplicationStageSection";
 import { ApplicationHeaderActions } from "./ApplicationHeaderActions";
+import { SendMessagePanel } from "./SendMessagePanel";
+import { CommunicationLog } from "@/components/CommunicationLog";
+import {
+  getCommunicationPreferences,
+  listApplicationMessages,
+  listMessageTemplates,
+} from "@/lib/communications/queries";
+import { getChannelAvailability } from "@/lib/communications/channels";
+import { loadMessageContext } from "@/lib/communications/triggers";
+import { createClient } from "@/lib/supabase/server";
 import { PRIORITY_LABELS, PRIORITY_TONE, type ApplicationPriority } from "@/lib/applications/validation";
 import { Activity, Layers, Pencil } from "lucide-react";
 
@@ -88,6 +98,49 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
   // Per-stage passing thresholds, from the SAME rows that decided visibility —
   // one fetch, so the two cannot disagree about the job's configuration.
   const thresholds = thresholdsFromStages(stageRows);
+
+  // Module 15's candidate communication. Read in parallel with each other and
+  // AFTER the application resolves, because every one of them is keyed on the
+  // candidate or application id.
+  //
+  // The message CONTEXT is loaded even for a role that cannot send, because the
+  // composer's preview renders from it and a Recruiter who is not assigned still
+  // sees the log. Nothing here is a secret from a team member.
+  const [
+    { messages, failed: messagesFailed },
+    { templates: messageTemplates },
+    communicationPreferences,
+    channels,
+    messageContext,
+  ] = await Promise.all([
+    listApplicationMessages({
+      organizationId: membership.organization.id,
+      applicationId: application.id,
+    }),
+    listMessageTemplates(membership.organization.id),
+    getCommunicationPreferences({
+      organizationId: membership.organization.id,
+      candidateId: application.candidate_id,
+    }),
+    getChannelAvailability(membership.organization.id),
+    loadMessageContext({
+      client: await createClient(),
+      organizationId: membership.organization.id,
+      applicationId: application.id,
+    }),
+  ]);
+
+  /**
+   * "Manual send: Owner/Admin/Recruiter (assigned) can send."
+   *
+   * The assignment condition is mirrored here so the composer is not offered to
+   * somebody the API will refuse — and the API refuses independently, because a
+   * hidden button is not an access control.
+   */
+  const canSendMessage =
+    hasRole(membership.role, ["owner", "admin"]) ||
+    (membership.role === "recruiter" &&
+      application.assigned_recruiter_id === membership.user_id);
 
   // Loaded AFTER the stages, because each entry's Pass/Fail is judged against
   // its own stage's threshold, and those live on the rows above.
@@ -214,6 +267,25 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
             source: application.source,
             priority: (application.priority ?? "normal") as ApplicationPriority,
           }}
+          actions={
+            canSendMessage && messageContext ? (
+              <SendMessagePanel
+                applicationId={application.id}
+                candidateName={application.candidate_name}
+                // The application's REAL values, resolved server-side by the same
+                // loader the automatic sends use — so the preview cannot differ
+                // from what actually goes out.
+                values={messageContext.values}
+                templates={messageTemplates}
+                candidateEmail={messageContext.candidateEmail}
+                candidatePhone={messageContext.candidatePhone}
+                emailOptedOut={communicationPreferences.email_opted_out}
+                whatsappOptedOut={communicationPreferences.whatsapp_opted_out}
+                emailConnected={channels.emailConnected}
+                whatsappConnected={channels.whatsappConnected}
+              />
+            ) : null
+          }
         />
       )}
 
@@ -245,6 +317,45 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
 
       {/* Spec section 7: AI summary renders at the top, timeline below. */}
       <ApplicationSummary applicationId={application.id} />
+
+      {/*
+        Communications. Its own section rather than folded into the Timeline,
+        because the two answer different questions: the timeline says what happened
+        to the application, this says what the candidate was actually told. A
+        recruiter deciding whether to chase somebody needs the second, in full,
+        with the exact wording available.
+
+        Visible to EVERY role, read-only for every role — it is a record.
+      */}
+      <div className="card mb-4" id="communications">
+        <div className="is-flex is-justify-content-space-between is-align-items-center mb-2">
+          <h2 className="title is-5 mb-0">Communications</h2>
+          {(communicationPreferences.email_opted_out ||
+            communicationPreferences.whatsapp_opted_out ||
+            communicationPreferences.unknown) && (
+            <span className="has-text-secondary" style={{ fontSize: 12 }}>
+              {communicationPreferences.unknown
+                ? "Opt-out status unknown"
+                : [
+                    communicationPreferences.email_opted_out ? "Email opted out" : null,
+                    communicationPreferences.whatsapp_opted_out ? "WhatsApp opted out" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+            </span>
+          )}
+        </div>
+        <CommunicationLog
+          messages={messages}
+          failed={messagesFailed}
+          timeZone={membership.organization.timezone}
+          emptyMessage={
+            messageTemplates.some((template) => template.active)
+              ? "Nothing has been sent about this application yet. Active templates send as their events happen."
+              : "Nothing has been sent about this application yet, and no message template is switched on."
+          }
+        />
+      </div>
 
       <div className="columns">
         <div className="column is-two-thirds">

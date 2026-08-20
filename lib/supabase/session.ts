@@ -7,7 +7,27 @@ import { requireSupabaseConfig } from "./env";
  * Deny-by-default: a new module's routes are protected the moment they exist,
  * without anyone remembering to add them here.
  */
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password", "/invite"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/invite",
+  /**
+   * Module 15's unsubscribe page.
+   *
+   * A CANDIDATE IS NOT A USER OF THIS PRODUCT. They have no login, so an
+   * unsubscribe link that required a session would be a link nobody who receives
+   * it can use — and an automated recruitment email whose unsubscribe does not work
+   * is exactly what CAN-SPAM and PECR forbid.
+   *
+   * The page is authorised by its own signed token instead (an HMAC over the
+   * candidate id and channel; see lib/communications/optout.ts), so it can only opt
+   * ONE candidate out of ONE channel, cannot be pointed at anybody else by editing
+   * the id, and cannot re-subscribe anyone.
+   */
+  "/unsubscribe",
+];
 
 function matches(pathname: string, paths: string[]) {
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));

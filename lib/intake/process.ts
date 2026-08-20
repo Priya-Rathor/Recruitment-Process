@@ -34,6 +34,7 @@ import type { IntakeStatus } from "@/lib/intake/status";
 import { DEFAULT_APPLICATION_STAGE } from "@/lib/applications/stages";
 import { logActivity, logAiCall } from "@/lib/activity/log";
 import { dispatch } from "@/lib/automations/engine";
+import { trySendForEvent } from "@/lib/communications/triggers";
 import type { Candidate } from "@/lib/types";
 import { formatDbError } from "@/lib/supabase/errors";
 
@@ -61,6 +62,20 @@ export type ProcessInput = {
   /** Origin for automation webhooks; mirrors the applications route. */
   webhookUrl: string;
 };
+
+/**
+ * The site origin, from the automation webhook URL the caller already built.
+ *
+ * Returns null on anything unparseable, which degrades the unsubscribe footer to
+ * its "reply and ask" wording rather than emitting a broken link.
+ */
+function originOf(webhookUrl: string): string | null {
+  try {
+    return new URL(webhookUrl).origin;
+  } catch {
+    return null;
+  }
+}
 
 /** Failure shorthand — every early exit produces the same shape. */
 function failed(message: string, extra: Partial<ProcessOutcome> = {}): ProcessOutcome {
@@ -644,6 +659,25 @@ export async function ensureApplicationForCandidate({
     eventType: "application.created",
     actorId,
     metadata: { stage: DEFAULT_APPLICATION_STAGE, source: "resume_upload", via: "bulk_intake" },
+  });
+
+  /**
+   * MODULE 15 — "we received your application", same as every other creation path.
+   *
+   * A CANDIDATE FROM A THIRTY-FILE UPLOAD IS STILL A PERSON WHO APPLIED. Skipping
+   * the acknowledgement here because the route was bulk would mean whether somebody
+   * hears back depends on which screen a recruiter happened to use.
+   *
+   * The origin is derived from webhookUrl rather than threaded as a second
+   * parameter: this route already builds that value as `<origin>/api/webhooks/bolna`
+   * from its own request, so the two can never disagree, and a duplicate argument
+   * through three layers is one more thing a future call-site can forget to pass.
+   */
+  await trySendForEvent({
+    organizationId,
+    applicationId,
+    eventKey: "application_received",
+    origin: originOf(webhookUrl),
   });
 
   // Module 13, same as every other application-creation path. Wrapped so a

@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { resolveTemplatedMessageActions } from "@/lib/communications/ruleActions";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { getAutomation, type AutomationRow } from "@/lib/automations/queries";
 import {
   approvalIsMandatory,
+  approvalIsRecommended,
   checkExecutable,
   requiredIntegrationsFor,
   validateRule,
@@ -125,6 +127,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       });
       if (!validated.ok) return jsonError(validated.error, 400);
 
+      // MODULE 15 — same verification as on create: any named message template
+      // must be ours, and its event_key and channels come from the row.
+      const resolvedActions = await resolveTemplatedMessageActions({
+        organizationId: membership.organization.id,
+        actions: validated.rule.actions,
+      });
+      if (!resolvedActions.ok) return jsonError(resolvedActions.error, 422);
+      validated.rule.actions = resolvedActions.actions;
+
       updates.trigger = validated.rule.trigger;
       updates.conditions = validated.rule.conditions;
       updates.actions = validated.rule.actions;
@@ -134,6 +145,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // even if the rule had it off and the client did not mention it. The
       // constraint belongs to the action, not to how the rule was created.
       if (approvalIsMandatory(validated.rule.actions)) updates.requires_approval = true;
+
+      /**
+       * Adding "Send templated message" to a rule that had approval off DEFAULTS
+       * it on, and the same request may turn it back off — the `requires_approval`
+       * branch below runs after this one and wins.
+       *
+       * Defaulted rather than forced because the wording it sends was written and
+       * activated by an Owner or Admin, so a person has already reviewed it once.
+       */
+      if (
+        !("requires_approval" in payload) &&
+        approvalIsRecommended(validated.rule.actions) &&
+        !approvalIsRecommended(existing.actions)
+      ) {
+        updates.requires_approval = true;
+      }
 
       // Back to draft, unless this same request re-activates it deliberately.
       if (existing.status === "active" && payload.status !== "active") {

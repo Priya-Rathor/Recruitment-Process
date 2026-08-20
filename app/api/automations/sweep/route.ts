@@ -9,73 +9,77 @@ import { automationsEnabled } from "@/lib/organizations/automationSwitch";
 export const maxDuration = 300;
 
 /**
- * POST /api/automations/sweep — run the scheduler.
+ * The scheduler. TWO CALLERS, TWO VERBS, ONE SHARED IMPLEMENTATION.
  *
- * TWO CALLERS, ONE SHARED IMPLEMENTATION.
+ *   GET  — the cron. Authenticated by a shared secret; no session exists, so it
+ *          sweeps every organization under the service-role client.
+ *   POST — an Owner or Admin pressing "Run the scheduler now". Their session,
+ *          their organization only, RLS applied normally.
  *
- *   - THE CRON, authenticated by a shared secret in the Authorization header.
- *     No session exists, so it sweeps every organization under the service-role
- *     client.
- *   - AN OWNER OR ADMIN pressing "Run the scheduler now", authenticated by their
- *     session. Sweeps their own organization only, under their own client, so
- *     RLS applies normally.
+ * WHY THE VERBS ARE SPLIT. Vercel Cron issues a GET. Accepting either verb on one
+ * handler and guessing the caller from a header would mean an unauthenticated POST
+ * could be mistaken for a cron, or a signed-in user's request treated as one —
+ * and the difference between those two paths is "this organization" versus "every
+ * organization". Not a distinction to infer.
  *
- * WHY BOTH. Until a cron is configured this endpoint is the only thing that runs
- * time-based rules, and a button is honest about that in a way a rule that
- * silently never fires is not — the same call
- * /api/notifications/reminders already made. The button also lets an admin prove
- * the behaviour before trusting a schedule with it.
- *
- * THE SECRET IS COMPARED, NOT PARSED. A missing CRON_SECRET means the cron path
- * is REFUSED rather than open: an unauthenticated endpoint that runs every
- * organization's automations is not something to leave on by default.
+ * WHY THE BUTTON EXISTS AT ALL. Until a cron is configured this endpoint is the
+ * only thing that runs time-based rules, and the Automations page says so in
+ * words. That is the call /api/notifications/reminders already made: pretending
+ * rules fire on a schedule when nothing is scheduled would be worse than an
+ * honest button. It also lets an admin rehearse the cron's exact behaviour before
+ * trusting a schedule with it.
  */
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const secret = process.env.CRON_SECRET;
-    const presented = request.headers.get("authorization");
 
-    // Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`.
-    const looksLikeCron = presented !== null;
-
-    if (looksLikeCron) {
-      if (!secret) {
-        return jsonError(
-          "Scheduled sweeps aren't configured on this deployment (CRON_SECRET is unset).",
-          503
-        );
-      }
-      if (presented !== `Bearer ${secret}`) {
-        // Deliberately vague. A precise message here helps whoever is guessing.
-        return jsonError("Not authorized.", 401);
-      }
-
-      const result = await runCronSweep();
-
-      if (!result.configured) {
-        return jsonError(
-          "The scheduler can't run: no Supabase service-role key is configured, so it has no way to read data without a signed-in user.",
-          503
-        );
-      }
-
-      return NextResponse.json({
-        data: {
-          source: "cron",
-          organizations: result.organizations,
-          organizations_truncated: result.truncated,
-          // Summed here rather than in the UI so the number the log shows and the
-          // number the screen shows cannot disagree.
-          runs_created: result.organizations.reduce((total, org) => total + org.runsCreated, 0),
-        },
-      });
+    // No secret configured means the cron path is REFUSED, not open. An
+    // unauthenticated endpoint that runs every organization's automations is not
+    // something to leave enabled by default.
+    if (!secret) {
+      return jsonError(
+        "Scheduled sweeps aren't configured on this deployment (CRON_SECRET is unset).",
+        503
+      );
     }
 
-    // ---- The manual path. A person pressed a button. --------------------------
+    if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+      // Deliberately vague. A precise message here helps whoever is guessing.
+      return jsonError("Not authorized.", 401);
+    }
+
+    const result = await runCronSweep();
+
+    if (!result.configured) {
+      return jsonError(
+        "The scheduler can't run: no Supabase service-role key is configured, so it has no way to read data without a signed-in user.",
+        503
+      );
+    }
+
+    return NextResponse.json({
+      data: {
+        source: "cron",
+        organizations: result.organizations,
+        organizations_truncated: result.truncated,
+        // Summed here rather than in the caller, so the number in the log and the
+        // number on the screen cannot disagree.
+        runs_created: result.organizations.reduce((total, org) => total + org.runsCreated, 0),
+        failures: result.organizations.filter((org) => org.error !== null).length,
+      },
+    });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
+/** POST — the manual button. A person pressed it, on their own organization. */
+export async function POST() {
+  try {
     const [membership, user] = await Promise.all([
-      // A Viewer cannot make the product act on candidates, and a Recruiter
-      // cannot either: this runs whatever rules an Admin activated, at a moment
-      // of the presser's choosing, which is an Owner/Admin decision.
+      // A Viewer cannot make the product act on candidates, and neither can a
+      // Recruiter: this runs whatever rules an Admin activated, at a moment of the
+      // presser's choosing, which is an Owner/Admin decision.
       requireRole(["owner", "admin"]),
       requireCurrentUser(),
     ]);

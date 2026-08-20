@@ -22,7 +22,7 @@
 // until migration 0022. One column of badges has to mean one thing, so the
 // scale is normalised here and the native value is kept alongside it.
 // =============================================================================
-import type { ConfigurableStage } from "@/lib/applications/stages";
+import { PIPELINE_STAGES, type ApplicationStage, type ConfigurableStage } from "@/lib/applications/stages";
 import type { EvaluationStatus } from "@/lib/evaluation/verdict";
 
 /** The stages the Evaluation panel has a section for, in board order. */
@@ -194,4 +194,78 @@ export function previewSummary(summary: string | null, limit = 140): string {
   if (!summary) return "No summary recorded.";
   const text = summary.trim().replace(/\s+/g, " ");
   return text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text;
+}
+
+/**
+ * Is every evaluation this application was expecting now in?
+ *
+ * MODULE 13's `evaluations_complete` trigger rests on this, and it is a pure
+ * function for exactly that reason: a rule that advances somebody's application
+ * must reach the same verdict every time, and the verdict has to be testable
+ * without a database.
+ *
+ * THREE CONDITIONS, and each one is here because of a way this could otherwise
+ * be wrong:
+ *
+ *   1. AT LEAST ONE ENTRY EXISTS. An application nobody has evaluated has not
+ *      "completed its evaluations" — it has had none. Vacuous truth here would
+ *      advance every fresh application on its first sweep.
+ *
+ *   2. NOTHING IS STILL PENDING. `pending` is the outcome a recruiter records
+ *      when the interview happened but the verdict has not been reached. Treating
+ *      it as complete would advance a candidate on a decision nobody made.
+ *
+ *   3. EVERY ENABLED STAGE UP TO THE CURRENT ONE HAS AN ENTRY. Without this, an
+ *      application at Director Round with one phone-interview entry and nothing
+ *      for the video interview would read as complete. Stages AFTER the current
+ *      one are deliberately not required: they have not happened yet, and waiting
+ *      for them would mean the trigger never fires.
+ *
+ * `enabledStages` comes from job_hiring_stages, so a job that does not run written
+ * assessments is not held up waiting for one.
+ */
+export function evaluationsComplete({
+  entries,
+  enabledStages,
+  currentStage,
+}: {
+  entries: Pick<EvaluationEntry, "stage" | "outcome">[];
+  enabledStages: ConfigurableStage[];
+  currentStage: ApplicationStage;
+}): { complete: boolean; reason: string } {
+  if (entries.length === 0) {
+    return { complete: false, reason: "No evaluations have been logged yet." };
+  }
+
+  const pending = entries.filter((entry) => entry.outcome === "pending");
+  if (pending.length > 0) {
+    return {
+      complete: false,
+      reason: `${pending.length} evaluation${pending.length === 1 ? "" : "s"} still recorded as pending.`,
+    };
+  }
+
+  const currentIndex = PIPELINE_STAGES.indexOf(currentStage as (typeof PIPELINE_STAGES)[number]);
+
+  // A terminal stage (rejected/withdrawn) is not in PIPELINE_STAGES, so the index
+  // is -1. Nothing further is expected of an application that has left the
+  // pipeline, so what is logged is what there was.
+  if (currentIndex === -1) return { complete: true, reason: "Every logged evaluation has an outcome." };
+
+  const missing = enabledStages.filter((stage) => {
+    const index = PIPELINE_STAGES.indexOf(stage);
+    // Strictly BEFORE the current stage. A candidate who has just arrived at
+    // Video Interview has not had that interview yet.
+    if (index === -1 || index >= currentIndex) return false;
+    return !entries.some((entry) => entry.stage === stage);
+  });
+
+  if (missing.length > 0) {
+    return {
+      complete: false,
+      reason: `No evaluation logged yet for: ${missing.join(", ")}.`,
+    };
+  }
+
+  return { complete: true, reason: "Every expected evaluation is in." };
 }

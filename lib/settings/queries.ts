@@ -20,6 +20,36 @@ export type OnboardingSettings = {
   pendingReminderDays: number;
 };
 
+/**
+ * Candidate communication — the interview reminder's timing and channels.
+ *
+ * WHY THIS LIVES IN ORGANIZATION SETTINGS AND NOT IN A NEW TABLE.
+ *
+ * The spec asks to "reuse Module 11's existing reminder timing config, add channel
+ * choice to it rather than creating a second reminder system". Module 11 never
+ * built one — its feedback queue is computed on read and hard-codes
+ * FEEDBACK_DUE_HOURS — so there was nothing to extend. Putting the timing here,
+ * beside every other operating default, and having the ONE existing dispatcher
+ * (lib/notifications/reminders.ts) send it is the nearest honest reading of that
+ * instruction: one reminder system, one config, one place it is triggered from.
+ */
+export type CommunicationSettings = {
+  /**
+   * How many hours before an interview the reminder goes out.
+   * 0 switches it off — see normalizeCommunicationSettings.
+   */
+  interviewReminderHours: number;
+  /**
+   * Which channels the reminder uses.
+   *
+   * A LIST RATHER THAN A SINGLE CHOICE, because "both" is a real answer: a
+   * WhatsApp arrives on the phone the candidate is holding and an email survives
+   * for them to find the joining link in. An empty list switches the reminder off
+   * as surely as 0 hours does, and the settings screen says so.
+   */
+  interviewReminderChannels: ("email" | "whatsapp")[];
+};
+
 export type RetentionSettings = {
   /** Days to keep call transcripts and recordings. 0 = keep indefinitely. */
   transcriptRetentionDays: number;
@@ -35,6 +65,7 @@ export type OrganizationSettings = {
   screening_settings: ScreeningSettings;
   retention_settings: RetentionSettings;
   onboarding_settings: OnboardingSettings;
+  communication_settings: CommunicationSettings;
   logo_url: string | null;
   brand_color: string | null;
   updated_at: string | null;
@@ -61,6 +92,22 @@ export const DEFAULT_ONBOARDING_SETTINGS: OnboardingSettings = {
   pendingReminderDays: 3,
 };
 
+/**
+ * 24 hours, email only.
+ *
+ * A day ahead is early enough to rearrange a morning and late enough that the
+ * candidate has not forgotten again by the time it happens. Email only, because
+ * WhatsApp is the newest and least likely to be configured — a default that
+ * assumed it would make every reminder record a "not sent" row on a fresh install.
+ *
+ * The reminder still only goes out if an ACTIVE interview_reminder template exists,
+ * so this default cannot start messaging anybody on its own.
+ */
+export const DEFAULT_COMMUNICATION_SETTINGS: CommunicationSettings = {
+  interviewReminderHours: 24,
+  interviewReminderChannels: ["email"],
+};
+
 export const DEFAULT_RETENTION_SETTINGS: RetentionSettings = {
   transcriptRetentionDays: 0,
   archivedCandidateRetentionDays: 0,
@@ -74,6 +121,7 @@ export const DEFAULT_SETTINGS: Omit<OrganizationSettings, "organization_id" | "u
   screening_settings: DEFAULT_SCREENING_SETTINGS,
   retention_settings: DEFAULT_RETENTION_SETTINGS,
   onboarding_settings: DEFAULT_ONBOARDING_SETTINGS,
+  communication_settings: DEFAULT_COMMUNICATION_SETTINGS,
   logo_url: null,
   brand_color: null,
 };
@@ -126,6 +174,7 @@ export async function getOrganizationSettings(
       screening_settings: normalizeScreeningSettings(row.screening_settings),
       retention_settings: normalizeRetentionSettings(row.retention_settings),
       onboarding_settings: normalizeOnboardingSettings(row.onboarding_settings),
+      communication_settings: normalizeCommunicationSettings(row.communication_settings),
       logo_url: (row.logo_url as string | null) ?? null,
       brand_color: (row.brand_color as string | null) ?? null,
       updated_at: (row.updated_at as string | null) ?? null,
@@ -176,6 +225,39 @@ export function normalizeOnboardingSettings(value: unknown): OnboardingSettings 
   // Capped at 90. A "reminder" further out than a quarter is not a reminder,
   // and 0 is the honest way to say "don't remind me".
   return { pendingReminderDays: Math.min(Math.floor(days), 90) };
+}
+
+/**
+ * Normalises stored communication settings.
+ *
+ * Clamped on WRITE as well as on read, so a value edited straight into the JSONB
+ * cannot make the product message a candidate a fortnight early. An unrecognised
+ * channel is dropped rather than passed through: a stored "sms" would make the
+ * dispatcher skip a channel it cannot send on and report nothing useful.
+ */
+export function normalizeCommunicationSettings(value: unknown): CommunicationSettings {
+  const raw = (value ?? {}) as Record<string, unknown>;
+
+  const hours = raw.interviewReminderHours;
+  const interviewReminderHours =
+    typeof hours === "number" && Number.isFinite(hours) && hours >= 0
+      ? // 168 hours — a week. A "reminder" further out than that is an
+        // announcement, and the interview will very likely have moved.
+        Math.min(Math.floor(hours), 168)
+      : DEFAULT_COMMUNICATION_SETTINGS.interviewReminderHours;
+
+  const channels = Array.isArray(raw.interviewReminderChannels)
+    ? raw.interviewReminderChannels.filter(
+        (channel): channel is "email" | "whatsapp" =>
+          channel === "email" || channel === "whatsapp"
+      )
+    : DEFAULT_COMMUNICATION_SETTINGS.interviewReminderChannels;
+
+  return {
+    interviewReminderHours,
+    // Deduplicated: ["email","email"] would make the dispatcher send twice.
+    interviewReminderChannels: [...new Set(channels)],
+  };
 }
 
 export function normalizeRetentionSettings(value: unknown): RetentionSettings {
@@ -298,6 +380,10 @@ export function parseSettingsPayload(value: unknown): ParseResult {
 
   if ("onboarding_settings" in raw) {
     updates.onboarding_settings = normalizeOnboardingSettings(raw.onboarding_settings);
+  }
+
+  if ("communication_settings" in raw) {
+    updates.communication_settings = normalizeCommunicationSettings(raw.communication_settings);
   }
 
   if ("retention_settings" in raw) {

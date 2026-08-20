@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { hasRole, requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
+import { dispatch } from "@/lib/automations/engine";
 import { notify } from "@/lib/notifications/notify";
 import {
   createSignedDocumentUrl,
@@ -234,6 +235,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         },
         linkPath: `/hires/${record.id}#document-${id}`,
       });
+    }
+
+    /**
+     * MODULE 13 — the `onboarding_document_uploaded` trigger.
+     *
+     * Dispatched for EVERY upload, not only candidate-owned ones. The
+     * notification above is deliberately narrower (a recruiter filing their own
+     * offer letter does not need telling), but a rule is written by an admin who
+     * chose its conditions, and silently withholding events from it would make the
+     * trigger mean something different from its name.
+     *
+     * Wrapped and awaited for the usual reason: a failing rule must never cost
+     * somebody the document they just uploaded.
+     */
+    try {
+      await dispatch({
+        organizationId: membership.organization.id,
+        organizationName: membership.organization.name,
+        applicationId,
+        trigger: "onboarding_document_uploaded",
+        triggeredBy: actor.id,
+        webhookUrl: `${request.nextUrl.origin}/api/webhooks/bolna`,
+      });
+    } catch (automationError) {
+      console.error("[onboarding] automations after document upload failed:", automationError);
     }
 
     return NextResponse.json({ data });

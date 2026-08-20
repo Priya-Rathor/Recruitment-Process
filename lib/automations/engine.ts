@@ -50,7 +50,6 @@ import {
   ACTION_LABELS,
   CONSEQUENTIAL_ACTIONS,
   approvalIsMandatory,
-  countChargeable,
   describeRule,
   normalizeConditions,
   requiredIntegrationsFor,
@@ -67,12 +66,15 @@ import { getStatus as getEmailStatus } from "@/lib/integrations/email";
 import { getStatus as getCalendarStatus } from "@/lib/integrations/calendar";
 import { getStatus as getLlmStatus } from "@/lib/integrations/llm";
 import { getStatus as getN8nStatus, triggerWorkflow } from "@/lib/integrations/n8n";
+import { getStatus as getWhatsAppStatus } from "@/lib/integrations/whatsapp";
 import { startScreeningCall } from "@/lib/screening/queries";
 import { calculateAndStoreMatch } from "@/lib/matching/queries";
 import { generateReportForApplication } from "@/lib/screening/reportQueries";
 import { canTransition, isApplicationStage, STAGE_LABELS, type ApplicationStage } from "@/lib/applications/stages";
 import { logActivity } from "@/lib/activity/log";
 import { notify, notifyMany } from "@/lib/notifications/notify";
+import { sendTemplatedMessage } from "@/lib/communications/triggers";
+import { isCommunicationEvent } from "@/lib/communications/events";
 import { findOwnersAndAdmins } from "@/lib/notifications/queries";
 import { startOfDayInZone, resolveTimeZone } from "@/lib/time";
 import { formatDbError } from "@/lib/supabase/errors";
@@ -181,7 +183,7 @@ export async function buildContext({
   const { data, error } = await client
     .from("applications")
     .select(
-      "id, stage, match_score, job_id, source, assigned_recruiter_id, created_at, " +
+      "id, stage, match_score, job_id, candidate_id, source, assigned_recruiter_id, created_at, " +
         "candidate:candidates(phone, email), job:jobs(id, status)"
     )
     .eq("id", applicationId)
@@ -194,6 +196,7 @@ export async function buildContext({
     stage: string;
     match_score: number | null;
     job_id: string | null;
+    candidate_id: string | null;
     source: string | null;
     assigned_recruiter_id: string | null;
     created_at: string | null;
@@ -206,6 +209,11 @@ export async function buildContext({
   const { data: stageRow } = await client
     .from("application_stage_history")
     .select("entered_at")
+    // organization_id is filtered explicitly even though application_id already
+    // pins the row. This function now runs under the SERVICE-ROLE client for
+    // webhook and scheduled triggers, and that client bypasses RLS — so the
+    // standing rule applies: every query made with it names its tenant.
+    .eq("organization_id", organizationId)
     .eq("application_id", applicationId)
     .is("exited_at", null)
     .order("entered_at", { ascending: false })
@@ -227,6 +235,7 @@ export async function buildContext({
     const { count, error: questionError } = await client
       .from("job_screening_questions")
       .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
       .eq("job_id", application.job_id);
     // A failed count stays null — "we couldn't tell", not "there are none".
     if (!questionError) jobHasScreeningQuestions = (count ?? 0) > 0;
@@ -260,23 +269,13 @@ export async function buildContext({
   // question count: "we could not tell" is not "they have no resume", and a rule
   // gating an email on having one must not fire on a database hiccup.
   let candidateHasResume: boolean | null = null;
-  {
-    const { data: appRow } = await client
-      .from("applications")
-      .select("candidate_id")
-      .eq("id", applicationId)
+  if (application.candidate_id) {
+    const { count, error: resumeError } = await client
+      .from("resumes")
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .maybeSingle();
-
-    const candidateId = (appRow as { candidate_id: string } | null)?.candidate_id ?? null;
-    if (candidateId) {
-      const { count, error: resumeError } = await client
-        .from("resumes")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("candidate_id", candidateId);
-      if (!resumeError) candidateHasResume = (count ?? 0) > 0;
-    }
+      .eq("candidate_id", application.candidate_id);
+    if (!resumeError) candidateHasResume = (count ?? 0) > 0;
   }
 
   // The most recent evaluation's outcome. Ordered by when the thing HAPPENED,
@@ -365,6 +364,14 @@ const HEALTH_CHECKS: Record<
   },
   llm: { read: getLlmStatus, label: "the AI provider", why: "this rule can't run AI actions" },
   n8n: { read: getN8nStatus, label: "n8n", why: "this rule can't reach the workflow engine" },
+  // MODULE 15's channel. Only ever REQUIRED by a "Send templated message" action
+  // whose template is WhatsApp-only — a `both` template requires neither channel,
+  // because either one delivering is enough. See requiredIntegrationsFor().
+  whatsapp: {
+    read: getWhatsAppStatus,
+    label: "WhatsApp",
+    why: "this rule can't send the WhatsApp message it's configured to send",
+  },
 };
 
 export async function checkIntegrations({
@@ -409,10 +416,12 @@ export async function checkIntegrations({
  */
 async function countRunsToday({
   client,
+  organizationId,
   automationId,
   timeZone,
 }: {
   client: EngineClient;
+  organizationId: string;
   automationId: string;
   timeZone: string;
 }): Promise<number | null> {
@@ -421,6 +430,9 @@ async function countRunsToday({
   const { count, error } = await client
     .from("automation_runs")
     .select("id", { count: "exact", head: true })
+    // Explicit tenant filter, for the service-role client's sake — see the note
+    // in buildContext. automation_id alone would be correct but not compliant.
+    .eq("organization_id", organizationId)
     .eq("automation_id", automationId)
     .gte("started_at", since);
 
@@ -825,6 +837,75 @@ async function executeAction(input: ExecuteActionInput): Promise<ActionResult> {
           action: action.type,
           status: "success",
           detail: "Stage update emailed to the candidate.",
+        };
+      }
+
+      /**
+       * MODULE 15 — "Send templated message".
+       *
+       * The organization's OWN template library, not a template that lives in
+       * this codebase. Which is the whole point of the action: `send_candidate_email`
+       * can only ever send the one stage-update wording we wrote, and the spec
+       * asks for an org to be able to combine message-sending with other actions
+       * on any trigger it likes, using words it approved.
+       *
+       * Everything about the send itself — opt-out enforcement, the unsubscribe
+       * footer, the log row, one-per-application dedupe, email and WhatsApp being
+       * independent — belongs to lib/communications/send.ts and happens the same
+       * way it does for a built-in trigger. Nothing about messaging is
+       * reimplemented here.
+       *
+       * WHY A SKIP RATHER THAN A FAILURE IN MOST CASES. A deactivated template, a
+       * candidate who opted out, an unconnected WhatsApp: none of these is a
+       * broken rule, and marking them failed would pause a working automation
+       * (`paused_reason`) over an organization's own settings.
+       */
+      case "send_templated_message": {
+        const templateId = action.config?.template_id;
+        if (typeof templateId !== "string") {
+          return {
+            action: action.type,
+            status: "failed",
+            detail: "No message template is configured on this action.",
+          };
+        }
+
+        const eventKey = isCommunicationEvent(action.config?.event_key)
+          ? action.config.event_key
+          : null;
+
+        const result = await sendTemplatedMessage({
+          client,
+          organizationId,
+          applicationId,
+          templateId,
+          eventKey,
+        });
+
+        if (result.status === "sent") {
+          const channels = result.outcomes
+            .filter((outcome) => outcome.delivered)
+            .map((outcome) => (outcome.channel === "email" ? "email" : "WhatsApp"));
+
+          return {
+            action: action.type,
+            status: "success",
+            detail: `"${result.templateName ?? "Message"}" sent by ${channels.join(" and ")}.`,
+          };
+        }
+
+        if (result.status === "failed") {
+          return {
+            action: action.type,
+            status: "failed",
+            detail: result.detail ?? "The message could not be sent.",
+          };
+        }
+
+        return {
+          action: action.type,
+          status: "skipped",
+          detail: result.detail ?? "Nothing was sent.",
         };
       }
 
@@ -1297,6 +1378,7 @@ async function runOne({
   if (automation.daily_run_cap !== null && automation.daily_run_cap > 0) {
     const runsToday = await countRunsToday({
       client,
+      organizationId: input.organizationId,
       automationId: automation.id,
       timeZone,
     });

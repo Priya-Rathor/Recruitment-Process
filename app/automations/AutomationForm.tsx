@@ -19,6 +19,7 @@ import {
   TRIGGER_MODES,
   TRIGGER_SOURCES,
   approvalIsMandatory,
+  approvalIsRecommended,
   checkExecutable,
   describeRule,
   isScheduledTrigger,
@@ -32,6 +33,8 @@ import {
   type TriggerType,
 } from "@/lib/automations/catalog";
 import { APPLICATION_STAGES, STAGE_LABELS } from "@/lib/applications/stages";
+import { CHANNEL_LABELS, type MessageTemplate } from "@/lib/communications/templates";
+import { COMMUNICATION_EVENT_DEFINITIONS } from "@/lib/communications/events";
 
 export type AutomationFormValues = {
   id?: string;
@@ -88,18 +91,34 @@ function needsValue(operator: Operator) {
  *     the rule is written instead of buried in settings. Approval is FORCED for a
  *     candidate email and the checkbox says so rather than silently ignoring a
  *     click.
+ *
+ * AND ONE THING MODULE 15 ADDED: "Send templated message", which sends the
+ * organization's OWN wording from its own library rather than the single built-in
+ * stage-update email. Approval defaults ON for it but is not forced, because the
+ * words were already written and deliberately activated by an Owner or Admin — see
+ * APPROVAL_RECOMMENDED_ACTIONS in the catalogue.
  */
 export function AutomationForm({
   mode,
   initial,
   canUseAi,
   teamMembers = [],
+  messageTemplates = [],
 }: {
   mode: "create" | "edit";
   initial?: AutomationFormValues;
   canUseAi: boolean;
   /** For "assign a specific recruiter". Empty is handled, not assumed away. */
   teamMembers?: TeamMember[];
+  /**
+   * MODULE 15's library, for "Send templated message".
+   *
+   * Every template, active or not. An admin building a rule around a template they
+   * are about to switch on should not have to switch it on first — and the engine
+   * refuses to SEND from an inactive one, so offering it here cannot leak a message.
+   * The empty case is handled with a real message rather than an empty select.
+   */
+  messageTemplates?: MessageTemplate[];
 }) {
   const router = useRouter();
   const [values, setValues] = useState<AutomationFormValues>(initial ?? NEW_AUTOMATION);
@@ -627,12 +646,23 @@ export function AutomationForm({
                             ? { strategy: "job_owner" }
                             : type === "send_candidate_email"
                               ? { template: "candidate_stage_update" }
-                              : {},
+                              : type === "send_templated_message"
+                                ? // Pre-selects the first template, so a freshly
+                                  // picked action is not immediately invalid. The
+                                  // event_key and channels ride along because the
+                                  // activation check reads them — the API
+                                  // re-derives both from the template it verifies.
+                                  templateConfig(messageTemplates[0])
+                                : {},
                       };
                       update({
                         actions: next,
                         requires_approval:
-                          values.requires_approval || approvalIsMandatory(next),
+                          values.requires_approval ||
+                          approvalIsMandatory(next) ||
+                          // Defaults on for a templated message, and can be
+                          // switched back off — unlike the built-in candidate email.
+                          approvalIsRecommended(next),
                       });
                     }}
                   >
@@ -708,6 +738,36 @@ export function AutomationForm({
                   </>
                 )}
 
+                {action.type === "send_templated_message" && (
+                  messageTemplates.length === 0 ? (
+                    <span style={{ fontSize: 12, color: "var(--color-error)" }}>
+                      You have no message templates yet.
+                    </span>
+                  ) : (
+                    <div className="select is-small">
+                      <select
+                        value={String(action.config?.template_id ?? "")}
+                        onChange={(event) => {
+                          const next = [...values.actions];
+                          const chosen = messageTemplates.find(
+                            (template) => template.id === event.target.value
+                          );
+                          next[index] = { ...action, config: templateConfig(chosen) };
+                          update({ actions: next });
+                        }}
+                      >
+                        <option value="">Choose a template</option>
+                        {messageTemplates.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.name} · {CHANNEL_LABELS[template.channel]}
+                            {template.active ? "" : " (off)"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                )}
+
                 {action.type === "call_n8n_webhook" && (
                   <input
                     className="input is-small"
@@ -771,6 +831,17 @@ export function AutomationForm({
                   Sends one approved template — a stage update with no free text. Always needs
                   approval first.
                 </p>
+              )}
+
+              {action.type === "send_templated_message" && (
+                <SendTemplatedMessageNote
+                  templateId={
+                    typeof action.config?.template_id === "string"
+                      ? action.config.template_id
+                      : null
+                  }
+                  templates={messageTemplates}
+                />
               )}
 
               {action.type === "call_n8n_webhook" && (
@@ -907,6 +978,90 @@ export function AutomationForm({
           ? "Saving creates a draft. Nothing runs until you activate it on the next screen."
           : "Editing what an active rule does sends it back to draft, so somebody re-approves it before it acts again."}
       </p>
+    </div>
+  );
+}
+
+/**
+ * The config a "Send templated message" action stores.
+ *
+ * event_key and channels are COPIES of the template's own values, kept on the
+ * action so requiredIntegrationsFor() and the activation check stay pure functions
+ * — three UI paths call them, and making them asynchronous would push a database
+ * read into each. The API re-derives both from the template it has verified, so a
+ * client that sent something else cannot change what runs.
+ *
+ * A stale copy — somebody edits the template's channel afterwards — can only make
+ * the activation check more permissive than needed. It cannot make the SEND wrong:
+ * the engine reads the live template every time it runs.
+ */
+function templateConfig(template?: MessageTemplate): Record<string, unknown> {
+  if (!template) return {};
+
+  return {
+    template_id: template.id,
+    event_key: template.event_key,
+    channels: template.channel === "both" ? ["email", "whatsapp"] : [template.channel],
+  };
+}
+
+/**
+ * What this action will actually do, said beside it.
+ *
+ * The two facts an admin needs and would otherwise have to go and check: whether
+ * the chosen template is switched on, and that switching it on ALSO makes it send
+ * from its own built-in event trigger. Somebody who wires a rejection template into
+ * a rule and activates it can otherwise be surprised that stage moves send it too.
+ */
+function SendTemplatedMessageNote({
+  templateId,
+  templates,
+}: {
+  templateId: string | null;
+  templates: MessageTemplate[];
+}) {
+  const template = templates.find((candidate) => candidate.id === templateId);
+
+  if (templates.length === 0) {
+    return (
+      <p className="has-text-secondary mt-1" style={{ fontSize: 12 }}>
+        Write one under Settings → Message templates first. This action sends your own wording, not
+        a message built into the product.
+      </p>
+    );
+  }
+
+  if (!template) {
+    return (
+      <p className="has-text-secondary mt-1" style={{ fontSize: 12 }}>
+        Choose which of your templates this sends.
+      </p>
+    );
+  }
+
+  const eventLabel = COMMUNICATION_EVENT_DEFINITIONS[template.event_key];
+
+  return (
+    <div className="mt-1" style={{ fontSize: 12 }}>
+      <p className="has-text-secondary">
+        Sends your own {CHANNEL_LABELS[template.channel].toLowerCase()} wording. Opt-outs are
+        respected, the unsubscribe line is added automatically, and every send is recorded in the
+        candidate&apos;s communication log.
+      </p>
+
+      {!template.active ? (
+        // A rule pointing at a switched-off template is a rule that will skip
+        // every time. Said here rather than discovered in the run history.
+        <p style={{ color: "var(--status-attention-text)" }}>
+          “{template.name}” is switched off, so this action will skip until somebody activates it.
+        </p>
+      ) : eventLabel.firesWhen ? (
+        <p className="has-text-secondary">
+          Note that “{template.name}” is also active for {eventLabel.label.toLowerCase()}, so it
+          already sends {eventLabel.firesWhen}. A candidate is only ever sent it once per
+          application.
+        </p>
+      ) : null}
     </div>
   );
 }

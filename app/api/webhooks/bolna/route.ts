@@ -181,6 +181,61 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  /**
+   * MODULE 13 — the `screening_call_completed` trigger, finally wired.
+   *
+   * This trigger was refused at activation until now, and the reason was
+   * structural rather than a missing line here: the engine used the session-bound
+   * client for every query, and this handler has no session, so every rule would
+   * have been denied by RLS. A rule would have looked active and quietly never
+   * fired, and an admin would have believed their candidates were being followed
+   * up.
+   *
+   * The engine now takes its client as a parameter, so dispatching in 'service'
+   * mode works. What it still cannot do here is the Module 7-9 actions — those
+   * build their own session clients inside those modules — and `ACTION_MODES`
+   * records exactly that, so a rule pairing this trigger with them is refused at
+   * activation with the reason stated. Honest at the boundary rather than broken
+   * at run time.
+   *
+   * ONLY on a genuinely completed call. A cancelled one means the candidate
+   * declined and asked for a person; running automation over that would be the
+   * product ignoring what they said.
+   *
+   * Wrapped and awaited, like every other dispatch site: awaited because a
+   * serverless function can be frozen the moment it responds, which would leave a
+   * run claimed and unfinished; caught because a failing rule must not turn a
+   * recorded transcript into a 500 that makes Bolna retry the whole callback.
+   */
+  if (status === "completed" && assignment) {
+    try {
+      const { dispatch } = await import("@/lib/automations/engine");
+
+      // The organization's name for the engine's own use. From OUR row, like
+      // everything else in this handler — never from the payload.
+      const { data: organizationRow } = await admin
+        .from("organizations")
+        .select("name")
+        .eq("id", call.organization_id)
+        .maybeSingle();
+
+      await dispatch({
+        organizationId: call.organization_id,
+        organizationName: (organizationRow as { name: string } | null)?.name ?? "",
+        applicationId: call.application_id,
+        trigger: "screening_call_completed",
+        // Null, for the same reason logActivity above passes actorId: null. A
+        // provider callback is not a person, and naming the recruiter who started
+        // the call as the cause of its automated follow-up is a false record.
+        triggeredBy: null,
+        webhookUrl: "",
+        mode: "service",
+      });
+    } catch (automationError) {
+      console.error("[bolna webhook] automations after call completion failed:", automationError);
+    }
+  }
+
   return NextResponse.json({ received: true, matched: true });
 }
 

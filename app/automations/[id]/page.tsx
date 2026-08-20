@@ -21,6 +21,7 @@ import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
 import { RunStatusBadge, StatusBadge } from "../AutomationBadges";
 import { ActivationPanel } from "./ActivationPanel";
 import { AutomationForm } from "../AutomationForm";
+import { listMessageTemplates } from "@/lib/communications/queries";
 import { Zap } from "lucide-react";
 
 export const metadata = { title: "Automation" };
@@ -143,7 +144,13 @@ export default async function AutomationDetailPage({
     ? await getBolnaStatus(membership.organization.id)
     : null;
 
-  const teamMembers = canEdit ? await listTeamMembers(membership.organization.id) : [];
+  // Both only feed the edit form, so neither is read for a role that cannot edit.
+  const [teamMembers, messageTemplates] = canEdit
+    ? await Promise.all([
+        listTeamMembers(membership.organization.id),
+        listMessageTemplates(membership.organization.id).then((result) => result.templates),
+      ])
+    : [[], []];
 
   return (
     <AppShell>
@@ -248,6 +255,7 @@ export default async function AutomationDetailPage({
             mode="edit"
             canUseAi
             teamMembers={teamMembers}
+            messageTemplates={messageTemplates}
             initial={{
               id: automation.id,
               name: automation.name,

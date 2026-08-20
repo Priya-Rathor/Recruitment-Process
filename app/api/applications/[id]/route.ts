@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
 import { dispatch } from "@/lib/automations/engine";
+import { trySendForEvent } from "@/lib/communications/triggers";
+import { EVENT_FOR_STAGE } from "@/lib/communications/events";
 import { logActivityBatch } from "@/lib/activity/log";
 import { notify } from "@/lib/notifications/notify";
 import { APPLICATION_COLUMNS, getApplicationDetail } from "@/lib/applications/queries";
@@ -226,6 +228,40 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         },
         linkPath: `/applications/${id}`,
       });
+    }
+
+    /**
+     * MODULE 15 — the candidate-facing message for this stage.
+     *
+     * BEFORE the automation dispatch, and that ordering is deliberate. A rule can
+     * move the application on again (Shortlisted → AI Screening Call), and if the
+     * automation ran first the candidate would be told about the stage they ended
+     * up in and never about the one a person actually moved them to. Sending first
+     * means the message matches the action the recruiter took.
+     *
+     * Only on a real CHANGE, so re-saving the same stage sends nothing — the
+     * once-per-application guard in the send pipeline would catch it anyway, but
+     * not asking is cheaper than being refused.
+     *
+     * EVENT_FOR_STAGE has no entry for phone or video interview: those messages
+     * state a time, and a stage move has none. They fire from the scheduling
+     * action instead, where a time exists.
+     *
+     * Awaited and wrapped: a message that cannot be sent must never fail the stage
+     * change, which is the same rule the automation dispatch below follows.
+     */
+    if (updates.stage && updates.stage !== current.stage) {
+      const eventKey = EVENT_FOR_STAGE[updates.stage as ApplicationStage];
+
+      if (eventKey) {
+        await trySendForEvent({
+          organizationId: membership.organization.id,
+          applicationId: id,
+          eventKey,
+          // For the unsubscribe link in the footer.
+          origin: request.nextUrl.origin,
+        });
+      }
     }
 
     // Module 13. Fires only on a real stage CHANGE, so re-saving the same stage

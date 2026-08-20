@@ -7,22 +7,20 @@
 // only the block below the editor differs, because only the stage-specific
 // extras differ. Four near-identical modals would have drifted within a month.
 //
+// THE PROMPT EDITOR NOW LIVES IN components/PlaceholderEditor.tsx. It was
+// extracted, unchanged in behaviour, when Module 15's message templates needed
+// the same picker, the same caret handling and the same preview — for the same
+// reason the four stages share one modal.
+//
 // CANCEL SEMANTICS ARE THE SUBTLE PART. The spec: cancelling a FIRST-TIME
 // enable reverts the toggle to off, but cancelling a later edit leaves the
 // stage enabled. So this component reports what happened (`saved` vs
 // `cancelled`) and the parent decides — the modal does not own the toggle.
 // =============================================================================
 
-import { useRef, useState } from "react";
-import { Eye, Plus, RotateCcw, Search, X } from "lucide-react";
-import {
-  GROUP_LABELS,
-  PLACEHOLDER_FIELDS,
-  insertToken,
-  renderPreview,
-  splitTokens,
-  type PlaceholderGroup,
-} from "@/lib/hiring-stages/placeholders";
+import { useState } from "react";
+import { RotateCcw, X } from "lucide-react";
+import { PlaceholderEditor } from "@/components/PlaceholderEditor";
 import {
   MAX_CALL_ATTEMPTS,
   MAX_DURATION_MINUTES,
@@ -77,44 +75,6 @@ export function StageConfigModal({
   const [prompt, setPrompt] = useState(draft.promptTemplate);
   const [config, setConfig] = useState<StageConfig>(draft.config);
   const [questions, setQuestions] = useState<string[]>(draft.screeningQuestions);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerQuery, setPickerQuery] = useState("");
-  const [previewing, setPreviewing] = useState(false);
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Which fields the script references — the "chip list" the spec asks for when
-  // a plain <textarea> is used instead of a rich editor. Recomputed on render
-  // rather than stored, so it can never disagree with the text above it.
-  const { known, unknown } = splitTokens(prompt);
-
-  /** Inserts at the caret and puts the caret back after the token. */
-  function insert(token: string) {
-    const el = textareaRef.current;
-    const start = el?.selectionStart ?? prompt.length;
-    const end = el?.selectionEnd ?? prompt.length;
-
-    const { text, caret } = insertToken({ text: prompt, token, selectionStart: start, selectionEnd: end });
-    setPrompt(text);
-    setPickerOpen(false);
-    setPickerQuery("");
-
-    // After React repaints, or the caret lands wherever the browser left it.
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(caret, caret);
-    });
-  }
-
-  const filtered = PLACEHOLDER_FIELDS.filter((field) => {
-    const q = pickerQuery.trim().toLowerCase();
-    if (!q) return true;
-    return field.label.toLowerCase().includes(q) || field.token.includes(q);
-  });
-
-  const grouped = (["job", "candidate"] as PlaceholderGroup[])
-    .map((group) => ({ group, fields: filtered.filter((f) => f.group === group) }))
-    .filter((entry) => entry.fields.length > 0);
 
   function patchConfig(changes: Partial<Record<string, unknown>>) {
     setConfig((current) => ({ ...current, ...changes }) as StageConfig);
@@ -169,124 +129,16 @@ export function StageConfigModal({
           )}
 
           {/* ---- The script ------------------------------------------------ */}
-          <div className="stage-field">
-            <div className="stage-field__head">
-              <label className="label" htmlFor="stage-prompt">
-                {isScoring ? "Scoring guidance" : "Script / instructions for this stage"}
-              </label>
+          <PlaceholderEditor
+            id="stage-prompt"
+            label={isScoring ? "Scoring guidance" : "Script / instructions for this stage"}
+            help="Write what should happen during this stage. Insert live job or candidate details using the field picker — they'll be replaced with real values when this runs."
+            value={prompt}
+            onChange={setPrompt}
+            readOnly={readOnly}
+            placeholder="e.g. Confirm {{candidate.name}} is still interested in {{job.title}}…"
+          />
 
-              <div className="stage-picker">
-                <button
-                  type="button"
-                  className="button is-small"
-                  onClick={() => setPickerOpen((open) => !open)}
-                  aria-expanded={pickerOpen}
-                  disabled={readOnly}
-                >
-                  <Plus size={14} aria-hidden="true" />
-                  Insert field
-                </button>
-
-                {pickerOpen && (
-                  <div className="stage-picker__menu">
-                    <div className="stage-picker__search">
-                      <Search size={14} aria-hidden="true" />
-                      <input
-                        className="input"
-                        type="search"
-                        placeholder="Search fields"
-                        value={pickerQuery}
-                        onChange={(event) => setPickerQuery(event.target.value)}
-                      />
-                    </div>
-
-                    <div className="stage-picker__list">
-                      {grouped.map(({ group, fields }) => (
-                        <div key={group}>
-                          <p className="stage-picker__group">{GROUP_LABELS[group]}</p>
-                          {fields.map((field) => (
-                            <button
-                              key={field.token}
-                              type="button"
-                              className="stage-picker__item"
-                              onClick={() => insert(field.token)}
-                            >
-                              <span className="stage-picker__label">{field.label}</span>
-                              <code className="stage-picker__token">{`{{${field.token}}}`}</code>
-                            </button>
-                          ))}
-                        </div>
-                      ))}
-                      {grouped.length === 0 && (
-                        <p className="stage-picker__empty">No field matches that.</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <p className="stage-field__help">
-              Write what should happen during this stage. Insert live job or candidate details
-              using the field picker — they&apos;ll be replaced with real values when this runs.
-            </p>
-
-            <textarea
-              id="stage-prompt"
-              ref={textareaRef}
-              className="textarea stage-textarea"
-              rows={10}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              readOnly={readOnly}
-              placeholder="e.g. Confirm {{candidate.name}} is still interested in {{job.title}}…"
-            />
-
-            {/*
-              The chip list. A plain <textarea> cannot render a highlighted
-              token inline — it holds text, not markup — so this is the spec's
-              stated fallback: show which fields the script references.
-            */}
-            <div className="stage-chips">
-              <span className="stage-chips__label">Fields used in this script:</span>
-              {known.length === 0 && <span className="stage-chips__none">none yet</span>}
-              {known.map((field) => (
-                <span key={field.token} className="stage-chip">
-                  {field.label}
-                </span>
-              ))}
-            </div>
-
-            {/*
-              An unknown token does NOT block saving — refusing someone's work
-              over a typo is worse than showing them the typo. But it is said
-              out loud, because the alternative is an agent reading
-              "{{candidate.naem}}" to a candidate.
-            */}
-            {unknown.length > 0 && (
-              <p className="stage-warning">
-                {unknown.length === 1 ? "This field isn't recognised" : "These fields aren't recognised"}
-                {" and will be left as written: "}
-                {unknown.map((token) => `{{${token}}}`).join(", ")}
-              </p>
-            )}
-
-            <button
-              type="button"
-              className="text-link mt-3"
-              onClick={() => setPreviewing((value) => !value)}
-            >
-              <Eye size={14} aria-hidden="true" />
-              {previewing ? "Hide preview" : "Preview with sample data"}
-            </button>
-
-            {previewing && (
-              <div className="stage-preview">
-                <p className="stage-preview__label">Preview — sample values, not real candidates</p>
-                <pre className="stage-preview__body">{renderPreview(prompt) || "Nothing to preview yet."}</pre>
-              </div>
-            )}
-          </div>
 
           {/* ---- Stage-specific extras ------------------------------------- */}
           <div className="stage-extras">

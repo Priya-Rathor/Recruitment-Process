@@ -12,6 +12,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { hasRole, requireCurrentUser, requireMembership, requireRole } from "@/lib/tenant";
+import { dispatch } from "@/lib/automations/engine";
 import { logActivity } from "@/lib/activity/log";
 import { getOnboardingDetail } from "@/lib/onboarding/queries";
 import { blockerSummary, completionCheck, isOnboardingStatus } from "@/lib/onboarding/documents";
@@ -159,6 +160,30 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           : {}),
       },
     });
+
+    /**
+     * MODULE 13 — the `onboarding_completed` trigger.
+     *
+     * Only on the transition INTO completed, and only when it is a real change.
+     * Re-saving a completed record must not fire again — the dedupe key would
+     * usually catch that, but the key is built from the application's STAGE
+     * entry, and a hire sits in Hired throughout onboarding. So the guard has to
+     * be here: this is the one trigger whose occasion is not a stage change.
+     */
+    if (updates.status === "completed" && detail.status !== "completed") {
+      try {
+        await dispatch({
+          organizationId: membership.organization.id,
+          organizationName: membership.organization.name,
+          applicationId: detail.application_id,
+          trigger: "onboarding_completed",
+          triggeredBy: actor.id,
+          webhookUrl: `${request.nextUrl.origin}/api/webhooks/bolna`,
+        });
+      } catch (automationError) {
+        console.error("[onboarding] automations after completion failed:", automationError);
+      }
+    }
 
     return NextResponse.json({ data });
   } catch (error) {

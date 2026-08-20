@@ -465,6 +465,78 @@ export const EVENT_CATALOGUE = {
   },
 
   // ---------------------------------------------------------------------------
+  // Module 15 — candidate communication.
+  //
+  // A message to a candidate is filed against the APPLICATION, so it lands on the
+  // timeline a recruiter is already reading rather than in a separate place they
+  // have to remember to check. The Communications section shows the same events in
+  // full; this is the one-line audit record beside the stage change that caused it.
+  //
+  // NEVER THE MESSAGE BODY. The full resolved text lives in message_log, which has
+  // its own append-only policy; copying it here would put candidate-facing prose
+  // into a table whose whole purpose is that it is read broadly.
+  // ---------------------------------------------------------------------------
+  "message.sent": {
+    entity: "application",
+    label: "Message sent to candidate",
+    describe: (m) => {
+      const channel = text(m.channel) === "whatsapp" ? "WhatsApp" : "email";
+      const template = text(m.template);
+      const status = text(m.status, "sent");
+
+      // "Not sent" is the more important half of this event: it is how a team
+      // discovers that the candidate never heard, and why.
+      if (status !== "sent") {
+        return template
+          ? `"${template}" was not sent by ${channel}: ${text(m.detail, "no reason recorded")}`
+          : `A ${channel} message was not sent: ${text(m.detail, "no reason recorded")}`;
+      }
+
+      return template ? `Sent "${template}" by ${channel}` : `Sent a ${channel} message`;
+    },
+  },
+  "message_template.created": {
+    entity: "message_template",
+    label: "Message template created",
+    describe: (m) => `Created the message template ${text(m.name, "")}`.trim(),
+  },
+  "message_template.updated": {
+    entity: "message_template",
+    label: "Message template changed",
+    describe: (m) => {
+      const name = text(m.name, "a message template");
+      // Activation is called out separately from an edit: switching a template on
+      // is the moment it starts messaging candidates by itself, which is a
+      // different kind of change from fixing a typo in it.
+      if (m.active === true) return `Activated "${name}" — it now sends automatically`;
+      if (m.active === false) return `Deactivated "${name}" — it no longer sends automatically`;
+
+      const fields = Array.isArray(m.fields) ? (m.fields as string[]) : [];
+      return fields.length > 0
+        ? `Edited "${name}" (${fields.join(", ")})`
+        : `Edited "${name}"`;
+    },
+  },
+  "message_template.deleted": {
+    entity: "message_template",
+    label: "Message template deleted",
+    describe: (m) => `Deleted the message template ${text(m.name, "")}`.trim(),
+  },
+  "candidate.communication_preference_changed": {
+    entity: "candidate",
+    label: "Candidate contact preference changed",
+    describe: (m) => {
+      const channels = Array.isArray(m.opted_out_of) ? (m.opted_out_of as string[]) : [];
+      const label = (channel: string) => (channel === "whatsapp" ? "WhatsApp" : "email");
+
+      if (channels.length === 0) return "Cleared this candidate's opt-outs";
+
+      const source = text(m.source) === "candidate" ? "The candidate opted out of" : "Recorded an opt-out from";
+      return `${source} ${channels.map(label).join(" and ")}`;
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // Module 16 — analytics.
   //
   // Sensitive: an export takes organizational data out of the product in a form

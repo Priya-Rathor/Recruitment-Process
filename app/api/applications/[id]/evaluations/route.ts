@@ -7,7 +7,9 @@ import { parseEvaluationPayload } from "@/lib/applications/evaluationValidation"
 import { effectiveStages, acceptsEntries } from "@/lib/applications/effectiveStages";
 import { flagsFromRows } from "@/lib/applications/effectiveStages";
 import { listJobStages } from "@/lib/hiring-stages/queries";
-import { countByStage } from "@/lib/applications/evaluations";
+import { countByStage, evaluationsComplete } from "@/lib/applications/evaluations";
+import { dispatch } from "@/lib/automations/engine";
+import { CONFIGURABLE_STAGES, type ApplicationStage, type ConfigurableStage } from "@/lib/applications/stages";
 import { logActivity } from "@/lib/activity/log";
 import { formatDbError } from "@/lib/supabase/errors";
 
@@ -103,6 +105,58 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         scored: parsed.data.score !== null,
       },
     });
+
+    /**
+     * MODULE 13 — the `evaluations_complete` trigger.
+     *
+     * Fires only on the entry that COMPLETES the set. Recruitee's guidance is the
+     * reason this trigger exists at all: without it a candidate sits still between
+     * the last interviewer submitting feedback and somebody noticing that they
+     * did.
+     *
+     * The entries are re-read rather than derived from `existing` plus this one,
+     * because `existing` was loaded before the insert and another interviewer may
+     * have logged theirs in between. Advancing a candidate on a stale read of who
+     * has and has not decided is precisely the mistake to avoid.
+     *
+     * Wrapped and awaited, like every dispatch site: awaited because a serverless
+     * function can be frozen the moment it responds, which would leave a run
+     * claimed and unfinished; caught because a failing rule must never lose an
+     * interviewer's written-up feedback.
+     */
+    try {
+      const [entriesNow, stagesNow] = await Promise.all([
+        listEvaluationEntries({
+          organizationId: membership.organization.id,
+          applicationId: id,
+        }),
+        listJobStages({ organizationId: membership.organization.id, jobId: app.job_id }),
+      ]);
+
+      const flags = flagsFromRows(stagesNow);
+      const enabledStages = CONFIGURABLE_STAGES.filter(
+        (stage): stage is ConfigurableStage => flags[stage] === true
+      );
+
+      const verdict = evaluationsComplete({
+        entries: entriesNow,
+        enabledStages,
+        currentStage: app.stage as ApplicationStage,
+      });
+
+      if (verdict.complete) {
+        await dispatch({
+          organizationId: membership.organization.id,
+          organizationName: membership.organization.name,
+          applicationId: id,
+          trigger: "evaluations_complete",
+          triggeredBy: user.id,
+          webhookUrl: `${request.nextUrl.origin}/api/webhooks/bolna`,
+        });
+      }
+    } catch (automationError) {
+      console.error("[api] automations after evaluation log failed:", automationError);
+    }
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {

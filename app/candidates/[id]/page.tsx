@@ -15,8 +15,14 @@ import { listResumeHistory } from "@/lib/resumes/history";
 import { ResumesCard } from "./ResumesCard";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/types";
 import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
+import { StatusChip } from "@/components/ui/StatusChip";
 import { CandidateForm } from "../CandidateForm";
 import { ArchiveCandidateButton } from "./CandidateActions";
+import { CommunicationCard } from "./CommunicationCard";
+import {
+  getCommunicationPreferences,
+  listCandidateMessages,
+} from "@/lib/communications/queries";
 
 export const metadata = { title: "Candidate" };
 export const dynamic = "force-dynamic";
@@ -52,8 +58,19 @@ async function CandidateDetailContent({
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
 
-  const [duplicates, { applications }, pendingReviews, resumes, historyCards, parsedResume] =
-    await Promise.all([
+  const [
+    duplicates,
+    { applications },
+    pendingReviews,
+    resumes,
+    historyCards,
+    parsedResume,
+    // Module 15. The log is keyed on candidate_id rather than assembled from this
+    // person's application ids, so an archived or deleted application cannot take
+    // the record of what we told them with it.
+    { messages, failed: messagesFailed },
+    communicationPreferences,
+  ] = await Promise.all([
     getCandidateDuplicates({ organizationId: membership.organization.id, candidateId }),
     listApplications({
       organizationId: membership.organization.id,
@@ -79,6 +96,8 @@ async function CandidateDetailContent({
       viewerId: membership.user_id,
     }),
     getLatestParsedResume({ organizationId: membership.organization.id, candidateId }),
+    listCandidateMessages({ organizationId: membership.organization.id, candidateId }),
+    getCommunicationPreferences({ organizationId: membership.organization.id, candidateId }),
   ]);
 
   const pendingSummary = pendingReviewSummary(pendingReviews);
@@ -117,6 +136,18 @@ async function CandidateDetailContent({
               <span className="tag is-light" style={{ fontSize: 12 }}>
                 Archived
               </span>
+            )}
+            {/*
+              The opt-out chips, up here beside the name as well as on the
+              Communications card below. The spec asks for them "so recruiters see
+              it before attempting a manual send" — and somebody who opens this page
+              to find a phone number never scrolls as far as the card.
+            */}
+            {communicationPreferences.email_opted_out && (
+              <StatusChip tone="warning" label="Email opted out" />
+            )}
+            {communicationPreferences.whatsapp_opted_out && (
+              <StatusChip tone="warning" label="WhatsApp opted out" />
             )}
           </div>
         </div>
@@ -310,6 +341,25 @@ async function CandidateDetailContent({
         cards={historyCards}
         resumeSummary={resumeKeyPoints(parsedResume?.parseResult.raw_json)}
         timeZone={membership.organization.timezone}
+      />
+
+      {/*
+        Communications. Below the applications list, because "which pipelines is
+        this person in" comes first — but above Resumes, because what we have
+        already said to somebody is more often what a recruiter opens this page for
+        than which version of their CV we hold.
+      */}
+      <CommunicationCard
+        candidateId={candidate.id}
+        candidateName={candidate.name}
+        preferences={communicationPreferences}
+        messages={messages}
+        messagesFailed={messagesFailed}
+        timeZone={membership.organization.timezone}
+        // Owner/Admin/Recruiter may record an opt-out — a candidate saying "stop
+        // emailing me" on a call is heard by the recruiter on that call. The API
+        // enforces it independently of this flag.
+        canManage={canEdit}
       />
 
       <ResumesCard
