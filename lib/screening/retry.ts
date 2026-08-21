@@ -44,6 +44,19 @@ export const TERMINAL_STATUSES = [
   "answered",
   "cancelled",
   "callback_requested",
+  /**
+   * Module 21. The candidate heard the disclosure and said no.
+   *
+   * THE MOST TERMINAL STATUS IN THE LIST. A callback request is a "not now"; this
+   * is a "no". Re-dialling somebody who has refused is precisely the harassment
+   * the attempt cap exists to prevent, and it would be worse than an uncapped
+   * retry of a missed call — a missed call is silence, a refusal is an answer.
+   *
+   * It sits here rather than being handled at the call site so that every path
+   * that can schedule a call inherits it: the retry sweep, a Module 13
+   * automation, and any future bulk action all consult this list.
+   */
+  "consent_declined",
 ] as const;
 
 export type CallStatus = (typeof RETRYABLE_STATUSES)[number] | (typeof TERMINAL_STATUSES)[number] | "queued" | "dialing";

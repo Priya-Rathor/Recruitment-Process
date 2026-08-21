@@ -74,6 +74,16 @@ export function ScreeningForm({
             </div>
           </Field>
 
+          {/*
+            Module 21 moved recording, consent and retention to their own page.
+
+            This control is left in place and pointed at that page rather than
+            deleted: it is the setting an admin has had here since Module 8, and
+            silently removing a privacy control is a worse outcome than one extra
+            hop. The two are the same underlying decision now — the Privacy page
+            gates whether audio may be captured at all, so that is the one that
+            wins, and this stays as the per-call default beneath it.
+          */}
           <Field
             label="Record calls by default"
             hint="Recording is only ever possible after the candidate hears the consent disclosure and continues. Turning this off doesn't remove the disclosure — nothing can."
@@ -97,6 +107,11 @@ export function ScreeningForm({
               Every screening call opens by stating that it is automated and may be recorded, and
               treats the candidate continuing as consent. That disclosure has no setting and cannot
               be disabled.
+            </p>
+            <p className="mt-2" style={{ fontSize: 13 }}>
+              Recording, candidate consent, data retention, candidate data rights and who may open
+              a recording or transcript are configured under{" "}
+              <a href="/settings/privacy">Privacy &amp; consent</a>.
             </p>
           </div>
         </>

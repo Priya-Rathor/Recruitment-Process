@@ -4,6 +4,9 @@ import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/states";
 import { requireMembershipOrRedirect, requireCurrentUser, hasRole } from "@/lib/tenant";
 import { getInterview } from "@/lib/interviews/queries";
+import { listSessionsForInterview, suggestQuestionForInterview } from "@/lib/coding/queries";
+import { canStartCodingRound } from "@/lib/coding/session";
+import { buildCandidateUrl, isCodingTokenSigningConfigured } from "@/lib/coding/token";
 import {
   MODE_LABELS,
   RECOMMENDATION_LABELS,
@@ -11,6 +14,7 @@ import {
 } from "@/lib/interviews/feedback";
 import { CalendarBadge, InterviewStatusBadge, ModeBadge } from "../InterviewBadges";
 import { CancelInterview, FeedbackForm } from "./FeedbackForm";
+import { CodingRoundPanel } from "./CodingRoundPanel";
 import { MessageSquare } from "lucide-react";
 
 export const metadata = { title: "Interview" };
@@ -55,6 +59,43 @@ export default async function InterviewDetailPage({
         : null;
 
   const myFeedback = feedback.find((entry) => entry.submitted_by === user.id) ?? null;
+
+  /**
+   * Module 20's coding rounds, loaded HERE rather than fetched by the panel.
+   *
+   * The panel used to fetch on mount, which flashed an empty card on every visit
+   * to an interview that already had a round open, and went against AGENTS.md's
+   * "prefer loading data in server components" rule. The candidate URL is built
+   * only for a round that is still open — a copy-to-clipboard button holding a
+   * dead link is worse than no button.
+   */
+  const coding = await listSessionsForInterview({
+    organizationId: membership.organization.id,
+    interviewId: interview.id,
+  });
+
+  const codingSessions = await Promise.all(
+    coding.sessions.map(async (session) => ({
+      id: session.id,
+      status: session.status,
+      question_title: session.question_title,
+      created_at: session.created_at,
+      submitted_at: session.submitted_at,
+      candidate_url:
+        session.status === "created" || session.status === "in_progress"
+          ? await buildCandidateUrl({ sessionId: session.id })
+          : null,
+    }))
+  );
+
+  // The question the job's Written Assessment configuration already holds, so a
+  // recruiter is not asked to invent one they wrote down last month.
+  const codingSuggestion = await suggestQuestionForInterview({
+    organizationId: membership.organization.id,
+    interviewId: interview.id,
+  });
+
+  const startable = canStartCodingRound(interview.status);
 
   const reminder = feedbackReminderState({
     interview: {
@@ -166,6 +207,30 @@ export default async function InterviewDetailPage({
             icon={MessageSquare} />
             </div>
           )}
+
+          {/*
+            Module 20. Below the feedback form rather than above it: feedback is
+            what this page is FOR, and a coding round is one input to it. An
+            interviewer arrives here to write their assessment, not to run a
+            test they have usually already run.
+          */}
+          <CodingRoundPanel
+            interviewId={interview.id}
+            candidateName={interview.candidate_name}
+            sessions={codingSessions}
+            suggestion={codingSuggestion}
+            signingConfigured={isCodingTokenSigningConfigured()}
+            schemaOutOfDate={coding.schemaOutOfDate}
+            canStart={isStaff && startable.ok}
+            blockedReason={
+              !isStaff
+                ? "Your role can see coding rounds but not start them."
+                : !startable.ok
+                  ? startable.reason
+                  : null
+            }
+          />
+
         </div>
 
         <div className="column">

@@ -93,7 +93,7 @@ export type EvaluationEntry = {
    * offering an inline edit here would mean writing two update paths for one
    * row, and the second would drift.
    */
-  source: "screening_report" | "interview" | "manual";
+  source: "screening_report" | "interview" | "manual" | "coding";
   /** Deep link to the owning screen, for sources this panel does not edit. */
   href: string | null;
   editable: boolean;

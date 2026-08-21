@@ -45,6 +45,12 @@ const SECTIONS: SettingsSection[] = [
     roles: ["owner", "admin"],
   },
   {
+    href: "/settings/privacy",
+    label: "Privacy & consent",
+    description: "Recording, consent, retention, data rights",
+    roles: ["owner", "admin"],
+  },
+  {
     href: "/settings/pipeline",
     label: "Pipeline",
     description: "Stage SLA targets",

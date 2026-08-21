@@ -3,6 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { isApplicationStage, type ApplicationStage } from "@/lib/applications/stages";
 import { MAX_ALLOWED_ATTEMPTS, MIN_ALLOWED_DELAY_MINUTES } from "@/lib/screening/retry";
 import { formatDbError } from "@/lib/supabase/errors";
+import {
+  DEFAULT_PRIVACY_SETTINGS,
+  normalizePrivacySettings,
+  type PrivacySettings,
+} from "@/lib/privacy/settings";
 
 export type ScreeningSettings = {
   maxAttempts: number;
@@ -63,6 +68,11 @@ export type OrganizationSettings = {
   default_application_stage: ApplicationStage;
   default_interview_duration_minutes: number;
   screening_settings: ScreeningSettings;
+  /**
+   * Module 21. Normalised through lib/privacy/settings.ts, which owns the shape,
+   * the defaults and the clamps — this module only carries it.
+   */
+  privacy_settings: PrivacySettings;
   retention_settings: RetentionSettings;
   onboarding_settings: OnboardingSettings;
   communication_settings: CommunicationSettings;
@@ -119,6 +129,7 @@ export const DEFAULT_SETTINGS: Omit<OrganizationSettings, "organization_id" | "u
   default_application_stage: "applied",
   default_interview_duration_minutes: 60,
   screening_settings: DEFAULT_SCREENING_SETTINGS,
+  privacy_settings: DEFAULT_PRIVACY_SETTINGS,
   retention_settings: DEFAULT_RETENTION_SETTINGS,
   onboarding_settings: DEFAULT_ONBOARDING_SETTINGS,
   communication_settings: DEFAULT_COMMUNICATION_SETTINGS,
@@ -172,6 +183,7 @@ export async function getOrganizationSettings(
           ? row.default_interview_duration_minutes
           : 60,
       screening_settings: normalizeScreeningSettings(row.screening_settings),
+      privacy_settings: normalizePrivacySettings(row.privacy_settings),
       retention_settings: normalizeRetentionSettings(row.retention_settings),
       onboarding_settings: normalizeOnboardingSettings(row.onboarding_settings),
       communication_settings: normalizeCommunicationSettings(row.communication_settings),
@@ -320,6 +332,7 @@ export type SettingsPayload = Partial<{
   default_application_stage: string;
   default_interview_duration_minutes: number;
   screening_settings: unknown;
+  privacy_settings: unknown;
   retention_settings: unknown;
   logo_url: string | null;
   brand_color: string | null;
@@ -376,6 +389,13 @@ export function parseSettingsPayload(value: unknown): ParseResult {
   // on read — a value that never passes through the form still gets bounded.
   if ("screening_settings" in raw) {
     updates.screening_settings = normalizeScreeningSettings(raw.screening_settings);
+  }
+
+  // Normalised on write as well as on read, so a payload that bypassed the form
+  // still cannot store a state the form would refuse — including the one that
+  // matters most here, "recording off but store-audio ticked".
+  if ("privacy_settings" in raw) {
+    updates.privacy_settings = normalizePrivacySettings(raw.privacy_settings);
   }
 
   if ("onboarding_settings" in raw) {

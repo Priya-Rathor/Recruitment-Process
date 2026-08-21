@@ -1,0 +1,1160 @@
+// =============================================================================
+// Public website styles — Module 21.
+//
+// WHY THE MARKETING SITE GETS ITS OWN STYLESHEET AND ITS OWN LOOK.
+//
+// The internal app is deliberately restrained: flat white cards, a 1px border,
+// no shadows, minimal colour. That is correct for a dense data tool somebody
+// stares at for six hours — every drop shadow and gradient in a table view is
+// noise competing with the data.
+//
+// A landing page has the opposite job. It is read once, for ninety seconds, by
+// somebody who does not yet know what the product is. It needs contrast,
+// rhythm, and a reason to keep scrolling.
+//
+// So this file is a different visual register — dark sections alternating with
+// light, large display type, generous vertical space — while drawing every
+// colour from the SAME brand tokens in app/globals.scss. Nothing here invents a
+// palette. The dark sections are the brand navy that was already sampled from
+// the logo; the accent is the brand blue at the same value the app's primary
+// buttons use. A visitor who signs up should recognise the product they land in.
+//
+// EVERYTHING IS SCOPED UNDER .mkt. The internal app never loads this file, but
+// scoping means that even if a future page imports both, no rule here can
+// change a table cell or a form field in the app.
+//
+// ON THE BRAND GRADIENT. globals.scss documents that the gradient is decoration
+// only — contrast across its stops runs from about 6:1 down to under 3:1, so
+// text placed on it is readable over one end and invisible over the other, and
+// which end depends on the element's width. It is used here only as thin accent
+// rules and glows. No text sits on it anywhere.
+// =============================================================================
+
+.mkt {
+  // ---------------------------------------------------------------------------
+  // Local tokens. Derived from the brand tokens, never new colours.
+  // ---------------------------------------------------------------------------
+  --mkt-dark: var(--brand-navy);          // #010c27 — the dark section ground
+  --mkt-dark-raised: #061437;             // navy lifted ~4%, for cards on dark
+  --mkt-dark-border: rgba(255, 255, 255, 0.14);
+  --mkt-dark-border-strong: rgba(255, 255, 255, 0.26);
+  --mkt-on-dark: #ffffff;
+  --mkt-on-dark-muted: rgba(255, 255, 255, 0.66); // 9.1:1 on --mkt-dark
+  --mkt-on-dark-faint: rgba(255, 255, 255, 0.44);
+  --mkt-accent-on-dark: var(--brand-sky); // #00abf8 — 7.4:1 on the navy
+
+  // Section rhythm. One scale, so no section invents its own padding.
+  --mkt-section-y: clamp(4rem, 9vw, 7.5rem);
+  --mkt-gutter: clamp(1.25rem, 4vw, 2.5rem);
+  --mkt-max: 1180px;
+  --mkt-max-prose: 62ch;
+
+  // Display type. Fluid, so the hero never needs a mobile override.
+  --mkt-h1: clamp(2.25rem, 6.2vw, 4.25rem);
+  --mkt-h2: clamp(1.75rem, 4vw, 2.875rem);
+  --mkt-h3: clamp(1.25rem, 2.2vw, 1.75rem);
+  --mkt-lead: clamp(1.0625rem, 1.5vw, 1.25rem);
+
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-card);
+
+  // Long marketing headings need tighter tracking than app titles.
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.022em;
+    line-height: 1.06;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Layout primitives
+  // ---------------------------------------------------------------------------
+  .mkt-shell {
+    width: 100%;
+    max-width: var(--mkt-max);
+    margin-inline: auto;
+    padding-inline: var(--mkt-gutter);
+  }
+
+  .mkt-section {
+    padding-block: var(--mkt-section-y);
+  }
+
+  // The alternating ground. Sarvam's page reads as a rhythm rather than one long
+  // scroll because the background flips; this is that, in brand navy.
+  .mkt-section--dark {
+    background: var(--mkt-dark);
+    color: var(--mkt-on-dark);
+
+    h1,
+    h2,
+    h3 {
+      color: var(--mkt-on-dark);
+    }
+  }
+
+  .mkt-section--tint {
+    background: var(--color-background);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Eyebrow / pill labels — the small caps label above a heading.
+  // ---------------------------------------------------------------------------
+  .mkt-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    margin-bottom: var(--space-4);
+
+    // The 6px dot before the label. Decorative, so it is a pseudo-element and
+    // never reaches a screen reader.
+    &::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex: none;
+    }
+  }
+
+  .mkt-section--dark .mkt-eyebrow {
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .mkt-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.875rem;
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: 999px;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark-muted);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section heading block
+  // ---------------------------------------------------------------------------
+  .mkt-head {
+    max-width: 46rem;
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+
+    h2 {
+      font-size: var(--mkt-h2);
+    }
+  }
+
+  .mkt-lead {
+    font-size: var(--mkt-lead);
+    line-height: 1.55;
+    color: var(--color-text-secondary);
+    max-width: var(--mkt-max-prose);
+    margin-top: var(--space-4);
+  }
+
+  .mkt-section--dark .mkt-lead {
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Buttons. Same geometry as the app's controls so the brand holds, one size
+  // larger because a landing CTA is the page's primary target.
+  // ---------------------------------------------------------------------------
+  .mkt-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 3rem;
+    padding-inline: 1.5rem;
+    border-radius: var(--control-radius);
+    border: 1px solid transparent;
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast),
+      color var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .mkt-btn--primary {
+    background: var(--color-primary);
+    color: #fff;
+
+    &:hover {
+      background: var(--color-primary-hover);
+      color: #fff;
+    }
+  }
+
+  // On the dark hero a white button outreads a blue one, and it keeps the blue
+  // exclusively for the primary action further down the page.
+  .mkt-btn--invert {
+    background: #fff;
+    color: var(--brand-navy);
+
+    &:hover {
+      background: #e9eefc;
+      color: var(--brand-navy);
+    }
+  }
+
+  .mkt-btn--ghost-dark {
+    background: transparent;
+    border-color: var(--mkt-dark-border-strong);
+    color: var(--mkt-on-dark);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.4);
+      color: var(--mkt-on-dark);
+    }
+  }
+
+  .mkt-btn--ghost {
+    background: transparent;
+    border-color: var(--color-border);
+    color: var(--color-text);
+
+    &:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Brand lockup for dark surfaces. See MarketingWordmark.tsx for why the app's
+  // raster logo cannot be used here. --mkt-mark-size is set per instance.
+  // ---------------------------------------------------------------------------
+  .mkt-wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .mkt-wordmark__plate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    // Derived from the mark's own size so the badge stays proportional at any
+    // height the header or footer asks for.
+    border-radius: calc(var(--mkt-mark-size, 30px) * 0.28);
+    padding: calc(var(--mkt-mark-size, 30px) * 0.14);
+  }
+
+  .mkt-wordmark__text {
+    font-family: var(--font-heading);
+    font-size: calc(var(--mkt-mark-size, 30px) * 0.58);
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.02em;
+    color: var(--mkt-on-dark);
+    white-space: nowrap;
+  }
+
+  // The qualifier in the name. At full white it competes with the nav beside
+  // it; at this tone it is 9.1:1 on the navy — muted, not faint.
+  .mkt-wordmark__qualifier {
+    color: var(--mkt-on-dark-muted);
+    font-weight: var(--weight-medium);
+  }
+
+  // Below 30rem the wordmark text, "Sign in" and "Get started" together are
+  // wider than the viewport, and the overflow pushes the whole page sideways —
+  // a 17px horizontal scroll on the body was exactly this. The MARK is what
+  // gets kept: it is the recognisable half of the lockup, and both calls to
+  // action stay reachable, which matters more on a phone than the name does
+  // when it is already in the page title and the footer.
+  @media (max-width: 30rem) {
+    .mkt-header .mkt-wordmark__text {
+      display: none;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Header
+  // ---------------------------------------------------------------------------
+  .mkt-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(1, 12, 39, 0.88);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--mkt-dark-border);
+  }
+
+  .mkt-header__inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    height: 4.25rem;
+  }
+
+  .mkt-header__nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    margin-left: auto;
+
+    a {
+      color: var(--mkt-on-dark-muted);
+      text-decoration: none;
+      font-size: var(--text-body);
+      font-weight: var(--weight-medium);
+      transition: color var(--transition-fast);
+
+      &:hover {
+        color: var(--mkt-on-dark);
+      }
+    }
+  }
+
+  .mkt-header__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  // The nav collapses to the actions only. A hamburger holding four anchor
+  // links would be a disclosure widget wrapping a list of four words — the
+  // links are cheap to drop on a phone, and the two CTAs are what matter.
+  @media (max-width: 60rem) {
+    .mkt-header__nav {
+      display: none;
+    }
+
+    .mkt-header__actions {
+      margin-left: auto;
+    }
+  }
+
+  .mkt-header__signin {
+    color: var(--mkt-on-dark);
+    text-decoration: none;
+    font-weight: var(--weight-medium);
+    padding-inline: var(--space-2);
+
+    &:hover {
+      color: var(--mkt-accent-on-dark);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hero
+  // ---------------------------------------------------------------------------
+  .mkt-hero {
+    position: relative;
+    background: var(--mkt-dark);
+    color: var(--mkt-on-dark);
+    padding-block: clamp(3.5rem, 8vw, 6.5rem) clamp(3rem, 6vw, 5rem);
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  // The brand gradient as an out-of-focus glow behind the headline. Decoration
+  // only — it sits at -1 and is blurred past legibility, and no text overlaps
+  // its bright end.
+  .mkt-hero::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: -30%;
+    left: 50%;
+    width: min(1100px, 130%);
+    aspect-ratio: 2 / 1;
+    transform: translateX(-50%);
+    background: var(--brand-gradient);
+    opacity: 0.3;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+
+  .mkt-hero__inner {
+    position: relative;
+    max-width: 54rem;
+  }
+
+  .mkt-hero h1 {
+    font-size: var(--mkt-h1);
+    color: var(--mkt-on-dark);
+  }
+
+  // Sarvam's hero splits the headline: the claim in white, the qualifier in a
+  // muted tone on its own line. It makes a long headline scan as two beats
+  // instead of one wall.
+  .mkt-hero__h1-muted {
+    display: block;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .mkt-hero__lead {
+    font-size: var(--mkt-lead);
+    line-height: 1.6;
+    color: var(--mkt-on-dark-muted);
+    max-width: 44rem;
+    margin-top: var(--space-6);
+  }
+
+  .mkt-hero__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-8);
+  }
+
+  // The four-step chip row. Arrows are pseudo-elements, and the list is a real
+  // <ol> so the order is conveyed without relying on the glyphs.
+  .mkt-steps {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-size: var(--text-body);
+      color: var(--mkt-on-dark-muted);
+    }
+
+    li + li::before {
+      content: "";
+      width: 1.25rem;
+      height: 1px;
+      background: var(--mkt-dark-border-strong);
+      flex: none;
+    }
+
+    // On a phone the four steps wrap to two lines, and the connector then
+    // renders at the START of the second line — a dash pointing at nothing,
+    // which reads as a bullet that lost its list. The rule only ever joined
+    // items sitting side by side, so once they stop doing that it goes.
+    @media (max-width: 40rem) {
+      gap: var(--space-3) var(--space-6);
+
+      li + li::before {
+        display: none;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stat band
+  // ---------------------------------------------------------------------------
+  .mkt-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1px;
+    margin-top: clamp(3rem, 6vw, 4.5rem);
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--card-radius);
+    background: var(--mkt-dark-border);
+    overflow: hidden;
+  }
+
+  .mkt-stat {
+    background: var(--mkt-dark);
+    padding: clamp(1.25rem, 3vw, 1.75rem);
+
+    dt {
+      font-family: var(--font-heading);
+      font-size: clamp(2rem, 4.5vw, 3rem);
+      font-weight: var(--weight-bold);
+      line-height: 1;
+      letter-spacing: -0.03em;
+      color: var(--mkt-accent-on-dark);
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+
+  .mkt-stat__label {
+    margin-top: var(--space-3);
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .mkt-stat__note {
+    margin-top: var(--space-2);
+    font-size: var(--text-caption);
+    line-height: 1.5;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Feature explorer — the tabbed panel that carries the six capability groups.
+  // ---------------------------------------------------------------------------
+  .mkt-tabs {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-8);
+    // A horizontal scroller on narrow screens rather than a wrap, so the tab
+    // strip stays one line and the panel below does not jump as tabs reflow.
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .mkt-tab {
+    flex: none;
+    height: 2.5rem;
+    padding-inline: 1.125rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    color: var(--color-text-secondary);
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+
+    &:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    &[aria-selected="true"] {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+    }
+  }
+
+  .mkt-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: clamp(2rem, 5vw, 4rem);
+    align-items: start;
+  }
+
+  @media (max-width: 60rem) {
+    .mkt-panel {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .mkt-panel h3 {
+    font-size: var(--mkt-h3);
+  }
+
+  .mkt-panel__body {
+    margin-top: var(--space-4);
+    font-size: var(--text-body-lg);
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+  }
+
+  .mkt-panel__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: var(--space-6);
+    color: var(--color-primary);
+    font-weight: var(--weight-semibold);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  // The three capability lines. Two-line cells by design — a label that scans
+  // and a detail that explains, which is what makes the grid readable at a
+  // glance rather than a wall of feature bullets.
+  .mkt-caps {
+    display: grid;
+    gap: 1px;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+    overflow: hidden;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .mkt-cap {
+    background: var(--color-card);
+    padding: clamp(1rem, 2.5vw, 1.375rem);
+
+    strong {
+      display: block;
+      font-size: var(--text-body);
+      font-weight: var(--weight-semibold);
+      color: var(--color-text);
+    }
+
+    span {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: var(--text-caption);
+      line-height: 1.5;
+      color: var(--color-text-secondary);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Capability card grid (the /#product overview and product page cross-links)
+  // ---------------------------------------------------------------------------
+  .mkt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    gap: var(--space-4);
+  }
+
+  .mkt-card {
+    display: flex;
+    flex-direction: column;
+    padding: var(--card-padding);
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--transition-fast), transform var(--transition-fast);
+
+    h3 {
+      font-size: 1.125rem;
+      letter-spacing: -0.01em;
+    }
+
+    p {
+      margin-top: var(--space-3);
+      font-size: var(--text-body);
+      line-height: 1.55;
+      color: var(--color-text-secondary);
+    }
+  }
+
+  a.mkt-card:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+  }
+
+  .mkt-card__more {
+    margin-top: auto;
+    padding-top: var(--space-4);
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+    color: var(--color-primary);
+  }
+
+  @media (max-width: 48rem) {
+    .mkt-card {
+      padding: var(--card-padding-mobile);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Trust section (on dark)
+  // ---------------------------------------------------------------------------
+  .mkt-trust {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+    gap: var(--space-4);
+  }
+
+  .mkt-trust__card {
+    padding: clamp(1.25rem, 3vw, 1.75rem);
+    background: var(--mkt-dark-raised);
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--card-radius);
+
+    h3 {
+      font-size: 1.125rem;
+      color: var(--mkt-on-dark);
+    }
+
+    > p {
+      margin-top: var(--space-3);
+      font-size: var(--text-body);
+      line-height: 1.6;
+      color: var(--mkt-on-dark-muted);
+    }
+
+    ul {
+      margin: var(--space-4) 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: var(--space-3);
+    }
+
+    li {
+      position: relative;
+      padding-left: 1.5rem;
+      font-size: var(--text-caption);
+      line-height: 1.55;
+      color: var(--mkt-on-dark-faint);
+    }
+
+    // A tick drawn in CSS rather than an icon font or an inline SVG per bullet.
+    li::before {
+      content: "";
+      position: absolute;
+      left: 0.125rem;
+      top: 0.3rem;
+      width: 0.5rem;
+      height: 0.3rem;
+      border-left: 1.5px solid var(--mkt-accent-on-dark);
+      border-bottom: 1.5px solid var(--mkt-accent-on-dark);
+      transform: rotate(-45deg);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Flow diagram (how-it-works)
+  // ---------------------------------------------------------------------------
+  .mkt-flow {
+    display: grid;
+    gap: 0;
+    counter-reset: flow;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .mkt-flow__item {
+    position: relative;
+    counter-increment: flow;
+    padding: var(--space-4) 0 var(--space-4) 3.25rem;
+
+    // The connecting rail. Drawn on the item so it cannot desynchronise from
+    // the number, and stopped on the last child so the line does not dangle.
+    &::before {
+      content: "";
+      position: absolute;
+      left: 1.125rem;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: var(--color-border);
+    }
+
+    &:last-child::before {
+      bottom: auto;
+      height: var(--space-6);
+    }
+
+    &::after {
+      content: counter(flow);
+      position: absolute;
+      left: 0;
+      top: var(--space-4);
+      width: 2.25rem;
+      height: 2.25rem;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--color-primary-tint);
+      border: 1px solid var(--color-border);
+      color: var(--color-primary);
+      font-size: var(--text-caption);
+      font-weight: var(--weight-bold);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .mkt-flow__stage {
+    font-size: var(--text-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+  }
+
+  .mkt-flow__detail {
+    margin-top: 0.25rem;
+    font-size: var(--text-body);
+    line-height: 1.55;
+    color: var(--color-text-secondary);
+  }
+
+  // ---------------------------------------------------------------------------
+  // FAQ. Native <details>, so it is keyboard accessible and open-by-URL
+  // without a line of JavaScript.
+  // ---------------------------------------------------------------------------
+  .mkt-faq {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 52rem;
+  }
+
+  .mkt-faq__item {
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+    background: var(--color-card);
+    overflow: hidden;
+
+    &[open] {
+      border-color: var(--color-primary-muted, var(--color-primary));
+    }
+  }
+
+  .mkt-faq__q {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-6);
+    cursor: pointer;
+    font-family: var(--font-heading);
+    font-size: 1.0625rem;
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    // A plus that becomes a minus. Two bars, one rotated away when open.
+    &::after {
+      content: "";
+      margin-left: auto;
+      flex: none;
+      width: 0.875rem;
+      height: 0.875rem;
+      background: currentColor;
+      color: var(--color-text-secondary);
+      clip-path: polygon(
+        43% 0,
+        57% 0,
+        57% 43%,
+        100% 43%,
+        100% 57%,
+        57% 57%,
+        57% 100%,
+        43% 100%,
+        43% 57%,
+        0 57%,
+        0 43%,
+        43% 43%
+      );
+      transition: transform var(--transition-base);
+    }
+  }
+
+  .mkt-faq__item[open] .mkt-faq__q::after {
+    transform: rotate(45deg);
+  }
+
+  .mkt-faq__a {
+    padding: 0 var(--space-6) var(--space-6);
+    font-size: var(--text-body);
+    line-height: 1.65;
+    color: var(--color-text-secondary);
+    max-width: var(--mkt-max-prose);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Closing CTA
+  // ---------------------------------------------------------------------------
+  .mkt-cta {
+    text-align: center;
+    max-width: 40rem;
+    margin-inline: auto;
+
+    h2 {
+      font-size: var(--mkt-h2);
+    }
+
+    .mkt-lead {
+      margin-inline: auto;
+    }
+
+    .mkt-hero__ctas {
+      justify-content: center;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Footer
+  // ---------------------------------------------------------------------------
+  .mkt-footer {
+    background: var(--mkt-dark);
+    color: var(--mkt-on-dark-muted);
+    border-top: 1px solid var(--mkt-dark-border);
+    padding-block: clamp(3rem, 6vw, 4.5rem) var(--space-8);
+  }
+
+  .mkt-footer__top {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) repeat(auto-fit, minmax(9rem, 1fr));
+    gap: var(--space-8);
+  }
+
+  @media (max-width: 48rem) {
+    .mkt-footer__top {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .mkt-footer__tagline {
+    margin-top: var(--space-4);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    color: var(--mkt-on-dark-faint);
+    max-width: 22rem;
+  }
+
+  .mkt-footer__col {
+    h3 {
+      font-family: var(--font-body);
+      font-size: var(--text-caption);
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--mkt-on-dark-faint);
+    }
+
+    ul {
+      margin: var(--space-4) 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: var(--space-3);
+    }
+
+    a {
+      color: var(--mkt-on-dark-muted);
+      text-decoration: none;
+      font-size: var(--text-body);
+
+      &:hover {
+        color: var(--mkt-on-dark);
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .mkt-footer__bottom {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: center;
+    justify-content: space-between;
+    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--mkt-dark-border);
+    font-size: var(--text-caption);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Product page specifics
+  // ---------------------------------------------------------------------------
+  .mkt-crumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-caption);
+    color: var(--mkt-on-dark-faint);
+    margin-bottom: var(--space-6);
+
+    a {
+      color: var(--mkt-on-dark-muted);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--mkt-on-dark);
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .mkt-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: var(--space-4);
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  .mkt-meta__item {
+    padding: var(--space-4);
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--card-radius);
+    background: rgba(255, 255, 255, 0.03);
+
+    dt {
+      font-size: var(--text-caption);
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--mkt-accent-on-dark);
+    }
+
+    dd {
+      margin: var(--space-2) 0 0;
+      font-size: var(--text-body);
+      line-height: 1.55;
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  .mkt-modules {
+    display: grid;
+    gap: var(--space-4);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .mkt-module {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: var(--space-4) var(--space-6);
+    padding-block: var(--space-6);
+    border-top: 1px solid var(--color-border);
+
+    strong {
+      font-family: var(--font-heading);
+      font-size: 1.0625rem;
+      font-weight: var(--weight-semibold);
+      color: var(--color-text);
+    }
+
+    span {
+      font-size: var(--text-body);
+      line-height: 1.6;
+      color: var(--color-text-secondary);
+    }
+  }
+
+  @media (max-width: 48rem) {
+    .mkt-module {
+      grid-template-columns: 1fr;
+      gap: var(--space-2);
+    }
+  }
+
+  // The AI boundary block. Two columns that read as a contract: what the
+  // machine offers, what the human owns.
+  .mkt-boundary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 1px;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+    overflow: hidden;
+  }
+
+  .mkt-boundary__half {
+    background: var(--color-card);
+    padding: clamp(1.25rem, 3vw, 1.75rem);
+
+    h3 {
+      font-family: var(--font-body);
+      font-size: var(--text-caption);
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-secondary);
+    }
+
+    p {
+      margin-top: var(--space-3);
+      font-size: var(--text-body-lg);
+      line-height: 1.55;
+      color: var(--color-text);
+    }
+  }
+
+  .mkt-boundary__half--human {
+    background: var(--color-primary-tint);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Role flow cards (how-it-works)
+  // ---------------------------------------------------------------------------
+  .mkt-role {
+    padding: var(--card-padding);
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+
+    h3 {
+      font-size: 1.125rem;
+    }
+
+    > p {
+      margin-top: var(--space-2);
+      font-size: var(--text-body);
+      color: var(--color-text-secondary);
+    }
+
+    ol {
+      margin: var(--space-4) 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: var(--space-2);
+      counter-reset: role;
+    }
+
+    li {
+      counter-increment: role;
+      display: flex;
+      gap: var(--space-3);
+      align-items: baseline;
+      font-size: var(--text-body);
+      color: var(--color-text);
+
+      &::before {
+        content: counter(role);
+        flex: none;
+        width: 1.25rem;
+        font-size: var(--text-caption);
+        font-weight: var(--weight-bold);
+        color: var(--color-primary);
+        font-variant-numeric: tabular-nums;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // A visitor who has asked for less motion gets none of the transitions above.
+  // ---------------------------------------------------------------------------
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+
+    a.mkt-card:hover {
+      transform: none;
+    }
+  }
+}

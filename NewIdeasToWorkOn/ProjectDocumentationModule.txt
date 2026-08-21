@@ -1,0 +1,1162 @@
+I want to create a new **Project Documentation Module** inside my existing application.
+
+The purpose of this module is to provide a complete, easy-to-understand guide to the entire application.
+
+A new developer, client, tester, admin, or team member should be able to open this Documentation Module and understand:
+
+* What the project does.
+* How to access and sign in to the system.
+* What every module does.
+* How modules are connected.
+* How data flows through the system.
+* How candidates move through the recruitment process.
+* How Job Applications work.
+* How Forms work.
+* How Interviews work.
+* How Google Meet or meeting integrations work.
+* How the Live Coding feature works.
+* How candidate information is stored.
+* How APIs and backend processes work.
+* How database entities are connected.
+* How external services such as Google Cloud are used.
+* How to manually test each module.
+
+The Documentation Module should be designed as an **interactive, professional, easy-to-navigate documentation center**.
+
+IMPORTANT:
+
+Before implementing anything, analyze the existing project architecture and all existing modules.
+
+Do not guess.
+
+Do not create documentation for functionality that does not actually exist.
+
+First inspect the codebase and identify all real modules, integrations, routes, APIs, database entities, authentication flows, and external services.
+
+Do not modify unrelated functionality.
+
+---
+
+# PHASE 1 — ANALYZE THE COMPLETE PROJECT
+
+Analyze the complete codebase and identify all major modules.
+
+Possible modules may include:
+
+* Authentication
+* User Management
+* Candidate Management
+* Candidate Profile
+* Job Openings
+* Job Applications
+* Dynamic Forms
+* Public Application Forms
+* Resume Upload
+* Resume Parsing
+* Interview Management
+* Interview Scheduling
+* Google Meet Integration
+* Live Coding Interview
+* Coding Assessment
+* Communication
+* Email
+* WhatsApp
+* Notifications
+* Dashboard
+* Reports
+* Settings
+* File Management
+* API Integrations
+* Google Cloud Services
+* Database
+* Authentication and Authorization
+
+IMPORTANT:
+
+Do not assume all these modules exist.
+
+Only include modules that are actually present in the project.
+
+After analyzing the project, create a complete module map.
+
+Example:
+
+PROJECT
+│
+├── Authentication
+│
+├── Dashboard
+│
+├── Candidates
+│   ├── Candidate List
+│   ├── Candidate Profile
+│   ├── Resume
+│   ├── Applications
+│   ├── Forms
+│   └── Interviews
+│
+├── Jobs
+│   ├── Job Creation
+│   ├── Job Details
+│   └── Applications
+│
+├── Forms
+│   ├── Form Builder
+│   ├── Form Assignment
+│   └── Form Responses
+│
+├── Interviews
+│   ├── Interview Scheduling
+│   ├── Meeting Integration
+│   ├── Coding Round
+│   └── Interview Results
+│
+└── System
+├── APIs
+├── Database
+├── Cloud Services
+└── External Integrations
+
+Adapt this structure based on the actual project.
+
+---
+
+# PHASE 2 — CREATE A DOCUMENTATION CENTER UI
+
+Create a new Documentation Module inside the application.
+
+The UI should feel similar to a modern documentation platform.
+
+The layout should include:
+
+---
+
+TOP NAVIGATION
+
+[ Project Logo ]    Documentation
+
+[ Search Documentation ]
+
+[ Project Overview ]
+
+---
+
+LEFT SIDEBAR
+
+📖 Getting Started
+
+🔐 Authentication
+
+👥 Candidates
+
+💼 Job Openings
+
+📝 Job Applications
+
+📋 Forms
+
+🎯 Interviews
+
+💻 Live Coding
+
+🔗 Integrations
+
+☁️ Cloud Services
+
+🗄️ Database
+
+🔌 APIs
+
+🧪 Testing Guide
+
+🐛 Known Issues
+
+🚀 Future Improvements
+
+---
+
+MAIN CONTENT AREA
+
+Selected documentation content appears here.
+
+---
+
+RIGHT SIDEBAR
+
+On This Page
+
+* Overview
+* User Flow
+* UI Components
+* Technical Flow
+* API Flow
+* Database
+* Testing
+* Related Modules
+
+---
+
+Do not blindly copy this exact UI.
+
+Adapt it to the existing application's design system.
+
+Reuse:
+
+* Existing sidebar components.
+* Existing navigation.
+* Existing typography.
+* Existing cards.
+* Existing colors.
+* Existing buttons.
+* Existing responsive behavior.
+
+The Documentation Module should look like part of the existing product.
+
+---
+
+# FEATURE 1 — PROJECT OVERVIEW
+
+Create a Project Overview page.
+
+It should explain:
+
+## What Is This Project?
+
+Explain the project in simple language.
+
+## Main Purpose
+
+Explain what problem the application solves.
+
+## Main Users
+
+For example, based on the actual project:
+
+* Admin
+* Recruiter
+* Interviewer
+* Candidate
+* Client
+
+Only include actual roles found in the project.
+
+## Technology Overview
+
+Show the technologies actually used.
+
+Example:
+
+Frontend
+↓
+React / Next.js / other actual framework
+
+Backend
+↓
+Actual backend technology
+
+Database
+↓
+Actual database
+
+Cloud
+↓
+Actual cloud services
+
+Integrations
+↓
+Actual external services
+
+Do not guess technologies.
+
+Read the actual project configuration and dependencies.
+
+---
+
+# FEATURE 2 — GETTING STARTED
+
+Create a section called:
+
+Getting Started
+
+Document:
+
+## How to Access the Application
+
+Explain:
+
+1. Open the application.
+2. Navigate to the login page.
+3. Enter credentials.
+4. Authenticate.
+5. Access the dashboard.
+
+Use the actual application flow.
+
+## Sign In Flow
+
+Create a visual flow:
+
+USER
+↓
+Login Screen
+↓
+Enter Credentials
+↓
+Frontend Validation
+↓
+Authentication API
+↓
+Backend Validation
+↓
+User Authentication
+↓
+Session / Token Created
+↓
+Role Verification
+↓
+Dashboard
+
+Explain each step.
+
+Also document:
+
+* Login.
+* Logout.
+* Session persistence.
+* Protected routes.
+* Unauthorized access.
+* Password reset, if available.
+
+---
+
+# FEATURE 3 — DOCUMENT EVERY MODULE
+
+For EVERY actual module in the project, create documentation using the same common structure.
+
+Each module should contain:
+
+# Module Name
+
+## 1. Overview
+
+Explain in simple language:
+
+* What this module does.
+* Why it exists.
+* Who uses it.
+* Which problem it solves.
+
+## 2. Main UI
+
+Show and explain the main UI components.
+
+Create a section such as:
+
+| UI Component | Purpose | User Action | Expected Result |
+| ------------ | ------- | ----------- | --------------- |
+
+Examples:
+
+* Search bar
+* Add button
+* Table
+* Filters
+* Cards
+* Forms
+* Tabs
+* Modal
+* Save button
+* Submit button
+
+Only document components that actually exist.
+
+## 3. Complete User Flow
+
+Explain the module step-by-step.
+
+Example:
+
+User opens Candidate page
+↓
+Candidate list loads
+↓
+User searches for a candidate
+↓
+User opens candidate profile
+↓
+User views resume and history
+↓
+User performs an action
+
+Use the actual implementation.
+
+## 4. Technical Flow
+
+Explain:
+
+USER ACTION
+↓
+FRONTEND
+↓
+API
+↓
+BACKEND
+↓
+DATABASE / EXTERNAL SERVICE
+↓
+RESPONSE
+↓
+UI UPDATE
+
+This should help both technical and non-technical users understand the system.
+
+## 5. API Flow
+
+Document APIs involved in that module.
+
+For each API:
+
+* API name
+* Method
+* Endpoint
+* Purpose
+* Request
+* Response
+* Authentication
+* Error cases
+
+## 6. Database Flow
+
+Explain:
+
+* Which database tables/collections/entities are involved.
+* What information is stored.
+* Relationships.
+* Create flow.
+* Update flow.
+* Read flow.
+
+## 7. Related Modules
+
+Example:
+
+Candidate Module
+
+Related to:
+
+* Job Applications
+* Forms
+* Interviews
+* Resume Management
+
+Create clickable links between related documentation pages where appropriate.
+
+## 8. Manual Testing
+
+For every module, create test cases.
+
+Example:
+
+### TC-CANDIDATE-001
+
+Feature:
+Create Candidate
+
+Steps:
+
+1. Open Candidates.
+2. Click Add Candidate.
+3. Fill valid information.
+4. Click Save.
+
+Expected Result:
+
+A new candidate should be created and displayed in the candidate list.
+
+Include:
+
+* Positive cases.
+* Negative cases.
+* Edge cases.
+* UI testing.
+* Error handling.
+* Permission testing.
+
+---
+
+# FEATURE 4 — INTERACTIVE SYSTEM FLOW
+
+Create a visual System Flow page.
+
+This should show how major modules connect.
+
+Example:
+
+PUBLIC JOB APPLICATION
+│
+▼
+CANDIDATE SUBMITS PROFILE
+│
+▼
+RESUME UPLOAD
+│
+▼
+CANDIDATE CREATED / MATCHED
+│
+▼
+JOB APPLICATION CREATED
+│
+▼
+RECRUITER REVIEWS
+│
+▼
+SHORTLIST
+│
+├───────────────┐
+▼               ▼
+ASSIGN FORM      SCHEDULE INTERVIEW
+│               │
+▼               ▼
+CANDIDATE FILLS     GOOGLE MEET
+FORM                │
+│                 ▼
+└──────────► CODING ROUND
+│
+▼
+SUBMISSION SAVED
+│
+▼
+CANDIDATE PROFILE
+
+Create an interactive version appropriate for the existing frontend stack.
+
+The user should be able to:
+
+* Click a module.
+* View details.
+* Navigate to module documentation.
+* Understand dependencies.
+
+Do not introduce unnecessary heavy dependencies.
+
+---
+
+# FEATURE 5 — GOOGLE MEET AND EXTERNAL INTEGRATIONS
+
+Create a separate section:
+
+# Integrations
+
+Document every actual external integration.
+
+For example, if Google Meet is actually integrated:
+
+## Google Meet Integration
+
+Explain:
+
+1. Why Google Meet is used.
+2. How the meeting is created or connected.
+3. Which module starts the meeting.
+4. Where the meeting link is stored.
+5. How the candidate receives the link.
+6. How the interview is connected to the meeting.
+
+Create a flow:
+
+INTERVIEW CREATED
+↓
+MEETING LINK GENERATED OR ATTACHED
+↓
+MEETING INFORMATION SAVED
+↓
+INTERVIEWER OPENS MEETING
+↓
+CANDIDATE JOINS
+↓
+INTERVIEW IN PROGRESS
+
+Only document actual functionality.
+
+If the project only stores a Google Meet link and does not directly integrate with Google APIs, clearly say so.
+
+Do not falsely describe a Google Meet API integration.
+
+---
+
+# FEATURE 6 — GOOGLE CLOUD / CLOUD SERVICES DOCUMENTATION
+
+Inspect the project for actual cloud services.
+
+For every cloud service found, create documentation.
+
+For example, if Google Cloud is used:
+
+# Google Cloud
+
+## Service Name
+
+Example categories:
+
+* Cloud Storage
+* Cloud Run
+* Cloud Functions
+* Cloud SQL
+* Firebase
+* Authentication
+* Secret Manager
+* Other actual services
+
+For each service explain:
+
+### Purpose
+
+Why the service is used.
+
+### Where It Is Used
+
+Which module uses it.
+
+### Data Flow
+
+APPLICATION
+↓
+BACKEND
+↓
+GOOGLE CLOUD SERVICE
+↓
+RESPONSE
+↓
+APPLICATION
+
+### Configuration
+
+Explain the relevant configuration conceptually.
+
+Do NOT expose:
+
+* API keys.
+* Secrets.
+* Passwords.
+* Private credentials.
+
+### Dependencies
+
+Explain which project modules depend on this service.
+
+If Google Cloud is not actually used, do not create fake documentation for it.
+
+Instead document the actual cloud provider or hosting architecture used.
+
+---
+
+# FEATURE 7 — CANDIDATE JOURNEY
+
+Create a special page:
+
+# Complete Candidate Journey
+
+This should explain the complete lifecycle of a candidate.
+
+Example:
+
+CANDIDATE DISCOVERS JOB
+↓
+OPENS APPLICATION FORM
+↓
+FILLS PROFILE
+↓
+UPLOADS RESUME
+↓
+SUBMITS APPLICATION
+↓
+CANDIDATE PROFILE CREATED
+↓
+APPLICATION REVIEW
+↓
+SHORTLISTED
+↓
+CONTACTED
+↓
+PRE-INTERVIEW FORM
+↓
+INTERVIEW SCHEDULED
+↓
+GOOGLE MEET
+↓
+CODING ROUND
+↓
+INTERVIEW RESULT
+↓
+FINAL STATUS
+
+Adapt this to the actual project.
+
+This page should be understandable to non-technical stakeholders.
+
+---
+
+# FEATURE 8 — API DOCUMENTATION
+
+Create a central API Documentation page.
+
+Group APIs by module.
+
+Example:
+
+Candidates
+
+* GET Candidates
+* GET Candidate Details
+* Create Candidate
+* Update Candidate
+* Delete Candidate
+
+Jobs
+
+* Create Job
+* Get Jobs
+* Update Job
+
+Interviews
+
+* Create Interview
+* Update Interview Status
+
+Forms
+
+* Create Form
+* Assign Form
+* Submit Form
+
+Only document APIs that actually exist.
+
+Each API page should show:
+
+* Method.
+* Endpoint.
+* Description.
+* Authentication.
+* Request parameters.
+* Request body.
+* Success response.
+* Error responses.
+* Related frontend page.
+
+---
+
+# FEATURE 9 — DATABASE DOCUMENTATION
+
+Create a Database section.
+
+Document the actual entities/tables/collections.
+
+For every entity explain:
+
+* Name.
+* Purpose.
+* Important fields.
+* Relationships.
+* Which module uses it.
+
+Create a relationship flow.
+
+Example:
+
+USER
+│
+├── CANDIDATES
+│
+│   ├── APPLICATIONS
+│   │       │
+│   │       └── JOBS
+│   │
+│   ├── FORMS
+│   │
+│   └── INTERVIEWS
+│           │
+│           └── CODING SESSIONS
+
+Adapt this to the actual database.
+
+Do not expose sensitive data.
+
+---
+
+# FEATURE 10 — SEARCH DOCUMENTATION
+
+Add documentation search.
+
+Users should be able to search for:
+
+* Module names.
+* Features.
+* APIs.
+* Database entities.
+* Error messages.
+* Test cases.
+* Integrations.
+
+Example:
+
+Search:
+
+"How does candidate application work?"
+
+The search should return relevant documentation sections.
+
+Reuse existing search infrastructure if available.
+
+Do not build an unnecessary complex search engine for the first version.
+
+---
+
+# FEATURE 11 — MODULE STATUS
+
+Each documentation module should show a clear status.
+
+For example:
+
+IMPLEMENTED
+
+IN PROGRESS
+
+PLANNED
+
+DEPRECATED
+
+Example:
+
+Live Coding
+
+Status: IN PROGRESS
+
+Description:
+
+The coding environment allows candidates to participate in a technical coding round.
+
+Current Features:
+
+* Create coding session.
+* Generate QR code.
+* Candidate access.
+* Code editor.
+* Save submission.
+
+Planned:
+
+* Code execution.
+* AI evaluation.
+* Automated scoring.
+
+This allows team members to understand what is already implemented and what is planned.
+
+---
+
+# FEATURE 12 — KNOWN ISSUES AND IMPROVEMENTS
+
+Create a central section:
+
+Known Issues
+
+Each issue should include:
+
+* Module.
+* Description.
+* Impact.
+* Current status.
+* Recommended solution.
+
+Also create:
+
+Future Improvements
+
+For example:
+
+Module:
+Live Coding
+
+Current State:
+Code can be submitted.
+
+Future Improvement:
+Add automatic test case evaluation.
+
+Priority:
+High
+
+Do not automatically modify application code from these recommendations.
+
+---
+
+# FEATURE 13 — MANUAL TESTING CENTER
+
+Create a Testing section.
+
+Users should be able to select a module:
+
+[ Authentication ]
+
+[ Candidates ]
+
+[ Jobs ]
+
+[ Applications ]
+
+[ Forms ]
+
+[ Interviews ]
+
+[ Live Coding ]
+
+Then see test cases.
+
+Each test case should contain:
+
+Test Case ID
+
+Module
+
+Feature
+
+Preconditions
+
+Steps
+
+Expected Result
+
+Actual Result
+
+Status
+
+Priority
+
+Example:
+
+TC-AUTH-001
+
+Login with valid credentials.
+
+Precondition:
+
+A valid user account exists.
+
+Steps:
+
+1. Open Login.
+2. Enter valid email.
+3. Enter valid password.
+4. Click Login.
+
+Expected Result:
+
+User is authenticated and redirected correctly.
+
+Allow the UI to clearly show:
+
+* Not Tested
+* Passed
+* Failed
+* Blocked
+
+IMPORTANT:
+
+Do not create a complex QA management system unless that is required.
+
+Initially, this can be a documentation/testing guide interface.
+
+---
+
+# FEATURE 14 — COMMON DOCUMENTATION FORMAT
+
+Every module documentation page must follow the same structure:
+
+1. Overview
+2. Purpose
+3. Users and Permissions
+4. Main UI
+5. User Flow
+6. Technical Flow
+7. API Flow
+8. Database/Data Flow
+9. External Integrations
+10. Related Modules
+11. Manual Test Cases
+12. Edge Cases
+13. Known Issues
+14. Future Improvements
+
+This common format is extremely important.
+
+The documentation should feel consistent across the entire application.
+
+---
+
+# UI REQUIREMENTS
+
+The Documentation Module should have a professional modern UI.
+
+Priorities:
+
+* Easy navigation.
+* Clear sidebar.
+* Search.
+* Table of contents.
+* Good readability.
+* Expandable sections.
+* Code blocks for APIs.
+* Flow diagrams where useful.
+* Cards for module overview.
+* Responsive design.
+* Dark/light mode if the existing application supports it.
+
+Do not redesign the entire application.
+
+Only create the Documentation Module using the existing design system.
+
+---
+
+# DOCUMENTATION DATA STRATEGY
+
+Before implementing, determine the best approach for storing documentation.
+
+Possible options:
+
+1. Markdown files inside the project.
+2. Structured JSON/content files.
+3. Database-driven documentation.
+4. A combination of static documentation and dynamic project data.
+
+Choose the simplest maintainable solution that fits the existing project.
+
+For the first version, prefer a structure that developers can easily update.
+
+The documentation must not expose:
+
+* API keys.
+* Environment variables containing secrets.
+* Passwords.
+* Database credentials.
+* Private tokens.
+* Sensitive user information.
+
+---
+
+# IMPLEMENTATION PROCESS
+
+Follow this order:
+
+STEP 1
+
+Analyze the complete existing project.
+
+STEP 2
+
+Create a complete list of actual modules.
+
+STEP 3
+
+Create the documentation information architecture.
+
+STEP 4
+
+Show which files will be created or modified.
+
+STEP 5
+
+Implement the Documentation Module UI.
+
+STEP 6
+
+Create documentation for every actual existing module.
+
+STEP 7
+
+Add interactive module navigation.
+
+STEP 8
+
+Add system architecture and flow pages.
+
+STEP 9
+
+Add Google Meet/external integration documentation where applicable.
+
+STEP 10
+
+Add cloud infrastructure documentation based only on actual project configuration.
+
+STEP 11
+
+Add API and database documentation.
+
+STEP 12
+
+Add the Manual Testing Center.
+
+STEP 13
+
+Verify the UI on desktop, tablet, and mobile.
+
+STEP 14
+
+Verify that no existing application functionality is broken.
+
+---
+
+# FINAL OUTPUT
+
+After implementation, create a final documentation summary containing:
+
+## Documentation Module Created
+
+Explain what was implemented.
+
+## Documentation Pages
+
+List every page created.
+
+## Modules Documented
+
+List every actual project module.
+
+## Architecture
+
+Explain how documentation content is structured.
+
+## Files Created
+
+List new files.
+
+## Files Modified
+
+List modified files.
+
+## Manual Testing Guide
+
+Explain how someone can test the complete application.
+
+## Future Maintenance
+
+Explain how developers can add documentation for a new module.
+
+---
+
+# FINAL IMPORTANT RULES
+
+1. Analyze before implementing.
+2. Do not guess how modules work.
+3. Read the actual code.
+4. Document only real functionality.
+5. Clearly identify planned functionality separately.
+6. Do not expose secrets or credentials.
+7. Use one common documentation format for all modules.
+8. Make the documentation understandable for both technical and non-technical users.
+9. Reuse the existing application UI and architecture.
+10. Do not break existing functionality.
+11. Do not unnecessarily refactor unrelated modules.
+12. Create clear flows showing how all modules connect.
+13. Document actual Google Meet and cloud integrations accurately.
+14. Include a complete manual testing guide for every module.
+
+The final result should feel like a complete internal **Product Documentation + Technical Documentation + QA Testing Center** built directly inside the application.

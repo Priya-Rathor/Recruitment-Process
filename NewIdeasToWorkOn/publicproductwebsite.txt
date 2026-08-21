@@ -1,0 +1,708 @@
+I want to build a PUBLIC MARKETING / PRODUCT WEBSITE for my existing recruitment platform.
+
+Today the entire application is private. Every route sits behind authentication.
+There is no page a person can visit to find out what this product is, what it
+does, or how to get started.
+
+I want a public-facing website that presents the product, explains every module,
+shows how the workflows actually work, and lets a visitor make contact or
+request access — WITHOUT touching or weakening the private application.
+
+Target structure:
+
+PUBLIC WEBSITE (no login required)
+│
+├── Home / Landing
+├── Product Overview
+├── Product Pages (one per real module)
+│      ├── Jobs
+│      ├── Candidates
+│      ├── Applications
+│      ├── Resume AI Parsing
+│      ├── AI Matching
+│      ├── AI Screening Calls
+│      ├── Pipeline
+│      ├── Interviews
+│      ├── Live Coding Interviews
+│      ├── Clients
+│      ├── Automation
+│      ├── Analytics
+│      ├── Notifications & Communication
+│      └── Onboarding & Documents
+├── How It Works (end-to-end flows)
+├── Pricing (only if I confirm real pricing)
+├── Public Documentation
+├── About
+├── Contact / Get Started
+└── Legal (Privacy, Terms, DPA)
+
+PRIVATE APPLICATION (unchanged, still behind auth)
+│
+├── /dashboard
+├── /jobs
+├── /candidates
+├── /applications
+├── /pipeline
+├── /interviews
+├── /analytics
+├── /settings
+└── everything else that exists today
+
+
+====================================================
+IMPORTANT — READ BEFORE WRITING ANY CODE
+====================================================
+
+Do NOT start building pages immediately.
+
+This project already has a specification, a design system, a brand, an auth
+edge layer, and 19+ built modules. A marketing site written from imagination
+will contradict all of them.
+
+Before implementing anything, read:
+
+- AGENTS.md and CLAUDE.md (the architecture rules you must inherit)
+- README.md (the project layout table and the stack)
+- docs/00-overview.md (the product specification and end-to-end flow)
+- docs/00-build-order.md
+- every docs/modules/*.md file (the REAL feature list, per module)
+- docs/design/01-ui-audit.md (the design decisions already made)
+- app/globals.scss (the design tokens — the single source of truth for colour)
+- app/layout.tsx (fonts, metadata template, brand name, theme colour)
+- proxy.ts and lib/supabase/session.ts (how auth is enforced at the edge)
+- app/page.tsx (what the root route currently does)
+- components/ (the existing shared UI and state components)
+
+This is Next.js 16 with the App Router and the `proxy.ts` convention. It is NOT
+the Next.js version you may remember. Read the relevant guides in
+node_modules/next/dist/docs/ before writing routing, metadata, or caching code.
+
+
+====================================================
+PHASE 1 — ANALYZE THE EXISTING PROJECT
+====================================================
+
+Produce an analysis report BEFORE any implementation.
+
+The report must answer:
+
+1. What is the product actually called, and what is its positioning line?
+   (Do not invent a name. It is already defined in app/layout.tsx.)
+
+2. Which modules are genuinely BUILT and working today, versus specified in
+   docs/ but not yet implemented? List them in two separate columns.
+
+3. How is authentication enforced at the edge, and what exactly happens to an
+   anonymous request to "/" right now?
+
+4. What does app/page.tsx do today, and what breaks if a public home page
+   needs to live at "/"?
+
+5. Which routes are already public, and by what mechanism are they public?
+
+6. What design tokens, fonts, and brand assets already exist and must be reused?
+
+7. Where would a public site's data come from — is any of it dynamic, or is it
+   all static content?
+
+8. What is the safest way to add public routes to a deny-by-default auth layer
+   without accidentally exposing a private route?
+
+Do not begin implementation until this report is complete and I have seen it.
+
+
+====================================================
+PHASE 2 — THE ROUTING AND AUTH PROBLEM (SOLVE THIS FIRST)
+====================================================
+
+This is the single hardest part of the whole task. Address it explicitly before
+building any UI.
+
+Two facts about the current code make a public website impossible until they are
+handled:
+
+FACT 1 — The root route is not free.
+
+app/page.tsx currently redirects "/" straight to /dashboard. A public landing
+page wants that exact path.
+
+FACT 2 — Auth is deny-by-default at the edge.
+
+lib/supabase/session.ts holds a PUBLIC_PATHS allowlist. Anything not on that
+list redirects an anonymous visitor to /login. That default is deliberate and
+GOOD — a new module's routes are protected the moment they exist, without anyone
+remembering to protect them. Do not weaken it.
+
+So a new marketing page will 302 to /login until it is explicitly allowlisted.
+
+Decide and justify an approach. Consider at least these options:
+
+OPTION A — Route group in the same app
+
+app/
+├── (marketing)/
+│      ├── layout.tsx      ← public shell: marketing header + footer
+│      ├── page.tsx        ← "/" the landing page
+│      ├── product/...
+│      ├── how-it-works/
+│      ├── docs/
+│      └── contact/
+└── (app)/                 ← existing private routes, unchanged
+
+OPTION B — A single public prefix
+
+/site/*  or  /www/*  — one allowlist entry, zero collision with "/"
+
+OPTION C — A separate deployment entirely
+
+A standalone marketing site on the apex domain, with the product app on a
+subdomain (app.example.com).
+
+For each option, tell me:
+
+- How the allowlist entry is written, and whether it can over-match a private
+  route (e.g. does a "/product" entry accidentally free "/products"?)
+- What happens to "/" for an ANONYMOUS visitor
+- What happens to "/" for a SIGNED-IN visitor (should they see marketing, or be
+  sent to /dashboard? — this is a product decision, so ask me)
+- Whether the private app shell leaks into the public layout
+- Whether existing redirects (login's `next` param, the signed-in /login and
+  /signup bounce to /dashboard) still behave correctly
+- SEO and caching implications
+- Risk of accidentally exposing something private
+
+Recommend ONE and explain why. Then confirm with me before implementing.
+
+CRITICAL RULE for the allowlist change:
+
+The public marketing routes must be matched PRECISELY. When you add entries to
+PUBLIC_PATHS, prove — in writing, and in a unit test — that:
+
+- every intended public path is reachable while anonymous
+- NO existing private route became public as a side effect
+- a prefix entry cannot be extended into a private route by an attacker
+  appending a path segment
+
+Add a test for this. The allowlist is a security boundary now, not a
+convenience list.
+
+
+====================================================
+PHASE 3 — IDENTIFY THE REAL PRODUCTS AND MODULES
+====================================================
+
+Do not write marketing copy from guesswork.
+
+Walk docs/modules/ and the actual code, and build a table:
+
+| Module | Real capability | Built? | Public page? | Screenshot available? |
+
+Group the modules into a story a visitor can follow, rather than listing 19
+internal module numbers. Something like:
+
+SOURCE          → Jobs, Candidates, Applications, Bulk Resume Intake
+UNDERSTAND      → Resume AI Parsing, AI Matching
+SCREEN          → AI Screening Calls, Screening Reports
+DECIDE          → Pipeline, Interviews, Live Coding, Evaluations
+CLOSE           → Clients, Offers, Onboarding & Documents
+OPERATE         → Automation, Analytics, Notifications, Settings
+
+Propose your own grouping if a better one exists — but it must map to real,
+existing features.
+
+HARD RULE — NO FICTION.
+
+The website must not claim a capability the product does not have.
+
+Specifically forbidden:
+
+- Features that exist only in docs/ but are not built, described as available
+- Invented integrations
+- Invented pricing or plan tiers
+- Fake customer logos
+- Fake testimonials or quotes attributed to real-sounding people
+- Fake statistics ("cuts time-to-hire by 70%") with no source
+- Invented certifications (SOC 2, ISO 27001, HIPAA) that were never obtained
+- Fake customer counts or "trusted by N companies"
+
+If something is planned but not built, either leave it out or label it clearly
+as on the roadmap. A marketing page that overstates the product is the same
+class of error as a dashboard reporting a fake zero — it tells a human
+something untrue that they will act on.
+
+For anything you cannot verify from the codebase, ASK ME rather than filling
+the gap with a plausible-sounding claim.
+
+
+====================================================
+PHASE 4 — BUILD THE PUBLIC WEBSITE UI
+====================================================
+
+Create the public shell and the landing page.
+
+The public site is allowed to be more expressive than the internal app — the
+internal design system deliberately uses flat cards, no shadows, and restrained
+colour because it is a dense data tool used for hours a day. A landing page has
+a different job.
+
+But it must still be recognisably the SAME product:
+
+- Use the design tokens from app/globals.scss via var(--color-*). Never
+  hardcode hex values. Never introduce a second palette.
+- Use the brand assets already in public/brand/ (logo.png, logo-compact.png,
+  mark.png).
+- Use the existing typefaces from app/layout.tsx — the display face for
+  headings, the body face for text. Do not add a third font.
+- Respect the brand gradient rule already documented in globals.scss: it is
+  DECORATION ONLY. Contrast across its stops runs from roughly 6:1 down to
+  under 3:1, so no text may sit on top of it. Text goes beside it, never on it.
+
+Landing page sections:
+
+- Header with logo, primary nav, and a clear sign-in link
+- Hero: the real positioning line, one sentence of substance, primary CTA
+- The problem it solves, stated concretely
+- How the product works, in 4-6 steps
+- Module / capability overview with links to each product page
+- A section on the AI safety model (see Phase 9 — this is a selling point)
+- Social proof ONLY if I give you something real
+- Final CTA
+- Footer: product links, docs, legal, contact
+
+Requirements:
+
+- Fully responsive. Mobile-first. Test at 360px, 768px, 1280px, 1920px.
+- Accessible: semantic landmarks, one h1 per page, a real heading hierarchy,
+  visible focus states, alt text on every image, AA contrast minimum.
+- Keyboard navigable, including any mobile menu.
+- No layout shift. Reserve space for images.
+- Respect prefers-reduced-motion for any animation.
+- The public layout must NOT import the authenticated app shell, the sidebar,
+  or anything that calls a tenant helper.
+
+
+====================================================
+PHASE 5 — A PRODUCT PAGE FOR EVERY MODULE
+====================================================
+
+Build a product page per real capability group.
+
+Use a consistent template so the pages read as one product, not fourteen
+separate microsites:
+
+PRODUCT PAGE TEMPLATE
+│
+├── Breadcrumb
+├── H1 — the capability, in the user's words not the module number
+├── One-paragraph plain-language summary
+├── Who it is for (recruiter / hiring manager / agency owner)
+├── The problem, stated concretely
+├── What it does — 4-8 real capabilities
+├── How it works — the actual flow, as a diagram or numbered steps
+├── Visual — a real screenshot or an honest UI representation
+├── The AI boundary — what AI proposes, what a human confirms
+├── What it connects to — links to the adjacent modules
+└── CTA
+
+Rules:
+
+- Reuse ONE set of shared components across all product pages. Do not
+  copy-paste a page fourteen times. If a page needs a variant, add a prop.
+- Content should be data-driven where possible — a typed content file per
+  module rather than JSX prose hardcoded in each route — so copy can be edited
+  without touching layout.
+- Every page needs correct per-page metadata (title, description, canonical,
+  Open Graph). Note that app/layout.tsx already defines a title TEMPLATE, so a
+  page supplies only its own title, not the product suffix.
+- Internal linking between related modules, so the pages reinforce that this is
+  one connected system.
+
+
+====================================================
+PHASE 6 — "HOW IT WORKS" FLOWS
+====================================================
+
+Show the end-to-end product flow, grounded in docs/00-overview.md.
+
+The real flow is roughly:
+
+CLIENT REQUIREMENT
+↓
+JOB CREATED
+↓
+CANDIDATES ENTER (career page, upload, bulk intake, referral, manual)
+↓
+RESUME PARSED BY AI → STRUCTURED PROFILE
+↓
+HUMAN REVIEWS THE PARSED OUTPUT
+↓
+CANDIDATE MATCHED TO JOB (deterministic checks + AI semantic matching)
+↓
+AI SCREENING CALL (with consent disclosure)
+↓
+CALL SUMMARIZED INTO A STRUCTURED REPORT
+↓
+RECRUITER REVIEWS AI OUTPUT
+↓
+CANDIDATE MOVES THROUGH PIPELINE STAGES
+↓
+INTERVIEW SCHEDULED (with an AI-prepared brief)
+↓
+OPTIONAL LIVE CODING ROUND
+↓
+EVALUATION AND FEEDBACK RECORDED
+↓
+CLIENT REVIEW
+↓
+OFFER
+↓
+HIRE
+↓
+ONBOARDING AND DOCUMENT COLLECTION
+↓
+EVERYTHING MEASURED IN ANALYTICS, IMPROVED VIA AUTOMATION
+
+Also build role-specific short flows:
+
+- For an agency recruiter
+- For an in-house talent team
+- For a hiring manager
+- For a candidate (what the candidate actually experiences)
+
+Diagrams must be accessible: real markup or inline SVG with a title and
+description, not an image of text. They must be legible on mobile and must
+not force horizontal scrolling of the page body.
+
+
+====================================================
+PHASE 7 — SCREENSHOTS AND DEMO VISUALS
+====================================================
+
+Real visuals, captured from the running application.
+
+PROCESS:
+
+1. Seed a dedicated demo organization with clearly FICTIONAL data.
+2. Run the app against that seed.
+3. Capture screenshots of the real UI.
+4. Optimise them and commit them under a public asset directory.
+5. Reference them with explicit width and height to prevent layout shift.
+
+ABSOLUTE RULE — NO REAL PERSONAL DATA IN A PUBLIC SCREENSHOT.
+
+A screenshot of this product contains candidate names, emails, phone numbers,
+resumes, salary expectations, interview feedback, and AI assessments of real
+people. Publishing any of that on a marketing page is a data breach, and it is
+irreversible the moment it is deployed — the image gets cached, indexed, and
+scraped.
+
+So:
+
+- Every screenshot must come from purpose-built seed data with invented names,
+  invented email addresses on a domain reserved for documentation, and invented
+  companies.
+- Never screenshot a live production or staging tenant.
+- Before committing ANY image, verify it frame by frame: check the sidebar,
+  breadcrumbs, notification badges, browser tabs, autofill dropdowns, avatars,
+  toast messages, and any partially visible row at the edge of the viewport.
+  Real data leaks at the margins of a screenshot far more often than in the
+  middle of it.
+- Do not blur or crop as the primary defence. Reseed and recapture instead.
+- If a genuine screenshot cannot be produced safely, use an honest stylised UI
+  illustration and do not present it as a photograph of the product.
+
+Read docs/00-privacy-compliance.md before this phase and follow it.
+
+
+====================================================
+PHASE 8 — CONTACT / GET STARTED
+====================================================
+
+Make the CTAs actually work.
+
+Flows to support:
+
+- "Get started" → sign up (the existing /signup route)
+- "Sign in" → the existing /login route
+- "Contact us" / "Request a demo" → a public form
+- "Talk to sales" → whatever real channel I confirm
+
+THE PUBLIC FORM IS A SECURITY SURFACE. Treat it as one.
+
+An unauthenticated write endpoint on a multi-tenant database is exactly the
+thing this project's architecture rules are written to protect. Note carefully:
+the browser holds an authenticated PostgREST client, and RLS — not the route
+handler — is the real boundary. A public form makes that boundary reachable by
+anonymous callers too.
+
+Requirements:
+
+- A dedicated table for inbound leads. It is NOT tenant-scoped in the normal
+  sense, because a lead has no organization yet. Design its RLS explicitly:
+  anonymous INSERT may be permitted, but anonymous SELECT, UPDATE, and DELETE
+  must be impossible. Prove that an anonymous client cannot read back what
+  anyone else submitted.
+- Server-side validation of every field. Never trust the client.
+- Rate limiting per IP and a spam defence. Say which you chose and why.
+- A honeypot or equivalent that does not harm accessibility. No CAPTCHA that
+  blocks keyboard or screen reader users.
+- Length caps on every field, so the table cannot be used as free storage.
+- Store the submission first, then notify. A failed notification must never
+  lose the lead.
+- Route notifications through the existing integration adapters in
+  lib/integrations/ — do not re-implement an email call.
+- Explicit consent language and a link to the privacy policy. Record what the
+  person consented to and when.
+- Honest success and error states. If the send fails, say so — never show a
+  success message for a submission that did not persist.
+- The form must not leak internal error details. Use the existing
+  lib/api.ts error helpers.
+- Where do these leads go? Ask me. Do not assume an inbox.
+
+Migrations go in supabase/migrations/ as plain re-runnable SQL, following the
+existing numbering and the `if not exists` / `drop policy if exists` style.
+
+
+====================================================
+PHASE 9 — PUBLIC PRODUCT DOCUMENTATION
+====================================================
+
+A public documentation section a prospective or new customer can read without
+an account.
+
+Structure:
+
+DOCS
+├── Getting Started
+│      ├── Creating your organization
+│      ├── Inviting your team
+│      ├── Roles and permissions
+│      └── Your first job
+├── Guides (per module, task-oriented)
+├── AI and Automation
+│      ├── How the AI is used
+│      ├── What AI proposes vs what a human confirms
+│      ├── Screening calls and consent
+│      └── What happens when the AI fails
+├── Integrations
+├── Security and Privacy
+│      ├── Tenant isolation
+│      ├── Data retention and deletion
+│      └── Candidate rights
+├── FAQ
+└── Changelog
+
+Requirements:
+
+- Content lives in a maintainable content layer (MDX or typed content files),
+  not hardcoded in route components.
+- Working search, or at minimum a clear, complete navigation tree.
+- Deep-linkable headings with anchors.
+- A visible "last updated" date per page, sourced from real data rather than
+  typed by hand.
+- Code and configuration examples must be correct and copy-pasteable.
+- Do not document a feature that does not exist.
+
+MAKE THE AI SAFETY MODEL A SELLING POINT, not fine print.
+
+This product's real differentiator is the discipline already in its
+architecture, so say it plainly on the public site:
+
+- The pipeline is Raw Data → AI → Structured Output → Validation → Human Review
+  → Business Action. AI output never writes straight to a trusted table.
+- A recruiter stays responsible for every consequential hiring decision.
+- Anything that contacts a real person fails closed: disconnected by default,
+  explicit confirmation, a hard attempt cap, and a consent disclosure that
+  cannot be turned off.
+- Recording someone without telling them is unlawful in many jurisdictions, and
+  the product is built so it cannot happen.
+- Every organization's data is isolated at the database level by row-level
+  security, not merely filtered in the UI.
+- When the AI is unavailable, the manual workflow still works.
+
+Buyers evaluating AI recruitment tools are actively worried about exactly this.
+Stating it clearly is both honest and commercially useful.
+
+
+====================================================
+PHASE 10 — PERFORMANCE, SEO, AND CORRECTNESS
+====================================================
+
+A marketing site has different constraints from a dashboard.
+
+- Static rendering wherever possible. The public pages have no per-user state
+  and must not be dynamically rendered per request. Verify the build output
+  actually shows them as static.
+- No public page may import a tenant helper, a session client, or the service
+  role admin client. Add a check that enforces this — a public page that reads
+  the session becomes dynamic and, worse, invites a data leak.
+- Correct metadata on every page. Open Graph and Twitter cards with a real
+  preview image.
+- sitemap.xml and robots.txt, generated — and the sitemap must contain ONLY
+  public URLs. Never list a private app route.
+- JSON-LD structured data for the organization and the software product.
+- Optimised images through the framework's image handling, with modern formats.
+- No render-blocking third-party scripts. If analytics is wanted, ask me first
+  and disclose it in the privacy policy — do not silently add a tracker.
+- Do not regress the existing app's bundle. Report before-and-after sizes.
+- Lighthouse: aim for 95+ on performance, accessibility, and best practices.
+  Report the actual numbers you measured, not the numbers you hoped for.
+
+
+====================================================
+PHASE 11 — LEGAL PAGES
+====================================================
+
+Add the pages a real SaaS product needs:
+
+- Privacy Policy
+- Terms of Service
+- Cookie notice, if any cookie beyond the strictly necessary is set
+- Data Processing Agreement, or a placeholder that says where to request one
+- Candidate privacy notice — this product processes personal data about people
+  who never signed up for it, which is the sharpest privacy exposure in the
+  whole system
+
+Ground these in docs/00-privacy-compliance.md.
+
+Be explicit with me that these are drafts for a lawyer to review. Do not
+present generated legal text as legally sufficient, and do not copy another
+company's policy.
+
+
+====================================================
+TESTING
+====================================================
+
+Provide a manual test guide in the docs/ directory, following the format of the
+existing guides such as docs/QA-MANUAL-TESTING-GUIDE.md.
+
+Cover at least:
+
+TC-WEB-001  Anonymous visitor loads the home page. No redirect to /login.
+
+TC-WEB-002  Every public route is reachable while signed OUT.
+
+TC-WEB-003  Every private route STILL redirects to /login while signed out.
+            Enumerate them. This is the regression that matters most.
+
+TC-WEB-004  A signed-in user visiting the public site behaves as decided in
+            Phase 2, and can still reach /dashboard.
+
+TC-WEB-005  The login `next` parameter round-trip still works.
+
+TC-WEB-006  No public page renders any authenticated user's data.
+
+TC-WEB-007  Contact form submits and persists.
+
+TC-WEB-008  Contact form rejects invalid input server-side, with the client
+            validation bypassed.
+
+TC-WEB-009  Contact form is rate limited.
+
+TC-WEB-010  An anonymous PostgREST client CANNOT read the leads table.
+
+TC-WEB-011  An anonymous PostgREST client CANNOT update or delete a lead.
+
+TC-WEB-012  No screenshot on the public site contains real personal data.
+
+TC-WEB-013  sitemap.xml contains no private route.
+
+TC-WEB-014  Mobile navigation is fully keyboard accessible.
+
+TC-WEB-015  Every public page passes an accessibility audit.
+
+TC-WEB-016  Public pages are statically rendered in the build output.
+
+TC-WEB-017  Every internal link resolves. No 404s.
+
+TC-WEB-018  Every claim on the site maps to a feature that exists.
+
+Also add automated tests for the logic that can be tested without a database:
+
+- the public path matcher, including the over-matching cases from Phase 2
+- contact form validation
+- content integrity — every module content entry has the required fields, and
+  every internal link target exists
+
+Then run and report:
+
+npm run lint
+npm run typecheck
+npm test
+npm run build
+
+All must be clean and green. Bulma emits Sass deprecation warnings from its own
+internals during builds; those are not caused by project code and can be
+ignored.
+
+
+====================================================
+IMPLEMENTATION ORDER
+====================================================
+
+STEP 1   Analyze the existing project and produce the Phase 1 report.
+STEP 2   Inventory the real modules and their built/not-built status.
+STEP 3   Solve the routing and auth-allowlist problem. Get my approval.
+STEP 4   Build the public shell, layout, header, and footer.
+STEP 5   Build the landing page.
+STEP 6   Build the shared product-page components and the content layer.
+STEP 7   Build the product pages from real module data.
+STEP 8   Build the How It Works flows and diagrams.
+STEP 9   Seed demo data and capture safe screenshots.
+STEP 10  Build the contact/lead capture, with its migration and RLS.
+STEP 11  Build the public documentation section.
+STEP 12  Add the legal pages.
+STEP 13  Metadata, sitemap, robots, structured data, performance pass.
+STEP 14  Verify no private route became public.
+STEP 15  Run lint, typecheck, tests, and build.
+STEP 16  Write the documentation and the manual test guide.
+
+
+====================================================
+FINAL RULES
+====================================================
+
+1.  Analyze the existing project before writing any code.
+2.  Do not break a single existing route, test, or behaviour.
+3.  Do not refactor the private application while building the public one.
+4.  Keep the auth layer deny-by-default. Allowlist precisely and prove it.
+5.  No public page may read the session, a tenant helper, or the admin client.
+6.  Reuse the existing brand, tokens, and typefaces. Introduce no new palette.
+7.  Never hardcode a colour. Use var(--color-*).
+8.  Every claim on the site must map to a feature that actually exists.
+9.  No fake logos, testimonials, statistics, certifications, or customer counts.
+10. No real personal data in any public screenshot, ever.
+11. The public lead form is an unauthenticated write. Secure it at the RLS
+    layer, not only in the route handler.
+12. Migrations are plain, re-runnable SQL in supabase/migrations/.
+13. Route errors through lib/api.ts so internals never leak.
+14. Legal pages are drafts for a lawyer, and must be labelled as such to me.
+15. Do not add analytics, tracking, or any third-party script without asking.
+16. Do not invent pricing. Ask me.
+17. Build it with real content, not lorem ipsum placeholders.
+18. Ask me whenever a fact about the product cannot be verified from the code.
+19. Write documentation and a manual test guide when you are done.
+20. Keep it accessible and responsive throughout, not as a later cleanup pass.
+
+
+====================================================
+WHAT TO SHOW ME BEFORE IMPLEMENTING
+====================================================
+
+1.  The current architecture analysis.
+2.  The real built-versus-specified module inventory.
+3.  The recommended routing and auth approach, with the alternatives you
+    rejected and why.
+4.  The proposed sitemap of the public website.
+5.  The content and component architecture.
+6.  Every file that will be created.
+7.  Every existing file that will be modified, and exactly why.
+8.  The database changes, if any.
+9.  The security analysis for the public form and the allowlist change.
+10. The screenshot and demo-data plan.
+11. Any claim you are unsure the product can actually make.
+12. Open questions you need me to answer.
+
+Start with the analysis. Do not write implementation code until I have approved
+the plan.

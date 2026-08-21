@@ -37,6 +37,8 @@ export const NOTIFICATION_TYPES = [
   // candidate-facing message an automation may send.
   "automation_needs_approval",
   "candidate_stage_update",
+  // Module 20 — live coding.
+  "coding_round_submitted",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -298,6 +300,33 @@ export const TEMPLATES: Record<NotificationType, TemplateDefinition> = {
     defaultInApp: true,
     defaultEmail: true,
     priority: "normal",
+  },
+
+  /**
+   * Module 20. INTERNAL — this tells the interviewer, not the candidate.
+   *
+   * The candidate already knows they submitted; they clicked the button and read
+   * the confirmation. The person who needs telling is the interviewer, who may
+   * be mid-call and watching a monitor that has just stopped changing.
+   *
+   * `high` priority, unlike most internal notifications: a coding round is
+   * submitted during a live interview, and a notification a recruiter reads
+   * tomorrow is a notification that arrived after the decision was made.
+   */
+  coding_round_submitted: {
+    audience: "internal",
+    label: "Coding round submitted",
+    description:
+      "Tells the interviewer the moment a candidate submits their live coding round.",
+    fixedFacts: ["candidate_name", "job_title"],
+    placeholders: ["candidate_name", "job_title", "language"],
+    title: "{{candidate_name}} submitted their coding round",
+    body:
+      "{{candidate_name}} has submitted their coding round for the {{job_title}} role " +
+      "({{language}}). You can read the submission from the interview.",
+    defaultInApp: true,
+    defaultEmail: false,
+    priority: "high",
   },
 };
 

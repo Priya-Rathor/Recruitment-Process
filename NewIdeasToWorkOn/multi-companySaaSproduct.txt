@@ -1,0 +1,986 @@
+I want to evolve my existing recruitment and hiring platform into a proper MULTI-TENANT SAAS PRODUCT.
+
+The platform should support multiple companies/organizations.
+
+Each company should have its own private workspace.
+
+For example:
+
+MY PLATFORM
+│
+├── Company A Workspace
+│   ├── Team Members
+│   ├── Candidates
+│   ├── Jobs
+│   ├── Applications
+│   ├── Forms
+│   ├── Interviews
+│   └── Coding Sessions
+│
+├── Company B Workspace
+│   ├── Team Members
+│   ├── Candidates
+│   ├── Jobs
+│   ├── Applications
+│   ├── Forms
+│   ├── Interviews
+│   └── Coding Sessions
+│
+└── Company C Workspace
+    ├── Team Members
+    ├── Candidates
+    ├── Jobs
+    ├── Applications
+    ├── Forms
+    ├── Interviews
+    └── Coding Sessions
+
+
+IMPORTANT:
+
+Before changing any code, analyze the complete existing project architecture.
+
+Do NOT immediately rewrite the project.
+
+First inspect:
+
+- Authentication
+- User management
+- Existing database schema
+- Candidate module
+- Job module
+- Application module
+- Forms module
+- Interview module
+- Live Coding module
+- Google Meet integration if available
+- Existing roles and permissions
+- Existing API architecture
+- Existing frontend routing
+- Existing backend middleware
+- Existing database relationships
+
+I want the new SaaS architecture to extend the existing application without breaking current functionality.
+
+====================================================
+PHASE 1 — ANALYZE CURRENT ARCHITECTURE
+====================================================
+
+First determine:
+
+1. Is the application currently designed for only one company?
+2. Which database entities need organization/workspace isolation?
+3. Which existing entities should receive an organization_id?
+4. How are users currently connected to data?
+5. How is authentication currently implemented?
+6. How are permissions currently implemented?
+7. Which APIs need tenant/workspace filtering?
+8. Which frontend routes need workspace awareness?
+9. How can existing data be migrated safely?
+
+Before implementing anything, provide an analysis report.
+
+The report must include:
+
+- Current architecture
+- Current limitations
+- Multi-tenant migration strategy
+- Database changes
+- API changes
+- Authentication changes
+- Authorization changes
+- Frontend changes
+- Data migration plan
+- Security considerations
+- Potential breaking changes
+
+Do not start implementation until this analysis is complete.
+
+====================================================
+PHASE 2 — ORGANIZATION / COMPANY
+====================================================
+
+Introduce an Organization or Workspace concept.
+
+Each company using the platform should have an organization.
+
+Example:
+
+Organization
+
+- id
+- name
+- slug
+- logo
+- website
+- industry
+- company_size
+- created_at
+- updated_at
+- status
+
+Example:
+
+Organization:
+
+WebBee Technologies
+
+Workspace URL:
+
+app.example.com/webbee
+
+or use another architecture that fits the existing application.
+
+Another company:
+
+ABC Technologies
+
+Workspace:
+
+app.example.com/abc-technologies
+
+Do not blindly use this URL structure.
+
+Analyze the existing routing architecture first and choose the safest approach.
+
+====================================================
+PHASE 3 — USER AND ORGANIZATION RELATIONSHIP
+====================================================
+
+A user should belong to one or more organizations if appropriate.
+
+Example:
+
+USER
+│
+├── Organization A
+│      Role: OWNER
+│
+└── Organization B
+       Role: RECRUITER
+
+The architecture should support:
+
+- One user owning an organization.
+- Multiple users in one organization.
+- Different roles inside an organization.
+- Potentially one user belonging to multiple organizations.
+
+Create an appropriate relationship such as:
+
+USER
+        │
+        ▼
+ORGANIZATION MEMBERSHIP
+        │
+        ├── organization_id
+        ├── user_id
+        ├── role
+        ├── status
+        └── joined_at
+
+Adapt this structure to the existing database architecture.
+
+====================================================
+PHASE 4 — ROLES AND PERMISSIONS
+====================================================
+
+Implement a flexible role system.
+
+Suggested roles:
+
+SUPER_ADMIN
+
+Platform administrator.
+
+Can manage:
+
+- All organizations
+- Platform users
+- Global settings
+- Plans
+- Billing
+- Platform monitoring
+
+OWNER
+
+The company/workspace owner.
+
+Can manage:
+
+- Organization settings
+- Team members
+- Jobs
+- Candidates
+- Forms
+- Interviews
+- Billing
+- Integrations
+
+ADMIN
+
+Can manage most organization functionality.
+
+RECRUITER
+
+Can manage:
+
+- Candidates
+- Jobs
+- Applications
+- Forms
+- Interview scheduling
+
+INTERVIEWER
+
+Can access only relevant interview functionality.
+
+For example:
+
+- Assigned interviews
+- Candidate information required for interviews
+- Interview feedback
+- Coding sessions
+
+VIEWER
+
+Read-only access where appropriate.
+
+IMPORTANT:
+
+Do not blindly implement these exact permissions.
+
+First inspect existing roles and extend them safely.
+
+Create a permission matrix.
+
+Example:
+
+| Feature | Owner | Admin | Recruiter | Interviewer | Viewer |
+|---------|-------|-------|-----------|-------------|--------|
+| Manage Organization | Yes | Optional | No | No | No |
+| Invite Users | Yes | Yes | No | No | No |
+| Create Jobs | Yes | Yes | Yes | No | No |
+| Manage Candidates | Yes | Yes | Yes | Limited | Read |
+| Schedule Interview | Yes | Yes | Yes | Limited | No |
+| Submit Feedback | Yes | Yes | Yes | Yes | No |
+| Manage Billing | Yes | Optional | No | No | No |
+
+Adapt based on the actual product.
+
+====================================================
+PHASE 5 — DATA ISOLATION
+====================================================
+
+This is a critical requirement.
+
+Every organization's data must remain completely isolated.
+
+For example:
+
+Company A must NEVER be able to access:
+
+- Company B candidates
+- Company B jobs
+- Company B applications
+- Company B forms
+- Company B interviews
+- Company B coding sessions
+- Company B files
+
+The system must enforce organization-level data isolation.
+
+Conceptually:
+
+ORGANIZATION
+│
+├── CANDIDATES
+├── JOBS
+├── APPLICATIONS
+├── FORMS
+├── FORM RESPONSES
+├── INTERVIEWS
+├── CODING SESSIONS
+├── TEAM MEMBERS
+└── SETTINGS
+
+Analyze every existing entity and determine whether it requires:
+
+organization_id
+
+Examples may include:
+
+Candidates
+Jobs
+Applications
+Forms
+Interviews
+Coding Sessions
+Files
+Notifications
+Integrations
+
+Do not add organization_id blindly.
+
+Analyze relationships carefully.
+
+====================================================
+PHASE 6 — DATABASE MIGRATION
+====================================================
+
+Do not destroy existing data.
+
+Create a safe migration strategy.
+
+The migration should work like this:
+
+Existing Application
+        ↓
+Create Default Organization
+        ↓
+Existing Data
+        ↓
+Assign Existing Data
+to Default Organization
+        ↓
+Create Organization Relationships
+        ↓
+Verify Data Integrity
+
+Before applying any migration:
+
+1. Identify existing data.
+2. Identify affected tables/entities.
+3. Define migration order.
+4. Handle nullable values safely.
+5. Add indexes where necessary.
+6. Verify foreign key relationships.
+7. Provide rollback considerations.
+
+Do not run destructive migrations without clearly explaining the impact.
+
+====================================================
+PHASE 7 — AUTHENTICATION FLOW
+====================================================
+
+Update the authentication flow if necessary.
+
+The flow should support:
+
+NEW USER
+↓
+Sign Up
+↓
+Create Organization
+OR
+Join Existing Organization
+↓
+Select Role
+↓
+Access Workspace
+↓
+Dashboard
+
+Existing users should continue to work.
+
+For a new company:
+
+User signs up
+↓
+Creates Organization
+↓
+Becomes Owner
+↓
+Organization Workspace Created
+↓
+Owner Invites Team Members
+
+For an invited user:
+
+Owner/Admin
+↓
+Invites User
+↓
+User receives invitation
+↓
+User accepts invitation
+↓
+User joins Organization
+↓
+Correct role assigned
+↓
+Workspace access granted
+
+Reuse existing authentication architecture.
+
+Do not unnecessarily replace authentication.
+
+====================================================
+PHASE 8 — ORGANIZATION ONBOARDING
+====================================================
+
+Create an onboarding flow for new organizations.
+
+Example:
+
+STEP 1
+
+Welcome
+
+STEP 2
+
+Company Information
+
+- Company Name
+- Industry
+- Company Size
+- Website
+
+STEP 3
+
+Workspace Setup
+
+- Workspace Name
+- Workspace URL/Slug if applicable
+
+STEP 4
+
+Invite Team
+
+- Email
+- Role
+
+STEP 5
+
+Complete
+
+Redirect to Dashboard.
+
+The onboarding should be optional or resumable if appropriate.
+
+Do not block existing users unnecessarily.
+
+====================================================
+PHASE 9 — TEAM MANAGEMENT
+====================================================
+
+Create an Organization / Team Management page.
+
+Example:
+
+SETTINGS
+│
+├── Organization
+├── Team Members
+├── Roles & Permissions
+├── Integrations
+├── Notifications
+└── Billing
+
+Team Members should support:
+
+- View members
+- Invite member
+- Assign role
+- Change role
+- Remove member
+- Resend invitation
+- View invitation status
+
+Example:
+
+| Name | Email | Role | Status | Actions |
+
+Support:
+
+ACTIVE
+
+PENDING
+
+SUSPENDED
+
+if appropriate for the existing architecture.
+
+====================================================
+PHASE 10 — ORGANIZATION SETTINGS
+====================================================
+
+Create an Organization Settings page.
+
+Possible settings:
+
+Organization Name
+
+Logo
+
+Website
+
+Industry
+
+Company Size
+
+Default Timezone
+
+Recruitment Preferences
+
+Branding
+
+Only implement settings that are useful for the current product.
+
+Do not overbuild unnecessary configuration.
+
+====================================================
+PHASE 11 — WORKSPACE SWITCHING
+====================================================
+
+If a user belongs to multiple organizations, support workspace switching.
+
+Example:
+
+Current Workspace:
+
+[ WebBee Technologies ▼ ]
+
+------------------------
+
+WebBee Technologies
+
+ABC Technologies
+
+Create New Organization
+
+------------------------
+
+When the user switches organizations:
+
+Current Workspace
+↓
+Organization Context Changes
+↓
+Permissions Reload
+↓
+Relevant Data Loads
+
+The user should only see data belonging to the selected organization.
+
+Do not mix data between workspaces.
+
+====================================================
+PHASE 12 — MULTI-TENANT API SECURITY
+====================================================
+
+This is extremely important.
+
+Every protected API request must validate:
+
+1. User authentication.
+2. Organization membership.
+3. User role/permissions.
+4. Resource ownership by organization.
+
+Example:
+
+User requests:
+
+GET /candidates/{candidateId}
+
+The backend must verify:
+
+- User is authenticated.
+- User belongs to an organization.
+- Candidate belongs to that organization.
+- User has permission to access candidates.
+
+Never trust organization_id directly from the frontend without validation.
+
+Do not allow a user to change an organization_id in a request and access another company's data.
+
+Create or extend middleware/services to enforce tenant isolation.
+
+====================================================
+PHASE 13 — API CONTEXT
+====================================================
+
+Determine the safest method to identify the current organization.
+
+Possible approaches:
+
+- Organization ID in authenticated session
+- Active workspace in token/session
+- Workspace slug in route
+- Request context
+
+Choose the approach that best fits the existing authentication architecture.
+
+Do not duplicate organization information unnecessarily.
+
+Document how organization context is resolved.
+
+====================================================
+PHASE 14 — FRONTEND WORKSPACE EXPERIENCE
+====================================================
+
+Update the frontend so users clearly understand which organization they are working in.
+
+Example:
+
+TOP NAVIGATION
+
+[LOGO]
+
+WebBee Technologies ▼
+
+Dashboard
+Candidates
+Jobs
+Applications
+Forms
+Interviews
+
+User Menu
+
+When appropriate, show:
+
+Current Organization
+
+Organization switcher
+
+Role
+
+User profile
+
+The existing dashboard should continue working.
+
+Do not redesign unrelated screens.
+
+====================================================
+PHASE 15 — MODULE INTEGRATION
+====================================================
+
+Update existing modules to work inside an organization context.
+
+CANDIDATES
+
+Candidates must belong to the correct organization.
+
+JOBS
+
+Jobs must belong to the correct organization.
+
+APPLICATIONS
+
+Applications must connect:
+
+Organization
+↓
+Job
+↓
+Candidate
+
+FORMS
+
+Forms should belong to an organization.
+
+INTERVIEWS
+
+Interviews must belong to the correct organization.
+
+LIVE CODING
+
+Coding sessions must be isolated by organization.
+
+FILES
+
+Resume and uploaded files must not be accessible across organizations.
+
+Integrations should also be organization-specific where appropriate.
+
+Example:
+
+Organization A
+↓
+Their Google Integration
+
+Organization B
+↓
+Their Google Integration
+
+Do not share credentials or integration configurations between organizations.
+
+====================================================
+PHASE 16 — SUPER ADMIN PLATFORM
+====================================================
+
+If the project supports a platform administrator, create a separate Super Admin concept.
+
+Super Admin should be separate from normal organization users.
+
+Possible Super Admin capabilities:
+
+- View organizations
+- View organization status
+- Manage platform users
+- Suspend organization
+- Activate organization
+- Manage subscriptions
+- View platform-level metrics
+
+IMPORTANT:
+
+Super Admin should not accidentally use the normal organization workspace UI.
+
+Keep platform administration clearly separated.
+
+====================================================
+PHASE 17 — SUBSCRIPTION AND BILLING PREPARATION
+====================================================
+
+I may add billing and subscriptions later.
+
+Prepare the architecture so organizations can eventually have:
+
+FREE PLAN
+
+STARTER PLAN
+
+PROFESSIONAL PLAN
+
+ENTERPRISE PLAN
+
+Each organization may eventually have limits such as:
+
+- Number of team members
+- Number of active jobs
+- Number of candidates
+- Number of interviews
+- Number of coding sessions
+- Storage usage
+
+IMPORTANT:
+
+Do not implement payment processing unless it already exists or is explicitly requested.
+
+For now, create an architecture that can support plans in the future.
+
+Do not overbuild billing functionality.
+
+====================================================
+PHASE 18 — SECURITY REQUIREMENTS
+====================================================
+
+Verify:
+
+1. Organization A cannot access Organization B data.
+2. API authorization works correctly.
+3. Frontend hiding is NOT the only permission control.
+4. Backend validates every organization resource.
+5. Files are isolated.
+6. Public job applications only connect to the correct organization.
+7. Secure form links cannot expose private data.
+8. Candidate access does not provide organization dashboard access.
+9. Removed users lose access.
+10. Role changes take effect correctly.
+
+Create specific security tests for tenant isolation.
+
+====================================================
+PHASE 19 — MANUAL TESTING
+====================================================
+
+After implementation, create complete documentation:
+
+docs/multi-tenant-saas.md
+
+Include:
+
+# Overview
+
+Explain the multi-tenant architecture.
+
+# Organization Flow
+
+New User
+↓
+Create Organization
+↓
+Become Owner
+↓
+Invite Team
+↓
+Team Joins
+↓
+Use Workspace
+
+# Data Isolation
+
+Explain how tenant data is protected.
+
+# Roles
+
+Document every role.
+
+# Permissions
+
+Document permissions.
+
+# Database Changes
+
+Document affected entities.
+
+# API Changes
+
+Document organization context and authorization.
+
+# Manual Test Cases
+
+Create test cases such as:
+
+TC-ORG-001
+
+Create Organization
+
+Expected Result:
+New workspace is created successfully.
+
+TC-ORG-002
+
+Invite Team Member
+
+Expected Result:
+Invitation is created correctly.
+
+TC-ORG-003
+
+Organization Data Isolation
+
+Steps:
+
+1. Create Company A.
+2. Create Company B.
+3. Create candidate in Company A.
+4. Login as Company B.
+5. Attempt to access Company A candidate.
+
+Expected Result:
+
+Access must be denied.
+
+TC-ORG-004
+
+Workspace Switching
+
+Expected Result:
+
+Only the selected organization's data is displayed.
+
+TC-ORG-005
+
+Role Permissions
+
+Verify each role only accesses allowed functionality.
+
+TC-ORG-006
+
+Removed User
+
+Remove a team member.
+
+Expected Result:
+
+The user can no longer access the organization.
+
+TC-ORG-007
+
+Public Application
+
+Verify a candidate applying through Company A's job application cannot accidentally create data inside Company B.
+
+====================================================
+FINAL IMPLEMENTATION PROCESS
+====================================================
+
+Follow this exact order:
+
+STEP 1
+Analyze the existing project.
+
+STEP 2
+Identify all entities affected by multi-tenancy.
+
+STEP 3
+Create a detailed architecture plan.
+
+STEP 4
+Create a database migration plan.
+
+STEP 5
+Create organization/workspace models.
+
+STEP 6
+Create organization membership.
+
+STEP 7
+Implement roles and permissions.
+
+STEP 8
+Implement secure organization context.
+
+STEP 9
+Update APIs with tenant isolation.
+
+STEP 10
+Update existing modules gradually.
+
+STEP 11
+Create organization onboarding.
+
+STEP 12
+Create team management.
+
+STEP 13
+Add workspace switching if supported.
+
+STEP 14
+Test organization data isolation.
+
+STEP 15
+Run existing tests.
+
+STEP 16
+Verify no existing functionality is broken.
+
+STEP 17
+Create complete documentation and manual testing guide.
+
+====================================================
+FINAL RULES
+====================================================
+
+1. Do not rewrite the entire application unnecessarily.
+2. Analyze the existing architecture first.
+3. Reuse existing authentication.
+4. Reuse existing authorization where possible.
+5. Do not duplicate modules.
+6. Do not expose data between organizations.
+7. Backend security is mandatory.
+8. Frontend filtering alone is NOT sufficient.
+9. Existing data must be migrated safely.
+10. Existing users and functionality should continue working.
+11. Do not implement billing yet unless required.
+12. Prepare the architecture for future subscriptions.
+13. Document every major change.
+14. Create manual test cases.
+15. Verify multi-tenant data isolation before considering the implementation complete.
+
+Before writing code, first show me:
+
+1. Current architecture analysis
+2. Multi-tenant architecture proposal
+3. Database changes
+4. Files that will be modified
+5. Files that will be created
+6. Migration strategy
+7. Security strategy
+8. Potential risks
+
+Only after completing this analysis should implementation begin.

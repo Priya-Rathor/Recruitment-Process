@@ -45,15 +45,20 @@ describe("the stage catalogue", () => {
   });
 
   /**
-   * The honesty check. Two stages are wired to something that really runs —
-   * the screening call to Bolna, resume scoring to the matcher — and the other
-   * three are configuration-only. The UI reads THIS to decide whether to show
-   * "Not yet active", so marking a stage live without wiring an engine fails
-   * here rather than quietly promising something the product cannot do.
+   * The honesty check. Three stages are wired to something that really runs —
+   * resume scoring to the matcher, the screening call to Bolna, and the written
+   * assessment to Module 20's live coding rounds — and the other two are
+   * configuration-only. The UI reads THIS to decide whether to show "Not yet
+   * active", so marking a stage live without wiring an engine fails here rather
+   * than quietly promising something the product cannot do.
    */
   it("only calls a stage live when it names the engine behind it", () => {
     const live = STAGES.filter((s) => s.execution === "live");
-    expect(live.map((s) => s.key)).toEqual(["resume_score", "ai_screening_call"]);
+    expect(live.map((s) => s.key)).toEqual([
+      "resume_score",
+      "ai_screening_call",
+      "written_assessment",
+    ]);
     for (const stage of live) {
       expect(stage.engine, stage.key).toBeTruthy();
     }

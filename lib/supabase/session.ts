@@ -27,10 +27,68 @@ const PUBLIC_PATHS = [
    * the id, and cannot re-subscribe anyone.
    */
   "/unsubscribe",
+  /**
+   * Module 20's live coding round.
+   *
+   * SAME REASONING AS /unsubscribe, one step further. A candidate has no login,
+   * so a coding page behind a session would be a page the person it was built
+   * for cannot open — they scanned a QR code on a Google Meet screen share with
+   * their phone, and that phone has never seen this product.
+   *
+   * The page authorises itself with its own signed token instead (an HMAC over
+   * the coding session id; see lib/coding/token.ts), so it can only ever open
+   * ONE session, cannot be pointed at another by editing the URL, and stops
+   * working the moment an interviewer cancels the round. The URL carries no
+   * candidate, application, interview or organization id.
+   */
+  "/coding",
+  /**
+   * Module 21's public product website.
+   *
+   * THIS IS THE FIRST ENTRY THAT IS PUBLIC BECAUSE IT IS MARKETING, not because
+   * a candidate holds a signed token. Everything above is a page one specific
+   * person was sent a link to; these are pages anybody may read, including
+   * search engine crawlers.
+   *
+   * WHY "/" IS SAFE TO LIST HERE. matches() below treats an entry as "this exact
+   * path, or anything beneath it", and for "/" the second half compiles to
+   * startsWith("//") — which no normalised pathname satisfies. So "/" grants the
+   * landing page and nothing else. It does NOT open the whole app, which is the
+   * one thing a reader of this list will worry about.
+   *
+   * "/product" and "/how-it-works" ARE prefix entries, so they free everything
+   * beneath them. That is intended — /product/source, /product/screen and the
+   * rest are all public — and it is safe only because no private route begins
+   * with either string. Before adding a route to this block, check that: an
+   * entry of "/job" here would silently publish /jobs.
+   */
+  "/",
+  "/product",
+  "/how-it-works",
 ];
 
+/**
+ * An entry matches its own path, or any path beneath it.
+ *
+ * The `${p}/` form is what stops "/invite" from also matching "/invitees", so
+ * an entry can only ever free a real subtree. publicPaths.test.ts pins this,
+ * including the "/" case and the near-miss names of real private routes.
+ */
 function matches(pathname: string, paths: string[]) {
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+/**
+ * Is this path reachable without a session?
+ *
+ * EXPORTED SO IT CAN BE TESTED. The allowlist stopped being a convenience list
+ * the moment a marketing site was added to it — a wrong entry here does not
+ * break a page, it publishes one. updateSession() calls this rather than
+ * matches() directly, so the test exercises the same code path the edge does
+ * instead of a copy of the rule that could drift from it.
+ */
+export function isPublicPath(pathname: string) {
+  return matches(pathname, PUBLIC_PATHS);
 }
 
 /**
@@ -77,7 +135,7 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const isPublic = matches(pathname, PUBLIC_PATHS);
+  const isPublic = isPublicPath(pathname);
 
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone();

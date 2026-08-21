@@ -15,6 +15,15 @@ export const ACTIVITY_ENTITY_TYPES = [
   "automation",
   "integration",
   "message_template",
+  /**
+   * Module 21 — privacy, consent and data settings.
+   *
+   * A distinct entity rather than filing these under "organization", because the
+   * §10 privacy log has to be separable from general settings churn: "who viewed
+   * this transcript" and "who renamed the company" are both organization events
+   * but only one of them belongs in a privacy report.
+   */
+  "privacy",
 ] as const;
 
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
@@ -37,6 +46,7 @@ export const ENTITY_LABELS: Record<ActivityEntityType, string> = {
   automation: "Automation",
   integration: "Integration",
   message_template: "Message template",
+  privacy: "Privacy & consent",
 };
 
 export type ActivityEvent = {

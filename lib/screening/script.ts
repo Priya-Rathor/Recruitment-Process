@@ -60,6 +60,18 @@ export type ScriptInput = {
    * questions still come from job_screening_questions.
    */
   instructions?: string | null;
+  /**
+   * Module 21's privacy configuration, already normalised.
+   *
+   * OPTIONAL, AND ITS ABSENCE IS SAFE. Omitting it produces exactly the script
+   * this module shipped with — the mandatory disclosure, the greeting, the
+   * questions — which is why every existing caller and test still holds. What it
+   * can ADD is the §7 AI-processing disclosure. What it cannot do is remove or
+   * reorder the consent segment: these segments are appended after it, and
+   * assertScriptIsCompliant() re-checks the first segment regardless of what was
+   * passed here.
+   */
+  privacySegments?: ScriptSegment[];
 };
 
 /** Longest script we will send. Beyond this a call stops being a screen. */
@@ -124,6 +136,17 @@ export function buildCallScript(input: ScriptInput): CallScript {
       `I'll ask a few short questions about your experience and availability.`,
     expectsAnswer: false,
   });
+
+  // Module 21's privacy segments — currently the §7 AI-processing disclosure.
+  //
+  // AFTER consent and the greeting, BEFORE any question. Explaining how somebody's
+  // answers will be analysed only makes sense before they give any; said
+  // afterwards it is a summary, not a disclosure. It cannot displace the consent
+  // segment because it is pushed after it, and assertScriptIsCompliant() still
+  // has the final say before dialling.
+  for (const segment of input.privacySegments ?? []) {
+    segments.push(segment);
+  }
 
   // The job's own briefing, if one is configured. Placed here — after consent,
   // after the greeting, before the questions — so it can set tone and context

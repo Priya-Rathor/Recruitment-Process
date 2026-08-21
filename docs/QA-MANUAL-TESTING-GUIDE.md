@@ -3000,3 +3000,3412 @@ UNIQUE(organization_id, stage))`.
    at-risk after 1.5 days — check that reads sensibly for short stages.
 
 ---
+
+# 19. MODULE M16 — Interviews & Feedback
+
+## 19.1 Purpose
+
+Schedule a human interview, optionally push a Google Calendar invite, and collect
+**structured** feedback (a rating and a recommendation) rather than a note nobody
+can aggregate.
+
+## 19.2 Vocabulary (`lib/interviews/feedback.ts`)
+
+| Set | Values |
+| --- | --- |
+| `INTERVIEW_MODES` | `video`, `phone`, `onsite` |
+| `INTERVIEW_STATUSES` | `scheduled`, `completed`, `cancelled`, `no_show` |
+| `RECOMMENDATIONS` | `strong_yes`, `yes`, `no`, `strong_no` |
+| `FEEDBACK_DUE_HOURS` | **24** |
+
+Duration: `duration_minutes` DEFAULT 60, DB CHECK `> 0 and <= 480`.
+Feedback rating: **integer 1–5** (DB CHECK), and `UNIQUE (interview_id, submitted_by)`
+— one submission per person per interview.
+
+## 19.3 Feedback validation
+
+> Both a rating **and** a recommendation are required. An interview that produced
+> neither is not feedback — it is a note, and there is a notes field for that.
+
+- rating: must be an **integer** 1–5 → *"Give a rating from 1 to 5."*
+- recommendation: must be in the list → *"Choose a recommendation."*
+- notes: optional, trimmed, truncated at **5,000** characters.
+
+## 19.4 Feedback-overdue logic (`feedbackReminderState`)
+
+Returns `due: false` with a **distinct reason** for every non-due case, because
+chasing someone for feedback on a cancelled interview is worse than not chasing:
+
+| Reason | When |
+| --- | --- |
+| `feedback_submitted` | already filed |
+| `cancelled` | status is `cancelled` **or `no_show`** (a no-show has nothing to give feedback on) |
+| `not_finished` | `now < scheduled_at + duration`, or an unparseable date |
+| `too_soon` | finished, but less than `FEEDBACK_DUE_HOURS` ago |
+| `due: true` | finished ≥24h ago with no feedback; carries `hoursOverdue` |
+
+## 19.5 Google Calendar — the two guarantees
+
+1. **`not_connected` is NOT an error.** It is the ordinary state when nobody has
+   connected Calendar, and the caller must **carry on and save the interview**.
+2. **A revoked grant also degrades to `not_connected`**, not `failed` — a revoked
+   token is a connection problem, not a scheduling one.
+
+A calendar problem comes back as a **`calendarMessage` alongside a successful
+201**. Scheduling never fails because of the calendar.
+
+`interviews.calendar_sync_status` defaults to `not_attempted` with a null
+`calendar_event_id`, and that combination **must never read as a failure**.
+
+> **Important caveat, stated in the code itself:** `lib/integrations/calendar/oauth.ts`
+> is "written to Google's documented contract but **has never run against
+> Google**, because no Google Cloud project exists for this product." Treat the
+> live OAuth path as unverified.
+
+## 19.6 UI Components
+
+`/interviews` (list + `InterviewBadges`), `/interviews/[id]` (detail + `FeedbackForm`),
+`ScheduleInterview` on the application page.
+
+| UI Component | Purpose | Notes |
+| --- | --- | --- |
+| **Date & time** | Schedule | Invalid → "That date isn't valid." |
+| Mode select | video/phone/onsite | — |
+| Interviewer select | Assign | Must be an active member |
+| Duration | Minutes | 1–480 |
+| Location / Meeting URL / Notes | Context | Location is for onsite |
+| **Your feedback** card | Submit | Rating 1–5, recommendation, notes |
+| **All feedback** card | Panel view | Several people may file on one interview |
+| Cancel + reason | placeholder "e.g. Candidate withdrew, interviewer unavailable" | A cancelled interview is part of the record |
+
+## 19.7 Complete User Flow
+
+```
+SCHEDULE
+Step 1  Recruiter opens an application → Schedule interview
+Step 2  Picks date/time, mode, interviewer, duration
+Step 3  POST /api/interviews {application_id, …}
+        requireRole(["owner","admin","recruiter"])
+        400 "Choose an application."
+        parseSchedulePayload() validates the rest
+        404 when the error says "not found", else 400
+Step 4  INSERT interviews (calendar_sync_status 'not_attempted')
+        triggers: trg_interviews_tenant_integrity, trg_interviews_touch
+Step 5  Calendar attempted IF connected:
+          connected     → event created, calendar_event_id stored
+          not_connected → NOT an error; interview saved, sync stays not_attempted
+          revoked       → ALSO not_connected
+          real failure  → calendar_error recorded, interview still saved
+Step 6  RESPONSE 201 {data, calendarMessage?}
+Step 7  Candidate message fires from HERE (phone/video interview scheduled),
+        because this is where a TIME exists — a stage move has none
+
+FEEDBACK
+Step 8  Interviewer opens /interviews/{id}
+Step 9  Rating 1–5 + recommendation + optional notes → Submit
+Step 10 POST /api/interviews/{id}/feedback
+        404 interview
+        403 "Only the assigned interviewer can submit feedback for this one."
+        409 "This interview was cancelled, so there's nothing to give feedback on."
+        400 parseFeedback errors
+Step 11 INSERT interview_feedback (UNIQUE interview_id + submitted_by)
+Step 12 DB TRIGGER trg_feedback_completes_interview
+        → the interview is marked completed, so status and feedback can never
+          disagree
+Step 13 Automation trigger `interview_completed` fires
+Step 14 The entry appears in the application's Evaluation panel, scaled to 1–10
+```
+
+## 19.8 API Flow
+
+| API | Method | Auth | Errors |
+| --- | --- | --- | --- |
+| `/api/interviews` | GET | any member | 400 invalid status filter; 400 "Could not load interviews." |
+| `/api/interviews` | POST | owner/admin/recruiter | 400 "Choose an application."; schedule validation; 404/400 |
+| `/api/interviews/[id]` | GET | any member | 404 |
+| `/api/interviews/[id]` | PATCH | owner/admin/recruiter | 400 "Invalid status." / "That date isn't valid." / "That interviewer is not a member of this team." / "No valid fields provided."; 404 |
+| `/api/interviews/[id]/feedback` | POST | owner/admin/recruiter | 404; **403 not the assigned interviewer**; **409 cancelled**; 400 validation |
+
+## 19.9 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-INT-001 | Schedule | Happy path | Schedule a video interview for tomorrow | 201; appears in `/interviews` and on the application | | | Critical |
+| TC-INT-002 | Schedule | **Calendar not connected** | Calendar disconnected, schedule | **Interview is saved**; `calendar_sync_status = not_attempted`; **this does not look like a failure** | | | Critical |
+| TC-INT-003 | Schedule | **Calendar revoked** | Revoke the Google grant, schedule | Degrades to `not_connected`, **not** `failed`; interview saved | | | Critical |
+| TC-INT-004 | Schedule | Calendar connected | Connect, schedule | Event created; `calendar_event_id` stored | | | High |
+| TC-INT-005 | Schedule | Calendar error | Force a provider failure | `calendarMessage` returned **alongside a 201**; interview saved | | | Critical |
+| TC-INT-006 | Schedule | No application | POST without one | "Choose an application." | | | High |
+| TC-INT-007 | Schedule | Invalid date | `scheduled_at = "tomorrow"` | "That date isn't valid." | | | High |
+| TC-INT-008 | Schedule | Past date | Yesterday | Document the behaviour (there is no explicit future-date rule in the code) | | | Medium |
+| TC-INT-009 | Schedule | Duration 0 | Set 0 | DB CHECK `> 0` refuses | | | High |
+| TC-INT-010 | Schedule | Duration 481 | Set 481 | DB CHECK `<= 480` refuses | | | High |
+| TC-INT-011 | Schedule | Cross-tenant interviewer | Org B's user id | "That interviewer is not a member of this team." | | | Critical |
+| TC-INT-012 | Schedule | Viewer denied | Viewer POSTs | 403 | | | Critical |
+| TC-INT-013 | Reschedule | Change the time | PATCH `scheduled_at` | Updated; calendar re-synced if connected | | | High |
+| TC-INT-014 | Reassign | Change interviewer | PATCH `interviewer_id` | Updated | | | High |
+| TC-INT-015 | Cancel | With a reason | Set status cancelled + reason | Recorded; the interview stays in the record | | | High |
+| TC-INT-016 | Cancel | Invalid status | `{"status":"postponed"}` | 400 "Invalid status." | | | Medium |
+| TC-INT-017 | **Feedback** | Happy path | Rating 4, recommendation `yes`, notes | 201; **the interview becomes `completed` via the trigger** | | | Critical |
+| TC-INT-018 | Feedback | **Status/feedback cannot disagree** | Submit feedback on a `scheduled` interview | The trigger marks it completed automatically | | | Critical |
+| TC-INT-019 | Feedback | Missing rating | Recommendation only | "Give a rating from 1 to 5." | | | Critical |
+| TC-INT-020 | Feedback | Missing recommendation | Rating only | "Choose a recommendation." | | | Critical |
+| TC-INT-021 | Feedback | Rating 0 / 6 | Try both | Rejected both ways | | | High |
+| TC-INT-022 | Feedback | Non-integer rating | 3.5 | Rejected (`Number.isInteger`) | | | High |
+| TC-INT-023 | Feedback | Invalid recommendation | `"maybe"` | Rejected | | | High |
+| TC-INT-024 | Feedback | 6,000-char notes | Paste | Truncated at 5,000, not rejected | | | Low |
+| TC-INT-025 | Feedback | **Wrong interviewer** | Someone who is not the assigned interviewer submits | **403** "Only the assigned interviewer can submit feedback for this one." | | | Critical |
+| TC-INT-026 | Feedback | **Cancelled interview** | Submit on a cancelled one | **409** "This interview was cancelled, so there's nothing to give feedback on." | | | Critical |
+| TC-INT-027 | Feedback | Duplicate submission | The same person submits twice | Blocked by `UNIQUE (interview_id, submitted_by)` | | | High |
+| TC-INT-028 | Feedback | Panel | Two different interviewers file on one interview | Both stored; "All feedback" shows both | | | High |
+| TC-INT-029 | Feedback | Viewer denied | Viewer POSTs | 403 | | | Critical |
+| TC-INT-030 | Feedback | **Appears in Evaluations** | File a rating of 4 on a phone interview | Shows in the Phone Interview section scaled to **8/10** | | | Critical |
+| TC-INT-031 | Overdue | Not finished | Interview still in the future | `not_finished`, **no reminder** | | | High |
+| TC-INT-032 | Overdue | Too soon | Finished 2 hours ago | `too_soon`, no reminder | | | High |
+| TC-INT-033 | Overdue | Due | Finished 25 hours ago, no feedback | `due: true`, `hoursOverdue = 1` | | | Critical |
+| TC-INT-034 | Overdue | **Cancelled not chased** | Cancelled interview, 3 days old | `cancelled`, **no reminder** | | | Critical |
+| TC-INT-035 | Overdue | **No-show not chased** | `no_show`, 3 days old | `cancelled` reason, no reminder | | | Critical |
+| TC-INT-036 | Overdue | Feedback filed | Filed after 30 hours | `feedback_submitted`, no further reminder | | | High |
+| TC-INT-037 | Candidate msg | **Fires from scheduling** | Active `video_interview_scheduled` template, schedule one | The candidate message goes out **with a time in it** | | | Critical |
+| TC-INT-038 | Dashboard | Interviews today | Schedule one for today in the org timezone | The `interviewsToday` tile increments | | | High |
+| TC-INT-039 | Automation | `interview_completed` | Active rule, submit feedback | The rule fires once | | | High |
+| TC-INT-040 | Tenant | Cross-tenant | GET/PATCH org B's interview | 404 | | | Critical |
+
+## 19.10 Known Risks — M16
+
+1. **The Google OAuth exchange has never run against Google.** The code says so
+   explicitly. Anything in the live Calendar path is unverified — plan for it.
+2. There appears to be **no past-date guard** on `scheduled_at`. Confirm and file
+   if a past interview can be scheduled.
+3. Only the **assigned interviewer** may submit feedback — if the field is left
+   blank, check who (if anyone) can file.
+
+---
+
+# 20. MODULE M17 — Clients & Client Submission
+
+> **Agency mode only.** For an in-house organization (`agency_mode = false`)
+> the Clients nav item, the client filters and the submission card are all
+> hidden. Do not file "Clients is missing" as a bug on an in-house workspace.
+
+## 20.1 Purpose
+
+The companies an agency recruits **for**. Tracks the relationship, the account
+manager, the expected feedback turnaround, and the record of exactly what was
+sent about a candidate.
+
+## 20.2 UI Components
+
+### `/clients` and `/clients/[id]`
+"Add a client" (`NewClientForm`), the client list, the detail page with
+**Submissions**, `ClientActivityPanel`, and an AI activity summary.
+
+`clients (id, organization_id, name UNIQUE per org, contacts jsonb [{name,email,phone,role}],
+feedback_sla_days DEFAULT 3 CHECK 0..90, account_manager_id, notes, archived_at)`
+
+**Name is unique per organization** — a duplicate would split a client's history
+in two and quietly break their metrics.
+
+### `/applications/[id]/submission` — `SubmissionPanel`
+| UI Component | Purpose | Notes |
+| --- | --- | --- |
+| **Draft a submission** / **Submit again** | Generate text | `POST` — returns text only, **writes and sends nothing** |
+| Summary textarea | Edit | placeholder "Write the introduction yourself, or draft it with AI above." |
+| **Already submitted** notice | Guard | 409 on re-draft without acknowledgement |
+| **Send** | The explicit human act | `PUT` — records verbatim and opens the feedback clock |
+
+## 20.3 The propose/send split — the core rule
+
+- **`POST`** drafts. *"This endpoint only ever returns text. It writes nothing and
+  sends nothing."* Facts are gathered server-side, so the draft cannot be steered
+  by the caller.
+- **`PUT`** sends. It records **what was actually sent, verbatim**, in
+  `client_feedback_events.submission_text`. If it is ever disputed, the record must
+  be what was sent, not what we would generate today.
+- **Actual email delivery is Module 15's job.** Until then `PUT` **records** the
+  submission rather than transmitting it. Do not report "no email arrived" as a
+  submission bug without checking the message log.
+
+## 20.4 Complete User Flow
+
+```
+Step 1  Recruiter opens /applications/{id}/submission
+Step 2  Clicks Draft a submission
+Step 3  POST /api/applications/{id}/submission
+        requireRole(["owner","admin","recruiter"])
+        404 "Application not found."
+        409 if already submitted and not acknowledged
+        generateClientSubmission() with server-gathered facts
+        → returns TEXT ONLY
+Step 4  Recruiter edits the text freely
+Step 5  Clicks Send
+Step 6  PUT /api/applications/{id}/submission {summary}
+        400 "There's nothing to send — write or generate a summary first."
+        409 "This job has no client attached, so there's nobody to submit to."
+Step 7  INSERT client_feedback_events
+          client_id, application_id, requested_at = now(),
+          submission_text (VERBATIM), submitted_by
+          CHECK feedback_response_after_request
+Step 8  The feedback clock starts, measured against clients.feedback_sla_days
+Step 9  When the client responds, outcome is recorded:
+          interview | reject | hold | offer | other, plus response_notes
+Step 10 Turnaround feeds Analytics' "Average Client Feedback Time"
+```
+
+## 20.5 API Flow
+
+| API | Method | Auth | Errors |
+| --- | --- | --- | --- |
+| `/api/clients` | GET | **any member incl. Viewer** | 400 "Could not load clients." |
+| `/api/clients` | POST | owner/admin/recruiter | 409 "A client with that name already exists."; 400 |
+| `/api/clients/[id]` | GET | any member | 404 |
+| `/api/clients/[id]` | PATCH | owner/admin/recruiter | 400 "That account manager is not a member of this team."; **409 duplicate name (23505)**; 404 |
+| `/api/clients/[id]` | DELETE | **owner/admin** | **ARCHIVES** — a real delete would orphan jobs (`jobs.client_id` is ON DELETE SET NULL); 404 "Client not found, or already archived." |
+| `/api/clients/[id]/ai-action` | POST | any member | Internal activity summary; `saved:false` |
+| `/api/applications/[id]/submission` | GET | any member | — |
+| `/api/applications/[id]/submission` | POST | owner/admin/recruiter | 404; 409 already submitted |
+| `/api/applications/[id]/submission` | PUT | owner/admin/recruiter | 400 empty summary; **409 no client attached**; 400 "Could not record that submission." |
+
+## 20.6 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-CLI-001 | Mode | **In-house hides Clients** | Set `agency_mode = false` | No Clients nav item, no client filters, no submission card | | | Critical |
+| TC-CLI-002 | Mode | Agency shows Clients | `agency_mode = true` | All of the above appear | | | Critical |
+| TC-CLI-003 | Create | Happy path | Add a client with contacts | 201; appears in the list | | | Critical |
+| TC-CLI-004 | Create | **Duplicate name** | Add the same name twice | **409** "A client with that name already exists." | | | Critical |
+| TC-CLI-005 | Create | Same name, different org | Create it in org B | Allowed (uniqueness is per organization) | | | High |
+| TC-CLI-006 | Create | Empty name | Submit blank | Rejected (DB CHECK `length(btrim(name)) > 0`) | | | High |
+| TC-CLI-007 | Create | SLA 91 days | Set 91 | Rejected (CHECK 0..90) | | | Medium |
+| TC-CLI-008 | Create | SLA 0 | Set 0 | Allowed | | | Low |
+| TC-CLI-009 | Create | Viewer denied | Viewer POSTs | 403 | | | Critical |
+| TC-CLI-010 | Edit | Cross-tenant account manager | Org B's user | 400 "That account manager is not a member of this team." | | | Critical |
+| TC-CLI-011 | Archive | Owner archives | Archive a client | `archived_at` set | | | High |
+| TC-CLI-012 | Archive | **Jobs survive** | Archive a client with jobs attached | Jobs still exist and open; `client_id` is not destroyed | | | Critical |
+| TC-CLI-013 | Archive | Recruiter denied | Recruiter DELETEs | 403 | | | Critical |
+| TC-CLI-014 | Archive | Double archive | Twice | 404 "Client not found, or already archived." | | | Medium |
+| TC-CLI-015 | **Submission** | Draft writes nothing | Draft, then navigate away | **No `client_feedback_events` row exists** | | | Critical |
+| TC-CLI-016 | Submission | Draft cannot be steered | Try to pass extra prompt text | Facts come from the server; caller input does not reach the prompt | | | Critical |
+| TC-CLI-017 | Submission | Edit before sending | Rewrite the draft entirely, Send | **The edited text** is stored verbatim, not the AI's | | | Critical |
+| TC-CLI-018 | Submission | Empty send | Send with a blank summary | 400 "There's nothing to send — write or generate a summary first." | | | High |
+| TC-CLI-019 | Submission | **No client on the job** | Send for a job with no `client_id` | **409** "This job has no client attached, so there's nobody to submit to." | | | Critical |
+| TC-CLI-020 | Submission | Already submitted | Draft again after sending | **409** with an acknowledgement path; the UI says "Already submitted" | | | High |
+| TC-CLI-021 | Submission | Verbatim record | Send, then change the client's details | The stored `submission_text` is **unchanged** | | | Critical |
+| TC-CLI-022 | Submission | Feedback clock | Send | `requested_at` set; turnaround measured against `feedback_sla_days` | | | High |
+| TC-CLI-023 | Submission | Response recorded | Record outcome `interview` + notes | `responded_at` set; CHECK `responded_at >= requested_at` | | | High |
+| TC-CLI-024 | Submission | Invalid outcome | `{"outcome":"ghosted"}` | Rejected (CHECK) | | | Medium |
+| TC-CLI-025 | Submission | Viewer denied | Viewer POSTs/PUTs | 403 | | | Critical |
+| TC-CLI-026 | AI summary | Client activity | Click on the client detail page | Summary appears; `saved:false` | | | Medium |
+| TC-CLI-027 | AI summary | AI off | Unset the key | Friendly message; the page still works | | | High |
+| TC-CLI-028 | Tenant | Cross-tenant client | GET org B's client | 404 | | | Critical |
+| TC-CLI-029 | Analytics | Feedback time | Complete a submission cycle | It appears in Analytics' client feedback metric | | | High |
+
+## 20.7 Known Risks — M17
+
+1. **A submission does not actually email the client.** It records the text. If a
+   tester expects a delivered email, they will file a false bug — and if a
+   *recruiter* expects it, that is a genuine product risk.
+2. `jobs.client_id` was a forward stub with no FK until Module 12; verify no
+   orphan `client_id` values survive on old rows.
+3. Contacts are free-form JSONB — no email validation on a client contact.
+
+---
+
+# 21. MODULE M18 — Automation Engine
+
+## 21.1 Purpose
+
+Rules that do work automatically: *when X happens, if Y is true, do Z.* Explicitly
+**explainable and predictable** — conditions are evaluated by a pure function,
+never by AI. An LLM may *draft* a rule; it never *runs* one.
+
+**Who uses it:** **Owner/Admin only** create, edit, activate, delete, approve and
+run the scheduler. Every role can **read** rules, the run history, and the
+approval queue.
+
+## 21.2 Trigger vocabulary (`lib/automations/catalog.ts`)
+
+| Trigger | Label | Fires | Mode |
+| --- | --- | --- | --- |
+| `application_stage_changed` | An application enters a stage | on stage change | session |
+| `application_created` | An application is created | including by bulk intake | session |
+| `screening_call_completed` | A screening call completes | **Bolna webhook** | **service** |
+| `screening_report_created` | A screening report is generated | | session |
+| `interview_completed` | An interview is completed | on feedback submission | session |
+| `evaluations_complete` | Every evaluation is in | on the last one logged | session |
+| `onboarding_document_uploaded` | A new hire uploads a document | | session |
+| `onboarding_completed` | Onboarding is marked complete | | session |
+| `time_elapsed_in_stage` | An application has sat too long | **the scheduler** | **service** |
+
+## 21.3 Condition fields and operators
+
+**Fields:** `stage`, `match_score`, `candidate_has_phone`, `candidate_has_email`,
+`screening_consent_confirmed`, `job_has_screening_questions`, `days_in_stage`,
+`interest_level`, `application_source`, `candidate_has_resume`, `days_since_applied`,
+`assigned_recruiter_present`, `job_is_open`, `evaluation_outcome`.
+
+**Operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `is_true`, `is_false` —
+constrained per field by `FIELD_OPERATORS` (e.g. `stage` only accepts `eq`/`neq`).
+
+## 21.4 Actions
+
+| Action | Requires integration | Runs in |
+| --- | --- | --- |
+| `start_screening_call` | **bolna** | session only |
+| `generate_screening_report` | — | session only |
+| `calculate_match` | — | session only |
+| `move_to_stage` | — | both |
+| `notify_recruiter` | — (in-app needs nothing) | both |
+| `add_note` | — | both |
+| `send_candidate_email` | **email** | both |
+| `assign_recruiter` | — | both |
+| `call_n8n_webhook` | **n8n** | both |
+| `send_templated_message` | **computed from the template's channels** | both |
+
+**Three session-only actions.** `start_screening_call`, `generate_screening_report`
+and `calculate_match` each build their own session-bound Supabase client
+internally, so under the service role they would be denied by RLS. Activation
+**refuses** a rule pairing them with a sessionless trigger — the same honesty rule,
+one level finer.
+
+**`send_templated_message` deliberately has no fixed integration** — an email-only
+template needs `email`, a WhatsApp one needs `whatsapp`. Naming `email` would block
+a WhatsApp-only organization from activating a rule that never touches email.
+
+## 21.5 Guardrails
+
+| Guardrail | Rule |
+| --- | --- |
+| **Kill switch** | `organizations.automations_enabled` is checked **before a single rule is loaded**. It does **not** pause the rules — their status is untouched, so switching back on restores exactly what was there. |
+| **Draft by default** | `POST /api/automations` never reads `status` from the body. Activation is always a separate act. |
+| **Consequential actions** | `start_screening_call`, `generate_screening_report`, `calculate_match`, `send_candidate_email`, `send_templated_message` — cost money or contact a person |
+| **Approval MANDATORY** | any rule containing `send_candidate_email` — the wording lives in this codebase and nobody in the org ever read it |
+| **Approval on by default, switchable off** | `send_templated_message` — an Owner/Admin wrote *and explicitly activated* that template, so the review already happened over the words themselves |
+| **Daily cap** | optional; over it the run is **BLOCKED and the rule pauses itself** |
+| **Integration health** | a missing integration is **BLOCKED**, not failed |
+| **Dedupe** | `UNIQUE (automation_id, application_id, dedupe_key)`; the key is normally `<stage>:<stage_entered_at>` |
+| **Optimistic concurrency** | `expected_version` vs the row's `version`; a mismatch → 409 |
+| **Approval expiry** | `expires_at` defaults to now + 7 days — a proposal about a candidate goes stale |
+| **Test runs are inert** | `POST /api/automations/[id]/test` **does not call `dispatch()` at all**, and writes no run record — a test must not consume the dedupe key |
+
+## 21.6 Dispatch order (`lib/automations/engine.ts`)
+
+```
+1. Check the ORGANIZATION KILL SWITCH        (before any rule is loaded)
+2. Load ACTIVE rules for this trigger        (drafts and paused never execute)
+3. Build the evaluation context once
+4. CLAIM THE RUN — insert the run row FIRST.
+   The unique index makes concurrent triggers safe. A conflict means this
+   occasion is already handled: stop. No call, no AI spend.
+5. Evaluate conditions — not matching is a SKIP, not a failure
+6. Check the DAILY CAP — over it is BLOCKED, and the rule pauses itself
+7. Check integration health — missing is BLOCKED, not failed
+8. If approval is required: PROPOSE and stop. Nothing is executed.
+9. Otherwise execute actions, each recording its own outcome
+```
+
+**Claiming before evaluating means a skipped run also consumes the dedupe key.**
+Deliberate: a rule that did not match on this stage-entry will not match on a
+re-delivery either, and the run history then shows **every occasion the engine
+considered** — which is what makes "why didn't my automation fire?" answerable.
+
+## 21.7 The scheduler (`lib/automations/sweep.ts`)
+
+- `vercel.json` runs `GET /api/automations/sweep` **hourly** (`0 * * * *`).
+- **Safe to run every hour** because the dedupe key contains **no time**:
+  `time_elapsed_in_stage:<stage>:<stage_entered_at>`. Every sweep computes the
+  same string for the same stale application, so the first claims the run and
+  every later one is rejected. **One action per stage-entry, not one per sweep.**
+  This is also why there is no "last reminded at" column — that would need a
+  read-then-write, and the thing being raced is whether a candidate is emailed twice.
+- The scan is **bounded** and the bound is **reported, never silent**: `truncated`
+  reaches the UI and says how many were left.
+- **A sweep that finds nothing writes a row saying so** — that is how the UI tells
+  "the scheduler ran and there was nothing to do" apart from "the scheduler has
+  never run", two states that look identical from an empty history and mean
+  completely different things.
+- `maxDuration = 300` seconds.
+
+### The two verbs
+
+| Verb | Caller | Auth | Scope |
+| --- | --- | --- | --- |
+| **GET** | Vercel Cron | `Authorization: Bearer $CRON_SECRET`, constant compare | **every organization**, service-role client |
+| **POST** | "Run the scheduler now" button | `requireRole(["owner","admin"])` | the caller's organization only, RLS applied |
+
+The verbs are split on purpose: guessing the caller from a header would mean an
+unauthenticated POST could be mistaken for a cron, and the difference between the
+two paths is *this organization* versus *every organization*.
+
+`GET` returns **503** when `CRON_SECRET` is unset ("Scheduled sweeps aren't
+configured on this deployment") and **503** when no service-role key is
+configured. `POST` returns **409** when the kill switch is off.
+
+## 21.8 UI Components
+
+| Page | Components |
+| --- | --- |
+| `/automations` | Rule list, **New automation**, "This automation is live", "Recent runs", `SchedulerPanel` ("Run the scheduler now"), the kill switch, "You can't create automations" for non-admins |
+| `/automations/new` | `TemplatePicker` ("Start from a template"), "Describe it instead" (AI drafting, placeholder "e.g. Start AI screening for anyone entering Screening with a match above 75% who has a phone number") |
+| `/automations/[id]` | `AutomationForm` (1,067 lines): **When** / **If** / **Then**, "In plain English", **Guardrails**, `ActivationPanel` ("Review & activate"), "Run history" |
+| `/automations/approvals` | `ApprovalCard` — "Waiting for a decision", "Decisions already made", placeholder "Optional note — why you decided this way" |
+
+## 21.9 Complete User Flow — AI-drafted rule to live
+
+```
+Step 1  Admin opens /automations/new → Describe it instead
+Step 2  Types "Start AI screening for anyone entering Screening with a match
+        above 75% who has a phone number"
+Step 3  POST /api/automations/ai-action
+        requireRole(["owner","admin"])
+        400 "Describe the workflow you want to automate." if empty
+        → draftAutomationRule()
+        → THIS ENDPOINT WRITES NOTHING. It returns a proposal.
+Step 4  Admin reviews the When / If / Then and the plain-English summary
+Step 5  Clicks Save
+Step 6  POST /api/automations
+        - ALWAYS creates a DRAFT (status is not read from the body)
+        - name 1..120, unique per org → 409 on collision
+        - conditions validated; 422 if actions cannot be resolved
+        - required_integrations computed from the actions and stored
+        - approvalIsMandatory() FORCES requires_approval on regardless of
+          what the client sent
+        - drafted_by_ai = true
+Step 7  Admin opens the rule → Review & activate
+Step 8  PATCH /api/automations/{id} {status:"active", expected_version:N}
+        - 409 if the version moved (someone else edited it)
+        - 409 if a REQUIRED INTEGRATION IS DISCONNECTED
+        - 409 if a session-only action is paired with a sessionless trigger
+Step 9  Rule is live. The next matching event dispatches it.
+Step 10 With approval required, the run PROPOSES and stops:
+        automation_approvals row, status pending, expires in 7 days
+Step 11 Admin opens /automations/approvals, reads the proposal, decides
+Step 12 PATCH /api/automations/approvals/{id} {decision:"approved"}
+        → THIS IS WHAT ACTUALLY RUNS THE ACTIONS, under the approver's identity
+        409 if it was already decided or has expired
+```
+
+## 21.10 API Flow
+
+| API | Method | Auth | Errors |
+| --- | --- | --- | --- |
+| `/api/automations` | GET | **any member** | 500 "Could not load automations." |
+| `/api/automations` | POST | **owner/admin** | 400 template/name/conditions/daily-limit; **422** unresolvable actions; **409** duplicate name |
+| `/api/automations/[id]` | GET | any member | 404 |
+| `/api/automations/[id]` | PATCH | owner/admin | 400 many; 422 actions; **409 version conflict**; **409 activation blocked**; 409 duplicate name; 404 |
+| `/api/automations/[id]` | DELETE | owner/admin | **A real delete** — a rule is configuration, not a record; 404 |
+| `/api/automations/[id]/test` | POST | owner/admin | 400 "Choose an application to test against."; 404 automation/application. **Performs no live action and writes no run** |
+| `/api/automations/ai-action` | POST | owner/admin | 400 empty description. **Writes nothing** |
+| `/api/automations/runs` | GET | **any member incl. Viewer** | 500 |
+| `/api/automations/approvals` | GET | **any member** | 400 unknown status filter; 500 |
+| `/api/automations/approvals/[id]` | PATCH | **owner/admin** | 400 `'Send a decision of "approved" or "rejected".'`; **409** already decided/expired |
+| `/api/automations/switch` | PATCH | owner/admin | 400 "Send { enabled: true } or { enabled: false }."; 404 |
+| `/api/automations/sweep` | GET | **CRON_SECRET** | 503 unset / 401 wrong / 503 no service key |
+| `/api/automations/sweep` | POST | owner/admin | **409 kill switch off** |
+
+## 21.11 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-AUTO-001 | Create | From a template | New automation → pick a template → Save | Created as **draft** | | | Critical |
+| TC-AUTO-002 | Create | **Always a draft** | `POST /api/automations {"status":"active", …}` | Created as **draft** — `status` is ignored | | | Critical |
+| TC-AUTO-003 | Create | Duplicate name | Same name twice | **409** "An automation with that name already exists." | | | High |
+| TC-AUTO-004 | Create | Empty name | Blank | 400 "Give the automation a name." | | | High |
+| TC-AUTO-005 | Create | 121-char name | Paste | 400 "That name is too long." | | | Medium |
+| TC-AUTO-006 | Create | Unknown template | `{"template":"nope"}` | 400 "That template doesn't exist." | | | Medium |
+| TC-AUTO-007 | Create | Invalid daily limit | `{"daily_limit":0}` and `{"daily_limit":1.5}` | 400 "A daily limit must be a whole number above zero, or empty." | | | High |
+| TC-AUTO-008 | Create | Unresolvable action | Reference a template that does not exist | **422** | | | High |
+| TC-AUTO-009 | Create | **Recruiter denied** | Recruiter POSTs | **403** | | | Critical |
+| TC-AUTO-010 | Create | **RLS denies too** | Recruiter writes to `automations` via PostgREST | Refused by `automations_write_owner_admin` | | | Critical |
+| TC-AUTO-011 | **Approval forced** | `send_candidate_email` | Create a rule with that action and `requires_approval:false` | The flag is **forced true** regardless | | | Critical |
+| TC-AUTO-012 | Approval default | `send_templated_message` | Create such a rule | Approval is **on by default but can be switched off** | | | High |
+| TC-AUTO-013 | AI draft | Happy path | Describe a rule | A proposal with When/If/Then; **nothing saved** | | | Critical |
+| TC-AUTO-014 | AI draft | Nothing written | Draft, then navigate away | No `automations` row exists | | | Critical |
+| TC-AUTO-015 | AI draft | Empty description | Submit blank | 400 "Describe the workflow you want to automate." | | | Medium |
+| TC-AUTO-016 | AI draft | Recruiter denied | Recruiter POSTs | 403 | | | Critical |
+| TC-AUTO-017 | AI draft | `drafted_by_ai` recorded | Save an AI-drafted rule | The flag is true; the UI shows a Review & Activate step | | | High |
+| TC-AUTO-018 | **Activation** | **Disconnected integration** | Rule with `start_screening_call`, Bolna disconnected → activate | **409**, activation refused with a message naming the integration | | | Critical |
+| TC-AUTO-019 | Activation | Connect then activate | Connect Bolna, retry | Succeeds | | | Critical |
+| TC-AUTO-020 | Activation | **Session-only action + service trigger** | `screening_call_completed` + `start_screening_call` → activate | **409** — refused with an explanation | | | Critical |
+| TC-AUTO-021 | Activation | Service-safe combination | `screening_call_completed` + `move_to_stage` | Allowed | | | High |
+| TC-AUTO-022 | Activation | Invalid status | `{"status":"running"}` | 400 "Invalid status." | | | Medium |
+| TC-AUTO-023 | **Concurrency** | Version conflict | Open in two tabs, save in A, then save in B | Tab B gets **409** and is told the rule changed | | | Critical |
+| TC-AUTO-024 | Concurrency | Invalid version | `{"expected_version":"abc"}` | 400 "Invalid version." | | | Medium |
+| TC-AUTO-025 | **Test run** | **Performs no live action** | Test a rule containing `start_screening_call` | **No call is placed** | | | Critical |
+| TC-AUTO-026 | Test run | **Writes no run record** | Test three times | `automation_runs` is unchanged; the dedupe key is **not** consumed | | | Critical |
+| TC-AUTO-027 | Test run | Explains the verdict | Test against a non-matching application | Says which condition failed | | | High |
+| TC-AUTO-028 | Test run | Missing application | POST without one | 400 "Choose an application to test against." | | | Medium |
+| TC-AUTO-029 | **Dedupe** | Same stage-entry twice | Trigger the same rule twice for one stage-entry | **One run**; the second is rejected by the unique index | | | Critical |
+| TC-AUTO-030 | Dedupe | New stage-entry | Move out and back in | A **new** run (the key contains `stage_entered_at`) | | | High |
+| TC-AUTO-031 | Dedupe | Skip consumes the key | A rule whose conditions do not match | A **skipped run row** is written; a re-delivery does not re-evaluate | | | High |
+| TC-AUTO-032 | **Kill switch** | Off blocks everything | Switch automations off, move a stage | **No rule runs**; rules keep their `active` status | | | Critical |
+| TC-AUTO-033 | Kill switch | Back on restores | Switch on, move a stage | The same rules run again — nothing had to be re-activated | | | Critical |
+| TC-AUTO-034 | Kill switch | Recruiter denied | Recruiter PATCHes | 403 | | | Critical |
+| TC-AUTO-035 | Kill switch | Bad payload | `{"enabled":"yes"}` | 400 "Send { enabled: true } or { enabled: false }." | | | Medium |
+| TC-AUTO-036 | **Daily cap** | Over the cap | Set a cap of 2, trigger 3 times | Third is **BLOCKED** and **the rule pauses itself** | | | Critical |
+| TC-AUTO-037 | Daily cap | Timezone | Org in a non-UTC zone | "Today" for the cap uses the **organization** timezone | | | High |
+| TC-AUTO-038 | Integration | Missing = BLOCKED not FAILED | Disconnect email on an active rule that emails | Run status is **blocked**, with a reason — not a failure | | | Critical |
+| TC-AUTO-039 | **Approvals** | Proposal only | Trigger an approval-required rule | `automation_approvals` row created; **no action performed** | | | Critical |
+| TC-AUTO-040 | Approvals | Approve runs it | Approve | **The actions run now**, under the approver's identity | | | Critical |
+| TC-AUTO-041 | Approvals | Reject does nothing | Reject | Nothing runs; the decision and note are recorded | | | Critical |
+| TC-AUTO-042 | Approvals | Already decided | Decide twice | **409** | | | High |
+| TC-AUTO-043 | Approvals | **Expired** | Age a proposal past 7 days, then approve | **409** — a stale proposal must not act weeks later | | | Critical |
+| TC-AUTO-044 | Approvals | Bad decision value | `{"decision":"maybe"}` | 400 `Send a decision of "approved" or "rejected".` | | | Medium |
+| TC-AUTO-045 | Approvals | **Every role can read the queue** | As viewer/recruiter, open `/automations/approvals` | Visible (an automation about to act on your candidate should be visible) | | | High |
+| TC-AUTO-046 | Approvals | **Only owner/admin decide** | Recruiter PATCHes a decision | 403 | | | Critical |
+| TC-AUTO-047 | **Scheduler** | Cron unauthenticated | `GET /api/automations/sweep` with no header | **401** "Not authorized." | | | Critical |
+| TC-AUTO-048 | Scheduler | No `CRON_SECRET` | Unset it, GET with any header | **503**, never open | | | Critical |
+| TC-AUTO-049 | Scheduler | Wrong secret | `Authorization: Bearer wrong` | 401 | | | Critical |
+| TC-AUTO-050 | Scheduler | Correct secret | Correct bearer | Sweeps **every** organization; returns per-org results | | | Critical |
+| TC-AUTO-051 | Scheduler | No service-role key | Unset it, run the cron | **503** with an explanation | | | High |
+| TC-AUTO-052 | Scheduler | Manual button | Owner clicks "Run the scheduler now" | Sweeps **only** their organization | | | Critical |
+| TC-AUTO-053 | Scheduler | Manual + kill switch off | Click with automations off | **409** "…the scheduler did nothing." | | | High |
+| TC-AUTO-054 | Scheduler | Recruiter denied | Recruiter POSTs | 403 | | | Critical |
+| TC-AUTO-055 | **Scheduler idempotence** | Run hourly | Run the sweep 5 times in a row on the same stale application | **One run**, not five — the key has no time in it | | | Critical |
+| TC-AUTO-056 | Scheduler | Empty sweep recorded | Sweep with nothing to do | An `automation_sweeps` row exists saying it found nothing — distinguishable from "never run" | | | Critical |
+| TC-AUTO-057 | Scheduler | **Truncation reported** | Exceed the scan bound | `truncated` reaches the UI with a count — **not silent** | | | Critical |
+| TC-AUTO-058 | Scheduler | Approval expiry | Run a sweep | `expireStaleApprovals()` marks overdue proposals expired | | | High |
+| TC-AUTO-059 | Runs | History readable by all | As viewer, `/automations` run history | Visible | | | Medium |
+| TC-AUTO-060 | Runs | Skip vs fail vs block | Produce one of each | Three visibly distinct statuses with reasons | | | Critical |
+| TC-AUTO-061 | Delete | Real delete | Delete a rule | Actually removed (a rule is configuration, not a record) | | | High |
+| TC-AUTO-062 | Delete | Runs survive? | Delete a rule with run history | `automation_runs.automation_id` is `ON DELETE CASCADE` — **history goes with it**. Verify that is acceptable | | | High |
+| TC-AUTO-063 | Isolation | **Failing rule never blocks the action** | Break an active rule, move a stage | **The stage still changes** | | | Critical |
+| TC-AUTO-064 | Tenant | Cross-tenant | GET/PATCH org B's automation | 404 | | | Critical |
+
+## 21.12 Known Risks — M18
+
+1. **Deleting an automation cascades its run history away.** "What did this rule
+   ever do?" becomes unanswerable. Verify against your audit expectations.
+2. `CRON_SECRET` is **not documented in `.env.local.example`** — see §Recommended
+   Improvements. A deploy that forgets it gets a permanently 503 scheduler and no
+   time-based rules will ever run.
+3. Test runs deliberately write nothing, so there is **no record that a test
+   happened**.
+4. The daily cap **pauses the rule itself** — an admin may not notice their rule
+   silently went to `paused`.
+
+---
+
+# 22. MODULE M19 — Activity & Audit Log
+
+## 22.1 Purpose
+
+An **append-only** record of what happened, who did it, and when — plus an AI
+narrative layer that is mechanically prevented from inventing events.
+
+**Who uses it:** every role can read the ordinary feed. **Only Owner/Admin can
+read sensitive (security/settings) events** and open `/audit-log`.
+
+## 22.2 The two rules that govern logging (`lib/activity/log.ts`)
+
+1. **Logging must never break the action it records.** Every call is caught; a
+   failed insert is logged server-side and swallowed. `logActivity()` **never
+   throws and never rejects** — callers do not wrap it. Losing an audit row is
+   bad; losing a candidate's stage change because the audit insert failed is worse.
+2. **The caller does not decide what is sensitive.** `is_sensitive` comes from the
+   **catalogue**, not from the argument list. A route that could mark its own
+   event non-sensitive would be able to hide a role change from the audit log —
+   exactly what the audit log exists to catch.
+
+**`actor_id` is NULL for genuinely system-driven events** (a webhook, an
+automation acting on its own). *Never invent a user to fill the column:* "the
+system did this" is a true statement and "Priya did this" would not be.
+`actor_label` is a name/email **snapshot** so the row still reads correctly after
+the user is deleted.
+
+## 22.3 Immutability
+
+`activity_events` has **no update and no delete policy**, and
+`trg_activity_events_immutable` (`reject_activity_event_mutation()`) refuses any
+mutation. `/settings/security` states it plainly: *"The audit log is append-only.
+Nobody can edit or delete an entry — not an Owner, and not the server."*
+
+`entity_id` deliberately has **no foreign key**. It points at thirteen different
+tables, and more importantly *a log entry must outlive its subject*: if a
+candidate is later erased, "this record was erased on this date by this person" is
+exactly the row that has to survive. A cascade would delete the evidence along with
+the evidence's subject.
+
+Entity types: organization, member, job, candidate, application, resume,
+screening_call, screening_report, interview, client, automation, integration,
+message_template.
+
+**Metadata is summary-level only.** AI-call events store a token/outcome summary,
+**never** the prompt, the provider payload, or any credential. Candidate edits log
+**field names, not values** — the audit log must not become a permanent second copy
+of personal data. The invite log stores the **invite id, never the token** (anyone
+who could read the log could otherwise use the link to join the organization).
+
+## 22.4 Narrative grounding (`lib/activity/grounding.ts`) — the hard constraint
+
+> "AI narrative never states an event absent from the underlying log."
+
+Prompt wording cannot enforce that, so it is enforced **mechanically**. A
+milestone-vocabulary map ties each phrase the model might write to the event types
+that would make it true; a narrative using the phrase with none of those events
+present is rejected. `findUnsupportedNumbers()` / `numbersInText()` do the same for
+figures.
+
+The specific failure this prevents: a plausible narrative saying *"completed AI
+screening on August 11 and was shortlisted after recruiter review"* for a candidate
+who was **never screened**. Every clause reads like the true ones, so a human
+reviewer would not catch it — which is why the check has to be mechanical.
+
+## 22.5 UI Components
+
+| Page | Component | Notes |
+| --- | --- | --- |
+| `/audit-log` | Feed + filters | "The audit log is restricted" for non-admins |
+| `/candidates/[id]/activity` | `NarrativePanel` | "What's happened with {name}?" |
+| `/applications/[id]` | `ActivityTimeline` | Inline |
+
+## 22.6 API Flow
+
+| API | Method | Auth | Notes |
+| --- | --- | --- | --- |
+| `/api/activity-events` | GET | any member | `?entity_type ?entity_id ?event_type ?actor_id ?since ?sensitive`. **403 "Only an Owner or Admin can view the security audit log."** when `sensitive` is requested by another role. 400 "Unknown entity type." 500 "Could not load the activity log." |
+| `/api/activity-events/ai-action` | POST | **any member** | Candidate narrative. **The narrative is NOT saved** — it is a reading aid over rows that are the actual record. 400 "Which candidate?"; 404; 500 |
+
+**POST / PATCH / DELETE on `/api/activity-events` are deliberately not
+implemented** — the spec lists them, and the code documents the refusal (an
+append-only log has no editing API).
+
+## 22.7 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-AUD-001 | Logging | Job created | Create a job | A `job.created` event appears with the actor | | | Critical |
+| TC-AUD-002 | Logging | Stage change | Move an application | `application.stage_changed` with from/to | | | Critical |
+| TC-AUD-003 | Logging | Candidate created | Create a candidate | `candidate.created` | | | High |
+| TC-AUD-004 | Logging | Duplicate flagged | Create a suspected duplicate | Both `candidate.created` and `candidate.duplicate_flagged` | | | High |
+| TC-AUD-005 | Logging | Member invited | Send an invite | `member.invited` with **the invite id, never the token** | | | Critical |
+| TC-AUD-006 | Logging | Role changed | Change a role | A **sensitive** event is written | | | Critical |
+| TC-AUD-007 | **Never breaks the action** | Logging fails | Break the `activity_events` insert (e.g. revoke insert), then create a job | **The job is still created** | | | Critical |
+| TC-AUD-008 | **Sensitivity is not caller-controlled** | Forge it | Attempt to write a role-change event marked non-sensitive | `is_sensitive` comes from the catalogue and is **true** | | | Critical |
+| TC-AUD-009 | **Immutability** | Update refused | PostgREST `update` on `activity_events` | Refused by `trg_activity_events_immutable` | | | Critical |
+| TC-AUD-010 | Immutability | Delete refused | PostgREST `delete` | Refused | | | Critical |
+| TC-AUD-011 | Immutability | No API to edit | Try `PATCH /api/activity-events` | Not implemented | | | High |
+| TC-AUD-012 | **Access** | Sensitive events hidden | As recruiter, `?sensitive=true` | **403** "Only an Owner or Admin can view the security audit log." | | | Critical |
+| TC-AUD-013 | Access | `/audit-log` restricted | Recruiter opens it | "The audit log is restricted" | | | Critical |
+| TC-AUD-014 | Access | Owner sees sensitive | As owner | Sensitive events visible | | | Critical |
+| TC-AUD-015 | Access | RLS enforces it too | Recruiter selects `activity_events` with `is_sensitive = true` via PostgREST | Refused by the policy | | | Critical |
+| TC-AUD-016 | **System actor** | Webhook event | Let a Bolna webhook write an event | `actor_id` is **NULL**, and the UI does not invent a person | | | Critical |
+| TC-AUD-017 | System actor | Automation event | Let an automation act | `actor_id` NULL | | | Critical |
+| TC-AUD-018 | Actor label | Survives deletion | Log an event, delete the user | `actor_id` nulls out; `actor_label` still reads the name | | | High |
+| TC-AUD-019 | **Privacy** | Field names only | Edit a candidate's email, read the log | The event names the **field**, not the old/new value | | | Critical |
+| TC-AUD-020 | Privacy | No prompts logged | Run any AI action, read the log | A token/outcome summary only — **no prompt, no payload, no credential** | | | Critical |
+| TC-AUD-021 | Survival | Outlives the subject | Archive a candidate, read the log | Their events are **still there** (`entity_id` has no FK) | | | Critical |
+| TC-AUD-022 | Filters | By entity type | `?entity_type=job` | Only job events | | | High |
+| TC-AUD-023 | Filters | Unknown entity type | `?entity_type=alien` | 400 "Unknown entity type." | | | Medium |
+| TC-AUD-024 | Filters | By actor / since | Combine | Applied correctly | | | Medium |
+| TC-AUD-025 | **Narrative** | Grounded | Ask "What's happened with {name}?" on a candidate with real history | Every claim maps to a logged event | | | Critical |
+| TC-AUD-026 | **Narrative** | **Never invents** | Ask on a candidate who was **never screened** | The narrative **does not say they were screened**. Any such claim is a Critical bug | | | Critical |
+| TC-AUD-027 | Narrative | No unsupported numbers | Ask on a candidate with dates/counts | Every figure appears in the underlying facts | | | Critical |
+| TC-AUD-028 | Narrative | Not saved | Generate twice | Nothing is written to the log by generating | | | High |
+| TC-AUD-029 | Narrative | Empty history | Ask about a brand-new candidate | Says there is nothing yet, rather than inventing | | | Critical |
+| TC-AUD-030 | Narrative | Missing candidate | `POST` with a bad id | 404 "Candidate not found." | | | Medium |
+| TC-AUD-031 | Narrative | Empty payload | `POST {}` | 400 "Which candidate?" | | | Medium |
+| TC-AUD-032 | Narrative | Recruiter scope | As a recruiter | Their answer is naturally scoped by RLS to what they can read | | | High |
+| TC-AUD-033 | Narrative | AI off | Unset the key | Friendly message; **the raw timeline is still readable** | | | Critical |
+| TC-AUD-034 | Tenant | Cross-tenant | Read org B's events | None returned | | | Critical |
+
+## 22.8 Known Risks — M19
+
+1. **A swallowed logging failure is silent to the user.** If the audit insert
+   starts failing, nobody in the UI finds out. Watch the server log.
+2. `entity_id` has no FK, so a stale id can point at a deleted row — the feed must
+   render that gracefully rather than 404-ing a link.
+3. Narrative grounding depends on a **vocabulary map**. A milestone phrase not in
+   the map is not checked. Probe with unusual wording.
+
+---
+
+# 23. MODULE M20 — Internal Notifications
+
+## 23.1 Purpose
+
+Tell **colleagues** what needs them: in-app always, email optionally. Distinct from
+M21, which talks to **candidates**.
+
+## 23.2 Notification types (`lib/notifications/templates.ts`)
+
+`interview_reminder`, `interview_cancelled`, `feedback_overdue`,
+`client_feedback_overdue`, `automation_failed`, `screening_completed`,
+`screening_callback_requested`, `candidate_submitted`, `assigned_to_application`,
+`onboarding_document_uploaded`, `onboarding_document_pending`,
+`automation_needs_approval`, `candidate_stage_update`.
+
+Each definition carries an `audience`, `label`, `description`, `placeholders[]`,
+`title` and `body`. `isExternalTemplate(type)` marks the ones that can reach
+outside the team.
+
+## 23.3 The fixed-fact guard
+
+Notifications are rendered from a **template plus supplied facts**, never from raw
+event payloads. `lib/notifications/facts.ts` holds the fixed facts; the reword
+endpoint **re-renders from the template and the supplied facts** rather than
+trusting text sent by the client.
+
+`link_path` has a DB CHECK `like '/%'` — **a relative path only**. An absolute URL
+in a database column is an open redirect waiting for someone to write to it.
+
+`recipient_hint` is **masked at write time** (`maskEmail()`) — never a full address.
+
+## 23.4 Preferences model
+
+`notification_preferences (organization_id, user_id NULLABLE, notification_type,
+in_app_enabled DEFAULT true, email_enabled DEFAULT false)`.
+
+**`user_id = NULL` means the organization default** for that type. A personal row
+overrides it. **Deleting a personal row is different from setting it to match the
+default** — deleting means "follow whatever the organization decides from now on".
+
+Only **Owner/Admin** may change organization defaults
+(*"Only an Owner or Admin can change organization defaults."*).
+
+## 23.5 There is no scheduler for reminders
+
+`POST /api/notifications/reminders` exists **because there is no cron for this**.
+It is a button. *"Pretending reminders go out at 9am when nothing runs at 9am would
+not be honest."* It is **safe to call repeatedly** — every reminder is deduped
+against the last 24 hours.
+
+(The automation sweep *does* have a cron; internal reminders do not.)
+
+## 23.6 UI Components
+
+`/notifications` (`NotificationList`, `ReminderButton`), the unread badge in the
+account menu, `/settings/notifications` (`PreferenceEditor`).
+
+**The unread count degrades to `null` (no badge) rather than a confident `0`** —
+a fake zero would hide exactly the alerts that matter most.
+
+## 23.7 API Flow
+
+| API | Method | Auth | Notes |
+| --- | --- | --- | --- |
+| `/api/notifications` | GET | any member | **Own only.** There is no `user_id` filter and that is deliberate — RLS restricts the table to the caller |
+| `/api/notifications` | PATCH | any member | Mark all read; returns `{marked: n}` |
+| `/api/notifications/[id]` | PATCH | any member | `{read: bool}` — the **only** mutable field. Also filters `user_id` to match the RLS `WITH CHECK` |
+| `/api/notifications/[id]` | DELETE | any member | Dismiss — **a real delete** (a notification is a message, not a record) |
+| `/api/notifications/preferences` | GET | any member | Every type, resolved for this caller |
+| `/api/notifications/preferences` | PUT | any member; **org scope needs owner/admin** | 400 unknown type / bad scope / "Both channels must be specified."; **403 org defaults** |
+| `/api/notifications/preferences` | DELETE | any member | `?type=` clears a **personal override** |
+| `/api/notifications/reminders` | POST | owner/admin/recruiter | Dispatch overdue reminders. Viewer cannot make the product message people |
+| `/api/notifications/ai-action` | POST | owner/admin/recruiter | Reword an approved message. **Sends nothing.** 400 unknown type / "Choose a tone." |
+
+**`POST /api/notifications` is deliberately not implemented** — notifications are
+raised by the system, not posted by clients.
+
+## 23.8 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-NOTIF-001 | Deliver | Assignment | Assign an application to another recruiter | They get an in-app notification | | | Critical |
+| TC-NOTIF-002 | Deliver | **No self-notification** | Assign to yourself | **None** | | | High |
+| TC-NOTIF-003 | Deliver | Screening completed | Complete a call | The relevant people are notified | | | High |
+| TC-NOTIF-004 | Deliver | Automation needs approval | Trigger an approval-required rule | Owners/Admins are notified | | | High |
+| TC-NOTIF-005 | **Isolation** | Own only | Sign in as A and B; A gets a notification | **B cannot see it**, in the UI or via the API | | | Critical |
+| TC-NOTIF-006 | Isolation | RLS enforces it | B selects `notifications` via PostgREST | Only their own rows | | | Critical |
+| TC-NOTIF-007 | Isolation | Cannot mark someone else's read | `PATCH /api/notifications/{A's id}` as B | 404 | | | Critical |
+| TC-NOTIF-008 | Read | Mark one read | Click a notification | `read_at` set; the badge decrements | | | High |
+| TC-NOTIF-009 | Read | Mark all read | Click Mark all read | `{marked: n}`; badge clears | | | High |
+| TC-NOTIF-010 | Read | Bad payload | `PATCH {"read":"yes"}` | 400 "Specify whether this is read." | | | Medium |
+| TC-NOTIF-011 | Dismiss | Delete | Dismiss one | Actually deleted | | | Medium |
+| TC-NOTIF-012 | **Badge** | Degrades to no badge | Break the count query | **No badge** — never a confident "0" | | | Critical |
+| TC-NOTIF-013 | Badge | Accurate | 3 unread | Badge reads 3 | | | High |
+| TC-NOTIF-014 | Prefs | Personal override | Turn one type's email on for yourself | Only you are affected | | | High |
+| TC-NOTIF-015 | Prefs | **Org default needs admin** | Recruiter sets an organization-scope preference | **403** "Only an Owner or Admin can change organization defaults." | | | Critical |
+| TC-NOTIF-016 | Prefs | RLS enforces both halves | Recruiter writes an org-scope row via PostgREST | Refused by the policy's `WITH CHECK` | | | Critical |
+| TC-NOTIF-017 | Prefs | Unknown type | `{"type":"telepathy"}` | 400 "Unknown notification type." | | | Medium |
+| TC-NOTIF-018 | Prefs | Bad scope | `{"scope":"galaxy"}` | 400 "Scope must be 'organization' or 'user'." | | | Medium |
+| TC-NOTIF-019 | Prefs | Partial channels | Send only `in_app_enabled` | 400 "Both channels must be specified." | | | Medium |
+| TC-NOTIF-020 | Prefs | **Reset ≠ match** | Set a personal override equal to the default, then DELETE it | After DELETE the user **follows future org changes**; before it, they do not | | | High |
+| TC-NOTIF-021 | Prefs | Email off means no email | Disable email for a type, trigger it | In-app only | | | High |
+| TC-NOTIF-022 | **Link safety** | Relative only | Try to write `link_path = "https://evil.com"` | Refused by the DB CHECK `like '/%'` | | | Critical |
+| TC-NOTIF-023 | **Privacy** | Masked recipient | Send an email notification, inspect `notification_deliveries` | `recipient_hint` is **masked**, not a full address | | | Critical |
+| TC-NOTIF-024 | Reminders | Button works | Click on `/notifications` | Overdue reminders dispatched; a count is reported | | | High |
+| TC-NOTIF-025 | **Reminders** | **Safe to repeat** | Click three times in a row | **No duplicate reminders** (24-hour dedupe) | | | Critical |
+| TC-NOTIF-026 | Reminders | Viewer denied | Viewer POSTs | 403 | | | Critical |
+| TC-NOTIF-027 | Reminders | Feedback overdue | Interview finished 25h ago, no feedback | The interviewer is reminded | | | High |
+| TC-NOTIF-028 | Reminders | **Cancelled not chased** | Cancelled interview 3 days old | **No reminder** | | | Critical |
+| TC-NOTIF-029 | Reword AI | Returns a draft | Reword an approved message | A draft; **nothing sent** | | | Critical |
+| TC-NOTIF-030 | Reword AI | **Re-rendered server-side** | Send altered text in the body | The message is **re-rendered from the template and the supplied facts** — client text does not become the message | | | Critical |
+| TC-NOTIF-031 | Reword AI | Unknown type / no tone | Bad payloads | 400 "Unknown notification type." / "Choose a tone." | | | Medium |
+| TC-NOTIF-032 | Reword AI | Viewer denied | Viewer POSTs | 403 | | | High |
+| TC-NOTIF-033 | Delivery | Email failure recorded | Disconnect email, trigger an email notification | `notification_deliveries` records `failed` with a **plain** reason (no provider body) | | | High |
+| TC-NOTIF-034 | Delivery | In-app unaffected | Same test | The in-app notification still lands | | | Critical |
+| TC-NOTIF-035 | Tenant | Cross-tenant | Read org B's notifications | None | | | Critical |
+
+## 23.9 Known Risks — M20
+
+1. **There is no cron for internal reminders.** If nobody presses the button,
+   nobody is reminded. Do not assume a schedule.
+2. `notification_deliveries` has a `write_member` policy for **all** operations —
+   verify a member cannot forge a delivery record.
+3. Dismissal is a real delete, so a dismissed notification cannot be recovered.
+
+---
+
+# 24. MODULE M21 — Candidate Communications
+
+## 24.1 Purpose
+
+Everything the product says to a **candidate**: templated messages tied to
+pipeline events, manual one-off messages from a recruiter, and a working
+unsubscribe. This is the module with the most legal exposure in the product.
+
+**Who uses it:** Owner/Admin manage templates; Owner/Admin/Recruiter send;
+Viewer reads the log. **Candidates** receive messages and use `/unsubscribe`.
+
+## 24.2 The twelve events (`lib/communications/events.ts`)
+
+`application_received`, `shortlisted`, `ai_screening_call_scheduled`,
+`phone_interview_scheduled`, `video_interview_scheduled`, `interview_reminder`,
+`assessment_assigned`, `director_round_scheduled`, `offer_extended`, `hired`,
+`rejected`, `unqualified`.
+
+**Two have `firesWhen: null` — no automatic send point, and the settings screen
+says so rather than showing a switch that does nothing:**
+
+- **`offer_extended`** — there is no offer stage. The pipeline runs Director Round
+  straight to Hired, and the signed offer is filed as an onboarding document
+  *after* the hire. Inventing a send point would mean guessing which stage move
+  means "an offer went out", and guessing wrong emails an offer to somebody who has
+  not been offered anything.
+- **`unqualified`** — nothing in the schema distinguishes "rejected because they
+  did not meet the requirements" from "rejected because somebody else was better".
+
+Both remain fully usable manually and via automations.
+
+**`EVENT_FOR_STAGE` has no phone/video interview entries** — those messages state a
+**time**, and a stage move has none. They fire from the **scheduling** action instead.
+
+## 24.3 The five guarantees of the send pipeline (`lib/communications/send.ts`)
+
+Everything that messages a candidate goes through `sendOnChannel()` — automatic
+sends, the manual compose screen, and the automation action. **One path**, so the
+log is complete and the opt-out rule lives in exactly one place.
+
+1. **NEVER THROWS.** A stage change must not fail because an email provider is
+   down, and a recruiter must not lose a note because WhatsApp rate-limited us.
+2. **EMAIL AND WHATSAPP ARE INDEPENDENT.** A `both` template that fails on WhatsApp
+   still sends the email, and **each channel gets its own log row**. Nothing reads
+   the WhatsApp integration unless a WhatsApp send was actually asked for.
+3. **OPT-OUTS BIND AUTOMATIC SENDS ABSOLUTELY; HUMANS ARE NEVER SILENTLY BLOCKED.**
+   An automatic send to an opted-out channel is refused **in the pipeline**, not in
+   a caller that might forget. A **manual** send requires an explicit
+   `overrideOptOut` flag, and the API demands the flag while the UI demands a
+   confirmation — that is what makes the warning unskippable rather than decorative.
+4. **THE LOG RECORDS THE RESOLVED TEXT, AFTER THE FOOTER IS ATTACHED.** `body_sent`
+   is byte-for-byte what the provider was given. A log of the pre-footer body would
+   be a log of what we *meant* to send.
+5. **A LOG WRITE FAILURE IS REPORTED, NEVER SWALLOWED.** If the message went out
+   and the row did not, the caller is told. Silently losing the record of a message
+   that reached a real person is the worst outcome available here — worse than not
+   sending it.
+
+## 24.4 The unsubscribe (`lib/communications/optout.ts`) — read this before testing
+
+- **Every automatic message carries an opt-out, and a template cannot remove it.**
+  The footer is appended by the pipeline *after* the body is rendered, so it is not
+  a field an admin can delete, forget, or edit away — the same structural approach
+  M12 takes with the recording disclosure.
+- **The link is signed and carries no session.** It is an HMAC over
+  (candidate id, channel), so: a holder can opt **that one candidate** out of
+  **that one channel**; changing the id invalidates the signature so nobody can be
+  enumerated; and **the link cannot re-subscribe anyone** — opting back in is a
+  deliberate act recorded by a recruiter.
+- **No signing key → the footer changes rather than disappearing.** The key is
+  `INTEGRATION_ENCRYPTION_KEY`. Unset, the footer says *"reply to this message and
+  ask to be removed"*. **A dead unsubscribe link is worse than an instruction to a
+  human**, because the candidate believes they have opted out and nothing happened.
+- **The opt-out happens on a POST, not on the GET.** Mail clients and corporate
+  link scanners fetch every URL in an email. If the GET did the work, a scanner
+  would silently unsubscribe candidates who never clicked anything — and the team
+  would have no idea why their messages stopped arriving. So the page renders a
+  **button**, and the button submits. The outcome then rides in the URL so the
+  resulting page is a plain GET that can be reloaded or bookmarked.
+- `/unsubscribe` has **no session, no nav, no app shell** — the reader is not a
+  user of the product.
+
+## 24.5 Templates
+
+`message_templates (name ≤120, event_key CHECK against the closed 12, channel
+CHECK IN ('email','whatsapp','both'), subject ≤300, body, whatsapp_body,
+active DEFAULT **false**)`.
+
+Constraints:
+- `message_templates_subject_channel` — a WhatsApp-only template **may not** have a
+  subject (a subject nobody will ever see is refused rather than silently ignored).
+- `message_templates_whatsapp_body_scope` — `whatsapp_body` is only allowed when
+  `channel = 'both'`.
+
+**The seeded library ships INACTIVE.** An active template sends automatically the
+moment its event happens; seeding twelve live templates would mean a product update
+started emailing an organization's candidates without anybody choosing to.
+
+The editor **warns when a template references a token its own event cannot supply**
+— `{{interview.time}}` in the rejection email would render blank and nobody would
+notice until a candidate read it.
+
+## 24.6 The manual send route — four refusals
+
+`POST /api/messages` (owner/admin/recruiter; **a Recruiter may only send about
+their own applications** — RLS cannot express that, so the route does):
+
+1. **It will not trust the client's rendering.** Any remaining `{{tokens}}` are
+   resolved **server-side** from the database. A caller cannot post a body with a
+   candidate name of their choosing and have the log record it as this candidate's
+   message.
+2. **It will not silently send to somebody who opted out.** First attempt → **409
+   `code:"opted_out"`** with the reason; the recruiter re-submits with
+   `acknowledge_opt_out: true`.
+3. **It will not silently send to someone with no address.** Same 409 shape,
+   different code — the remedy is different.
+4. **It will not attach an unsubscribe footer.** A manual message is a
+   conversation, usually a reply. Stapling "unsubscribe here" onto a personal reply
+   is both odd and — when the recruiter is deliberately overriding an opt-out —
+   contradictory.
+
+Validation: 400 "Choose an application." / "Choose email or WhatsApp.";
+**422** "Write a message first." / "An email needs a subject line."
+
+## 24.7 UI Components
+
+| Page | Component | Notes |
+| --- | --- | --- |
+| `/settings/templates` | `TemplateLibrary` + `TemplateEditor` | "New template" / "Edit template", placeholder "e.g. Shortlisted — engineering roles", "e.g. Your application for {{job.title}}", "Hi {{candidate.name}}, …" |
+| `/applications/[id]` | `SendMessagePanel` | Channel, subject ("Your application for {{job.title}}"), body, opt-out warning |
+| `/applications/[id]`, `/candidates/[id]` | `CommunicationLog`, `CommunicationCard` | What was sent, when, by whom, status |
+| `/unsubscribe` | Standalone page | Logo + one card + one button. No nav |
+| `PlaceholderEditor` | Token insertion | Shared with hiring-stage prompts |
+
+## 24.8 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-COMM-001 | Templates | **Seeded inactive** | Fresh organization, open `/settings/templates` | Every seeded template is **inactive** — nothing sends until someone activates it | | | Critical |
+| TC-COMM-002 | Templates | Activate one | Activate `shortlisted`, move an application to Shortlisted | The candidate receives it | | | Critical |
+| TC-COMM-003 | Templates | **Inactive sends nothing** | Deactivate it, move another application | **No message** | | | Critical |
+| TC-COMM-004 | Templates | WhatsApp-only + subject | Create channel `whatsapp` with a subject | **Refused** (`message_templates_subject_channel`) | | | High |
+| TC-COMM-005 | Templates | `whatsapp_body` on an email template | Set it with channel `email` | Refused (`message_templates_whatsapp_body_scope`) | | | High |
+| TC-COMM-006 | Templates | Invalid `event_key` | `{"event_key":"ghosted"}` | Refused by the CHECK | | | High |
+| TC-COMM-007 | Templates | **Token warning** | Put `{{interview.time}}` in a rejection template | The editor **warns** that this event cannot supply that token | | | Critical |
+| TC-COMM-008 | Templates | Manual-only events labelled | Look at `offer_extended` and `unqualified` | Marked as having **no automatic send point** | | | Critical |
+| TC-COMM-009 | Templates | Owner/Admin only | Recruiter opens `/settings/templates` | Section hidden; `POST` → 403 | | | Critical |
+| TC-COMM-010 | Templates | Delete in use | Delete a template referenced by an automation | Refused or handled with a clear message | | | High |
+| TC-COMM-011 | **Automatic** | Stage → shortlisted | Active template, move the stage | Sent, logged with `event_key` | | | Critical |
+| TC-COMM-012 | Automatic | **No phone/video on stage move** | Active `video_interview_scheduled`, move the stage to video_interview | **No message** — it fires from scheduling, where a time exists | | | Critical |
+| TC-COMM-013 | Automatic | Fires from scheduling | Schedule a video interview | Sent, **with the time in it** | | | Critical |
+| TC-COMM-014 | Automatic | Once per application | Move out and back into the same stage | The once-per-application guard prevents a repeat | | | High |
+| TC-COMM-015 | **Opt-out** | Automatic refused | Opt a candidate out of email, trigger an automatic send | **Refused in the pipeline**; logged as not sent with a reason | | | Critical |
+| TC-COMM-016 | Opt-out | **Manual warns first** | Manually message an opted-out candidate | **409 `opted_out`** with the reason. **Nothing sent yet** | | | Critical |
+| TC-COMM-017 | Opt-out | Manual override works | Re-submit with `acknowledge_opt_out: true` | Sent, and the override is visible in the log | | | Critical |
+| TC-COMM-018 | Opt-out | Per channel | Opt out of email only | WhatsApp still sends | | | Critical |
+| TC-COMM-019 | Opt-out | Recording an opt-out | Recruiter records "please stop emailing me" | `candidate_communication_preferences` updated | | | High |
+| TC-COMM-020 | Opt-out | **Lifting requires a person** | Lift an opt-out via the UI | Allowed for owner/admin/recruiter, and audited | | | High |
+| TC-COMM-021 | Opt-out | Bad payload | `PUT {"email_opted_out":"yes"}` | 400 "email_opted_out must be true or false." | | | Medium |
+| TC-COMM-022 | **Unsubscribe** | Footer present | Send an automatic email | The footer with the unsubscribe link is there | | | Critical |
+| TC-COMM-023 | Unsubscribe | **Template cannot remove it** | Write a template with no footer text | The footer is **still appended** | | | Critical |
+| TC-COMM-024 | Unsubscribe | **GET does nothing** | Open the link and do **not** click | **The candidate is NOT unsubscribed** (link scanners must not opt people out) | | | Critical |
+| TC-COMM-025 | Unsubscribe | POST works | Click the button | Opted out; the page says so | | | Critical |
+| TC-COMM-026 | Unsubscribe | Reload is safe | Reload the result page | No re-submission; the state rides in the URL | | | High |
+| TC-COMM-027 | Unsubscribe | **Tampered id** | Change the candidate id in the token | **Signature invalid** — refused | | | Critical |
+| TC-COMM-028 | Unsubscribe | **Cannot re-subscribe** | Try to craft an "opt back in" link | Impossible — the token only opts out | | | Critical |
+| TC-COMM-029 | Unsubscribe | Already opted out | Click again | Reported as already opted out, not an error | | | Medium |
+| TC-COMM-030 | Unsubscribe | **No signing key** | Unset `INTEGRATION_ENCRYPTION_KEY`, send | Footer says **"reply and ask to be removed"** — **no dead link is emitted** | | | Critical |
+| TC-COMM-031 | Unsubscribe | Public path | Open `/unsubscribe` signed out | Renders; **no redirect to login**, no nav, no app shell | | | Critical |
+| TC-COMM-032 | **Manual send** | Happy path | Compose and send | Delivered and logged with `sent_by` | | | Critical |
+| TC-COMM-033 | Manual send | **Tokens resolved server-side** | POST a body with `{{candidate.name}}` and a forged name elsewhere | Tokens resolve from the **database**; the log records the real candidate's message | | | Critical |
+| TC-COMM-034 | Manual send | **No unsubscribe footer** | Send manually | **No footer** — it is a conversation | | | High |
+| TC-COMM-035 | Manual send | No address | Candidate with no email, send by email | **409** with a distinct code | | | Critical |
+| TC-COMM-036 | Manual send | Empty body | Send blank | **422** "Write a message first." | | | High |
+| TC-COMM-037 | Manual send | Email with no subject | Email channel, blank subject | **422** "An email needs a subject line." | | | High |
+| TC-COMM-038 | Manual send | No application | POST without one | 400 "Choose an application." | | | Medium |
+| TC-COMM-039 | Manual send | Bad channel | `{"channel":"pigeon"}` | 400 "Choose email or WhatsApp." | | | Medium |
+| TC-COMM-040 | Manual send | **Recruiter scope** | Recruiter sends about **someone else's** application | Refused — the route enforces what RLS cannot | | | Critical |
+| TC-COMM-041 | Manual send | Viewer denied | Viewer POSTs | 403 | | | Critical |
+| TC-COMM-042 | **Channels** | WhatsApp down, email works | Disconnect WhatsApp, send a `both` template | **Email still sends**; each channel has its own log row | | | Critical |
+| TC-COMM-043 | Channels | Email down, WhatsApp works | Reverse | WhatsApp still sends | | | Critical |
+| TC-COMM-044 | Channels | Neither connected | Both disconnected | Recorded as **not sent with a reason** — nothing fails | | | Critical |
+| TC-COMM-045 | Channels | WhatsApp never read unnecessarily | Send an email-only template with WhatsApp broken | WhatsApp is not consulted at all | | | High |
+| TC-COMM-046 | **Log** | Resolved text | Send an automatic message, read `body_sent` | **Includes the footer**, byte-for-byte what the provider got | | | Critical |
+| TC-COMM-047 | Log | Masked recipient | Inspect `recipient_hint` | Masked, never a full address or number | | | Critical |
+| TC-COMM-048 | Log | Provenance | Send one automatically and one manually | `sent_by` is NULL for the automation and a user id for the person; `event_key` set only on the automatic one | | | High |
+| TC-COMM-049 | Log | **Write failure reported** | Simulate a `message_log` insert failure after a successful send | The caller is **told** — not swallowed | | | Critical |
+| TC-COMM-050 | Log | Survives archived application | Archive an application that had messages | The log survives (`application_id` is ON DELETE SET NULL; `candidate_id` is stored separately) | | | High |
+| TC-COMM-051 | Never throws | Provider outage | Break the email provider, then move a stage | **The stage still changes** | | | Critical |
+| TC-COMM-052 | Tenant | Cross-tenant | Send about org B's application | 404/403 | | | Critical |
+
+## 24.9 Known Risks — M21
+
+1. This module can **contact real people**. Never test against production
+   credentials, and use addresses/numbers you control.
+2. `APP_URL` is the fallback origin for the unsubscribe link when a send has no
+   request behind it (an automation, the sweep). If it is unset **and** there is no
+   request, the link degrades. Verify the automation path specifically.
+3. **`supabase/migrations/0030_module15_candidate_messaging.sql` contains 4 bytes
+   of garbage** (the literal text `writ`). The `message_templates`, `message_log`
+   and `candidate_communication_preferences` tables exist **only** in
+   `supabase/ALL_MIGRATIONS.sql`. Anyone applying `supabase/migrations/` file by
+   file, or running `supabase db push`, gets a database with **no candidate
+   messaging tables at all** — see §Recommended Improvements. This is the single
+   highest-severity issue found in this review.
+
+---
+
+# 25. MODULE M22 — Analytics & Reporting
+
+## 25.1 Purpose
+
+The manager's view: funnel, time-to-hire, stage durations, bottleneck, source
+performance, screening metrics, interview metrics, automation metrics, estimated
+recruiter time saved — plus CSV export and an AI explainer.
+
+**Who uses it:** all four roles may **read**; a **Recruiter is scoped to their own
+work** and recruiter comparisons are hidden from them; a **Viewer may read but
+NOT export** (*"Your role can view analytics but not export them."*).
+
+## 25.2 The honesty rules — the most important thing to test here
+
+### `MIN_SAMPLE_FOR_RATE = 3`
+
+> Three, not one. Two data points give 0%, 50% or 100% — all of which read as
+> findings and none of which are.
+
+A `Rate` is one of **three** things, and they must render differently:
+
+| Kind | When | Rendered as | Caption |
+| --- | --- | --- | --- |
+| `rate` | denominator ≥ 3 | `"{percent}%"` (1 decimal) | — |
+| `insufficient` | 0 < denominator < 3 | `"{numerator}/{denominator}"` | "Not enough data for a meaningful percentage — n of m." |
+| `no_data` | denominator ≤ 0 or non-finite | `"—"` | "No data in this period." |
+
+**`formatRate` never invents a number for the absent cases.** A dash is a correct
+answer; `0%` would be a false one.
+
+### Other honest defaults
+- `MANUAL_CALL_OVERHEAD_MINUTES = 8` — the basis of "Estimated recruiter time saved".
+  It is an **estimate** and must be labelled as one.
+- `findBottleneck()` returns `null` when there is no bottleneck rather than picking
+  the least-good stage.
+- Date ranges: **7d / 30d / 90d / 12m**, with an optional **compare with previous**.
+  All computed in the **organization's** timezone with half-open `[start, end)` ranges.
+
+## 25.3 Filters are URLs
+
+`AnalyticsFilterBar` renders **links, not a client-side form**, so every filter
+state is a real URL: shareable, bookmarkable and back-button-correct. It also means
+**the CSV export link carries exactly the filters on screen** — which is what makes
+"export matches the screen" visible in the markup rather than asserted in a comment.
+
+Filters: `range`, `job_id`, `client_id` (**agency mode only**), `recruiter_id`
+(**hidden for a Recruiter, who is pinned to their own work**), `compare`.
+
+## 25.4 UI Components
+
+| UI Component | Purpose | Notes |
+| --- | --- | --- |
+| Range buttons | 7d / 30d / 90d / 12m | Active one is primary-styled |
+| Job / Client / Recruiter selects | Filter | Client hidden in-house; Recruiter hidden for recruiters |
+| **Compare with previous** toggle | Period comparison | Label flips to "Comparing with previous" |
+| **Export** button | CSV | Same filters as the screen. **Hidden/refused for a Viewer** |
+| Charts (`charts.tsx`) | Funnel, durations, sources | Flat, no 3D, tokenised colours |
+| "Estimated recruiter time saved" | Derived metric | Must read as an estimate |
+| **"Recruiter comparisons are restricted"** | Scope notice | Shown to a Recruiter |
+| `AskAnalytics` panel | AI explainer | placeholder "Why did placements drop this month?" |
+
+## 25.5 API Flow
+
+| API | Method | Auth | Notes |
+| --- | --- | --- | --- |
+| `/api/analytics` | GET | **all four roles** | `?range ?job_id ?client_id ?recruiter_id ?source ?compare`. The query layer scopes a Recruiter to their own work |
+| `/api/analytics/export` | GET | **not Viewer** | 403 "Your role can view analytics but not export them." Built from the **same `buildReport()`** the screen uses, with the same filters |
+| `/api/analytics/ai-action` | POST | all four roles | 400 "That question is too long." **The report is rebuilt server-side** with the caller's own filters and role scope. Response is **cached in-process**, keyed on the figures |
+
+**POST/PATCH/DELETE on `/api/analytics` are deliberately not implemented** —
+analytics is a read surface.
+
+## 25.6 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-ANL-001 | Load | Page renders | Open `/analytics` | Filters, charts and metric cards render | | | Critical |
+| TC-ANL-002 | **Honesty** | **n = 0** | Fresh org | Rates show **"—"** with "No data in this period." **Never 0%** | | | Critical |
+| TC-ANL-003 | Honesty | **n = 1** | Exactly one application | Shows **"1/1"** with "Not enough data for a meaningful percentage" — **not 100%** | | | Critical |
+| TC-ANL-004 | Honesty | **n = 2** | Two applications | Still `insufficient` — **not 50%** | | | Critical |
+| TC-ANL-005 | Honesty | n = 3 | Three applications | A real percentage appears | | | Critical |
+| TC-ANL-006 | Honesty | Percent precision | 1 of 3 | `33.3%` (one decimal) | | | Medium |
+| TC-ANL-007 | Honesty | Bottleneck absent | Even stage durations | **No bottleneck named**, rather than the least-good stage | | | High |
+| TC-ANL-008 | Honesty | Time saved labelled | Read the tile | Reads as an **estimate**, with the 8-minute basis discoverable | | | High |
+| TC-ANL-009 | Range | 7d | Click 7d | URL updates; data is for the last 7 days | | | High |
+| TC-ANL-010 | Range | 12m | Click 12m | Full year | | | High |
+| TC-ANL-011 | Range | Timezone | Org in `America/New_York` | Boundaries use the **org** timezone, half-open | | | Critical |
+| TC-ANL-012 | Compare | Toggle on | Click Compare | Label becomes "Comparing with previous"; deltas appear | | | High |
+| TC-ANL-013 | Compare | Deltas are correct | Known data across two periods | Direction and magnitude are right | | | High |
+| TC-ANL-014 | **Filters as URLs** | Shareable | Set filters, copy the URL, open in a new tab | **The same view** | | | Critical |
+| TC-ANL-015 | Filters | Back button | Apply three filters, press Back three times | Steps back through them correctly | | | High |
+| TC-ANL-016 | Filters | Client hidden in-house | `agency_mode = false` | **No Client filter** | | | High |
+| TC-ANL-017 | Filters | Recruiter filter hidden | As a recruiter | **No Recruiter filter**; "Recruiter comparisons are restricted" is shown | | | Critical |
+| TC-ANL-018 | **Scope** | Recruiter sees own | As a recruiter with a mixed dataset | Only their own work | | | Critical |
+| TC-ANL-019 | Scope | Owner sees everything | As owner | Org-wide | | | Critical |
+| TC-ANL-020 | Scope | Viewer sees org-wide | As viewer | Org-wide read | | | High |
+| TC-ANL-021 | **Export** | **Matches the screen** | Set filters, click Export | The CSV contains **exactly** the filtered figures on screen | | | Critical |
+| TC-ANL-022 | Export | **Viewer refused** | Viewer hits `/api/analytics/export` | **403** "Your role can view analytics but not export them." | | | Critical |
+| TC-ANL-023 | Export | Recruiter scope in the CSV | Recruiter exports | Own-scope data only | | | Critical |
+| TC-ANL-024 | Export | Filename and encoding | Open in Excel | UTF-8 safe; commas/quotes in names escaped correctly | | | High |
+| TC-ANL-025 | Export | Empty dataset | Export a fresh org | A valid CSV with headers, not a crash | | | High |
+| TC-ANL-026 | **Ask AI** | Grounded answer | Ask "Why did placements drop this month?" | The answer uses **only** the figures on screen | | | Critical |
+| TC-ANL-027 | Ask AI | **Rebuilt server-side** | Send altered filters/figures in the body | The report is **rebuilt server-side** with the caller's own filters and role scope | | | Critical |
+| TC-ANL-028 | Ask AI | Question too long | Paste a huge question | 400 "That question is too long." | | | Medium |
+| TC-ANL-029 | Ask AI | Cached | Ask the same question twice with no data change | Second is served from cache | | | Medium |
+| TC-ANL-030 | Ask AI | Cache invalidates | Change data, ask again | A fresh answer | | | High |
+| TC-ANL-031 | Ask AI | AI off | Unset the key | Friendly message; **charts still render** | | | Critical |
+| TC-ANL-032 | Ask AI | Recruiter scope | As a recruiter | The answer respects own-scope | | | Critical |
+| TC-ANL-033 | Charts | Design system | Inspect the charts | Flat, tokenised colours, **no 3D, no rainbow palette** | | | Medium |
+| TC-ANL-034 | Charts | Empty state | No data | Charts show an empty state, not a broken axis | | | High |
+| TC-ANL-035 | Funnel | Counts add up | Known dataset | Funnel steps are consistent with the applications list | | | Critical |
+| TC-ANL-036 | Funnel | **No double counting** | One candidate applied to two jobs | Counted as two applications, one per job — the `UNIQUE(candidate_id, job_id)` guard prevents a third | | | High |
+| TC-ANL-037 | Time to hire | Correct | Hire someone with a known timeline | Matches the stage history | | | High |
+| TC-ANL-038 | Client feedback time | Agency only | Complete a submission cycle | Appears; absent for in-house | | | High |
+| TC-ANL-039 | Tenant | Cross-tenant | Compare two orgs' numbers | Completely isolated | | | Critical |
+| TC-ANL-040 | Perf | Large dataset | 10,000 applications | Renders in reasonable time | | | Medium |
+
+## 25.7 Known Risks — M22
+
+1. The AI answer cache is **in-process** — per-instance on serverless.
+2. "Estimated recruiter time saved" rests on a single hard-coded constant
+   (8 minutes). If the UI ever drops the word "estimated", it becomes a claim.
+3. Rate rendering has three visual states. A UI regression that collapses
+   `insufficient` into `0%` would be a **Critical** honesty bug, not a cosmetic one.
+
+---
+
+# 26. MODULE M23 — Onboarding & Document Management
+
+## 26.1 Purpose
+
+After Hired: collect, verify and complete the document checklist every new hire
+owes. **Records are created by a database trigger, never by a route.**
+
+> The route is **`/hires`, not `/onboarding`.** `/onboarding` is Module 1's
+> workspace-setup wizard and a public path in `proxy.ts`; taking that route would
+> have broken sign-up. The nav **label** stays "Onboarding" because that is what a
+> recruiter calls this.
+
+## 26.2 Lifecycle
+
+```
+applications.stage → 'hired'
+   │ TRIGGER trg_applications_create_onboarding → create_onboarding_on_hire()
+   ▼
+onboarding_records (application_id UNIQUE)   ← the "exactly one per hire" guarantee
+   │ seeded from organization_document_templates
+   ▼
+onboarding_documents (one row per active template, + one-off additions)
+   pending → uploaded → verified
+                     ↘ rejected (reason REQUIRED)
+   │ all REQUIRED documents verified
+   ▼
+onboarding_records.status = 'completed', completed_at set
+```
+
+`application_id` is **UNIQUE** — an application moved out of Hired and back in must
+not get a second checklist, nor have its first one reset.
+
+`onboarding_records_completed_at_matches_status` — `completed_at` and `status`
+**cannot disagree**, because analytics reads both.
+
+## 26.3 The seven default document templates (`DEFAULT_DOCUMENT_TEMPLATES`)
+
+| # | Name | Required | Expected from |
+| --- | --- | --- | --- |
+| 1 | Signed Offer Letter | ✅ | **recruiter** |
+| 2 | PAN Card | ✅ | candidate |
+| 3 | Aadhaar / Government ID | ✅ | candidate |
+| 4 | Educational Certificates | ✅ | candidate |
+| 5 | Bank Account Details | ✅ | candidate |
+| 6 | Background Verification Consent | ✅ | candidate |
+| 7 | Previous Employment Relieving Letter | ❌ optional | candidate |
+
+Template names are **unique per organization** — two identically-named document
+types make the checklist unreadable ("PAN Card" twice, one verified).
+
+## 26.4 The completion gate (`lib/onboarding/documents.ts`)
+
+> "Mark onboarding complete" is enabled **only when every REQUIRED document is
+> Verified.** Getting that wrong in either direction is expensive: too strict and a
+> hire is stuck behind an optional relieving letter they will never produce; too
+> loose and someone is marked onboarded without a signed offer letter on file.
+
+`completionCheck()` returns the **verdict and the reasons together**, and the UI
+never re-derives it. `blockerSummary()` turns the blockers into a sentence.
+
+## 26.5 Database-level status integrity
+
+Three CHECK constraints stop a status and the row's contents drifting apart,
+**whichever client wrote the row**:
+
+- `onboarding_documents_uploaded_has_file` — anything other than `pending` must
+  have a `file_url`
+- `onboarding_documents_verified_has_verifier` — `verified` **iff** both
+  `verified_by` and `verified_at` are set
+- `onboarding_documents_rejected_has_reason` — **"Reject requires a short reason"**,
+  enforced here so it holds for a direct PostgREST write, not only in the form
+- `onboarding_documents_unique_template` — one row per template per hire, so
+  re-running generation cannot silently duplicate the checklist
+
+## 26.6 Permissions
+
+| Action | Roles |
+| --- | --- |
+| View | any member |
+| Upload / verify / add a one-off document | owner/admin/recruiter — **but only if not assigned to someone else**: *"This hire's onboarding is assigned to someone else."* |
+| **Reject** a document | **owner/admin only** |
+| **Reset** a document to pending | **owner/admin only** |
+| **Delete** a one-off document | **owner/admin**, and **only where `template_id` is null** |
+| **Reassign** onboarding | **owner/admin only** |
+
+`can_manage_onboarding(p_record_id)` is the DB-side helper backing the policies.
+
+## 26.7 File upload
+
+Private bucket **`onboarding-documents`**, 10 MB, path
+`<organization_id>/…` with policies on the **first path segment**.
+
+Accepted types are **wider than resumes** — photos are first-class here, because a
+candidate photographs their PAN card:
+`application/pdf`, `image/jpeg`, `image/png`, `image/heic`,
+`.docx`, `application/msword`.
+Rejection message: *"Upload a PDF, an image (JPG, PNG, HEIC), or a Word document."*
+
+Reads go through a **short-lived signed URL** then a redirect. Identity documents
+are the most sensitive files in this product.
+
+## 26.8 UI Components
+
+| Page | Component | Notes |
+| --- | --- | --- |
+| `/hires` | Table + `OnboardingFilters` + `ProgressBar` + avatar initials | Empty state: "No one is onboarding right now — New onboarding records are created automatically when an application reaches Hired." |
+| `/hires` | Status chips | in_progress = **warning** (wants attention), completed = success, on_hold = neutral (somebody chose it) |
+| `/hires/[id]` | `DocumentChecklist` (567 lines) + `OnboardingActions` | "Document progress", "Provided by", "Document name", rejection placeholder "e.g. The scan is cut off — the number isn't readable." |
+| `/settings/onboarding` | `DocumentTemplates` (554 lines) | Name, Description, Required, Provided by, reorder |
+
+## 26.9 API Flow
+
+| API | Method | Auth | Errors |
+| --- | --- | --- | --- |
+| `/api/onboarding/[id]` | GET | any member | 404 "Onboarding record not found." |
+| `/api/onboarding/[id]` | PATCH | owner/admin/recruiter | 400 invalid status; **completion-gate refusal with reasons**; **403 "Only an Owner or Admin can reassign onboarding."**; 400 non-member assignee; 400 "No valid fields provided." |
+| `/api/onboarding/[id]/documents` | POST | owner/admin/recruiter | 400 name empty/>120; 400 "Choose who provides this document — Candidate or Recruiter."; **403 assigned to someone else**; 404 |
+| `/api/onboarding/documents/[id]` | PATCH | owner/admin/recruiter | **409 "There is nothing uploaded to verify yet."**; **403 "Only an Owner or Admin can reject a document."**; **409 "Only an uploaded document can be rejected."**; **400 "Say why it was rejected — whoever uploaded it will see this."**; **403 "Only an Owner or Admin can reset a document."**; 400 invalid status |
+| `/api/onboarding/documents/[id]` | DELETE | **owner/admin** | Refused where `template_id` is not null; 404 |
+| `/api/onboarding/documents/[id]/file` | GET | any member | 404 "Document not found." / **404 "Nothing has been uploaded yet."** |
+| `/api/onboarding/documents/[id]/file` | POST | owner/admin/recruiter | 403 assigned elsewhere; 400 "Choose a file to upload."; 400 >10 MB; 400 wrong type; 400 "Could not attach that file." |
+| `/api/settings/document-templates` | GET | any member | 400 with a schema-migration hint |
+| `/api/settings/document-templates` | POST | **owner/admin** | **409 "A document type with that name already exists."** |
+| `/api/settings/document-templates/[id]` | PATCH / DELETE | **owner/admin** | 400 invalid flags/order; 409 duplicate name; 404 |
+| `/api/settings/document-templates/reorder` | PUT | **owner/admin** | 400 "Send the full ordered list of ids." / "Nothing to reorder." / "Duplicate ids in the order." / "That list refers to a document type that isn't yours." |
+
+## 26.10 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-ONB-001 | **Creation** | Hired creates a record | Move an application to Hired | An `onboarding_records` row + the 7-item checklist appear at `/hires` | | | Critical |
+| TC-ONB-002 | Creation | **Never by a route** | Try to POST an onboarding record | There is no create endpoint — only the trigger | | | High |
+| TC-ONB-003 | Creation | **Exactly one per hire** | Move out of Hired and back | **Still one record**, not reset (`application_id` UNIQUE) | | | Critical |
+| TC-ONB-004 | Creation | Seeded from active templates | Deactivate a template, then hire someone | The deactivated type is **not** in their checklist | | | High |
+| TC-ONB-005 | Upload | Valid PDF | Upload against a document | Status → uploaded; `file_url` set | | | Critical |
+| TC-ONB-006 | Upload | **Photo accepted** | Upload a JPEG of a PAN card | Accepted (photos are first-class here, unlike resumes) | | | Critical |
+| TC-ONB-007 | Upload | HEIC accepted | Upload an iPhone photo | Accepted | | | High |
+| TC-ONB-008 | Upload | Wrong type | Upload a `.zip` | "Upload a PDF, an image (JPG, PNG, HEIC), or a Word document." | | | High |
+| TC-ONB-009 | Upload | Over 10 MB | Upload 11 MB | "That file is larger than 10 MB." | | | High |
+| TC-ONB-010 | Upload | Replace | Upload again over an existing file | Replaced; status stays uploaded | | | High |
+| TC-ONB-011 | **Verify** | Happy path | Verify an uploaded document | Status verified; `verified_by`/`verified_at` set | | | Critical |
+| TC-ONB-012 | Verify | **Nothing uploaded** | Verify a `pending` document | **409** "There is nothing uploaded to verify yet." | | | Critical |
+| TC-ONB-013 | Verify | DB constraint holds | PostgREST-set `status='verified'` with no verifier | Refused by `onboarding_documents_verified_has_verifier` | | | Critical |
+| TC-ONB-014 | **Reject** | **Owner/Admin only** | Recruiter rejects | **403** "Only an Owner or Admin can reject a document." | | | Critical |
+| TC-ONB-015 | Reject | **Reason required** | Admin rejects with a blank reason | **400** "Say why it was rejected — whoever uploaded it will see this." | | | Critical |
+| TC-ONB-016 | Reject | DB constraint holds | PostgREST-set `status='rejected'` with no reason | Refused by `onboarding_documents_rejected_has_reason` | | | Critical |
+| TC-ONB-017 | Reject | Only an uploaded document | Reject a `pending` one | **409** "Only an uploaded document can be rejected." | | | High |
+| TC-ONB-018 | Reject | Reason is visible | Reject with a reason | Whoever uploaded it can see it | | | High |
+| TC-ONB-019 | Reset | Owner/Admin only | Recruiter resets to pending | **403** "Only an Owner or Admin can reset a document." | | | Critical |
+| TC-ONB-020 | **Completion gate** | **Blocked** | Leave one required document unverified, Mark complete | **Refused**, and the **reasons name the blocking documents** | | | Critical |
+| TC-ONB-021 | Completion gate | **Optional does not block** | Verify all required, leave the optional relieving letter pending | **Complete succeeds** | | | Critical |
+| TC-ONB-022 | Completion gate | Rejected blocks | Reject a required document | Completion blocked | | | Critical |
+| TC-ONB-023 | Completion gate | `completed_at` matches | Complete successfully | Both `status='completed'` and `completed_at` set (CHECK enforces the pair) | | | Critical |
+| TC-ONB-024 | Completion gate | Cannot fake it | PostgREST-set `status='completed'` with a null `completed_at` | Refused by the CHECK | | | Critical |
+| TC-ONB-025 | **Assignment** | Assigned elsewhere | Recruiter A uploads to a hire assigned to Recruiter B | **403** "This hire's onboarding is assigned to someone else." | | | Critical |
+| TC-ONB-026 | Assignment | Reassign is admin-only | Recruiter reassigns | **403** "Only an Owner or Admin can reassign onboarding." | | | Critical |
+| TC-ONB-027 | Assignment | Non-member assignee | Assign an org B user | 400 "That person is not a member of this team." | | | Critical |
+| TC-ONB-028 | One-off docs | Add | Add "Work permit" | Appears with `template_id = null` | | | High |
+| TC-ONB-029 | One-off docs | Missing `expected_from` | Add without choosing | 400 "Choose who provides this document — Candidate or Recruiter." | | | Medium |
+| TC-ONB-030 | One-off docs | Name too long | 121 chars | 400 "Keep the name under 120 characters." | | | Medium |
+| TC-ONB-031 | One-off docs | **Delete only one-offs** | Delete a template-derived document | **Refused** | | | Critical |
+| TC-ONB-032 | One-off docs | Delete a one-off | Delete one | Removed | | | High |
+| TC-ONB-033 | **Templates** | Duplicate name | Add "PAN Card" twice | **409** "A document type with that name already exists." | | | High |
+| TC-ONB-034 | Templates | Reorder | Drag/reorder and save | New order persists | | | Medium |
+| TC-ONB-035 | Templates | Reorder — partial list | Send some ids | 400 "Send the full ordered list of ids." | | | Medium |
+| TC-ONB-036 | Templates | Reorder — duplicates | Send an id twice | 400 "Duplicate ids in the order." | | | Medium |
+| TC-ONB-037 | Templates | **Reorder — foreign id** | Include org B's template id | 400 "That list refers to a document type that isn't yours." | | | Critical |
+| TC-ONB-038 | Templates | Owner/Admin only | Recruiter POSTs | 403 | | | Critical |
+| TC-ONB-039 | Templates | Delete does not destroy documents | Delete a template with existing documents | Documents survive with `template_id = null` (SET NULL) — the document itself is still real | | | Critical |
+| TC-ONB-040 | **File access** | Signed URL | Click a document | Redirected to a short-lived signed URL | | | Critical |
+| TC-ONB-041 | File access | **Private bucket** | Open the raw storage path unauthenticated | **Denied** | | | Critical |
+| TC-ONB-042 | File access | Nothing uploaded | GET the file on a pending document | **404** "Nothing has been uploaded yet." | | | Medium |
+| TC-ONB-043 | File access | Cross-tenant | Request org B's document | 404 | | | Critical |
+| TC-ONB-044 | List | Filters | Filter by job, assignee, status | Applied | | | High |
+| TC-ONB-045 | List | Archived job included | Hire on an archived job | Still listed and filterable (onboarding outlives the requisition) | | | High |
+| TC-ONB-046 | List | Empty state | No hires | "No one is onboarding right now…" with a link to Applications | | | High |
+| TC-ONB-047 | List | **Schema-migration state** | Run against a DB missing migration 0026 | "Database migration pending" with the SCHEMA_OUT_OF_DATE message — **not a generic error** | | | High |
+| TC-ONB-048 | Status chips | Tones | One record in each status | in_progress **warning**, completed success, on_hold neutral | | | Medium |
+| TC-ONB-049 | Automation | `onboarding_document_uploaded` | Active rule, upload a document | Fires | | | High |
+| TC-ONB-050 | Automation | `onboarding_completed` | Active rule, complete a record | Fires | | | High |
+
+## 26.11 Known Risks — M23
+
+1. **A required-document list change does not retro-fit existing hires.** Adding a
+   new required template after someone is mid-onboarding — verify what happens.
+2. Overdue-pending sweeps (`overduePendingDocuments`, `lib/onboarding/reminders.ts`)
+   depend on the same reminder path as M20 — which has **no cron**.
+3. Identity documents are the most sensitive files here. Test the private-bucket
+   and signed-URL behaviour hardest.
+
+---
+
+# 27. MODULE M24 — Settings & Integrations
+
+## 27.1 Purpose
+
+Everything an organization configures once and checks occasionally, plus the
+credential store for six external providers.
+
+## 27.2 Settings sections and who can open them (`SettingsShell.tsx`)
+
+| Section | Route | Roles |
+| --- | --- | --- |
+| Organization | `/settings/organization` | **owner/admin** |
+| Team & permissions | `/settings/users` | **everyone** |
+| Recruitment | `/settings/recruitment` | owner/admin |
+| Screening | `/settings/screening` | owner/admin |
+| Pipeline | `/settings/pipeline` | owner/admin |
+| Onboarding documents | `/settings/onboarding` | owner/admin |
+| Message templates | `/settings/templates` | owner/admin |
+| Notifications | `/settings/notifications` | **everyone** |
+| Integrations | `/settings/integrations` | owner/admin |
+| Security & data | `/settings/security` | owner/admin |
+
+> **Sections a role may not open are HIDDEN, not greyed out.** The requirement is
+> "hide or disable (not just visually gray out without blocking)", and every page
+> re-checks independently. A Recruiter sees the two sections that are genuinely
+> theirs rather than a wall of locked doors.
+
+`/settings` itself **redirects to the first section your role can actually open** —
+an Owner lands on Organization, a Recruiter on Team & permissions.
+
+## 27.3 Credential security — three layers
+
+1. **AES-GCM encryption at rest** (`lib/integrations/crypto.ts`), key from
+   `INTEGRATION_ENCRYPTION_KEY` (≥32 chars). Format `"<base64 iv>.<base64 ciphertext>"`.
+   **Unset → the adapters refuse to connect** rather than storing secrets in the clear.
+2. **A column-level REVOKE** (migration 0007) on `encrypted_credentials`, so even
+   an Owner's authenticated session cannot read the ciphertext. Reading it requires
+   the service-role client.
+3. **The API returns only masked metadata**: `maskSecret()` → `"••••••4F8A"`.
+   The key itself is never returned.
+
+A decryption failure (usually a rotated key) says *"Stored credentials could not be
+read. Reconnect the integration."* rather than leaking crypto detail.
+
+## 27.4 The six providers
+
+| Provider | Connect style | What stops working without it |
+| --- | --- | --- |
+| **bolna** | API key | AI screening calls (manual and automated); screening reports, which are built from transcripts |
+| **calendar** | **OAuth** | Interview invites — *"interviews still schedule here, but nobody is invited"*; Google Meet links |
+| **email** | API key (Resend-compatible) | Candidate emails, email notifications |
+| **whatsapp** | API key (Meta Cloud API) | WhatsApp candidate messages |
+| **llm** | API key | AI features (see the caveat below) |
+| **n8n** | API key + URL | The `call_n8n_webhook` automation action |
+
+Statuses: `disconnected` | `connected` | `needs_attention` | `error`.
+`credential_mode`: `platform_managed` | `organization_managed`.
+
+### The LLM adapter's honest status — read this before filing a bug
+
+`lib/ai/provider.ts` reads its key from **`OPENAI_API_KEY` in the server
+environment**. This adapter lets an Owner store a *per-organization* key and see
+its health, but **`provider.ts` does not read from here yet** — doing so would put
+a database round trip and a decrypt in front of every AI call and change a
+signature eleven modules depend on.
+
+So `getStatus()` reports the truth rather than a convenient fiction, via
+`activeSource`:
+
+| `activeSource` | Meaning |
+| --- | --- |
+| `server_environment` | the env key is set and **is what will actually be used** |
+| `organization_key` | a key is stored here **and no env key exists** |
+| `none` | AI is unavailable |
+
+> "Reporting *connected* here while provider.ts silently used a different key would
+> be the worse outcome — an admin would rotate a key and see no change."
+
+**The `test()` action lists models rather than generating a completion** — a "test"
+that generated tokens would cost money every time someone pressed it.
+
+## 27.5 Google Calendar OAuth
+
+`GET /api/settings/integrations/calendar/authorize` (owner/admin) builds the
+Google sign-in link; `GET …/callback` completes it. Both refuse with a clear
+message when `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are unset.
+State is CSRF-protected via `lib/integrations/calendar/state.ts`.
+
+> **`lib/integrations/calendar/oauth.ts` carries a prominent warning in the source:
+> it is written to Google's documented contract but has never run against Google,
+> because no Google Cloud project exists for this product.** Treat the live flow as
+> unverified.
+
+## 27.6 Danger zone
+
+`/settings/security` separates dangerous actions to the **bottom of the page,
+never beside normal Save buttons**. It lists what is protected (encrypted
+credentials, database-level tenant isolation, the unconditional call disclosure,
+the append-only audit log), warns that disconnecting an integration stops
+candidate-facing features immediately, and states plainly that **organization
+deletion, full export and individual erasure are not available yet — and no button
+pretends otherwise.**
+
+## 27.7 API Flow
+
+| API | Method | Auth | Errors |
+| --- | --- | --- | --- |
+| `/api/settings` | GET | any member | 500 "Could not load settings." |
+| `/api/settings` | PATCH | **owner/admin** | 400 validation; 400 "That recruiter isn't an active member of this team."; 400 "Could not save those settings." |
+| `/api/settings/integrations` | GET | **owner/admin** | — |
+| `/api/settings/integrations/[provider]` | GET | owner/admin | **404 "Unknown integration."** for a bad provider |
+| `/api/settings/integrations/[provider]` | POST | owner/admin | **409 `test_failed`** when the credential does not work; 400 on a save failure |
+| `/api/settings/integrations/[provider]` | DELETE | owner/admin | **400 "Disconnecting needs an explicit confirmation."** |
+| `/api/settings/integrations/calendar/authorize` | GET | owner/admin | Refuses with an explanation when Google OAuth is unconfigured; 500 "Could not build the Google sign-in link." |
+| `/api/settings/integrations/calendar/callback` | GET | owner/admin | — |
+| `/api/pipeline/sla` | GET/PUT | member / **owner-admin** | see M15 |
+| `/api/settings/message-templates` | GET/POST | member / **owner-admin** | 422 validation with `warnings`; 409 conflicts |
+| `/api/settings/message-templates/[id]` | PATCH/DELETE | **owner/admin** | 409; 404 |
+| `/api/settings/document-templates*` | see M23 | | |
+
+## 27.8 Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-SET-001 | Navigation | `/settings` redirects | Open `/settings` as owner | Lands on `/settings/organization` | | | High |
+| TC-SET-002 | Navigation | Recruiter redirect | Open `/settings` as a recruiter | Lands on `/settings/users` | | | High |
+| TC-SET-003 | **Visibility** | **Sections hidden, not greyed** | View the sidebar as a recruiter | Only **Team & permissions** and **Notifications**; the rest are **absent** | | | Critical |
+| TC-SET-004 | Visibility | Direct URL still refused | Recruiter opens `/settings/integrations` | Restricted panel; API → 403 | | | Critical |
+| TC-SET-005 | Recruitment | Defaults save | Change the default interview duration | Persists; applies to new interviews | | | High |
+| TC-SET-006 | Recruitment | Default recruiter must be a member | Set an org B user | 400 "That recruiter isn't an active member of this team." | | | Critical |
+| TC-SET-007 | Recruitment | Currency format | Set `INR` / `inr` / `RUPEE` | Only a 3-uppercase-letter code passes (`^[A-Z]{3}$`) | | | Medium |
+| TC-SET-008 | Recruitment | Duration bounds | Set 4, then 481 | Rejected (CHECK 5..480) | | | Medium |
+| TC-SET-009 | Screening | Attempts and delay | Set attempts 5, delay 15 | Saved; the retry policy uses them | | | High |
+| TC-SET-010 | Screening | Clamping | Set attempts 10 | Clamped to 5 | | | High |
+| TC-SET-011 | Pipeline | SLA targets | Change stage targets | Board aging updates | | | High |
+| TC-SET-012 | **Integrations** | Connect Bolna | Paste a valid key → Connect | Status `connected`; the UI shows **only a mask** like `••••••4F8A` | | | Critical |
+| TC-SET-013 | Integrations | **Key never returned** | Inspect every API response and the page source | **The plaintext key never appears** | | | Critical |
+| TC-SET-014 | Integrations | Bad key | Paste an invalid key | **409 `test_failed`** with a plain message — no raw provider body | | | Critical |
+| TC-SET-015 | Integrations | **No encryption key** | Unset `INTEGRATION_ENCRYPTION_KEY`, try to connect | **Refused** with the actionable message; **nothing stored in the clear** | | | Critical |
+| TC-SET-016 | Integrations | Security page reflects it | Same state, open `/settings/security` | "Encryption isn't configured on this server, so no credentials can be stored." | | | Critical |
+| TC-SET-017 | Integrations | Rotated key | Connect, change `INTEGRATION_ENCRYPTION_KEY`, then test | "Stored credentials could not be read. Reconnect the integration." | | | High |
+| TC-SET-018 | Integrations | **Disconnect needs confirmation** | `DELETE` without the confirmation flag | **400** "Disconnecting needs an explicit confirmation." | | | Critical |
+| TC-SET-019 | Integrations | **Impact shown first** | Click Disconnect in the UI | The dependent features are listed **before** confirming | | | Critical |
+| TC-SET-020 | Integrations | Disconnect works | Confirm | Status `disconnected`; dependent automations are blocked, not silently broken | | | Critical |
+| TC-SET-021 | Integrations | Unknown provider | `GET /api/settings/integrations/pigeon` | **404** "Unknown integration." | | | Medium |
+| TC-SET-022 | Integrations | **Recruiter denied** | Recruiter opens/POSTs | Hidden; 403 | | | Critical |
+| TC-SET-023 | Integrations | **RLS denies too** | Recruiter selects `organization_integrations` via PostgREST | Refused (`organization_integrations_select_owner_admin`) | | | Critical |
+| TC-SET-024 | Integrations | **Ciphertext unreadable** | Owner selects `encrypted_credentials` via PostgREST | **Refused by the column-level REVOKE** | | | Critical |
+| TC-SET-025 | **LLM honesty** | `activeSource` | Env key set, org key also stored | Reports **`server_environment`** and says so — not a misleading "connected" | | | Critical |
+| TC-SET-026 | LLM honesty | Org key only | Unset the env key, store an org key | Reports `organization_key` | | | High |
+| TC-SET-027 | LLM honesty | Neither | Neither set | Reports `none`; AI features say unavailable | | | High |
+| TC-SET-028 | LLM test | **Costs nothing** | Press Test | Lists models — **does not generate a completion** | | | High |
+| TC-SET-029 | Calendar | Not configured | Unset `GOOGLE_CLIENT_ID`, click Connect | Clear refusal, not a broken redirect | | | High |
+| TC-SET-030 | Calendar | Authorize link | Configured, click Connect | Redirected to Google's consent screen | | | High |
+| TC-SET-031 | Calendar | Callback state | Tamper with the `state` parameter | Rejected (CSRF protection) | | | Critical |
+| TC-SET-032 | Calendar | **Unverified path** | Any live Google exchange | Expect failures — the OAuth module has never run against Google | | | High |
+| TC-SET-033 | Danger zone | Separated | Open `/settings/security` | Danger zone at the **bottom**, visually distinct, not beside a Save button | | | High |
+| TC-SET-034 | Danger zone | **No fake buttons** | Look for Delete organization / Export all data | **Absent**, with a sentence explaining they are not available yet | | | Critical |
+| TC-SET-035 | Retention | Save settings | Change retention values | Persist (deletion itself is the unbuilt Privacy retrofit) | | | Medium |
+| TC-SET-036 | Branding | Brand colour | Set `#004CF5`, then `blue` | First accepted, second rejected | | | Medium |
+| TC-SET-037 | Save | **Explicit, never auto** | Change a field and navigate away without saving | **Nothing is saved** | | | High |
+| TC-SET-038 | Tenant | Cross-tenant | Read org B's settings | Refused | | | Critical |
+
+## 27.9 Known Risks — M24
+
+1. **The Google OAuth path is unverified against Google.** Stated in the source.
+2. Per-organization LLM keys are stored but **not used**. An Owner who rotates the
+   org key sees no behavioural change. The status text is honest about it — verify
+   the UI actually surfaces `activeSource`.
+3. `N8N_WEBHOOK_URL` appears in `.env.local.example` but **is never read by any
+   code** (`grep process.env.N8N_WEBHOOK_URL` finds nothing) — the n8n adapter
+   stores its URL per organization instead.
+
+---
+
+# 28. MODULE M25 — AI Service Layer (cross-cutting)
+
+## 28.1 Purpose
+
+One boundary for every LLM call, so failure is an expected state and no AI output
+ever reaches a trusted table without a human in between.
+
+## 28.2 The named functions (`lib/ai/`)
+
+| Function | Used by |
+| --- | --- |
+| `parseResume` | M07, M09 |
+| `structureCandidateText` | M08 |
+| `parseCandidateSearch` | M08 (NL search) |
+| `extractJobFromDescription` | M05 |
+| `matchCandidateToJob` | M11 |
+| `generateScreeningSummary` | M13 |
+| `generateInterviewBrief` | M10/M16 |
+| `generateApplicationSummary` | M10 |
+| `generateClientSubmission` | M17 |
+| `generateDailyBrief` | M04 |
+| `prioritizePipeline` | M15 |
+| `draftAutomationRule` | M18 |
+| `summarizeActivity` | M19 |
+| `adjustMessageTone` | M20 |
+| `explainAnalytics` | M22 |
+| `generateOnboardingRecommendations` | M02 |
+| `numericGuard` (helper) | M04, M19 |
+
+**There is deliberately no generic `askAI()`.**
+
+## 28.3 The contract
+
+```ts
+type AiResult<T> = { ok: true; data: T }
+                 | { ok: false; code: AiErrorCode; message: string }
+
+type AiErrorCode = "not_configured" | "provider_error" | "invalid_output"
+```
+
+| Code | User-facing message |
+| --- | --- |
+| `not_configured` | "AI is not configured. Add an LLM provider API key in Settings to enable AI suggestions." |
+| `provider_error` (non-2xx / unreachable) | "The AI service is temporarily unavailable. You can continue manually and retry later." |
+| `provider_error` (**timeout**) | "The AI service took too long to respond. You can continue manually and retry later." |
+| `invalid_output` (non-JSON) | "The AI response could not be read. Please retry or continue manually." |
+| `invalid_output` (schema fail) | "The AI response was incomplete or in an unexpected format. Please retry or continue manually." |
+
+Defaults: model `gpt-4o-mini` (or `AI_MODEL`), base URL `https://api.openai.com/v1`
+(or `AI_BASE_URL`), `temperature 0.2`, `max_tokens 1200`,
+`response_format: {type:"json_object"}`, **30-second abort budget**.
+
+**Errors are logged server-side and a plain message is returned** — provider bodies
+and stack traces never reach a browser.
+
+## 28.4 The `ai-action` endpoints — all return `saved: false`
+
+`/api/organizations/[id]/ai-action`, `/api/jobs/ai-action`,
+`/api/candidates/ai-action`, `/api/candidates/search`,
+`/api/applications/[id]/ai-action`, `/api/applications/[id]/interview-brief`,
+`/api/applications/[id]/submission` (POST), `/api/dashboard/ai-action`,
+`/api/pipeline/ai-action`, `/api/automations/ai-action`,
+`/api/activity-events/ai-action`, `/api/notifications/ai-action`,
+`/api/analytics/ai-action`, `/api/clients/[id]/ai-action`.
+
+## 28.5 Cross-cutting AI Test Cases
+
+| Test Case ID | Feature | Test Scenario | Steps | Expected Result | Actual | Status | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-AI-001 | **Degradation** | **Every AI feature with no key** | Unset `OPENAI_API_KEY`, restart, then visit **every** AI surface | Each shows the `not_configured` message and **the manual workflow still works everywhere**. This is the single most important AI test | | | Critical |
+| TC-AI-002 | Degradation | Provider unreachable | Point `AI_BASE_URL` at a dead host | "temporarily unavailable… continue manually" on every surface | | | Critical |
+| TC-AI-003 | Degradation | **Timeout** | Point at a host that hangs >30s | "took too long to respond"; the request **aborts**, it does not hang the page | | | Critical |
+| TC-AI-004 | Degradation | Non-JSON output | Return prose from a mock provider | "The AI response could not be read." **Nothing written** | | | Critical |
+| TC-AI-005 | Degradation | Schema mismatch | Return valid JSON of the wrong shape | "incomplete or in an unexpected format." **Nothing written** | | | Critical |
+| TC-AI-006 | Degradation | Rate limited (429) | Mock a 429 | `provider_error`, friendly message | | | High |
+| TC-AI-007 | **Leakage** | No provider body reaches the browser | Force each failure, inspect every network response | **No stack trace, no provider payload, no key** | | | Critical |
+| TC-AI-008 | Leakage | Server log has detail | Same tests, read the server console | The detail **is** there (for debugging) | | | Medium |
+| TC-AI-009 | **Nothing saved** | Every `ai-action` | Call each one, then check the database | **No trusted table changed**; every response carries `saved: false` | | | Critical |
+| TC-AI-010 | Boundary | No direct provider calls | `grep -rn "api.openai.com\|chat/completions" app components lib --include=*.ts --include=*.tsx` | Only `lib/ai/provider.ts` and `lib/integrations/llm/index.ts` (the health check) | | | Critical |
+| TC-AI-011 | Boundary | No generic `askAI` | `grep -rn "askAI" .` | No results | | | High |
+| TC-AI-012 | Permissions | Write-capable AI is role-gated | Call each `ai-action` as a Viewer | Read-only AI (summaries, briefs, narratives, analytics, search) allowed; anything that proposes an edit or costs a call → **403** | | | Critical |
+| TC-AI-013 | Audit | AI calls logged | Run any AI action, read the audit log | A token/outcome summary is recorded — **never the prompt** | | | Critical |
+| TC-AI-014 | **Numeric guard** | Daily brief | Compare every figure in the brief with the KPI tiles | **No contradiction** | | | Critical |
+| TC-AI-015 | Numeric guard | Narrative | Compare every figure in a candidate narrative with the timeline | No unsupported number | | | Critical |
+| TC-AI-016 | Grounding | Narrative events | See TC-AUD-026 | Never claims an unlogged event | | | Critical |
+| TC-AI-017 | Determinism | NL search | Same query twice | Same results (AI parses; the query is deterministic) | | | Critical |
+| TC-AI-018 | Model config | `AI_MODEL` override | Set a different model | Used; failures degrade normally | | | Medium |
+
+---
+
+# 29. API Documentation — complete endpoint reference
+
+**84 route files, 130 exported handlers, 56 pages.** Every one wraps its body in
+`try { … } catch { return handleRouteError(error) }`.
+
+## 29.1 Universal error contract
+
+| Status | Meaning | Body |
+| --- | --- | --- |
+| **401** | No session (`TenantError`) | `{"error":"Not authenticated"}` |
+| **403** | Wrong role or no membership | `{"error":"Requires role: owner or admin. You are recruiter."}` |
+| **404** | Not found **or another tenant's row** (never confirms existence) | `{"error":"<Thing> not found."}` |
+| **400** | Validation / malformed JSON | `{"error":"<specific message>"}` |
+| **409** | Conflict (duplicate, terminal transition, version, opt-out, integration state) | often with a `code` |
+| **422** | Semantically invalid (candidate fields on an application, unresolvable actions, empty message body) | `{"error":"…"}` |
+| **500** | Anything unhandled | **always** `{"error":"Something went wrong. Please try again."}` — internals never leak |
+| **503** | A required deployment secret is unset (webhook, cron, service-role) | explanatory |
+
+`parsePagination()`: `page` ≥1 (default 1), `per_page` default 25, **clamped to a
+maximum of 100**.
+
+## 29.2 Endpoint table
+
+| API | Method | Endpoint | Purpose | Auth | Request | Response | Key errors |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Auth callback | GET | `/auth/callback` | Exchange an OAuth/email code | none | `?code&next` | 302 | `?error=missing_code`, `?error=auth_failed` |
+| Organizations | GET | `/api/organizations` | Memberships | session | — | list | 401 |
+| Organizations | POST | `/api/organizations` | Create workspace | session | `{name,…}` | 201 | 400 name |
+| Organization | GET/PATCH/DELETE | `/api/organizations/[id]` | Read / update / **refuse delete** | member / owner-admin | partial | `{data}` | 400/403/404 |
+| Org onboarding | POST | `/api/organizations/[id]/onboarding` | Finish setup | owner/admin | `{industry,size,agency_mode,onboarding_answer}` | `{data}` | 400/403/404 |
+| Org AI | POST | `/api/organizations/[id]/ai-action` | Setup suggestions | owner/admin | `{answer}` | `{data,saved:false}` | 400 |
+| Org switch | POST | `/api/organizations/switch` | Set active org cookie | session | `{organization_id}` | cookie | 400/404 |
+| Members | GET | `/api/members` | Roster | member | `?status&role` | list | 400 |
+| Member | PATCH/DELETE | `/api/members/[id]` | Role / remove | owner/admin | `{role}` | `{data,changed}` | 400/403/**409 last owner**/404 |
+| Invites | GET/POST | `/api/invites` | List / create | owner/admin | `{email,role}` | 201 `{data,invite_url}` | 400/403/**409 duplicate** |
+| Invite | DELETE | `/api/invites/[id]` | Revoke | owner/admin | — | `{data}` | 404 |
+| Invite accept | POST | `/api/invites/accept` | Join | session | `{token}` | `{organization_id}` | 400 |
+| Dashboard | GET | `/api/dashboard` | KPI snapshot | member | — | `{data}` | 401 |
+| Dashboard AI | POST | `/api/dashboard/ai-action` | Daily brief | member | — | `{…,cached?}` | AI codes |
+| Jobs | GET/POST | `/api/jobs` | List / create | member / owner-admin-recruiter | job fields | 201 | 400/403 |
+| Job | GET/PATCH/DELETE | `/api/jobs/[id]` | Read / update / **archive** | member / oar / owner-admin | partial | `{data}` | **403 close own**/404 |
+| Job AI | POST | `/api/jobs/ai-action` | Extract from a JD | oar | `{text}` | `{data,saved:false}` | 400 |
+| Hiring stages | GET/PUT | `/api/jobs/[id]/hiring-stages` | Read / upsert | member / oar | `{stages:[…]}` | `{data}` | 400/404 |
+| Intake | GET/POST | `/api/jobs/[id]/intake` | Batch state / process one file | member / oar | multipart | `{data,batch_id}` | 400/**409 archived**/404 |
+| Intake item | PATCH | `/api/jobs/[id]/intake/[itemId]` | Resolve a conflict | oar | `{candidate_id}` | `{data}` | 400/404 |
+| Candidates | GET/POST | `/api/candidates` | List / create | member / oar | candidate fields | 201 | **409 duplicate_suspected** |
+| Candidate | GET/PATCH/DELETE | `/api/candidates/[id]` | Read / update / **archive** | member / oar / owner-admin | partial | `{data}` | 400/404 |
+| Candidate lookup | GET | `/api/candidates/lookup` | Typeahead | member | `?q` | list | — |
+| Candidate search | POST | `/api/candidates/search` | NL search | **member incl. viewer** | `{query}` | list | 400 |
+| Candidate AI | POST | `/api/candidates/ai-action` | Structure a blurb | oar | `{text}` | `{data,saved:false}` | 400 |
+| Comm prefs | PUT | `/api/candidates/[id]/communication-preferences` | Opt-out | oar | `{email_opted_out,whatsapp_opted_out}` | `{data}` | 400/404 |
+| Resumes | GET/POST | `/api/candidates/[id]/resumes` | List / upload | member / oar | multipart | 201 | 400 type/size |
+| Resume parse | POST | `/api/resumes/[id]/parse` | Extract + AI parse | oar | — | `{data}` | **422 low text** |
+| Resume review | POST | `/api/resumes/[id]/review` | Apply chosen fields | oar | `{decisions}` | `{data}` | **409 not parsed** |
+| Resume download | GET | `/api/resumes/[id]/download` | Signed URL | member | — | 302 | 404 |
+| Applications | GET/POST | `/api/applications` | List / create | member / oar | `{candidate_id,job_id,…}` | 201 | **409 already applied** |
+| Application | GET/PATCH/DELETE | `/api/applications/[id]` | Read / update / **archive** | member / oar / owner-admin | partial | `{data}` | **422 candidate fields**, **409 terminal** |
+| App notes | POST | `/api/applications/[id]/notes` | Add a note | oar | `{note}` | 201 | 400 |
+| App AI | POST | `/api/applications/[id]/ai-action` | Summary | member | — | `{data,saved:false}` | — |
+| Match | GET/POST | `/api/applications/[id]/match` | Read / recalculate | member / oar | — | `{data,calculated}` | 404 |
+| Screening call | GET/POST | `/api/applications/[id]/screening-call` | Attempts / start | member / oar | — | 201 | integration + cap codes |
+| Screening report | GET/POST | `/api/applications/[id]/screening-report` | Read / generate | member / oar | — | 201 | eligibility codes |
+| Report review | POST | `/api/screening-reports/[id]/review` | Correct fields | oar | `{fields}` | `{data}` | **400 ai_* immutable** |
+| Interview brief | POST | `/api/applications/[id]/interview-brief` | Generate a brief | member | — | `{data}` | 404 |
+| Evaluations | POST | `/api/applications/[id]/evaluations` | Log an entry | oar | `{stage_key,score,outcome,summary}` | 201 | 400/404 |
+| Evaluation | PATCH | `/api/applications/[id]/evaluations/[entryId]` | Correct an entry | oar | partial | `{data}` | 404 |
+| Submission | GET/POST/PUT | `/api/applications/[id]/submission` | Read / **draft** / **send** | member / oar / oar | `{summary}` | 201 | **409 no client**, 409 already sent |
+| Interviews | GET/POST | `/api/interviews` | List / schedule | member / oar | `{application_id,…}` | 201 `{data,calendarMessage?}` | 400/404 |
+| Interview | GET/PATCH | `/api/interviews/[id]` | Read / reschedule | member / oar | partial | `{data}` | 400/404 |
+| Feedback | POST | `/api/interviews/[id]/feedback` | Structured feedback | oar | `{rating,recommendation,notes}` | 201 | **403 wrong interviewer**, **409 cancelled** |
+| Clients | GET/POST | `/api/clients` | List / create | member / oar | `{name,…}` | 201 | 409 duplicate |
+| Client | GET/PATCH/DELETE | `/api/clients/[id]` | Read / update / **archive** | member / oar / owner-admin | partial | `{data}` | 409/404 |
+| Client AI | POST | `/api/clients/[id]/ai-action` | Activity summary | member | — | `{data,saved:false}` | 404 |
+| Pipeline SLA | GET/PUT | `/api/pipeline/sla` | Read / save targets | member / **owner-admin** | `{targets}` | `{data}` | 400 |
+| Pipeline AI | POST | `/api/pipeline/ai-action` | Prioritise | oar | `{question}` | `{data}` | 400 |
+| Automations | GET/POST | `/api/automations` | List / **create as draft** | member / **owner-admin** | rule fields | 201 | 400/**422**/409 |
+| Automation | GET/PATCH/DELETE | `/api/automations/[id]` | Read / edit+activate / **delete** | member / owner-admin | `{…,expected_version}` | `{data}` | **409 version**, **409 activation blocked** |
+| Automation test | POST | `/api/automations/[id]/test` | Dry run — **inert** | owner-admin | `{application_id}` | verdict | 400/404 |
+| Automation AI | POST | `/api/automations/ai-action` | Draft a rule | owner-admin | `{description}` | `{data}` | 400 |
+| Runs | GET | `/api/automations/runs` | History | **member incl. viewer** | filters | list | 500 |
+| Approvals | GET | `/api/automations/approvals` | Queue | **member** | `?status` | list | 400/500 |
+| Approval | PATCH | `/api/automations/approvals/[id]` | **Approve = run it** | **owner-admin** | `{decision,note}` | `{data}` | 400/**409 decided/expired** |
+| Kill switch | PATCH | `/api/automations/switch` | Org-wide on/off | owner-admin | `{enabled}` | `{data}` | 400/404 |
+| Sweep | GET | `/api/automations/sweep` | **Cron — every org** | **`Bearer $CRON_SECRET`** | — | per-org results | **503**/401 |
+| Sweep | POST | `/api/automations/sweep` | Manual — own org | owner-admin | — | `{data}` | **409 kill switch** |
+| Activity | GET | `/api/activity-events` | Feed | member | filters | list | **403 sensitive**, 400 |
+| Activity AI | POST | `/api/activity-events/ai-action` | Candidate narrative | member | `{candidate_id}` | `{data,saved:false}` | 400/404/500 |
+| Notifications | GET/PATCH | `/api/notifications` | Own list / mark all read | member | — | `{data}` / `{marked}` | 500 |
+| Notification | PATCH/DELETE | `/api/notifications/[id]` | Read flag / dismiss | member | `{read}` | `{data}` | 400/404 |
+| Notif prefs | GET/PUT/DELETE | `/api/notifications/preferences` | Read / save / reset | member; **org scope owner-admin** | `{type,scope,channels}` | `{data}` | 400/**403** |
+| Reminders | POST | `/api/notifications/reminders` | Dispatch overdue | oar | — | counts | 403 |
+| Notif AI | POST | `/api/notifications/ai-action` | Reword — **sends nothing** | oar | `{type,tone}` | `{data}` | 400 |
+| Messages | POST | `/api/messages` | **Manual candidate message** | oar (**own applications**) | `{application_id,channel,subject,body,…}` | `{data}` | **409 opted_out / no address**, 422 |
+| Analytics | GET | `/api/analytics` | Report JSON | **all roles** | filters | `{data}` | — |
+| Analytics export | GET | `/api/analytics/export` | CSV | **not viewer** | filters | text/csv | **403 viewer** |
+| Analytics AI | POST | `/api/analytics/ai-action` | Explain | all roles | `{question}` | `{data}` | 400 |
+| Settings | GET/PATCH | `/api/settings` | Org settings | member / owner-admin | partial | `{data}` | 400/500 |
+| Integrations | GET | `/api/settings/integrations` | Health of all six | owner-admin | — | list | 403 |
+| Integration | GET/POST/DELETE | `/api/settings/integrations/[provider]` | Status / connect / disconnect | owner-admin | `{credentials}` | `{data}` | **404 unknown**, **409 test_failed**, **400 confirm** |
+| Calendar OAuth | GET | `…/calendar/authorize` \| `…/callback` | Google flow | owner-admin | — | 302 | config refusals |
+| Msg templates | GET/POST | `/api/settings/message-templates` | List / create | member / owner-admin | template fields | 201 `{data,warnings}` | **422**/409 |
+| Msg template | PATCH/DELETE | `/api/settings/message-templates/[id]` | Update / delete | owner-admin | partial | `{data}` | 409/404 |
+| Doc templates | GET/POST | `/api/settings/document-templates` | List / create | member / owner-admin | `{name,…}` | `{data}` | **409 duplicate** |
+| Doc template | PATCH/DELETE | `/api/settings/document-templates/[id]` | Update / delete | owner-admin | partial | `{data}` | 400/409/404 |
+| Doc reorder | PUT | `/api/settings/document-templates/reorder` | Save order | owner-admin | `{ids:[…]}` | `{data}` | **400 foreign id** |
+| Onboarding | GET/PATCH | `/api/onboarding/[id]` | Read / status+assignee | member / oar | partial | `{data}` | **gate refusal**, **403 reassign** |
+| Onb documents | POST | `/api/onboarding/[id]/documents` | Add a one-off | oar | `{name,expected_from}` | `{data}` | 400/**403 assigned** |
+| Onb document | PATCH/DELETE | `/api/onboarding/documents/[id]` | Status / remove | oar / **owner-admin** | `{status,…}` | `{data}` | **403 reject/reset**, **409**, **400 reason** |
+| Onb file | GET/POST | `/api/onboarding/documents/[id]/file` | Signed URL / upload | member / oar | multipart | 302 / `{data}` | 400/403/404 |
+| Screening calls | GET | `/api/screening-calls` | Global list | member | `?status` | list | 400 |
+| **Bolna webhook** | POST | `/api/webhooks/bolna` | Call outcome | **HMAC only** | signed JSON | `{received}` | **503/401/400/500** |
+
+*(oar = owner / admin / recruiter)*
+
+## 29.3 API test cases to run against **every** endpoint
+
+| ID | Scenario | Expected |
+| --- | --- | --- |
+| TC-API-001 | No session | **401 JSON**, never an HTML redirect |
+| TC-API-002 | Session, no organization | 403 "No organization membership" |
+| TC-API-003 | Wrong role | 403 naming the required role **and** the caller's role |
+| TC-API-004 | Another tenant's id | **404**, never 403 (403 would confirm the row exists) |
+| TC-API-005 | Malformed JSON body | 400 "Invalid JSON body." |
+| TC-API-006 | Empty body on a POST that needs one | 400 with a specific message |
+| TC-API-007 | Unknown extra fields | Ignored, **never** applied — especially `organization_id` |
+| TC-API-008 | **`organization_id` injection** | Ignored; the session's tenant is used |
+| TC-API-009 | `id` injection in the body | Ignored |
+| TC-API-010 | SQL-ish strings in text fields | Stored literally (parameterised queries) |
+| TC-API-011 | `<script>` in text fields | Stored and **rendered escaped** by React |
+| TC-API-012 | Very large body (10 MB JSON) | Rejected cleanly, no crash |
+| TC-API-013 | Unsupported method (e.g. PUT where only GET/POST exist) | 405 from Next |
+| TC-API-014 | `?page=0`, `?page=-1`, `?page=abc` | Clamped to 1 |
+| TC-API-015 | `?per_page=1000` | Clamped to **100** |
+| TC-API-016 | Simulated DB outage | **500** with the generic message; **no internals leak** |
+| TC-API-017 | Concurrent identical POSTs | Unique constraints hold; one row |
+| TC-API-018 | Expired session mid-request | 401 |
+
+---
+
+# 30. Database Documentation
+
+## 30.1 Tables (42) by module
+
+| Table | Purpose | Key columns | Used by |
+| --- | --- | --- | --- |
+| `organizations` | The tenant | `name`, `timezone`, `agency_mode`, `automations_enabled`, `onboarding_*` | M02, everything |
+| `users` | Profile mirroring `auth.users` | `auth_id` UNIQUE FK CASCADE, `email` | M01 |
+| `organization_members` | Membership + role | `role org_role`, `status`, UNIQUE(org,user) | M03 |
+| `invites` | Pending invitations | `token` UNIQUE, `expires_at` (+7d), `status` | M03 |
+| `jobs` | Requisitions | `title`, skills arrays, ranges, `status`, `owner_recruiter_id`, `archived_at` | M05 |
+| `job_screening_questions` | AI call questions | `question`, `display_order` | M05, M12 |
+| `job_interview_questions` | **Legacy** — retired by migration 0025 | | — |
+| `job_hiring_stages` | Per-job stage config | `stage_key` CHECK(4), `enabled`, `prompt_template`, `config jsonb`, UNIQUE(job,stage) | M06 |
+| `candidates` | People | `email/phone` + `*_normalized`, `skills`, `education`, `employment_history`, `archived_at`, CHECK contactable | M08 |
+| `candidate_duplicates` | Suspected dupes | `matched_on`, `status`, UNIQUE pair | M08 |
+| `applications` | candidate × job | `stage`, `rejected_at_stage`, `match_score`, `priority`, **UNIQUE(candidate,job)** | M10 |
+| `application_stage_history` | Every stage move | `entered_at`, `exited_at` (NULL = current), `changed_by` | M10, M15, M22 |
+| `application_notes` | Timeline notes | `note`, `author_id` | M10 |
+| `application_evaluations` | Manual round outcomes | `stage_key` CHECK(4), `occurred_at`, `score` 1..10, `outcome` | M14 |
+| `resumes` | Uploaded files | `file_url`, `file_hash`, `parse_status`, `extracted_characters` | M09 |
+| `resume_parse_results` | AI output | `raw_json`, `confidence`, `applied_fields`, UNIQUE(resume) | M09 |
+| `resume_intake_items` | Bulk-drop outcomes | `batch_id`, `status`, `conflict_candidate_ids[]`, `parsed_json`, `queued_conflict_count` | M07 |
+| `application_matches` | Match scores | `overall/deterministic/semantic`, 3 jsonb lists, `ai_used`, `is_stale`, UNIQUE(application) | M11 |
+| `screening_calls` | Voice calls | `status`, `attempt_number`, `transcript`, **`consent_confirmed`**, `provider_call_id` | M12 |
+| `screening_reports` | AI extraction + corrections | current cols + **frozen `ai_*` cols**, `uncertain_fields[]`, `corrected_fields[]`, UNIQUE(call) | M13 |
+| `interviews` | Scheduled interviews | `scheduled_at`, `duration_minutes` 1..480, `mode`, `status`, `calendar_sync_status` | M16 |
+| `interview_feedback` | Structured feedback | `rating` 1..5, `recommendation`, UNIQUE(interview,submitted_by) | M16 |
+| `clients` | Client companies | `name` UNIQUE per org, `contacts jsonb`, `feedback_sla_days` 0..90 | M17 |
+| `client_feedback_events` | Submissions + responses | `submission_text` (verbatim), `requested_at`, `responded_at`, `outcome` | M17 |
+| `pipeline_sla_config` | Stage targets | `target_days` 0..365, UNIQUE(org,stage) | M15 |
+| `automations` | Rules | `trigger`, `conditions jsonb`, `actions jsonb`, `status`, `required_integrations[]`, `drafted_by_ai`, UNIQUE(org,name) | M18 |
+| `automation_runs` | Execution log | `status`, `reason`, `action_results jsonb`, **`dedupe_key`** | M18 |
+| `automation_approvals` | Oversight queue | `actions`, `summary`, `status`, `expires_at` (+7d), UNIQUE(run) | M18 |
+| `automation_sweeps` | Scheduler audit | `source` cron/manual, counts, `error_message` | M18 |
+| `activity_events` | **Append-only audit** | `entity_type`, `entity_id` (**no FK**), `event_type`, `actor_id`, `actor_label`, `is_sensitive` | M19 |
+| `notifications` | Internal messages | `user_id` NOT NULL, `type`, `link_path` CHECK `like '/%'`, `priority`, `read_at` | M20 |
+| `notification_deliveries` | Per-channel outcome | `channel`, `status`, `recipient_hint` (**masked**) | M20 |
+| `notification_preferences` | Per type | `user_id` NULL = **org default**, `in_app_enabled`, `email_enabled` | M20 |
+| `message_templates` | Candidate templates | `event_key` CHECK(12), `channel`, `body`, `whatsapp_body`, **`active` DEFAULT false** | M21 |
+| `message_log` | Candidate sends | `body_sent` (**resolved, with footer**), `status`, `recipient_hint`, `sent_by` NULL = automation | M21 |
+| `candidate_communication_preferences` | Opt-outs | `email_opted_out`, `whatsapp_opted_out`, `opted_out_reason` | M21 |
+| `organization_settings` | Org config | `currency` `^[A-Z]{3}$`, defaults, `screening_settings jsonb`, `retention_settings jsonb`, `brand_color` | M24 |
+| `organization_integrations` | Credential store | `provider` CHECK(5), **`encrypted_credentials` (column REVOKE)**, `credential_hint`, UNIQUE(org,provider) | M24 |
+| `user_preferences` | Per-user cosmetics | `display_timezone` (**display only**), `date_format` CHECK(4) | M24 |
+| `organization_document_templates` | Checklist definition | `name` UNIQUE per org, `required`, `expected_from`, `display_order`, `active` | M23 |
+| `onboarding_records` | One per hire | **`application_id` UNIQUE**, `status`, `completed_at` (CHECK pairs with status) | M23 |
+| `onboarding_documents` | Checklist items | `status`, `file_url`, 4 integrity CHECKs, UNIQUE(record,template) | M23 |
+
+## 30.2 Enums (13)
+
+`org_role`, `job_status`, `work_mode`, `candidate_source`, `application_stage`,
+`duplicate_status`, `resume_parse_status`, `interest_level`, `location_acceptance`,
+`screening_call_status`, `interview_mode`, `interview_status`,
+`interview_recommendation`, `calendar_sync_status`, `automation_status`,
+`automation_run_status`, `automation_approval_status`, `activity_entity_type`,
+`notification_channel`, `notification_delivery_status`, `evaluation_outcome`,
+`document_owner`, `onboarding_status`, `onboarding_document_status`,
+`message_channel`, `message_status`, `integration_status`.
+
+## 30.3 Trigger inventory (64) — what to test
+
+| Category | Triggers | What breaks if they stop working |
+| --- | --- | --- |
+| **Tenant integrity** (`*_tenant_integrity`) on applications, matches, resumes, resume_intake, screening_calls, notifications, deliveries, evaluations, feedback, interviews, clients' feedback, activity_events, automation runs/approvals, onboarding_documents, job_hiring_stages, settings, user_preferences | 18 | A row could reference a parent in another organization |
+| **Timestamps** (`*_touch*`) | 14 | `updated_at` goes stale |
+| **Auth** `on_auth_user_created` | 1 | New signups have no profile row |
+| **Owner protection** `enforce_owner_remains` | 1 | A workspace could be orphaned with no Owner |
+| **Stage history** `trg_applications_stage_history` | 1 | Duration analytics and SLA aging break |
+| **Rejection stage** `trg_applications_stamp_rejected_stage` | 1 | "Rejected at which stage?" becomes unanswerable |
+| **Onboarding creation** `trg_applications_create_onboarding` | 1 | Hires get no checklist |
+| **Match staleness** `trg_candidates_mark_matches_stale`, `trg_jobs_mark_matches_stale` | 2 | Scores silently go out of date |
+| **Match sync** `trg_matches_sync_application_score` | 1 | Board and detail disagree on the score |
+| **Contact normalisation** `trg_candidates_normalize_contact` | 1 | Dedupe stops catching duplicates |
+| **Delete guard** `trg_candidates_guard_delete` | 1 | A candidate with resumes could be hard-deleted |
+| **Recruiter close rule** `trg_jobs_recruiter_closes_own` | 1 | A recruiter could close anyone's job via PostgREST |
+| **Consent stamp** `trg_screening_calls_consent` | 1 | Consent could be forged |
+| **Report preconditions** `trg_screening_reports_preconditions` | 1 | A non-consented transcript could be summarised |
+| **AI freeze** `trg_screening_reports_protect_ai` | 1 | The original AI extraction could be rewritten |
+| **Feedback completes interview** `trg_feedback_completes_interview` | 1 | Status and feedback could disagree |
+| **Audit immutability** `trg_activity_events_immutable` | 1 | **The audit log could be edited** |
+| **Automation** activation, version bump, approval decision, run completion-only | 4 | Rules could activate without integrations; runs could be rewritten |
+| **Resume score sync** `trg_job_hiring_stages_sync_resume_score` | 1 | Job passing score drifts from the stage config |
+
+## 30.4 Standard database flow
+
+```
+USER ACTION
+  → API ROUTE      requireMembership()/requireRole()  — tenant from the SESSION
+  → VALIDATION     a pure function in lib/<module>/validation.ts
+  → DATABASE       INSERT/UPDATE with .eq("organization_id", …) AND RLS
+                   + CHECK constraints
+                   + TRIGGERS (tenant integrity, history, staleness, timestamps)
+  → SIDE EFFECTS   logActivity() → notify() → trySendForEvent() → dispatch()
+                   (in that order; each wrapped so none can fail the action)
+  → RESPONSE       {data} or {error}
+  → UI             router.refresh() re-renders the server component
+```
+
+## 30.5 Database test cases
+
+| ID | Scenario | Expected |
+| --- | --- | --- |
+| TC-DB-001 | **Tenant isolation, every table** | As org A via PostgREST, `select *` from each of the 42 tables | Only org A's rows |
+| TC-DB-002 | **Cross-tenant insert** | Insert with org B's `organization_id` | Refused by RLS `WITH CHECK` |
+| TC-DB-003 | **Cross-tenant parent reference** | Insert an application pointing at org B's candidate | Refused by the tenant-integrity trigger |
+| TC-DB-004 | **Role bypass via PostgREST** | As a recruiter, update `automations` / `organization_settings` / `pipeline_sla_config` | All refused by policy |
+| TC-DB-005 | **Audit immutability** | Update or delete an `activity_events` row | Refused |
+| TC-DB-006 | **Last Owner** | Demote or remove the sole Owner | Refused by the constraint trigger |
+| TC-DB-007 | **Credential ciphertext** | Select `encrypted_credentials` as an Owner | Refused by the column REVOKE |
+| TC-DB-008 | **Stage history invariant** | After many moves | Exactly one row with `exited_at IS NULL` per application |
+| TC-DB-009 | **Onboarding uniqueness** | Two hires on one application | Refused by `application_id` UNIQUE |
+| TC-DB-010 | **Application uniqueness** | Same candidate + job twice | Refused by UNIQUE(candidate,job) |
+| TC-DB-011 | **Automation dedupe** | Same `(automation, application, dedupe_key)` twice | Second refused |
+| TC-DB-012 | Storage isolation | Read another org's object path in `resumes` / `onboarding-documents` | Refused (first-path-segment policy) |
+| TC-DB-013 | Cascade behaviour | Delete an organization in SQL | Everything cascades cleanly |
+| TC-DB-014 | `ON DELETE SET NULL` | Delete a user who owns jobs/notes/uploads | Rows survive with NULL references |
+| TC-DB-015 | **Migration order** | Apply `supabase/migrations/*` in filename order onto a clean project | See §Recommended Improvements — **0030 is corrupt** |
+
+---
+
+# 31. Authentication & Authorization Flow (consolidated)
+
+## 31.1 The full flow
+
+```
+                       ┌─────────────────────────────────────────┐
+  User enters          │  supabase.auth.signInWithPassword()      │
+  credentials  ───────►│  (called DIRECTLY from the browser —     │
+                       │   not through an API route of ours)      │
+                       └──────────────┬──────────────────────────┘
+                                      │ session cookies set
+                                      ▼
+                       ┌─────────────────────────────────────────┐
+  Every request  ─────►│  proxy.ts → updateSession()              │
+                       │  • refreshes the token (must run before  │
+                       │    any Server Component reads it)        │
+                       │  • /api/* and /auth/* pass through       │
+                       │  • public paths allow-listed             │
+                       │  • otherwise no user → /login?next=…     │
+                       │  • signed in at /login|/signup → /dashboard│
+                       └──────────────┬──────────────────────────┘
+                                      ▼
+        ┌─────────────────────────────┴─────────────────────────────┐
+        ▼                                                           ▼
+  PAGES                                                       API ROUTES
+  requireMembershipOrRedirect()                     requireMembership()/requireRole()
+  • no session      → redirect /login               • throws TenantError
+  • no organization → redirect /onboarding          • handleRouteError → JSON 401/403
+  • self-heals a missing public.users row
+        │                                                           │
+        └─────────────────────────────┬─────────────────────────────┘
+                                      ▼
+                       ┌─────────────────────────────────────────┐
+                       │  ROW-LEVEL SECURITY — the real boundary  │
+                       │  is_org_member() / has_org_role()        │
+                       │  + tenant-integrity triggers             │
+                       └─────────────────────────────────────────┘
+```
+
+## 31.2 The permission matrix
+
+Legend: ✅ allowed · ❌ denied · **own** = limited to their own work
+
+| Capability | Owner | Admin | Recruiter | Viewer |
+| --- | :---: | :---: | :---: | :---: |
+| View dashboard | ✅ org | ✅ org | ✅ **own** | ✅ org |
+| Create / edit jobs | ✅ | ✅ | ✅ | ❌ |
+| **Close a job** | ✅ any | ✅ any | ✅ **own only** | ❌ |
+| Archive a job | ✅ | ✅ | ❌ | ❌ |
+| Create / edit candidates | ✅ | ✅ | ✅ | ❌ |
+| Archive a candidate | ✅ | ✅ | ❌ | ❌ |
+| Upload / parse / review a resume | ✅ | ✅ | ✅ | ❌ |
+| Download a resume | ✅ | ✅ | ✅ | ✅ |
+| Bulk intake | ✅ | ✅ | ✅ | ❌ |
+| Create applications, move stages, add notes | ✅ | ✅ | ✅ | ❌ |
+| Archive an application | ✅ | ✅ | ❌ | ❌ |
+| **Recalculate a match** | ✅ | ✅ | ✅ | ❌ (viewing never triggers one) |
+| **Start a screening call** | ✅ | ✅ | ✅ | ❌ |
+| Generate / review a screening report | ✅ | ✅ | ✅ | ❌ (read ✅) |
+| Log / edit evaluations | ✅ | ✅ | ✅ | ❌ |
+| Move cards on the pipeline | ✅ | ✅ | ✅ **own+unassigned** | ❌ |
+| **Edit SLA targets** | ✅ | ✅ | ❌ | ❌ |
+| Schedule interviews | ✅ | ✅ | ✅ | ❌ |
+| Submit interview feedback | ✅ | ✅ | ✅ **assigned interviewer only** | ❌ |
+| Manage clients | ✅ | ✅ | ✅ | ❌ (read ✅) |
+| Archive a client | ✅ | ✅ | ❌ | ❌ |
+| Draft / send a client submission | ✅ | ✅ | ✅ | ❌ |
+| **Create / edit / activate automations** | ✅ | ✅ | ❌ | ❌ |
+| Read automations, runs, approval queue | ✅ | ✅ | ✅ | ✅ |
+| **Decide an approval** | ✅ | ✅ | ❌ | ❌ |
+| **Run the scheduler / kill switch** | ✅ | ✅ | ❌ | ❌ |
+| Read the ordinary activity feed | ✅ | ✅ | ✅ | ✅ |
+| **Read sensitive audit events / `/audit-log`** | ✅ | ✅ | ❌ | ❌ |
+| Own notifications + personal preferences | ✅ | ✅ | ✅ | ✅ |
+| **Organization notification defaults** | ✅ | ✅ | ❌ | ❌ |
+| Dispatch reminders | ✅ | ✅ | ✅ | ❌ |
+| **Manage message templates** | ✅ | ✅ | ❌ | ❌ |
+| **Send a candidate message** | ✅ | ✅ | ✅ **own applications** | ❌ |
+| Record / lift a candidate opt-out | ✅ | ✅ | ✅ | ❌ |
+| View analytics | ✅ org | ✅ org | ✅ **own**, no recruiter comparison | ✅ org |
+| **Export analytics** | ✅ | ✅ | ✅ | ❌ |
+| Ask Analytics AI | ✅ | ✅ | ✅ **own** | ✅ |
+| Onboarding: upload / verify / add | ✅ | ✅ | ✅ **if not assigned elsewhere** | ❌ |
+| **Onboarding: reject / reset / delete / reassign** | ✅ | ✅ | ❌ | ❌ |
+| **Manage settings & integrations** | ✅ | ✅ | ❌ | ❌ |
+| Invite / remove members, change roles | ✅ | ✅ | ❌ | ❌ |
+| **Grant or revoke Owner** | ✅ | ❌ | ❌ | ❌ |
+| Edit the organization | ✅ | ✅ | ❌ | ❌ |
+| Delete the organization | ❌ (not built) | ❌ | ❌ | ❌ |
+
+## 31.3 Authorization test cases
+
+| ID | Scenario | Expected | Priority |
+| --- | --- | --- | --- |
+| TC-AUTHZ-001 | **Run the whole matrix in the UI as each of the four roles** | Denied capabilities are **hidden**, not shown-and-refused | Critical |
+| TC-AUTHZ-002 | **Run the whole matrix via `curl` as each role** | Every denial is a **403**, independent of the UI | Critical |
+| TC-AUTHZ-003 | **Run the writes via the browser's PostgREST client as each role** | RLS refuses every denied write, independent of the route | Critical |
+| TC-AUTHZ-004 | Recruiter's own-scope | Dashboard, Pipeline, Applications, Analytics all scoped | Critical |
+| TC-AUTHZ-005 | Viewer cannot mutate anything | Every write → 403 | Critical |
+| TC-AUTHZ-006 | Viewer cannot spend money | No calls, no AI writes, no exports | Critical |
+| TC-AUTHZ-007 | Owner-only capabilities | Only an Owner may grant/revoke Owner | Critical |
+| TC-AUTHZ-008 | Role change takes effect | Promote a viewer to admin; they refresh | New capabilities appear | Critical |
+| TC-AUTHZ-009 | Removal takes effect | Remove a member; they navigate | Access lost | Critical |
+| TC-AUTHZ-010 | Cross-tenant everything | Every `[id]` route with another org's id | **404** everywhere | Critical |
+
+---
+
+# 32. Error Handling & Failure Testing
+
+## 32.1 Frontend failures
+
+| ID | Failure | How to induce | Expected |
+| --- | --- | --- | --- |
+| TC-ERR-001 | API unavailable | Stop the dev server, click a save button | Readable error, form state preserved, retry works |
+| TC-ERR-002 | Slow API | DevTools → Slow 3G | Skeletons (never a full-page spinner); buttons show `is-loading` and disable |
+| TC-ERR-003 | Network disconnected | Toggle offline mid-submit | Error message; **no silent data loss** |
+| TC-ERR-004 | Invalid JSON response | Mock a malformed response | Handled, not a white screen |
+| TC-ERR-005 | Empty response | Mock `{}` | Empty state, not a crash |
+| TC-ERR-006 | **Multiple rapid clicks** | Double- and triple-click every submit button in the product | Exactly one request; button disabled while busy |
+| TC-ERR-007 | Page refresh mid-flow | Refresh during a multi-step wizard | Resumes sensibly |
+| TC-ERR-008 | Browser back after a mutation | Press Back after saving | No accidental re-submit |
+| TC-ERR-009 | Route-level error boundary | Force a render error | `app/error.tsx` shows "Something went wrong" + a **Retry** button — never a raw stack |
+| TC-ERR-010 | Very long text | Paste 50,000 characters into a textarea | Either rejected with a limit message or handled without freezing |
+| TC-ERR-011 | Deep-linked missing row | Open `/applications/<random uuid>` | Clean not-found, not a 500 |
+| TC-ERR-012 | Two tabs, same record | Edit in both, save both | Last write wins **except** on automations, which 409 on a version conflict |
+
+## 32.2 Backend failures
+
+| ID | Failure | Expected |
+| --- | --- | --- |
+| TC-ERR-020 | Invalid request body | 400 with a **specific** message |
+| TC-ERR-021 | Missing required field | 400 naming the field |
+| TC-ERR-022 | Database unreachable | 500 with the **generic** message; the real detail only in the server log |
+| TC-ERR-023 | **Missing migration** | `isSchemaOutOfDate()` recognises 42P01 / 42703 / PGRST204 / PGRST205 and the UI says "This page needs a database migration that hasn't been applied yet." |
+| TC-ERR-024 | **RLS denial (42501)** | Reported as an **error**, never as "not built yet" |
+| TC-ERR-025 | Statement timeout | Error, never a fake zero |
+| TC-ERR-026 | Constraint violation | Translated to a readable message (e.g. `candidates_contactable`) — never a raw constraint name |
+| TC-ERR-027 | Unique violation (23505) | 409 with a human sentence |
+| TC-ERR-028 | Auth failure | 401 JSON |
+| TC-ERR-029 | `head: true` count failure | `describeDbError()` explains the limitation instead of logging `{message:""}` |
+
+## 32.3 External integration failures
+
+| ID | Integration | Failure | Expected |
+| --- | --- | --- | --- |
+| TC-ERR-040 | **LLM** | No key | `not_configured`; **every manual workflow still works** |
+| TC-ERR-041 | LLM | Unreachable / 5xx | "temporarily unavailable… continue manually" |
+| TC-ERR-042 | LLM | Timeout >30s | Aborted with the timeout message |
+| TC-ERR-043 | LLM | 429 rate limit | `provider_error`, friendly |
+| TC-ERR-044 | LLM | Invalid output | `invalid_output`; **nothing written** |
+| TC-ERR-045 | **Bolna** | Disconnected | Calls refused with a clear reason; **nothing dialled** |
+| TC-ERR-046 | Bolna | Invalid key | `test_failed` 409 on connect; plain message |
+| TC-ERR-047 | Bolna | **Webhook secret unset** | 503 — every webhook rejected |
+| TC-ERR-048 | Bolna | Forged webhook | 401 |
+| TC-ERR-049 | Bolna | Webhook write failure | **500 so the provider retries** |
+| TC-ERR-050 | **Calendar** | Not connected | Interview still saves; `not_attempted` |
+| TC-ERR-051 | Calendar | Revoked grant | Degrades to `not_connected`, **not** failed |
+| TC-ERR-052 | Calendar | API error | `calendarMessage` **alongside a 201** |
+| TC-ERR-053 | **Email** | Disconnected | Automatic sends logged as not sent with a reason; **stage changes still succeed** |
+| TC-ERR-054 | Email | Provider 5xx | Logged `failed` with a plain reason; no provider body stored |
+| TC-ERR-055 | **WhatsApp** | Disconnected | **Email-only sends unaffected** |
+| TC-ERR-056 | WhatsApp | Fails on a `both` template | Email still sends; two independent log rows |
+| TC-ERR-057 | **n8n** | Unreachable | The action records a failure; the run continues |
+| TC-ERR-058 | **Encryption key** | Unset | Integrations refuse to connect; nothing stored in the clear |
+| TC-ERR-059 | Encryption key | Rotated | "Stored credentials could not be read. Reconnect the integration." |
+| TC-ERR-060 | **Service-role key** | Unset | Webhook 503; cron sweep 503; features degrade to "not configured" rather than crashing |
+| TC-ERR-061 | **CRON_SECRET** | Unset | `GET /api/automations/sweep` → 503; **time-based rules never run** |
+
+## 32.4 The universal resilience rule
+
+**Nothing in the side-effect chain may fail the action that caused it.**
+Verify all four, one at a time, by breaking each and then moving an application's stage:
+
+1. `logActivity()` — never throws, catches internally
+2. `notify()` — same contract
+3. `trySendForEvent()` — the send pipeline never throws
+4. `dispatch()` — awaited but wrapped in `try/catch`
+
+**In every case, the stage change must still succeed.**
+
+---
+
+# 33. Validation Testing
+
+## 33.1 Existing validation
+
+### Authentication
+| Field | Required | Rule | Valid | Invalid | Error |
+| --- | :---: | --- | --- | --- | --- |
+| Email (signup/login) | ✅ | browser `type=email` | `a@b.co` | `notanemail` | native |
+| Password (signup) | ✅ | ≥8 chars | `Password1` | `abc` | "Use at least 8 characters for your password." |
+| Password (reset) | ✅ | ≥8 + must match confirm | — | mismatch | "Those passwords don't match." |
+| Name (signup) | ✅ | non-empty | — | — | native |
+
+### Organization
+| Field | Required | Rule | Error |
+| --- | :---: | --- | --- |
+| Name | ✅ | 1–120 chars, `btrim` non-empty (DB CHECK) | "Organization name is required." / "…is too long." |
+| Timezone | ✅ | defaults `Asia/Kolkata` | — |
+| Brand colour | ❌ | `^#[0-9A-Fa-f]{6}$` (DB) | constraint |
+| Currency | ❌ | `^[A-Z]{3}$` (DB) | constraint |
+| `agency_mode` | ❌ | boolean; **absent ≠ false** | "agency_mode must be true or false." |
+
+### Jobs
+| Field | Required | Rule | Error |
+| --- | :---: | --- | --- |
+| Title | ✅ | 1–200, trimmed | "A job title is required." / "Title must be 200 characters or fewer." |
+| Description | ❌ | ≤20,000 | "Description must be 20000 characters or fewer." |
+| Location | ❌ | ≤200 | "Location must be 200 characters or fewer." |
+| Experience min/max | ❌ | number 0–60; **min ≤ max** | "…cannot be negative." / "…unrealistically large." / "Minimum experience cannot be greater than maximum experience." |
+| Salary min/max | ❌ | number ≥0; **min ≤ max** | "Minimum salary cannot be greater than maximum salary." |
+| Required/Preferred skills | ❌ | ≤25 entries, ≤120 chars, deduped; **preferred ∖ required** | "…cannot have more than 25 entries." |
+| Work mode | ❌ | enum | "Work mode must be onsite, hybrid, or remote." |
+| Status | ❌ | enum | "Status must be draft, open, on_hold, or closed." |
+| Owner recruiter | ❌ | UUID **and an active member** | "…is not a valid id." / "…is not a member of this team." |
+| Screening questions | ❌ | ≤500 chars each, **first 20 kept** | silently trimmed |
+
+### Candidates
+| Field | Required | Rule | Error |
+| --- | :---: | --- | --- |
+| Name | ✅ | 1–200 | "A candidate name is required." |
+| Email | ⚠️ | ≤320, `^[^\s@]+@[^\s@]+\.[^\s@]+$`, lowercased | "Enter a valid email address." |
+| Phone | ⚠️ | ≤40, **≥6 digits** after stripping | "Enter a valid phone number." |
+| **Email OR phone** | ✅ | at least one (validation + DB CHECK) | "Add an email address or a phone number." |
+| Location / Company / Role | ❌ | ≤120 / ≤200 / ≤200 | "… must be N characters or fewer." |
+| Total experience | ❌ | 0–60 | "…unrealistically large." |
+| Expected salary | ❌ | ≥0 | "…cannot be negative." |
+| Notice period | ❌ | 0–365 | "…unrealistically large." |
+| Skills | ❌ | ≤40, ≤60 chars, deduped | "Skills cannot have more than 40 entries." |
+| Source | ❌ | enum of 7 | "Select a valid intake source." |
+| Education / Employment | ❌ | **normalised, never rejected** | — |
+
+### Applications
+| Field | Rule | Error |
+| --- | --- | --- |
+| candidate_id / job_id | required on create | "Select a candidate." / "Select a job." |
+| stage | valid enum + `canTransition` | "Invalid stage." / **409** terminal reason |
+| priority | low/normal/high | "Priority must be Low, Normal or High." |
+| match_score | 0–100 | "Match score must be between 0 and 100." |
+| assigned_recruiter_id | active member | "That recruiter is not a member of this team." |
+| **name/email/phone** | **forbidden** | **422** "Candidate name, email and phone are edited on the candidate's own page, not here." |
+| note | non-empty, ≤ cap | "Write something before saving the note." |
+
+### Interviews & feedback
+| Field | Rule | Error |
+| --- | --- | --- |
+| application_id | required | "Choose an application." |
+| scheduled_at | parseable date | "That date isn't valid." |
+| duration_minutes | 1–480 (DB) | constraint |
+| interviewer_id | active member | "That interviewer is not a member of this team." |
+| rating | **integer 1–5** | "Give a rating from 1 to 5." |
+| recommendation | enum of 4 | "Choose a recommendation." |
+| notes | ≤5,000, truncated | silent |
+
+### Files
+| Context | Types | Max | Error |
+| --- | --- | --- | --- |
+| Resume upload | `.pdf .doc .docx` (extension first, MIME fallback) | 10 MB | "Only PDF and Word documents (.doc, .docx) are supported" / "That file is larger than 10 MB." |
+| Bulk intake | same | 10 MB | same, as a **failed row** not a request error |
+| Onboarding document | PDF, JPEG, PNG, **HEIC**, .doc, .docx | 10 MB | "Upload a PDF, an image (JPG, PNG, HEIC), or a Word document." |
+
+### Other
+| Area | Rule |
+| --- | --- |
+| Client name | non-empty, **unique per organization** |
+| Client `feedback_sla_days` | 0–90 |
+| SLA `target_days` | 0–365 |
+| Automation name | 1–120, unique per org |
+| Automation daily limit | whole number > 0, or empty |
+| Message template | event_key in the closed 12; WhatsApp-only may not have a subject; `whatsapp_body` only when channel = `both`; body non-empty; name ≤120; subject ≤300 |
+| Manual message | 422 empty body; 422 email with no subject |
+| Document template name | 1–120, unique per org; description ≤500 |
+| Onboarding rejection reason | **required**, ≤500 (DB CHECK) |
+| Evaluation score | 1–10 |
+| Notification `link_path` | must start with `/` (DB CHECK) |
+| Pagination | page ≥1, per_page ≤100 |
+| `?next=` redirect | `/^\/(?!\/)/` in two places |
+
+## 33.2 Recommended missing validation — **documentation only, no code changed**
+
+| # | Area | Gap | Risk | Suggested rule | Priority |
+| --- | --- | --- | --- | --- | --- |
+| V-01 | Signup errors | `SignupForm` renders `signUpError.message` **verbatim** | Account enumeration via "User already registered", defeating the care taken on `/login` and `/forgot-password` | Genericise to "We couldn't create that account. Try signing in instead." | **High** |
+| V-02 | Password policy | Length-only (≥8) | Weak passwords accepted | Add a complexity or breach-list check | Medium |
+| V-03 | **Invite email binding** | `accept_invite()` never compares `invites.email` to the caller | Anyone with the link joins at the invited role | Compare the accepting user's email to the invite | **Critical** |
+| V-04 | **Invite role overwrite** | `ON CONFLICT DO UPDATE SET role`, `status='active'` | A stale invite can demote an existing member or **restore a removed one** | Refuse when a membership already exists, or require an explicit re-invite flow | **High** |
+| V-05 | Timezone | No server-side IANA validation | An invalid zone could break every date calculation for that org | Validate against a known list | Medium |
+| V-06 | Interview date | No past-date guard found | Interviews can be scheduled in the past | Warn or refuse | Medium |
+| V-07 | Job title uniqueness | None | Duplicate requisitions split a pipeline | Warn on a near-duplicate title within the same client | Medium |
+| V-08 | Client contact emails | `contacts` is free-form JSONB | Invalid addresses stored | Validate each contact's email shape | Medium |
+| V-09 | Search escaping | `%_,()` are **stripped**, not escaped | A search for a title with a comma silently searches something else | Escape rather than strip | Low |
+| V-10 | Stage config numbers | Clamped **silently** | A user typing 999 gets 480 with no message | Reflect the clamped value or warn | Medium |
+| V-11 | Prompt truncation | Silent at 8,000 chars | Part of a script vanishes unnoticed | Show a character counter and a warning | Medium |
+| V-12 | Question truncation | Only the first 20 screening questions are kept | Silent data loss | Reject with a message instead | Medium |
+| V-13 | Bulk intake concurrency | No client-side cap on parallel uploads | 100 files → 100 concurrent AI calls | Throttle to a fixed concurrency | Medium |
+| V-14 | Filename sanitisation | `file_name` truncated to the last 200 chars only | Odd storage paths | Sanitise separators and control characters | Low |
+| V-15 | Notes length | Enforced server-side but no live counter | Users hit an error only on submit | Add a counter | Low |
+| V-16 | Onboarding notes | ≤2,000 (DB) with no UI counter | Same | Add a counter | Low |
+| V-17 | Analytics question | Length checked; content is not | Prompt-injection surface (mitigated by the server-side rebuild) | Consider a content guard | Low |
+| V-18 | Duplicate acknowledgement | A client can always send `acknowledge_duplicates: true` | The warning becomes bypassable by any non-UI caller | Require a matching duplicate-id list | Medium |
+
+---
+
+# 34. Feature Dependency Map
+
+```
+                        ┌───────────────────────────────┐
+                        │  M01 Authentication & Session │
+                        └───────────────┬───────────────┘
+                                        ▼
+                        ┌───────────────────────────────┐
+                        │  M02 Organization (tenant,     │
+                        │      timezone, agency_mode)    │
+                        └───────────────┬───────────────┘
+                     ┌──────────────────┼──────────────────┐
+                     ▼                  ▼                  ▼
+          ┌──────────────────┐ ┌────────────────┐ ┌──────────────────┐
+          │ M03 Team & Roles │ │ M24 Settings & │ │ M25 AI Service   │
+          │  (permissions)   │ │  Integrations  │ │     Layer        │
+          └────────┬─────────┘ └───────┬────────┘ └────────┬─────────┘
+                   │                   │                    │
+                   ▼                   │                    │
+          ┌──────────────────┐         │                    │
+          │  M05 Jobs        │◄────────┼──── M17 Clients ───┤ (agency mode)
+          └────────┬─────────┘         │                    │
+                   ├────────────► M06 Hiring Stages         │
+                   │                   │                    │
+                   ▼                   │                    │
+          ┌──────────────────┐         │                    │
+          │  M08 Candidates  │◄── M07 Bulk Intake ──────────┤
+          └────────┬─────────┘         │                    │
+                   ├────────────► M09 Resumes & Parsing ────┤
+                   ▼                   │                    │
+          ┌────────────────────────────────────────────────────────┐
+          │  M10 APPLICATIONS  ── the hub every later module hangs  │
+          │                       its data off                     │
+          └───┬───────┬────────┬────────┬────────┬────────┬────────┘
+              ▼       ▼        ▼        ▼        ▼        ▼
+          M11      M12      M13      M14      M15      M16
+        Matching  Screen-  Screen-  Evalua-  Pipe-   Inter-
+                  ing Call ing Rep. tions    line    views
+              │       │        │        │        │        │
+              └───────┴────────┴────────┴────────┴────────┘
+                                ▼
+                        ┌───────────────┐
+                        │ stage = hired │
+                        └───────┬───────┘
+                                ▼
+                    ┌───────────────────────┐
+                    │ M23 Onboarding & Docs │  (created by a DB trigger)
+                    └───────────────────────┘
+
+  CROSS-CUTTING, fed by everything above:
+    M18 Automations ──► reads M10-M16, M23; acts through M12, M20, M21
+    M19 Activity & Audit ──► written by every module (never blocks it)
+    M20 Notifications ──► internal, triggered by M10, M12, M16, M18, M23
+    M21 Candidate Communications ──► triggered by M10 (stages), M16 (scheduling),
+                                     M07 (intake), M18 (rules)
+    M22 Analytics ──► reads M05, M08, M10, M12, M16, M17, M18, M23
+    M04 Dashboard ──► reads M08, M10, M12, M16, M18
+```
+
+## 34.1 Practical consequences for a tester
+
+| If this is broken… | …these will look broken too |
+| --- | --- |
+| M01 Authentication | **Everything** |
+| M02 Organization / timezone | Dashboard "today", Analytics ranges, SLA aging, automation daily caps |
+| M03 Roles | Every permission test in every module |
+| M05 Jobs | Applications, Matching, Screening scripts, Pipeline, Analytics |
+| M08 Candidates | Applications, Resumes, Screening, Communications |
+| **M10 Applications** | **M11–M16, M18, M20–M23** — the single highest-blast-radius module |
+| M24 Integrations | Screening (Bolna), Calendar invites, all candidate messaging, AI features, n8n actions |
+| M25 AI layer | Every AI surface — but **no manual workflow** should be affected |
+
+## 34.2 The correct test order
+
+**M01 → M02 → M03 → M24 → M05 → M06 → M08 → M09 → M07 → M10 → M11 → M12 →
+M13 → M14 → M15 → M16 → M17 → M23 → M18 → M20 → M21 → M04 → M22 → M19**
+
+Rationale: authenticate, become a tenant, get roles, connect integrations (or
+deliberately leave them disconnected to test degradation), then build data
+forward through the funnel, then test the cross-cutting layers **last** — because
+they read everything the earlier modules produced.
+
+---
+
+# 35. Complete End-to-End Testing Flows
+
+These are built from the **actual** application, not a generic template. Run them
+in order; each assumes the previous one's data exists.
+
+---
+
+## E2E-001 — New workspace, first hire (the golden path)
+**Priority: Critical · ~45 min · Roles: Owner**
+
+1. Open `/signup`, create an account with a fresh email and an 8+ character password.
+2. Confirm the email if confirmation is enabled; land on `/onboarding`.
+3. **Step 1** — name the workspace "E2E Agency", country India, timezone `Asia/Kolkata`. Continue.
+4. **Step 2** — industry "IT services", size, choose **"We recruit for client companies"**, hiring focus "Java and React roles". Get AI suggestions.
+5. **Step 3** — read the suggestions, click **Finish setup**. Land on `/dashboard`.
+   ✔ Verify: header shows "E2E Agency", today's date in Asia/Kolkata, six KPI tiles all at 0 with **no red or amber accents**.
+6. `/clients` → **Add a client** "Acme Corp", SLA 3 days. ✔ Saved.
+7. `/jobs/new` → paste a real Java job description → **Extract with AI** → review the diff → accept the fields you want → set client Acme Corp, status **Open**, add 3 required skills, an experience range and a salary band → **Save**.
+   ✔ Verify: Job Health says **"No screening questions — add them in the AI Screening Call stage…"**
+8. On `/jobs/[id]` → **Hiring stages** → Configure **AI Screening Call** → enable it, write a prompt using `{{candidate.name}}` and `{{job.title}}`, add 3 screening questions, set max attempts 3 → **Save**.
+   ✔ Verify: Job Health is now **Healthy** (assuming ranges and skills are set).
+   ✔ Verify: Phone/Video/Written rows say **"Not yet active — configuration only"**.
+9. `/candidates/new` → name, email, phone, 5 skills, experience, expected salary, notice period → **Save**. ✔ 201, no duplicate warning.
+10. `/candidates/[id]/resume` → upload a real PDF resume → **Parse** → **Review changes**.
+    ✔ Verify: a diff table appears. **Accept only "Skills"** and apply.
+    ✔ Verify: skills updated; name/email/phone **unchanged**.
+11. `/applications/new` → link that candidate to the job → **Save**.
+    ✔ Verify: created at stage **Applied**.
+12. Open the application → **Match** → a score appears with strong matches / gaps / needs-verification, each labelled fact-or-judgement.
+    ✔ If AI is off, verify it says AI was not consulted and still shows a deterministic score.
+13. Move the stage to **Shortlisted**.
+    ✔ Verify: the timeline records the move; the stepper updates; `/pipeline` shows the card in Shortlisted.
+14. Move to **AI Screening Call** → open the screening-call panel.
+    ✔ Verify: **the consent disclosure is displayed before you can dial.**
+    ✔ (Only place a real call against a test number you control.)
+15. Move to **Phone Interview** → log an evaluation: score 8, outcome **pass**, summary.
+    ✔ Verify: it appears in the Evaluation panel and the **Next action** banner suggests the next configured stage.
+16. **Schedule an interview** for tomorrow, mode video, assign yourself, 60 minutes.
+    ✔ Verify: 201; if Calendar is disconnected this is **not** an error.
+17. `/interviews/[id]` → submit feedback: rating **4**, recommendation **yes**, notes.
+    ✔ Verify: the interview becomes **completed** automatically.
+    ✔ Verify: it appears in the Evaluation panel scaled to **8/10**.
+18. Back on the application → **Draft a submission** → edit the text → **Send**.
+    ✔ Verify: the stored text is **your edited version**, and the client feedback clock has started.
+19. Move the stage to **Hired**.
+    ✔ Verify: `/hires` now shows this person with a **7-item checklist**.
+20. `/hires/[id]` → upload a file against **Signed Offer Letter** → **Verify** it.
+    ✔ Try **Mark complete** now → **refused**, with the blocking documents named.
+21. Upload and verify all remaining **required** documents; leave the optional
+    "Previous Employment Relieving Letter" pending → **Mark complete**.
+    ✔ Verify: **succeeds**. Status = Completed with a `completed_at`.
+22. `/dashboard` → ✔ tiles reflect the activity. `/analytics` → ✔ the funnel shows one hire.
+23. `/audit-log` → ✔ every step above appears as an event with an actor.
+24. Sign out. ✔ Back button does not restore the app.
+
+---
+
+## E2E-002 — Bulk intake, ten resumes, mixed outcomes
+**Priority: Critical · ~30 min · Role: Recruiter**
+
+Prepare: 6 clean resumes for new people, 1 resume for a candidate who already
+exists (same email), 1 whose email belongs to A and phone to B, 1 `.txt`, 1
+corrupt/scanned-image PDF.
+
+1. Open `/jobs/[id]` → **Add candidates** → drop all 10 at once.
+2. ✔ Each row updates independently; a slow file does not freeze the others.
+3. ✔ 6 rows → `candidate_created`; candidates + applications exist.
+4. ✔ 1 row → `candidate_matched`; **no duplicate candidate**.
+5. ✔ 1 row → `match_conflict`; **nothing created**; the file is still downloadable.
+6. ✔ 1 row → `failed` — "Only PDF and Word documents (.doc, .docx) are supported".
+7. ✔ 1 row → `failed` with a message about extractable text, **not** blaming the AI.
+8. ✔ The summary line is a readable sentence.
+9. Close the modal, reopen it. ✔ **Every row and status is restored.**
+10. Resolve the conflict → pick a candidate → ✔ `manually_connected`; **no second AI call**.
+11. Drop one of the 6 again. ✔ `already_applied`.
+12. Open a matched candidate. ✔ A **"profile updates need your review"** banner; the stored profile is **unchanged**.
+13. ✔ `/applications` shows the new applications at stage **Applied**.
+
+---
+
+## E2E-003 — Full permission sweep
+**Priority: Critical · ~60 min · Roles: all four**
+
+Create four accounts (Owner, Admin, Recruiter, Viewer) in one workspace.
+
+1. Owner invites the other three at their roles; each accepts via `/invite/{token}`.
+2. As **each** role, walk §31.2 in the UI. ✔ Denied capabilities are **hidden**.
+3. As each role, hit the same endpoints with `curl`. ✔ Every denial is a **403**.
+4. As each role, attempt the same writes from the browser console via PostgREST.
+   ✔ **RLS refuses every denied write.**
+5. As Recruiter: ✔ Dashboard says "Your workload"; Pipeline says "yours and unassigned"; Analytics hides the recruiter filter and shows "Recruiter comparisons are restricted".
+6. As Recruiter: try to close **another** recruiter's job → ✔ 403 in the route **and** refused by the trigger.
+7. As Admin: try to promote someone to Owner → ✔ 403.
+8. As Owner: try to demote yourself as the **sole** Owner → ✔ 409.
+9. As Viewer: try to start a screening call, export analytics, upload a resume, send a message → ✔ 403 on all four.
+10. Owner removes the Recruiter. ✔ They lose access on their next navigation.
+
+---
+
+## E2E-004 — Automation, approval and the scheduler
+**Priority: Critical · ~40 min · Role: Owner/Admin**
+
+1. `/automations/new` → **Describe it instead** → "Notify the recruiter when an application has sat in Shortlisted for 3 days".
+2. ✔ A proposal appears; **nothing is saved**. Save it → ✔ created as **draft**.
+3. Open it → **Review & activate** → ✔ activates (no integration needed for a notification).
+4. Create a second rule with **`send_candidate_email`** → ✔ `requires_approval` is **forced on** and cannot be switched off.
+5. Create a third with **`start_screening_call`** while Bolna is **disconnected** → activate → ✔ **409**, naming the missing integration.
+6. Connect Bolna → activate → ✔ succeeds.
+7. **Test** rule 3 against an application → ✔ a verdict is shown, **no call is placed, no run row is written**.
+8. Trigger rule 2 for real → ✔ a proposal lands in `/automations/approvals`; **nothing is sent**.
+9. **Approve** it → ✔ the action runs now, under your identity.
+10. Trigger it again and **reject** → ✔ nothing runs; the decision and note are recorded.
+11. Age a pending proposal past 7 days → approve → ✔ **409 expired**.
+12. Set a **daily limit of 2** on rule 1, trigger it 3 times → ✔ the third is **BLOCKED** and **the rule pauses itself**.
+13. Turn the **kill switch off** → move a stage → ✔ **nothing runs**; rules keep `active`.
+14. Turn it back on → ✔ the same rules run again with no re-activation.
+15. Click **Run the scheduler now** → ✔ sweeps **only** your organization; a sweep row is written **even when nothing was found**.
+16. Run it five times in a row against the same stale application → ✔ **one run, not five**.
+17. `curl` `GET /api/automations/sweep` with no header → ✔ **401**. With `CRON_SECRET` unset → ✔ **503**.
+18. Break an active rule, then move a stage → ✔ **the stage still changes**.
+
+---
+
+## E2E-005 — Candidate communications, opt-out and unsubscribe
+**Priority: Critical · ~35 min · Roles: Admin + a mail account you control**
+
+1. `/settings/templates` → ✔ **every seeded template is inactive.**
+2. Activate **Shortlisted** (email). Put `{{interview.time}}` in it → ✔ the editor **warns** the event cannot supply it. Remove it.
+3. Move an application to **Shortlisted** → ✔ the candidate receives the email.
+4. ✔ The email has an **unsubscribe footer** you did not write.
+5. **Open the link and do nothing.** ✔ The candidate is **NOT** unsubscribed.
+6. Click the button. ✔ Opted out; the page says so. Reload → ✔ safe.
+7. Change the candidate id inside the token → ✔ **refused** (invalid signature).
+8. Move another application for the **same** candidate to Shortlisted → ✔ the automatic send is **refused** and logged as not sent with a reason.
+9. **Manually** message that candidate → ✔ **409 `opted_out`** with the reason. Re-submit acknowledging → ✔ sent, and the override is visible in the log.
+10. ✔ The manual message has **no** unsubscribe footer.
+11. Disconnect **WhatsApp**, send a **`both`** template → ✔ **email still sends**; two independent log rows.
+12. Disconnect **email** and move a stage → ✔ **the stage still changes**; the message is logged as not sent.
+13. Unset `INTEGRATION_ENCRYPTION_KEY`, send again → ✔ the footer says **"reply and ask to be removed"** — **no dead link**.
+14. Check `message_log.body_sent` → ✔ it is the **resolved text including the footer**, and `recipient_hint` is **masked**.
+
+---
+
+## E2E-006 — Screening call, webhook and report
+**Priority: Critical · ~30 min · Role: Recruiter + Owner**
+
+1. Ensure the job has 3 screening questions and the AI Screening Call stage enabled.
+2. Open the screening-call panel → ✔ the **consent disclosure is shown first**.
+3. Start a call (test number only). ✔ A `queued` row; `consent_confirmed = false`.
+4. POST the Bolna webhook **with no signature** → ✔ **401**.
+5. POST with a **valid signature but a tampered body** → ✔ 401.
+6. POST with a valid signature but a **forged `organization_id`** → ✔ ignored; tenancy comes from our row.
+7. POST with an **unknown call id** → ✔ **200** `{received:true,matched:false}`.
+8. POST a valid completed payload with a transcript and a consent answer → ✔ status, transcript, recording, duration and `consent_confirmed` all recorded.
+9. Generate the **screening report** → ✔ succeeds.
+10. Set `consent_confirmed = false` on another call and generate → ✔ refused with the **no-consent** message; ✔ a direct PostgREST insert is refused by the trigger too.
+11. Correct `expected_ctc` on the report → ✔ the current value changes, `ai_expected_ctc` does **not**, and `corrected_fields` records it.
+12. Try to edit an `ai_*` column → ✔ **"The original AI extraction cannot be edited."**
+13. ✔ `/pipeline` shows "screening report to review" on the card until it is reviewed.
+14. Unset `BOLNA_WEBHOOK_SECRET` → POST anything → ✔ **503**.
+
+---
+
+## E2E-007 — Full AI-degradation sweep
+**Priority: Critical · ~30 min**
+
+Unset `OPENAI_API_KEY`, restart the server, then visit **every** AI surface:
+
+Job JD extraction · Candidate blurb structuring · NL candidate search · Resume
+parsing · Bulk intake · Match calculation · Screening report · Interview brief ·
+Application summary · Client submission draft · Client activity summary · Daily
+brief · Pipeline prioritisation · Automation drafting · Candidate narrative ·
+Message reword · Analytics explainer · Onboarding recommendations.
+
+For **each**: ✔ a friendly `not_configured` message, ✔ a retry affordance where
+one exists, and ✔ **the manual workflow still fully works**.
+
+Then repeat with `AI_BASE_URL` pointing at (a) a dead host, (b) a host that hangs
+for 60 s, (c) a mock returning prose, (d) a mock returning valid JSON of the wrong
+shape. ✔ Four distinct messages; ✔ **nothing written** in any case; ✔ no provider
+body or stack trace reaches the browser.
+
+---
+
+## E2E-008 — Multi-tenant isolation
+**Priority: Critical · ~30 min**
+
+1. Create workspace **A** (Owner A) and workspace **B** (Owner B) with a full data set each.
+2. As A, request every `[id]` route with B's ids → ✔ **404 everywhere**, never 403.
+3. As A, forge the `active_organization_id` cookie to B's id → ✔ falls back to A; **no B data**.
+4. As A, `POST /api/organizations/switch` with B's id → ✔ 404.
+5. As A, create a candidate whose email exists in B → ✔ **no duplicate warning** (dedupe is org-scoped).
+6. As A, search for a B candidate by name → ✔ no results.
+7. As A, from the browser console, `select` every table via PostgREST → ✔ only A's rows.
+8. As A, attempt an insert carrying B's `organization_id` → ✔ refused by RLS.
+9. As A, attempt to reference B's candidate from an A application → ✔ refused by the tenant-integrity trigger.
+10. Open a B resume's storage path while signed in as A → ✔ denied.
+11. Compare Analytics numbers → ✔ completely independent.
+12. ✔ A user who belongs to both orgs switches cleanly with no bleed-through.
+
+---
+
+## E2E-009 — Recruiter's day (scope + realism)
+**Priority: High · ~25 min · Role: Recruiter**
+
+1. Sign in → `/dashboard` → ✔ "Your workload", own-scope counts.
+2. `/pipeline` → ✔ "yours and unassigned"; move one of your cards.
+3. Try to move a card assigned to another recruiter → ✔ it is not on your board.
+4. `/candidates` → NL search → ✔ results; run it twice → ✔ identical.
+5. Add a candidate that triggers a duplicate warning → ✔ 409; acknowledge → ✔ created.
+6. Upload and parse a resume → review → apply **two** fields only.
+7. Log an evaluation, schedule an interview, submit feedback.
+8. Send a manual message about **your own** application → ✔ allowed.
+9. Try to send about someone **else's** application → ✔ refused.
+10. `/analytics` → ✔ own-scope; ✔ the recruiter filter is absent; ✔ **Export works** (recruiters may export).
+11. Try `/settings/integrations`, `/audit-log`, `/automations/new` → ✔ hidden or restricted.
+
+---
+
+## E2E-010 — Onboarding document lifecycle
+**Priority: High · ~25 min · Roles: Recruiter + Admin**
+
+1. Move an application to **Hired** → ✔ `/hires` shows a 7-item checklist.
+2. As Recruiter, upload a **JPEG photo** of an ID → ✔ accepted (photos are first-class here).
+3. Upload a `.zip` → ✔ rejected with the exact type message.
+4. Try to **verify** a `pending` document → ✔ **409** "There is nothing uploaded to verify yet."
+5. Verify an uploaded one → ✔ `verified_by` / `verified_at` recorded.
+6. As Recruiter, try to **reject** → ✔ **403** (Owner/Admin only).
+7. As Admin, reject with a **blank** reason → ✔ **400** "Say why it was rejected…".
+8. Reject with a reason → ✔ recorded and visible to the uploader.
+9. Try **Mark complete** with one required document unverified → ✔ refused, blockers named.
+10. Verify everything required; leave the optional relieving letter pending → **Mark complete** → ✔ succeeds.
+11. Add a one-off document "Work permit" → ✔ created. Delete it as Admin → ✔ removed.
+12. Try to delete a **template-derived** document → ✔ refused.
+13. Assign the record to another recruiter; as the original recruiter, try to upload → ✔ **403** "This hire's onboarding is assigned to someone else."
+14. As Recruiter, try to **reassign** → ✔ 403.
+15. Click a document → ✔ a short-lived signed URL. Open the raw storage path unauthenticated → ✔ **denied**.
+
+---
+
+## E2E-011 — In-house (non-agency) workspace
+**Priority: High · ~15 min**
+
+1. Create a workspace choosing **"We hire for ourselves"**.
+2. ✔ **Clients is absent** from the nav.
+3. ✔ The Jobs list has **no Client filter**; a bookmarked `?client_id=` is **dropped**, not applied.
+4. ✔ Analytics has **no Client filter**.
+5. ✔ The application detail page has **no client submission card** (or it explains there is no client).
+6. Switch the org to agency mode in settings → ✔ all of the above reappear.
+
+---
+
+## E2E-012 — Responsive & accessibility pass
+**Priority: High · ~30 min**
+
+At **375px**, **768px**, **1024px**, **1440px** on: Login, Dashboard, Jobs list,
+Job detail, Candidates, Candidate detail, Applications, Application detail,
+Pipeline, Interviews, Clients, Automations, Analytics, Hires, Settings, Notifications.
+
+- ✔ No horizontal page scroll (wide tables scroll **inside** their container)
+- ✔ The mobile drawer opens, locks page scroll, and closes on navigation
+- ✔ Nav links are all reachable at every width (the bar was measured to fit 1440px exactly with the current item count — watch for clipping at 1280px)
+- ✔ Every interactive element is keyboard-reachable in a sensible order
+- ✔ Focus is visible everywhere
+- ✔ Modals trap focus, close on Escape and on backdrop click
+- ✔ Every icon-only button has an `aria-label`
+- ✔ Error banners use `role="alert"`
+- ✔ Text contrast is adequate in both the light palette and any dark rendering
+
+---
+
+# 36. Bug Reporting Template
+
+Copy this per finding.
+
+```markdown
+## Bug ID
+BUG-<MODULE>-<NNN>          e.g. BUG-AUTH-001
+
+## Module
+M__ — <module name>          e.g. M12 — AI Screening Calls
+
+## Feature
+<the specific feature or endpoint>
+
+## Related Test Case
+TC-____-___                  (or "exploratory")
+
+## Description
+<one or two sentences: what is wrong, stated as a fact>
+
+## Steps to Reproduce
+1.
+2.
+3.
+
+## Expected Result
+<what should happen, and where that expectation comes from —
+ this document's section, a UI message, or a spec line>
+
+## Actual Result
+<what actually happened, verbatim: exact error text, HTTP status, console output>
+
+## Severity
+- [ ] **Critical** — data loss, cross-tenant leak, security bypass, a message
+      sent to a real candidate that should not have been, consent/audit failure,
+      the product stating a false number
+- [ ] **High** — a core workflow is blocked or a permission is wrong
+- [ ] **Medium** — a workaround exists; a degraded but honest state
+- [ ] **Low** — cosmetic, copy, or a rare edge case
+
+## Priority
+- [ ] **P0** — fix now, blocks release
+- [ ] **P1** — fix before release
+- [ ] **P2** — next iteration
+- [ ] **P3** — backlog
+
+## Environment
+- Role: owner / admin / recruiter / viewer
+- Organization mode: agency / in-house
+- Browser + version:
+- Device / viewport:
+- Integrations connected: bolna / calendar / email / whatsapp / llm / n8n
+- `OPENAI_API_KEY` set: yes / no
+- `INTEGRATION_ENCRYPTION_KEY` set: yes / no
+- `BOLNA_WEBHOOK_SECRET` set: yes / no
+- `CRON_SECRET` set: yes / no
+- Migrations applied through: 00__
+
+## Evidence
+- Screenshot / video:
+- Network tab: request + response body (redact credentials)
+- Browser console:
+- Server console (the useful detail lives here — errors are genericised for the browser):
+- Relevant database rows:
+
+## Additional Notes
+<reproducibility: always / intermittent (n of m attempts)>
+<regression? did this work before?>
+<blast radius: which other modules depend on this — see §34>
+```
+
+---
+
+# 37. Master Testing Checklist
+
+Tick a module only when **every Critical** case in it has passed.
+
+## M01 — Authentication & Session
+- [ ] Signup (valid, short password, duplicate email, invalid email)
+- [ ] Email confirmation flow / `/auth/callback`
+- [ ] Login (valid, wrong password, unknown email — **identical** messages)
+- [ ] Google OAuth (enabled and disabled)
+- [ ] Deep-link preservation via `?next`
+- [ ] **Open-redirect defence** (`?next=https://…`, `?next=//…`)
+- [ ] Forgot password (**always reports success**)
+- [ ] Reset password (valid, mismatched, short, expired)
+- [ ] Every protected route redirects when signed out
+- [ ] Every public path renders when signed out
+- [ ] **API returns JSON 401, not an HTML redirect**
+- [ ] Logout; back button does not restore the app
+- [ ] Session persistence across refresh; expiry mid-session
+- [ ] Profile self-heal (no redirect loop)
+- [ ] Supabase unconfigured / placeholder → actionable message
+
+## M02 — Organization & Onboarding
+- [ ] 3-step wizard, including Skip AI
+- [ ] Name validation (empty, whitespace, 121 chars)
+- [ ] **Timezone drives "today"**
+- [ ] AI suggestions: happy, unavailable, provider error, retry
+- [ ] **Agency mode on/off changes the nav and the filters**
+- [ ] Already-onboarded redirect; refresh mid-wizard
+- [ ] Settings edit; recruiter/viewer blocked (hidden **and** 403)
+- [ ] Brand colour / currency constraints
+- [ ] `agency_mode` absent ≠ false
+- [ ] **Cross-tenant org id → 404**
+- [ ] Org switcher: lists, switches, hidden with one membership, **forged cookie falls back**
+- [ ] Organization deletion refused
+
+## M03 — Team, Invites & Permissions
+- [ ] Invite create / revoke / duplicate 409
+- [ ] **Admin cannot invite an Owner**
+- [ ] Recruiter and Viewer cannot invite
+- [ ] Accept: signed out, signed in, expired, revoked, reused, garbage token
+- [ ] **Invite email binding** (V-03) — file if unbound
+- [ ] **Invite role overwrite / removed-member restore** (V-04)
+- [ ] Role change; **only an Owner touches Owner**
+- [ ] **Last-Owner protection in the route AND via PostgREST**
+- [ ] Member removal; removed member loses access
+- [ ] **Membership leak trap** — own role resolves correctly
+- [ ] Cross-tenant member id → 404
+
+## M04 — Dashboard
+- [ ] Loads; skeleton, not a full-page spinner
+- [ ] **Recruiter own-scope vs org-wide**
+- [ ] **Org timezone half-open day boundary**
+- [ ] Tiles: zero state has no colour; overdue amber; failures red
+- [ ] **pending ≠ error ≠ 0** on every tile
+- [ ] Attention queue: empty / populated / **error ≠ empty**
+- [ ] Daily brief: generate, **numeric consistency**, empty org, AI off, caching
+- [ ] Quick links; `force-dynamic` freshness
+
+## M05 — Jobs
+- [ ] Create minimal and full
+- [ ] Every validation rule (title, ranges, skills, enums, ids)
+- [ ] **min ≤ max on both ranges**
+- [ ] **Skill dedupe and preferred ∖ required**
+- [ ] **`organization_id` in the body is ignored**
+- [ ] AI extraction: proposals only, nothing saved, AI off
+- [ ] Partial PATCH does not blank unmentioned fields
+- [ ] **Recruiter closes only own jobs — route AND trigger**
+- [ ] Archive (owner/admin only, double-archive, applications survive)
+- [ ] Filters, **search-metacharacter safety**, pagination clamp
+- [ ] Job health: all 7 rules; drafts never unhealthy
+- [ ] Cross-tenant 404; cross-tenant client refused
+- [ ] **Editing a job marks matches stale**
+
+## M06 — Job Hiring Stages
+- [ ] All five stages listed on a new job
+- [ ] **"Not yet active — configuration only" on the three unwired stages**
+- [ ] **Resume-score off/on wording is not "no resume scoring"**
+- [ ] **Config survives disabling** (upsert, never delete)
+- [ ] Tokens stay literal at save time
+- [ ] Numeric clamping; duplicate/unknown stage keys refused
+- [ ] Viewer reads, cannot write
+- [ ] **Disabled stages are not offered in the stage-move dropdown**
+- [ ] **Terminal exits always offered**
+
+## M07 — Bulk Resume Intake
+- [ ] 10 files at once; each resolves independently
+- [ ] **One corrupt file does not cost the others**
+- [ ] Unsupported type → failed **row**, HTTP 200
+- [ ] Size limit; empty file
+- [ ] Match by email; phone-format variance; email case variance
+- [ ] **Gmail dots NOT stripped**
+- [ ] All three conflict reasons → nothing created; file downloadable
+- [ ] Manual resolution; **parsed output reused (no second AI call)**
+- [ ] `already_applied`
+- [ ] **Profile conflicts queued, not applied**
+- [ ] Close/reopen restores the batch
+- [ ] Archived job → 409
+- [ ] AI off; scanned PDF; `.doc`; `.docx`; password-protected
+- [ ] Automations and candidate messages fire; **inactive template sends nothing**
+
+## M08 — Candidates
+- [ ] Name + email / name + phone / **neither → refused**
+- [ ] Email lowercased; phone digit rule; all numeric bounds
+- [ ] Half-filled education row does not lose the others
+- [ ] **Duplicate: 409 first, acknowledge to proceed, recorded for review**
+- [ ] Duplicate insert failure does not roll back the candidate
+- [ ] PATCH cannot clear both contacts (route **and** DB CHECK)
+- [ ] Archive (owner/admin, double, applications survive)
+- [ ] Structured filters; clear
+- [ ] **NL search: deterministic, AI off, nonsense query, Viewer allowed**
+- [ ] AI structure: proposals only
+- [ ] **Dedupe and lookup do not leak across tenants**
+- [ ] **Audit records field names, not values**
+
+## M09 — Resumes & Parsing
+- [ ] PDF / .doc / .docx accepted; **extension-first for a mislabelled .doc**
+- [ ] .txt and images rejected with the exact message
+- [ ] 10 MB limit; no file
+- [ ] **Tenant-scoped storage path**
+- [ ] Parse: happy, **scanned PDF → 422 honest**, corrupt, protected, huge, AI off, bad JSON
+- [ ] Re-parse replaces (UNIQUE)
+- [ ] **Apply with nothing selected changes nothing**
+- [ ] Per-field accept; **recruiter's value wins**
+- [ ] Not-parsed → 409; would-clear-contacts → 400
+- [ ] `applied_fields` / `reviewed_by` recorded
+- [ ] Download: signed URL, **private bucket**, cross-tenant, expiry, Viewer allowed
+- [ ] Recruiter cannot delete from storage
+
+## M10 — Applications
+- [ ] Create; **duplicate → 409**; cross-tenant candidate/job/recruiter
+- [ ] Forward and **backward** moves; **terminal → 409**
+- [ ] Same-stage no-op sends nothing and fires nothing
+- [ ] **Candidate fields refused with 422 — including `null`**
+- [ ] Priority, source, score validation
+- [ ] Assignment notification; **no self-notification**
+- [ ] Notes; Viewer denied
+- [ ] **Exactly one open stage-history row**
+- [ ] `rejected_at_stage` stamped
+- [ ] **Hired creates onboarding exactly once**
+- [ ] **Recruiter list = own + unassigned**; sorted by stage
+- [ ] **Message before automation ordering**
+- [ ] **A failing automation or message never fails the stage change**
+- [ ] Archive; cross-tenant 404
+
+## M11 — AI Matching
+- [ ] Calculate; **Viewer never triggers one**
+- [ ] Deterministic reproducibility
+- [ ] **Missing data skipped, weights renormalised**
+- [ ] Skills case-insensitivity; location substring; notice tiers
+- [ ] **AI off → deterministic-only, `ai_used=false`, and the UI says so**
+- [ ] **Lists internally consistent with the score**
+- [ ] Fact-vs-judgement provenance on every finding
+- [ ] Staleness on candidate and job edits; not recalculated per view
+- [ ] `applications.match_score` synced; one row per application; 0–100
+- [ ] Per-job weight override
+
+## M12 — Screening Calls
+- [ ] **Disclosure shown first and cannot be removed or displaced**
+- [ ] Consent not stamped until confirmed; refusal keeps it false
+- [ ] Start: happy, **Bolna disconnected**, no phone, **Viewer 403**
+- [ ] **Attempt cap and delay respected**
+- [ ] **`callback_requested` never auto-retried**
+- [ ] Settings clamping (5 attempts, 15 min)
+- [ ] Question and instruction caps; run-time token resolution
+- [ ] Webhook: **no secret → 503**, missing/bad/tampered signature → 401
+- [ ] **Forged `organization_id` ignored**; unknown id → 200; write failure → 500
+- [ ] Transcript/recording/duration/consent recorded
+- [ ] Webhook cannot create rows
+- [ ] Service-mode automation fires
+
+## M13 — Screening Report
+- [ ] All three eligibility refusals, **consent checked first**
+- [ ] **DB trigger enforces preconditions too**
+- [ ] **`ai_*` immutable — route AND trigger**
+- [ ] Corrections recorded in `corrected_fields` with a reviewer
+- [ ] Both versions visible; uncertain fields surfaced
+- [ ] Regenerate replaces — **warn before discarding corrections**
+- [ ] Viewer reads but cannot generate or review
+- [ ] AI off / invalid output → nothing written
+- [ ] Pipeline "screening report to review" flag
+
+## M14 — Evaluations & Next Action
+- [ ] Log on all four manual stages; **stage not on this job refused**
+- [ ] Score bounds; backdated `occurred_at` ordering
+- [ ] **Only `application_evaluations` rows are editable**
+- [ ] **Interview feedback and screening reports merge in**
+- [ ] **1–5 scaled to 1–10 for display**
+- [ ] All five next-action kinds; **disabled stages skipped**
+- [ ] **Next action never acts by itself**
+- [ ] `evaluations_complete` automation
+
+## M15 — Pipeline & SLA
+- [ ] Board renders; card count; empty and error states
+- [ ] **Recruiter own + unassigned**; Viewer has no move control
+- [ ] Move works and fires the same side effects as the detail page
+- [ ] Terminal exits offered; terminal cards have no options
+- [ ] SLA: ok / at-risk (75%) / breached / **terminal not tracked**
+- [ ] **Absent config uses defaults, not "no SLA"**
+- [ ] Configured overrides; bounds 0–365; **owner/admin only**
+- [ ] Org timezone for days-in-stage
+- [ ] Job filter (**note: only 12 shown**); Ask AI; Viewer denied
+- [ ] Keyboard accessible; mobile horizontal scroll
+
+## M16 — Interviews & Feedback
+- [ ] Schedule happy path
+- [ ] **Calendar not connected is NOT an error**
+- [ ] **Revoked grant degrades to not_connected**
+- [ ] Calendar error returns `calendarMessage` with a 201
+- [ ] Duration bounds; invalid date; cross-tenant interviewer
+- [ ] Reschedule / reassign / cancel with a reason
+- [ ] Feedback: **rating AND recommendation both required**
+- [ ] Integer 1–5 only; notes truncated
+- [ ] **Only the assigned interviewer**; **cancelled → 409**
+- [ ] Duplicate submission blocked; panel feedback works
+- [ ] **Trigger marks the interview completed**
+- [ ] **Appears in Evaluations at 1–10 scale**
+- [ ] Overdue: not_finished / too_soon / due / **cancelled and no_show never chased**
+- [ ] **Candidate message fires from scheduling, with a time**
+
+## M17 — Clients & Submission
+- [ ] **In-house hides everything client-related**
+- [ ] Create; **duplicate name 409**; same name in another org allowed
+- [ ] SLA bounds; Viewer denied
+- [ ] Cross-tenant account manager refused
+- [ ] Archive; **jobs survive**
+- [ ] **Draft writes nothing and cannot be steered**
+- [ ] **Edited text is what is stored, verbatim**
+- [ ] Empty send 400; **no client → 409**; already submitted → 409
+- [ ] Verbatim record unchanged by later client edits
+- [ ] Feedback clock; outcome enum; analytics metric
+
+## M18 — Automations
+- [ ] **Always created as a draft**
+- [ ] Name/limit/template validation; **recruiter denied in route AND RLS**
+- [ ] **Approval forced for `send_candidate_email`**; default-on for templated messages
+- [ ] AI draft writes nothing; `drafted_by_ai` recorded
+- [ ] **Activation blocked by a disconnected integration**
+- [ ] **Activation blocked for a session-only action on a service trigger**
+- [ ] **Version conflict 409**
+- [ ] **Test run: no live action, no run row, dedupe key untouched**
+- [ ] **Dedupe: one run per stage-entry**; skip consumes the key
+- [ ] **Kill switch blocks everything and restores cleanly**
+- [ ] **Daily cap blocks and pauses the rule**
+- [ ] Missing integration = **blocked**, not failed
+- [ ] Approvals: propose-only, approve runs, reject does nothing, **expired 409**
+- [ ] Every role reads the queue; **only owner/admin decide**
+- [ ] Scheduler: 401 / 503 / correct secret / manual scope / **409 kill switch**
+- [ ] **Idempotent across repeated sweeps**
+- [ ] **Empty sweep recorded**; **truncation reported**
+- [ ] Skip vs fail vs block visibly distinct
+- [ ] Delete is real — **note the run-history cascade**
+- [ ] **A failing rule never blocks the manual action**
+
+## M19 — Activity & Audit
+- [ ] Events written for create / update / stage / invite / role
+- [ ] **Logging failure never breaks the action**
+- [ ] **Sensitivity comes from the catalogue, not the caller**
+- [ ] **Update and delete refused — route, policy and trigger**
+- [ ] Sensitive events hidden from recruiter/viewer; `/audit-log` restricted
+- [ ] **System events have a NULL actor** and the UI does not invent one
+- [ ] `actor_label` survives user deletion
+- [ ] **Field names not values; no prompts, payloads or credentials**
+- [ ] Events outlive their subject
+- [ ] Filters; unknown entity type 400
+- [ ] **Narrative never states an unlogged event**
+- [ ] **No unsupported numbers**; not saved; empty history handled; AI off
+
+## M20 — Notifications
+- [ ] Delivery on assignment, screening, approvals; **no self-notification**
+- [ ] **Strict per-user isolation — UI, API and RLS**
+- [ ] Mark read / mark all / dismiss
+- [ ] **Badge degrades to no badge, never a confident 0**
+- [ ] Personal override; **org defaults are owner/admin only (route AND policy)**
+- [ ] **Reset ≠ setting-to-match**
+- [ ] **`link_path` must be relative** (DB CHECK)
+- [ ] **`recipient_hint` masked**
+- [ ] Reminders: work, **safe to repeat**, Viewer denied, **cancelled not chased**
+- [ ] Reword: draft only, **re-rendered server-side**
+- [ ] Email failure recorded; **in-app unaffected**
+
+## M21 — Candidate Communications
+- [ ] **Seeded templates ship inactive**
+- [ ] Activate → sends; deactivate → nothing
+- [ ] Channel/subject/body constraints; **token warning**
+- [ ] Manual-only events labelled
+- [ ] **No phone/video message on a stage move; fires from scheduling**
+- [ ] Once-per-application guard
+- [ ] **Opt-out binds automatic sends absolutely**
+- [ ] **Manual warns first, then overrides**; per-channel
+- [ ] **Footer present and un-removable**
+- [ ] **GET does nothing; POST unsubscribes**
+- [ ] Reload safe; **tampered id refused**; **cannot re-subscribe**
+- [ ] **No signing key → instruction, not a dead link**
+- [ ] `/unsubscribe` is public, bare, sessionless
+- [ ] Manual send: tokens resolved server-side, **no footer**, no address 409, 422s
+- [ ] **Recruiter scoped to own applications**
+- [ ] **Channels independent both ways**
+- [ ] `body_sent` includes the footer; `recipient_hint` masked; provenance correct
+- [ ] **Log write failure is reported**
+- [ ] **Provider outage never fails the action**
+
+## M22 — Analytics
+- [ ] **n=0 → "—"**, **n=1 and n=2 → "x/y" not a percentage**, n≥3 → a percentage
+- [ ] Bottleneck absent when there is none
+- [ ] Time-saved reads as an estimate
+- [ ] All four ranges; compare; **org timezone**
+- [ ] **Filters are shareable URLs; back button correct**
+- [ ] Client filter hidden in-house; recruiter filter hidden for recruiters
+- [ ] **Recruiter own-scope everywhere including the CSV**
+- [ ] **Export matches the screen**; **Viewer refused**
+- [ ] CSV escaping and empty dataset
+- [ ] **Ask AI grounded and rebuilt server-side**; cache; AI off
+- [ ] Charts: flat, tokenised, empty state
+- [ ] Funnel consistent with the applications list
+
+## M23 — Onboarding & Documents
+- [ ] **Hired creates a record; never by a route; exactly one per hire**
+- [ ] Seeded from active templates only
+- [ ] Upload: PDF, **photos, HEIC**, wrong type, 10 MB, replace
+- [ ] **Verify requires an upload (409) — and the DB agrees**
+- [ ] **Reject is owner/admin only and requires a reason — route AND DB**
+- [ ] Only an uploaded document can be rejected; reset is admin-only
+- [ ] **Completion gate blocks on required, ignores optional, and names blockers**
+- [ ] **`status`/`completed_at` cannot disagree**
+- [ ] **Assignment lock (403) and admin-only reassignment**
+- [ ] One-off documents: add, delete; **template-derived cannot be deleted**
+- [ ] Template duplicate 409; reorder validation incl. **foreign id**
+- [ ] Template delete leaves documents intact
+- [ ] **Signed URL; private bucket; cross-tenant 404**
+- [ ] Filters; archived jobs included; empty state; **migration-pending state**
+- [ ] Status chip tones; both onboarding automation triggers
+
+## M24 — Settings & Integrations
+- [ ] `/settings` redirects per role
+- [ ] **Sections hidden, not greyed**; direct URLs still refused
+- [ ] Recruitment / screening / pipeline defaults save and apply
+- [ ] Default recruiter must be a member; currency and duration bounds
+- [ ] Connect each provider; **only a mask is ever returned**
+- [ ] **Bad key → 409 `test_failed`** with a plain message
+- [ ] **No encryption key → refuses to connect**; security page says so
+- [ ] Rotated key → reconnect message
+- [ ] **Disconnect needs confirmation and shows the impact first**
+- [ ] Unknown provider → 404
+- [ ] **Recruiter denied — route, RLS and the column REVOKE**
+- [ ] **LLM `activeSource` honesty**; test costs nothing
+- [ ] Calendar: unconfigured refusal, authorize link, **state tampering rejected**
+- [ ] **Danger zone separated; no buttons that pretend**
+- [ ] Explicit save, never auto-save
+
+## M25 — AI Service Layer
+- [ ] **Every AI surface degrades with no key, and the manual path still works**
+- [ ] Unreachable / timeout / non-JSON / schema-mismatch → four distinct messages
+- [ ] **Nothing written in any failure case**
+- [ ] **No provider body or stack trace reaches the browser**
+- [ ] `saved: false` on every `ai-action`
+- [ ] **Only `lib/ai/provider.ts` (and the LLM health check) touch the provider**
+- [ ] No generic `askAI`
+- [ ] Role gating on write-capable AI
+- [ ] AI calls audited without prompts
+- [ ] **Numeric guard and narrative grounding hold**
+
+## Cross-cutting
+- [ ] **Multi-tenant isolation across all 42 tables (E2E-008)**
+- [ ] **Full permission sweep across all four roles (E2E-003)**
+- [ ] **Full AI-degradation sweep (E2E-007)**
+- [ ] Every failure mode in §32
+- [ ] Responsive + accessibility pass (E2E-012)
+- [ ] `npm run lint`, `npm run typecheck`, `npm test` all clean
+- [ ] `npm run build` succeeds
+
+---
+
+# 38. Recommended Improvements
+
+Found by reading the code. **No code was modified.** Each row is either a
+*verified fact about the repository* (marked ✔ **verified**) or a *risk to confirm
+while testing*.
+
+## 38.1 Critical
+
+| # | Module | Current behaviour | Problem / risk | Recommended improvement | Priority |
+| --- | --- | --- | --- | --- | --- |
+| R-01 | Migrations / M21 | ✔ **verified** — `supabase/migrations/0030_module15_candidate_messaging.sql` is **4 bytes** containing the literal text `writ`. The `message_templates`, `message_log` and `candidate_communication_preferences` tables exist **only** inside `supabase/ALL_MIGRATIONS.sql`. | Anyone following README step 3 (apply each file in `supabase/migrations/` in order) or running `supabase db push` gets a database **with no candidate-messaging tables at all**. Every M21 surface fails, the message log never records a send, and opt-outs cannot be stored — while the code believes it sent. | Restore the real migration file from `ALL_MIGRATIONS.sql` (the block defining those three tables and their policies) and re-verify that `ALL_MIGRATIONS.sql` is regenerated from the directory, not the other way round. | **P0** |
+| R-02 | M03 | ✔ **verified** — `accept_invite(p_token)` validates only `status='pending'` and `expires_at > now()`. It never compares `invites.email` with the accepting user's address. | **Anyone who obtains the invite link joins the organization at the invited role**, whatever address they signed up with. The page's "Use the email address the invite was sent to" is advice, not enforcement. | Compare `lower(v_invite.email)` with the caller's `auth.users.email` and raise if they differ; keep a documented exception path if forwarding is genuinely intended. | **P0** |
+| R-03 | M03 | ✔ **verified** — `accept_invite` uses `ON CONFLICT (organization_id, user_id) DO UPDATE SET role = excluded.role, status = 'active'`. | A stale invite link **overwrites an existing member's role** (an Admin holding an old "viewer" link demotes themselves) and, worse, **reactivates a removed member** — a person who was removed keeps their access by re-opening an old link. | Refuse when an active membership already exists; require an explicit re-invite for a removed member. | **P0** |
+| R-04 | M18 / Deployment | ✔ **verified** — `CRON_SECRET` is read by `app/api/automations/sweep/route.ts` but is **absent from both `.env.local.example` and the local `.env.local`**. | With it unset the cron endpoint returns **503 forever**. `time_elapsed_in_stage` rules never fire, and nothing in the product says so except that one endpoint. A deployment can look healthy while every time-based automation is dead. | Add `CRON_SECRET` to `.env.local.example` with the same explanatory comment style the other secrets use, and surface the "scheduler not configured" state on `/automations` next to the manual button. | **P0** |
+| R-05 | M01 | ✔ **verified** — `app/signup/SignupForm.tsx` renders `signUpError.message` verbatim. | Supabase's "User already registered" makes `/signup` an **account-enumeration oracle**, defeating the deliberate genericisation on `/login` ("That email and password combination didn't work.") and `/forgot-password` ("If an account exists…"). | Map provider errors to one generic message, keeping the detail in the server log. | **P1** |
+
+## 38.2 High
+
+| # | Module | Current behaviour | Problem / risk | Recommended improvement | Priority |
+| --- | --- | --- | --- | --- | --- |
+| R-06 | M03 | ✔ **verified** — `POST /api/invites` returns `{data, invite_url}` and sends **no email**. The code comment says Module 15 will email it "instead". | If the UI does not surface `invite_url`, an invite is created that nobody can use — a silent dead end. | Either wire the invite to the (now existing) email pipeline, or make the copyable link unmissable in the UI. | P1 |
+| R-07 | M18 | ✔ **verified** — `automation_runs.automation_id` and `automation_approvals.automation_id` are `ON DELETE CASCADE`, and `DELETE /api/automations/[id]` is a **real delete**. | Deleting a rule **destroys its entire run history**, so "what did this rule ever do to our candidates?" becomes unanswerable — in a product that otherwise archives rather than deletes and keeps an append-only audit log. | Soft-delete the rule (an `archived_at`), or write a terminal `activity_events` summary before deleting. | P1 |
+| R-08 | M13 | Regenerating a screening report **replaces the row**, discarding `corrected_fields` and the human's edits. | Silent loss of reviewed human work — the most likely data-loss path in the module. | Confirm before regenerating and say what will be lost; or keep prior versions. | P1 |
+| R-09 | M24 / M25 | ✔ **verified** — per-organization LLM keys are stored and health-checked, but `lib/ai/provider.ts` reads only `OPENAI_API_KEY`. The adapter is honest about it via `activeSource`. | An Owner rotates the organization key and **nothing changes**. The honesty is in the data; it only helps if the UI shows it. | Verify the settings page renders `activeSource` prominently; longer term, have `provider.ts` prefer the stored key (already recorded as a follow-up in `docs/modules/17-settings-notes.md`). | P1 |
+| R-10 | M16 / M24 | ✔ **verified** — `lib/integrations/calendar/oauth.ts` states it "has never run against Google, because no Google Cloud project exists for this product". | The entire live Calendar path is unverified. Interview invites may fail in ways nobody has seen. | Create a Google Cloud project and run the flow end to end before relying on invites; until then label Calendar as beta in the UI. | P1 |
+| R-11 | M15 | ✔ **verified** — `/pipeline` renders `jobs.slice(0, 12)` filter buttons. | On an organization with more than 12 jobs, the rest are **unreachable from this page**. | Replace with a searchable select, or add "show all". | P1 |
+| R-12 | M20 / M23 | Internal reminders and overdue-document sweeps have **no scheduler** — only `POST /api/notifications/reminders`, a button. | Nobody is reminded unless a human presses a button. The automation sweep *does* have a cron; this does not. | Add the reminder dispatch to the existing hourly sweep, or add a second cron entry in `vercel.json`. | P1 |
+| R-13 | M08 | `POST /api/candidates` accepts `acknowledge_duplicates: true` unconditionally. | Any non-UI caller (or a UI regression) bypasses the duplicate warning entirely. | Require the client to echo back the specific duplicate ids it was shown. | P1 |
+| R-14 | M11 | `GET /api/applications/[id]/match` **calculates on demand**, which spends an AI call on a page view. | A GET with a side effect and a cost. The staleness guard limits it, but a stale-marking bug becomes a spend bug. | Make calculation explicit (POST only) and have GET return "stale — recalculate?". | P1 |
+| R-15 | M04 | `OVERDUE_DAYS = 3` is defined in `lib/dashboard/metrics.ts` **and** mirrored in `app/api/dashboard/ai-action/route.ts` (the route's own comment admits it). | Two copies of one threshold will drift, and the brief would then contradict the tiles — the exact failure `numericGuard` exists to prevent. | Import the constant rather than mirroring it. | P1 |
+
+## 38.3 Medium
+
+| # | Module | Current behaviour | Problem / risk | Recommended improvement | Priority |
+| --- | --- | --- | --- | --- | --- |
+| R-16 | Deployment | ✔ **verified** — `AI_MODEL`, `AI_BASE_URL`, `SUPABASE_SECRET_KEY` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are read by the code but **absent from `.env.local.example`**, which documents only the legacy key names. | The example file is the onboarding contract; a name it omits is a name nobody sets. `.env.local` already uses the *current* key names, so the template is behind the code. | Document all five (plus `CRON_SECRET` from R-04). | P2 |
+| R-17 | Deployment | ✔ **verified** — `N8N_WEBHOOK_URL` is in `.env.local.example` but is **never read** (`grep process.env.N8N_WEBHOOK_URL` finds nothing); the n8n adapter stores its URL per organization. | A documented variable that does nothing invites mis-configuration and false confidence. | Remove it, or note that it is superseded by the per-organization setting. | P2 |
+| R-18 | M06 | Stage-config numbers are **clamped silently** (999 → 480) and prompts are **truncated silently** at 8,000 characters. | A user's input is changed with no message; part of a call script can vanish unnoticed. | Reflect the clamped value in the field and warn on truncation; add a character counter. | P2 |
+| R-19 | M05 | `replaceQuestions()` keeps only the **first 20** screening questions and silently drops any over 500 characters. | Silent data loss on save. | Reject with a message naming the limit. | P2 |
+| R-20 | M05 | Job search **strips** `%_,()` rather than escaping them. | Searching for a title containing a comma silently searches a different string. | Escape the metacharacters instead. | P2 |
+| R-21 | M07 | No client-side concurrency cap on bulk uploads. | 100 files means 100 concurrent AI calls — provider rate limiting, and a bill. | Throttle to a fixed concurrency (4–6) with a queue. | P2 |
+| R-22 | M16 | No past-date guard on `scheduled_at` was found in `parseSchedulePayload`. | Interviews can be scheduled in the past, polluting "Interviews today" and the overdue-feedback logic. | Warn (not refuse — back-filling a past interview is legitimate) and exclude past interviews from "today". | P2 |
+| R-23 | M02 | Timezone is accepted without server-side IANA validation. | An invalid zone could break every date calculation for that organization. | Validate against `Intl.supportedValuesOf('timeZone')`. | P2 |
+| R-24 | M17 | `clients.contacts` is free-form JSONB with no email validation. | Invalid client contact addresses stored silently. | Validate each contact's shape on write. | P2 |
+| R-25 | M02 | `onboarding_completed_at` is only set at "Finish setup". | A user who creates the org and closes the tab has a real workspace the wizard keeps re-prompting for. | Confirm this is not a loop; consider marking complete at step 1 and treating steps 2–3 as optional. | P2 |
+| R-26 | M04 | The "Invite your team" button renders for **every** role, including Viewer. | A Viewer is offered an action they cannot perform. | Hide it for roles that cannot invite, matching the pattern used everywhere else. | P2 |
+| R-27 | M23 | Adding a new **required** template does not retro-fit hires already in progress. | Two hires can have different definitions of "complete" with no visible reason. | Decide and document the policy; consider offering a "add to in-progress hires" action. | P2 |
+| R-28 | M18 | A rule that hits its daily cap **pauses itself** with no prominent signal. | An admin's rule silently stops working. | Notify Owners/Admins when a rule self-pauses. | P2 |
+| R-29 | M19 | A failed `logActivity()` insert is swallowed and only reaches the server console. | If auditing starts failing, nobody in the product finds out. | Add a health signal (a counter, or a banner on `/audit-log`). | P2 |
+| R-30 | M05 | No duplicate-title detection on jobs. | Two identical requisitions split one pipeline and skew analytics. | Warn on a near-identical title for the same client. | P2 |
+| R-31 | Repo hygiene | ✔ **verified** — during this review the working tree held 8 uncommitted source files; they were committed mid-review as `6616d3b "Create testing doc"`, which mixes **UI changes** (`app/globals.scss` +228, `app/layout.tsx`, `app/analytics/charts.tsx`), **library changes** (`lib/automations/queries.ts`, `lib/settings/queries.ts`) and **a 1,029-line idea note** (`NewIdeasToWorkOn/`) into one commit alongside documentation. | A commit that mixes styling, library logic and notes cannot be reverted selectively, and its message does not describe what it changed. A tester cannot tell which commit introduced a UI regression. | Split unrelated changes into separate commits with descriptive messages; always record the exact commit hash under test in the QA report. | P2 |
+| R-32 | M22 | "Estimated recruiter time saved" rests on one hard-coded constant (`MANUAL_CALL_OVERHEAD_MINUTES = 8`). | If the UI ever drops the word "estimated", a guess becomes a claim. | Make the basis visible in the UI (a tooltip naming the 8 minutes). | P2 |
+
+## 38.4 Low
+
+| # | Module | Issue | Recommendation | Priority |
+| --- | --- | --- | --- | --- |
+| R-33 | M07 | `file_name` is truncated to the last 200 characters only, with no separator sanitisation | Sanitise path separators and control characters | P3 |
+| R-34 | M10 / M23 | Length limits (notes 5,000 / onboarding notes 2,000) are enforced server-side with no live counter | Add character counters | P3 |
+| R-35 | M11 | Location matching is substring-based, so "Delhi" matches "New Delhi" and anything containing "delhi" | Consider a token-boundary comparison | P3 |
+| R-36 | M08 | Skill caps differ between jobs (25) and candidates (40) | Harmless, but worth documenting so it does not read as a bug | P3 |
+| R-37 | M13 | `uncertain_fields` is model-supplied and advisory | Ensure the UI never presents it as a gate | P3 |
+| R-38 | M04 / M22 | AI response caches are in-process, so per-instance on serverless | Document, or move to a shared cache | P3 |
+
+## 38.5 What is genuinely well built (do not "fix" these)
+
+Worth stating, because a tester unfamiliar with the reasoning could file these as bugs:
+
+- **Degrade-don't-lie.** `pending` / `error` / `ok` are three distinct metric
+  states, and a broken query is **never** reported as `0`.
+- **Rates below n=3 refuse to be percentages.** `1/1` is shown, not `100%`.
+- **The consent disclosure and the unsubscribe footer are structural** — no
+  configuration path can remove either.
+- **The AI's original screening extraction is frozen by a database trigger.**
+- **The audit log is append-only, enforced at the database.**
+- **Every rule that matters is enforced twice** — in the route for a friendly
+  message and in RLS or a trigger for the actual boundary.
+- **404, never 403, for another tenant's id** — a 403 would confirm the row exists.
+- **Errors are genericised for the browser and detailed in the server log.**
+- **`logActivity`, `notify` and the send pipeline never throw**, so no side effect
+  can fail the action that caused it.
+- **Test runs are inert**; **the dedupe key contains no time**, which is what makes
+  an hourly sweep safe.
+- **Templates ship inactive**, so a deploy never starts emailing candidates.
+
+---
+
+# QUICK START MANUAL TESTING GUIDE
+
+Everything you need to test this application without opening the source again.
+
+## Step 0 — Set up (30 minutes, do this once)
+
+1. **Record what you are testing.**
+   ```bash
+   git rev-parse --short HEAD && git status --short
+   ```
+   Write the commit hash into your test report. If `git status` is not clean,
+   commit or stash first — otherwise "does this reproduce on master?" is
+   unanswerable (see R-31).
+
+2. **Verify the build is green** — if any of these fail, stop and report it
+   before manual testing:
+   ```bash
+   npm install
+   npm run lint        # expect: clean
+   npm run typecheck   # expect: clean
+   npm test            # expect: 50 files, 1114 tests, all passing
+   ```
+
+3. **Apply the database.** Paste `supabase/ALL_MIGRATIONS.sql` into the Supabase
+   SQL Editor and run it.
+   ⚠️ **Do not apply `supabase/migrations/` file by file** until R-01 is fixed —
+   `0030` is corrupt and you would end up without the candidate-messaging tables.
+
+4. **Create the two private storage buckets** if the SQL editor blocked the
+   `storage.buckets` inserts: `resumes` and `onboarding-documents`, both **not
+   public**, 10 MB, then re-run the policy statements at the end of those files.
+
+5. **Configure `.env.local`.** Minimum to test everything except integrations:
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `SUPABASE_SECRET_KEY`, `INTEGRATION_ENCRYPTION_KEY` (32+ chars).
+   Add as you go: `OPENAI_API_KEY`, `BOLNA_WEBHOOK_SECRET`, `GOOGLE_CLIENT_ID` /
+   `GOOGLE_CLIENT_SECRET`, `APP_URL`, and **`CRON_SECRET`** (undocumented — R-04).
+   In **Authentication → Providers** enable Email (and Google if testing OAuth),
+   and add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
+
+6. **Prepare test assets:**
+   - 8 real resumes (PDF and Word), one of them a **scanned image PDF**, one **corrupt**
+   - 1 `.txt` and 1 `.png` (to be rejected)
+   - 1 file over 10 MB
+   - A photo of an ID-style document (JPEG) for onboarding
+   - A mail account **you control** for candidate messages
+   - A phone number **you control** if you test Bolna at all
+
+7. **Create four accounts** in one workspace: Owner, Admin, Recruiter, Viewer.
+   Use four browsers or profiles so you can switch roles instantly.
+
+8. `npm run dev` → `http://localhost:3000`.
+
+---
+
+## Step 1 — Test **M01 Authentication** first (~45 min)
+
+**Why first:** nothing else is reachable without it, and a broken session makes
+every later failure ambiguous.
+
+**Do:** run **TC-AUTH-001 → TC-AUTH-036** (§4.8), then the M01 UI/UX checklist (§4.9)
+and edge cases (§4.10).
+
+**Verify above all:**
+- ✅ Wrong password and unknown email give **identical** messages
+- ✅ Forgot-password **always** reports success
+- ✅ `?next=https://evil.example.com` lands on `/dashboard`, never off-origin
+- ✅ Every protected route redirects when signed out
+- ✅ `curl /api/jobs` signed out gives **JSON 401**, not an HTML redirect
+- ⚠️ Check R-05: does `/signup` leak "User already registered"?
+
+**Then go to Step 2.**
+
+---
+
+## Step 2 — **M02 Organization** (~30 min)
+
+**Do:** TC-ORG-001 → TC-ORG-030 (§5.6).
+
+**Verify:** the wizard completes; **the timezone you choose is the one the
+dashboard uses**; agency mode on/off changes the nav; a forged
+`active_organization_id` cookie falls back to your own org; another org's id
+returns **404**.
+
+---
+
+## Step 3 — **M03 Team & Permissions** (~45 min)
+
+**Do:** TC-TEAM-001 → TC-TEAM-035 (§6.6). Accept the three invites now — you need
+all four roles for everything that follows.
+
+**Verify hardest:**
+- ✅ Last-Owner protection holds **in the route and via PostgREST**
+- ✅ Only an Owner may grant or revoke Owner
+- ⚠️ **R-02** — accept an invite while signed in as a *different* address. If you
+  get in, that is a **P0** finding, file it immediately.
+- ⚠️ **R-03** — accept a stale invite as an existing member; check whether your
+  role was overwritten. Remove a member, then have them re-open their old invite
+  link; check whether their access came back.
+
+---
+
+## Step 4 — **M24 Settings & Integrations** (~40 min)
+
+**Why here:** every later module's degradation test depends on knowing what is
+connected. Do this **before** creating data.
+
+**Do:** TC-SET-001 → TC-SET-038 (§27.8).
+
+**Verify:** sections a role cannot open are **absent from the sidebar**; a
+connected credential is only ever shown masked; **unset the encryption key and
+confirm connecting is refused**; disconnecting lists the impact and demands
+confirmation; the danger zone contains no button that pretends.
+
+**Then deliberately leave Bolna, Calendar, Email and WhatsApp DISCONNECTED** for
+Steps 5–12. You will connect them in Step 13.
+
+---
+
+## Step 5 — **M05 Jobs** then **M06 Hiring Stages** (~50 min)
+
+**Do:** TC-JOB-001 → TC-JOB-060 (§8.7), then TC-STAGE-001 → TC-STAGE-025 (§9.6).
+
+**Verify:** all range and skill rules; **a recruiter can close only their own job,
+and the database refuses it too**; job health produces the exact seven sentences;
+the three unwired stages say **"Not yet active — configuration only"**; a disabled
+stage keeps its saved script.
+
+---
+
+## Step 6 — **M08 Candidates** then **M09 Resumes** (~60 min)
+
+**Do:** TC-CAND-001 → TC-CAND-048 (§11.6), then TC-RES-001 → TC-RES-038 (§12.8).
+
+**Verify:** the **duplicate 409 → acknowledge** protocol; a candidate must keep an
+email or a phone; the **resume review applies nothing unless you choose it**; a
+scanned PDF fails with an honest message about text, not about the AI; the raw
+storage path is denied without a signed URL.
+
+---
+
+## Step 7 — **M07 Bulk Intake** (~40 min)
+
+**Do:** **E2E-002** (§35), then TC-INTK-001 → TC-INTK-036 (§10.10).
+
+**Verify:** ten files with mixed outcomes all resolve **independently**; a
+conflict creates **nothing** and stays downloadable; a matched candidate's profile
+is **not overwritten** — the changes are queued for review.
+
+---
+
+## Step 8 — **M10 Applications** (~50 min)
+
+**This is the hub. Take your time.**
+
+**Do:** TC-APP-001 → TC-APP-050 (§13.7).
+
+**Verify:** duplicate application → 409; backward moves allowed; **terminal stages
+refuse to reopen**; **`{"email": null}` in a PATCH is refused with 422**; exactly
+one open stage-history row; moving to **Hired creates an onboarding record exactly
+once**; a recruiter's list is own + unassigned.
+
+---
+
+## Step 9 — **M11 Matching**, **M14 Evaluations**, **M15 Pipeline** (~60 min)
+
+**Do:** §14.5, §17.8, §18.7.
+
+**Verify:** a candidate with a blank salary is **not punished** — the weight is
+renormalised; with AI off the score stands alone and says so; the **Next action
+banner never acts by itself**; SLA colours appear at the right thresholds and
+terminal cards are **not tracked**.
+
+---
+
+## Step 10 — **M16 Interviews** (~40 min)
+
+**Do:** TC-INT-001 → TC-INT-040 (§19.9), with Calendar still **disconnected**.
+
+**Verify:** **a disconnected calendar is not an error** — the interview saves;
+feedback needs **both** a rating and a recommendation; **only the assigned
+interviewer** can file it; submitting feedback **marks the interview completed**;
+a 4/5 shows as **8/10** in Evaluations; cancelled and no-show interviews are
+**never chased** for feedback.
+
+---
+
+## Step 11 — **M17 Clients** (~30 min, agency mode)
+
+**Do:** TC-CLI-001 → TC-CLI-029 (§20.6). Then **E2E-011** on a second, in-house
+workspace.
+
+**Verify:** drafting a submission **writes nothing**; the text **you edited** is
+what gets stored verbatim; a job with no client refuses to submit with a 409.
+
+---
+
+## Step 12 — **M23 Onboarding & Documents** (~40 min)
+
+**Do:** **E2E-010** (§35), then TC-ONB-001 → TC-ONB-050 (§26.10).
+
+**Verify:** the **completion gate blocks on required documents and names them**,
+but the optional relieving letter does **not** block; **rejection needs a reason,
+enforced by the database too**; the assignment lock returns 403; identity
+documents are only reachable through a short-lived signed URL.
+
+---
+
+## Step 13 — **Connect the integrations**, then M12/M13 and M18 (~90 min)
+
+Now connect Bolna, Email, WhatsApp, Calendar and the LLM.
+
+1. **M12 + M13** — run **E2E-006** (§35), then §15.8 and §16.6.
+   ✅ The consent disclosure is shown **before** you can dial and cannot be
+   displaced by a job prompt.
+   ✅ The webhook rejects unsigned, tampered and forged-tenant payloads.
+   ✅ A report cannot be generated without recorded consent — and the database
+   refuses it too.
+   ✅ The `ai_*` columns cannot be edited.
+   ⚠️ Only dial a number you control.
+
+2. **M18 Automations** — run **E2E-004** (§35), then TC-AUTO-001 → TC-AUTO-064 (§21.11).
+   ✅ Rules always create as **draft**.
+   ✅ Activation is refused when a required integration is disconnected.
+   ✅ A **test run performs no live action and writes no run row**.
+   ✅ Running the sweep five times produces **one** run, not five.
+   ✅ The kill switch stops everything and restores it without re-activation.
+   ⚠️ Check R-04: with `CRON_SECRET` unset the cron endpoint is a permanent 503.
+
+---
+
+## Step 14 — **M20 Notifications** then **M21 Candidate Communications** (~70 min)
+
+**Do:** §23.8, then **E2E-005** (§35) and §24.8.
+
+**Verify — this is the highest-legal-risk module in the product:**
+- ✅ Every seeded template ships **inactive**
+- ✅ The unsubscribe footer is present and **a template cannot remove it**
+- ✅ **Opening** the unsubscribe link does nothing; only the **button** unsubscribes
+- ✅ A tampered candidate id in the token is refused
+- ✅ With no signing key the footer says "reply and ask to be removed" — **no dead link**
+- ✅ An automatic send to an opted-out channel is **refused**; a manual one **warns first**
+- ✅ Disconnecting WhatsApp does not stop email
+- ✅ `message_log.body_sent` contains the footer; `recipient_hint` is masked
+
+---
+
+## Step 15 — **M04 Dashboard** then **M22 Analytics** (~60 min)
+
+**Why now:** both read everything you just created, so they are only meaningful
+with real data behind them.
+
+**Do:** §7.7, then §25.6.
+
+**Verify:**
+- ✅ Every number in the **Daily Brief** matches the KPI tiles
+- ✅ A metric whose query fails shows an **error**, never a `0`
+- ✅ A rate with n=1 shows **"1/1"**, never **"100%"**
+- ✅ The exported CSV **matches the screen exactly**, and a **Viewer cannot export**
+- ✅ Filters are shareable URLs and the back button works
+
+---
+
+## Step 16 — **M19 Activity & Audit** (~30 min)
+
+**Do:** §22.7.
+
+**Verify:** every action from Steps 1–15 appears with the right actor; **system
+actions have no actor and the UI does not invent one**; updates and deletes are
+refused; the candidate narrative **never claims an event that is not in the log**
+(test it on someone who was never screened).
+
+---
+
+## Step 17 — Cross-cutting sweeps (~2.5 hours)
+
+Run these last, in this order:
+
+1. **E2E-007 — AI degradation.** Unset `OPENAI_API_KEY`, restart, and visit
+   **every** AI surface. The manual workflow must work everywhere. Then repeat
+   with a dead host, a hanging host, a prose response and a wrong-shape response.
+2. **E2E-003 — the full permission sweep.** All four roles, in the UI, then by
+   `curl`, then via the browser's PostgREST client.
+3. **E2E-008 — multi-tenant isolation.** Two workspaces, every `[id]` route,
+   every table.
+4. **§32 — failure testing.** Break each dependency in turn and confirm the
+   universal resilience rule: **nothing in the side-effect chain may fail the
+   action that caused it.**
+5. **E2E-012 — responsive and accessibility**, at 375 / 768 / 1024 / 1440.
+6. `npm run build` — must succeed.
+
+---
+
+## Step 18 — Report
+
+For each finding use the template in §36. Sort by severity, and lead your report
+with:
+
+- the commit hash under test,
+- which integrations were connected,
+- which of R-01 … R-05 you were able to confirm,
+- and the modules where **every Critical case passed**.
+
+### The eight things that must be true before this ships
+
+1. **No cross-tenant data reaches any user, through any path** (UI, API, PostgREST, storage).
+2. **No role can do anything the permission matrix denies** — checked in all three layers.
+3. **The screening consent disclosure cannot be removed or displaced.**
+4. **The unsubscribe footer cannot be removed, and the link actually works** —
+   or, with no key, is honestly replaced by an instruction.
+5. **No metric ever shows a fake `0`, and no rate below n=3 shows a percentage.**
+6. **No AI output reaches a trusted table without a human confirming it**, and
+   every AI surface degrades to a working manual workflow.
+7. **The audit log cannot be edited or deleted by anyone.**
+8. **No side effect — logging, notification, candidate message or automation —
+   can fail the user action that triggered it.**
+
+---
+
+*End of document.*

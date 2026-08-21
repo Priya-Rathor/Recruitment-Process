@@ -3511,3 +3511,310 @@ a {
   .doc-template__controls { width: 100%; }
   .doc-row__actions { width: 100%; }
 }
+
+// =============================================================================
+// Module 20 — live coding rounds
+//
+// Two audiences, one stylesheet. The interviewer's surfaces (the QR modal, the
+// monitor) reuse the existing card and modal geometry unchanged — they are
+// ordinary pages in this product. The candidate's page is the exception: it is
+// the only screen in the application built for somebody with no account, no
+// nav and, half the time, a phone held in one hand on a video call.
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// The candidate's page
+// -----------------------------------------------------------------------------
+.coding-page {
+  min-height: 100vh;
+  // The dashboard's ground, not white. The editor is the white surface here,
+  // and floating it on its own colour is what makes it read as the thing to
+  // look at rather than as the page itself.
+  background-color: var(--color-background);
+  padding: var(--space-4);
+}
+
+.coding-page__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+  opacity: 0.85;
+}
+
+.coding-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.coding-shell__head {
+  margin-bottom: var(--space-4);
+}
+
+.coding-shell__eyebrow {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-1);
+}
+
+.coding-shell__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-page);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+  // A long question title must wrap rather than push the layout sideways on a
+  // phone — this page has no horizontal room to give away.
+  overflow-wrap: anywhere;
+}
+
+.coding-shell__meta {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin: var(--space-1) 0 0;
+}
+
+.coding-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--card-radius);
+  font-size: var(--text-body);
+  margin-bottom: var(--space-4);
+
+  &.is-done {
+    background-color: var(--status-connected-bg);
+    color: var(--status-connected-text);
+  }
+
+  &.is-stopped {
+    background-color: var(--status-attention-bg);
+    color: var(--status-attention-text);
+  }
+
+  svg { flex-shrink: 0; margin-top: 2px; }
+}
+
+/**
+ * Question beside editor on a wide screen, question above it on a narrow one.
+ *
+ * Question FIRST in the DOM, always: on a phone the candidate has to read it
+ * before they can write anything, and a source order that put the editor first
+ * would make them scroll up to find out what they were answering.
+ */
+.coding-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 1024px) {
+  .coding-grid {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .coding-question {
+    // Follows the candidate down a long editor, so the question is readable
+    // from anywhere in the file without scrolling back.
+    position: sticky;
+    top: var(--space-4);
+    max-height: calc(100vh - var(--space-8));
+    overflow-y: auto;
+  }
+}
+
+.coding-question__body {
+  font-size: var(--text-body);
+  line-height: 1.65;
+  color: var(--color-text);
+  // The interviewer typed this into a textarea; their line breaks are part of
+  // the question and collapsing them would change what was asked.
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
+.coding-work {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.coding-work__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.coding-work__language {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.coding-work__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+
+  // Full width on a phone: these are the two things the candidate has to hit
+  // accurately, sometimes with a thumb.
+  @media (max-width: 560px) {
+    .button { flex: 1 1 auto; justify-content: center; }
+  }
+}
+
+.coding-work__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  color: var(--color-error);
+  margin: 0;
+}
+
+/**
+ * The save indicator.
+ *
+ * Never allowed to disappear — every state has a word. A tick that fades after
+ * two seconds leaves somebody under time pressure checking whether it saved.
+ */
+.coding-save {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+
+  &.is-saved { color: var(--color-success); }
+  &.is-failed { color: var(--color-error); }
+}
+
+.coding-save__spin {
+  animation: spin 0.9s linear infinite;
+}
+
+// -----------------------------------------------------------------------------
+// The editor
+// -----------------------------------------------------------------------------
+.coding-editor {
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  overflow: hidden;
+  // Tall enough to hold a real answer without scrolling on a laptop, and capped
+  // against the viewport so a phone keyboard cannot bury the Submit button.
+  height: clamp(320px, 55vh, 620px);
+
+  .cm-editor {
+    height: 100%;
+    // 16px minimum: anything smaller and iOS Safari zooms the whole page on
+    // focus, which on this screen means the candidate loses the question.
+    font-size: 16px;
+  }
+
+  .cm-editor.cm-focused {
+    outline: none;
+  }
+
+  .cm-scroller {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    line-height: 1.6;
+  }
+
+  .cm-gutters {
+    background-color: var(--color-background);
+    border-right: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+}
+
+.coding-editor__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  background-color: var(--color-background);
+}
+
+// -----------------------------------------------------------------------------
+// The refusal card (invalid / expired / cancelled)
+// -----------------------------------------------------------------------------
+.coding-closed__icon {
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
+}
+
+// -----------------------------------------------------------------------------
+// The interviewer's surfaces
+// -----------------------------------------------------------------------------
+.coding-qr {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4);
+  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+
+  // Always white and never tinted, whatever the surrounding card does: a QR
+  // code read by a phone camera across a compressed video call needs the
+  // contrast it was generated with.
+  img { display: block; width: 100%; max-width: 280px; height: auto; }
+}
+
+.coding-link {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  // Selectable and wrapping, so the link is copyable by hand when the clipboard
+  // API is unavailable — an insecure origin, or a browser that refused.
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.coding-monitor__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/**
+ * The candidate's code, read-only.
+ *
+ * A <pre>, not an editor. Nothing here should be typeable — and shipping a code
+ * editor to a screen nobody can type into would cost the interviewer a megabyte
+ * for the privilege of not using it.
+ */
+.coding-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: var(--text-label);
+  line-height: 1.6;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  padding: var(--space-3);
+  margin: 0;
+  max-height: 60vh;
+  // Scrolls inside its own container so the page body never scrolls sideways,
+  // whatever the candidate's line lengths were.
+  overflow: auto;
+  white-space: pre;
+  tab-size: 4;
+
+  &:focus-visible { box-shadow: var(--focus-ring); }
+}

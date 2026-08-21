@@ -1,7 +1,7 @@
 // =============================================================================
 // Loading the Evaluation panel.
 //
-// Reads THREE sources and normalises them into one list (see
+// Reads FOUR sources and normalises them into one list (see
 // lib/applications/evaluations.ts for why they are not merged into one table).
 // Every query is tenant-scoped, and a failure in one source degrades that
 // section rather than the page: a screening report that will not load must not
@@ -19,6 +19,9 @@ import {
   type InterestLevel,
 } from "@/lib/applications/evaluations";
 import { normalizeHighlights, statusFor } from "@/lib/evaluation/verdict";
+import { listSessionsForApplication } from "@/lib/coding/queries";
+import { LANGUAGE_LABELS, isCodingLanguage } from "@/lib/coding/languages";
+import { STATUS_LABELS as CODING_STATUS_LABELS } from "@/lib/coding/session";
 import { formatDbError } from "@/lib/supabase/errors";
 
 /** Every evaluation entry for one application, newest first. */
@@ -38,16 +41,17 @@ export async function listEvaluationEntries({
   applicationId: string;
   thresholds?: Partial<Record<EvaluationStage, number | null>>;
 }): Promise<EvaluationEntry[]> {
-  const [screening, interviews, manual] = await Promise.all([
+  const [screening, interviews, manual, coding] = await Promise.all([
     loadScreeningEntries({ organizationId, applicationId }),
     loadInterviewEntries({ organizationId, applicationId }),
     loadManualEntries({ organizationId, applicationId }),
+    loadCodingEntries({ organizationId, applicationId }),
   ]);
 
   // Status is applied HERE, once, so every source is judged the same way — a
   // per-loader implementation would give three chances to disagree about what
   // "pass" means.
-  return sortEntries([...screening, ...interviews, ...manual]).map((entry) => {
+  return sortEntries([...screening, ...interviews, ...manual, ...coding]).map((entry) => {
     const threshold = thresholds[entry.stage] ?? null;
     return {
       ...entry,
@@ -275,4 +279,91 @@ async function loadManualEntries({
     // The only source this panel owns, so the only one it may edit.
     editable: true,
   }));
+}
+
+/**
+ * Live coding rounds (Module 20).
+ *
+ * ONE ENTRY PER SESSION, not per submission — the same choice loadScreeningEntries()
+ * makes for calls. A round that was started and then cancelled, or one the
+ * candidate never opened, still happened, and hiding it would make the history
+ * read as though the interviewer never tried.
+ *
+ * SURFACED, NEVER DUPLICATED. Pressing Submit already writes an
+ * application_evaluations row (see lib/coding/afterSubmit.ts), which is what
+ * gives the interviewer somewhere to record their verdict. This loader adds the
+ * ROUND itself alongside it — the question, the language, whether it was opened,
+ * and a link to the code. The two are complementary: one is the judgement, this
+ * one is the evidence.
+ *
+ * `editable: false` and a deep link, for the same reason interviews are
+ * read-only here: the code lives on the coding session's own screen, and two
+ * update paths for one row is how they drift.
+ */
+async function loadCodingEntries({
+  organizationId,
+  applicationId,
+}: {
+  organizationId: string;
+  applicationId: string;
+}): Promise<EvaluationEntry[]> {
+  const sessions = await listSessionsForApplication({ organizationId, applicationId });
+
+  return sessions.map((session) => {
+    const language = session.submission?.programming_language ?? null;
+    const languageLabel =
+      language && isCodingLanguage(language) ? LANGUAGE_LABELS[language] : null;
+
+    return {
+      id: `coding:${session.id}`,
+      stage: "written_assessment" as EvaluationStage,
+      // When the candidate submitted, falling back to when the round was set up.
+      // Ordering a history by "when it was created" would put a round submitted
+      // yesterday below one started this morning and never answered.
+      occurredAt: session.submitted_at ?? session.created_at,
+      // NO SCORE, and never one. Nothing in this product runs the code, so any
+      // number here would be a judgement nobody made. The interviewer records
+      // theirs on the evaluation row the submission created.
+      score: null,
+      nativeScore: null,
+      nativeScale: null,
+      // Deliberately null rather than 'pending': the accompanying
+      // application_evaluations row already carries the outcome, and two rows
+      // both claiming to hold the verdict is exactly the drift this avoids.
+      outcome: null,
+      interested: null,
+      summary: buildCodingSummary(session.status, session.question_title, languageLabel),
+      strengths: [],
+      concerns: [],
+      status: "needs_review" as const,
+      threshold: null,
+      // The candidate wrote this. They are not a public.users row, and naming a
+      // recruiter here would credit them with work they did not do.
+      loggedByName: null,
+      source: "coding" as const,
+      href: `/coding-sessions/${session.id}`,
+      editable: false,
+    };
+  });
+}
+
+/** One sentence describing where a coding round got to. */
+function buildCodingSummary(
+  status: string,
+  questionTitle: string,
+  languageLabel: string | null
+): string {
+  const question = questionTitle.trim().length > 0 ? questionTitle.trim() : "Coding round";
+
+  if (status === "submitted") {
+    return languageLabel
+      ? `${question} — submitted in ${languageLabel}. Open the round to read the code.`
+      : `${question} — submitted. Open the round to read the code.`;
+  }
+  if (status === "cancelled") return `${question} — cancelled before it was submitted.`;
+  if (status === "expired") return `${question} — the link expired before it was submitted.`;
+  if (status === "in_progress") return `${question} — the candidate has the round open.`;
+
+  const label = CODING_STATUS_LABELS[status as keyof typeof CODING_STATUS_LABELS] ?? status;
+  return `${question} — ${label.toLowerCase()}, not submitted.`;
 }

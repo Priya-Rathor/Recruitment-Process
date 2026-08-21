@@ -340,6 +340,37 @@ export const EVENT_CATALOGUE = {
     label: "Interview cancelled",
     describe: () => "Cancelled the interview",
   },
+  "interview.coding_round_started": {
+    entity: "interview",
+    label: "Coding round started",
+    describe: (m) => {
+      const title = text(m.question_title);
+      return title ? `Started a coding round: ${title}` : "Started a coding round";
+    },
+  },
+  "interview.coding_round_cancelled": {
+    entity: "interview",
+    label: "Coding round cancelled",
+    describe: (m) => {
+      const reason = text(m.reason);
+      return reason ? `Cancelled the coding round — ${reason}` : "Cancelled the coding round";
+    },
+  },
+  /**
+   * The candidate submitted. actor_id is NULL for this one and always will be:
+   * a candidate is not a user of this product, and naming a recruiter as the
+   * actor would be a false statement about who did it.
+   */
+  "interview.coding_round_submitted": {
+    entity: "interview",
+    label: "Coding round submitted",
+    describe: (m) => {
+      const language = text(m.language);
+      return language
+        ? `Candidate submitted their coding round (${language})`
+        : "Candidate submitted their coding round";
+    },
+  },
   "interview.feedback_submitted": {
     entity: "interview",
     label: "Interview feedback submitted",
@@ -568,6 +599,129 @@ export const EVENT_CATALOGUE = {
       return m.ok === false
         ? `${feature} was attempted but failed (${text(m.error_code, "error")})`
         : `${feature} ran`;
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // Module 21 — privacy, consent and data.
+  //
+  // EVERY ONE OF THESE IS SENSITIVE, and that is not caution — it is what the
+  // §10 privacy log is for. These events answer "who looked at this person's
+  // voice recording", "when did they consent", "who deleted their file". A
+  // recruiter browsing the general activity feed has no business reading that
+  // about a colleague's candidates; an Owner auditing a subject access request
+  // does. `sensitive: true` routes them to /audit-log, which is Owner/Admin only.
+  //
+  // The metadata deliberately carries IDS AND COUNTS, NEVER CONTENT. Logging a
+  // transcript view must not copy the transcript into the log — that would
+  // duplicate the most sensitive artifact in the product into a table with a
+  // different retention period and a different access rule, which is how a
+  // deletion request ends up incomplete.
+  // ---------------------------------------------------------------------------
+  "privacy.settings_updated": {
+    entity: "privacy",
+    sensitive: true,
+    label: "Privacy settings changed",
+    describe: (m) => {
+      const sections = Array.isArray(m.sections) ? (m.sections as string[]) : [];
+      return sections.length > 0
+        ? `Changed privacy settings: ${sections.join(", ")}`
+        : "Changed privacy settings";
+    },
+  },
+  "privacy.consent_given": {
+    entity: "screening_call",
+    sensitive: true,
+    label: "Candidate consent given",
+    describe: (m) =>
+      m.explicit === true
+        ? "The candidate explicitly confirmed they were happy to continue"
+        : "The candidate was told the call is automated and recorded, and continued",
+  },
+  "privacy.consent_declined": {
+    entity: "screening_call",
+    sensitive: true,
+    label: "Candidate consent declined",
+    describe: (m) => {
+      const kept = text(m.retained, "metadata only");
+      return `The candidate declined to continue; retained ${kept}`;
+    },
+  },
+  "privacy.consent_withdrawn": {
+    entity: "candidate",
+    sensitive: true,
+    label: "Candidate consent withdrawn",
+    describe: (m) => {
+      const action = text(m.action, "future AI interviews stopped");
+      return `The candidate withdrew consent — ${action}`;
+    },
+  },
+  "privacy.recording_created": {
+    entity: "screening_call",
+    sensitive: true,
+    label: "Interview recording created",
+    describe: (m) => {
+      const seconds = num(m.duration_seconds);
+      return seconds === null
+        ? "A call recording was stored"
+        : `A call recording was stored (${seconds}s)`;
+    },
+  },
+  "privacy.recording_deleted": {
+    entity: "screening_call",
+    sensitive: true,
+    label: "Interview recording deleted",
+    describe: (m) => {
+      const reason = text(m.reason, "");
+      return reason ? `A call recording was deleted — ${reason}` : "A call recording was deleted";
+    },
+  },
+  "privacy.transcript_viewed": {
+    entity: "screening_call",
+    sensitive: true,
+    label: "Transcript viewed",
+    describe: () => "Opened a call transcript",
+  },
+  "privacy.recording_viewed": {
+    entity: "screening_call",
+    sensitive: true,
+    label: "Recording accessed",
+    describe: (m) =>
+      m.downloaded === true ? "Downloaded a call recording" : "Played a call recording",
+  },
+  "privacy.data_exported": {
+    entity: "candidate",
+    sensitive: true,
+    label: "Candidate data exported",
+    describe: (m) => {
+      const artifacts = Array.isArray(m.artifacts) ? (m.artifacts as string[]) : [];
+      return artifacts.length > 0
+        ? `Exported this candidate's data (${artifacts.join(", ")})`
+        : "Exported this candidate's data";
+    },
+  },
+  "privacy.data_deleted": {
+    entity: "candidate",
+    sensitive: true,
+    label: "Candidate data deleted",
+    describe: (m) => {
+      const artifacts = Array.isArray(m.artifacts) ? (m.artifacts as string[]) : [];
+      const scope = artifacts.length > 0 ? artifacts.join(", ") : "AI interview data";
+      return `Permanently deleted this candidate's ${scope}`;
+    },
+  },
+  "privacy.retention_applied": {
+    entity: "privacy",
+    sensitive: true,
+    label: "Retention policy applied",
+    describe: (m) => {
+      const count = num(m.affected) ?? 0;
+      const action = text(m.action, "processed");
+      const artifact = text(m.artifact, "records");
+      if (count === 0) return `Retention sweep ran; no ${artifact} were due`;
+      const verb =
+        action === "delete" ? "deleted" : action === "archive" ? "archived" : "flagged for review";
+      return `Retention policy ${verb} ${count} ${artifact}`;
     },
   },
 } as const satisfies Record<string, EventDefinition>;

@@ -1,0 +1,1088 @@
+I want to implement a new **Public Job Application and Candidate Form Module** in my existing recruitment platform.
+
+IMPORTANT:
+
+Before changing or writing any code, first analyze my complete existing project architecture.
+
+I already have modules such as:
+
+* Candidates
+* Candidate Profiles
+* Job Openings
+* Interviews
+* Forms or Assessments if already implemented
+* Authentication
+* User roles
+* Resume upload or parsing functionality, if available
+* Candidate communication functionality, if available
+
+Do not immediately start implementing.
+
+First inspect the existing code and understand how the current Candidate, Job, Interview, and Profile modules work.
+
+The goal is to build this feature as part of the existing system and NOT as a separate application.
+
+---
+
+# MAIN BUSINESS REQUIREMENT
+
+I want recruiters, clients, or authorized users to be able to create a **Job Application Form**.
+
+This form can then be shared publicly with candidates.
+
+The candidate should be able to:
+
+1. Open a public application link.
+2. Fill in their contact and profile information.
+3. Upload their resume.
+4. Fill additional questions configured by the recruiter.
+5. Submit the application.
+
+After submission, the system should automatically:
+
+Candidate submits application
+↓
+Application is validated
+↓
+Resume is uploaded
+↓
+Candidate record is created or matched with an existing candidate
+↓
+Candidate profile is automatically populated
+↓
+Resume is attached to the candidate
+↓
+Application is linked to the Job Opening
+↓
+Application status is created
+↓
+Recruiter can review the candidate
+↓
+Recruiter can communicate with the candidate
+↓
+Candidate can move into the interview process
+
+This should be the main architecture.
+
+---
+
+# PHASE 1 — ANALYZE THE EXISTING PROJECT
+
+Before implementation, inspect and explain:
+
+## Candidate Module
+
+Determine:
+
+* How candidates are currently created.
+* Which fields are available.
+* Where candidate profile data is stored.
+* How candidate details are displayed.
+* How resumes are currently stored.
+* Whether duplicate candidates are already handled.
+
+## Job Module
+
+Determine:
+
+* How job openings are created.
+* How candidates are connected to jobs.
+* Whether applications already exist.
+
+## Interview Module
+
+Determine:
+
+* How a candidate enters the interview process.
+* How interview records are connected to candidates.
+* How interview status works.
+
+## Existing Forms
+
+Check whether there is already:
+
+* A form builder.
+* Dynamic fields.
+* Questionnaires.
+* Candidate forms.
+
+If such functionality already exists, reuse and extend it instead of creating duplicate systems.
+
+## Authentication
+
+Determine:
+
+* Which users can create application forms.
+* Which users can view submitted applications.
+* Whether public candidates should need to log in.
+
+---
+
+# PHASE 2 — IMPLEMENTATION PLAN
+
+Before writing code, provide a concise implementation plan.
+
+The plan must include:
+
+1. Existing files that need modification.
+2. New files that need to be created.
+3. Database changes.
+4. New API endpoints.
+5. New frontend routes.
+6. How public access will work.
+7. How a submission creates or updates a Candidate.
+8. How duplicate candidates will be handled.
+9. How the application connects to a Job Opening.
+10. How the candidate later enters the interview process.
+
+Only after this analysis and plan should implementation begin.
+
+---
+
+# FEATURE 1 — JOB APPLICATION FORM
+
+Authorized users should be able to create an application form for a job.
+
+Example:
+
+Job:
+Senior Python Developer
+
+Application Form:
+Senior Python Developer Application
+
+The form builder should allow the recruiter to configure fields.
+
+There should be standard fields such as:
+
+## Personal Information
+
+* First Name
+* Last Name
+* Email Address
+* Phone Number
+* Location
+* LinkedIn Profile
+* Portfolio URL
+* GitHub URL
+
+## Professional Information
+
+* Current Company
+* Current Job Title
+* Total Experience
+* Relevant Experience
+* Current Salary
+* Expected Salary
+* Notice Period
+
+Only include salary fields if appropriate for the existing platform and configuration.
+
+## Resume
+
+* Resume Upload
+
+Supported validation should include appropriate:
+
+* File types
+* Maximum file size
+* Required/optional status
+
+## Custom Questions
+
+The recruiter should also be able to add custom questions.
+
+Examples:
+
+"Why are you interested in this position?"
+
+"How many years of Python experience do you have?"
+
+"Are you available to join within 30 days?"
+
+"Describe your experience with Generative AI."
+
+Support appropriate field types such as:
+
+* Short Text
+* Long Text
+* Email
+* Phone
+* Number
+* Dropdown
+* Radio Buttons
+* Checkboxes
+* Date
+* File Upload
+* URL
+* Yes/No
+
+Reuse the existing dynamic Forms Module if it already exists or is being implemented.
+
+Do not create a duplicate form engine.
+
+---
+
+# FEATURE 2 — CREATE APPLICATION FORM FROM JOB
+
+Inside the existing Job Opening details page, add an appropriate action such as:
+
+[ Create Application Form ]
+
+or:
+
+[ Manage Application Form ]
+
+The recruiter should be able to:
+
+1. Select standard candidate fields.
+2. Add custom questions.
+3. Configure required fields.
+4. Add instructions.
+5. Preview the form.
+6. Save as draft.
+7. Publish the form.
+
+The application form should be connected to the Job Opening.
+
+Architecture:
+
+Job Opening
+↓
+Application Form
+↓
+Public Application Link
+↓
+Candidate Application
+
+---
+
+# FEATURE 3 — PUBLIC APPLICATION LINK
+
+When the form is published, generate a public secure URL.
+
+Example:
+
+/apply/{secure-token}
+
+or a route structure that follows the existing application's architecture.
+
+The public URL should not require the candidate to log into the recruiter dashboard.
+
+The recruiter should be able to:
+
+* Copy Application Link
+* View QR Code
+* Share the application
+* Disable the application
+* Regenerate the link if necessary
+
+Example:
+
+---
+
+Senior Python Developer
+
+Application Status: Open
+
+Public Application Link
+
+[ Copy Link ]
+
+[ Show QR Code ]
+
+Applications: 24
+
+[ View Applications ]
+
+---
+
+---
+
+# FEATURE 4 — PUBLIC CANDIDATE APPLICATION PAGE
+
+When a candidate opens the public link, they should see a professional application page.
+
+Example:
+
+---
+
+Company / Job Information
+
+Senior Python Developer
+
+Location: Remote
+
+Experience: 2–5 Years
+
+---
+
+Apply for this Position
+
+First Name *
+[________________]
+
+Last Name *
+[________________]
+
+Email *
+[________________]
+
+Phone Number *
+[________________]
+
+LinkedIn
+[________________]
+
+Years of Experience *
+[________________]
+
+Upload Resume *
+[ Choose File ]
+
+Why are you interested in this role?
+
+[____________________________]
+
+[ Submit Application ]
+
+---
+
+The page must be:
+
+* Mobile responsive.
+* Tablet responsive.
+* Desktop responsive.
+* Easy to use.
+* Accessible through a public link.
+* Independent from the internal dashboard.
+
+Follow the existing application's design system where possible.
+
+---
+
+# FEATURE 5 — RESUME UPLOAD AND PROFILE CREATION
+
+This is one of the most important requirements.
+
+When the candidate uploads a resume and submits the application:
+
+Application Form
+↓
+Candidate enters profile information
+↓
+Candidate uploads resume
+↓
+System validates information
+↓
+Resume is uploaded
+↓
+Candidate record is checked
+↓
+New candidate created OR existing candidate matched
+↓
+Profile information is saved
+↓
+Resume is attached
+↓
+Application is connected to Job Opening
+
+If resume parsing already exists in the project:
+
+Reuse it.
+
+The flow should become:
+
+Resume Upload
+↓
+Existing Resume Parser
+↓
+Extract Candidate Information
+↓
+Compare with manually entered information
+↓
+Create/Update Candidate Profile
+
+If resume parsing does not exist:
+
+Do not unnecessarily build a complex AI parser unless it is already part of the project's requirements.
+
+First implement reliable resume storage and candidate profile creation.
+
+---
+
+# FEATURE 6 — DUPLICATE CANDIDATE HANDLING
+
+Before automatically creating a new candidate, check for possible duplicates.
+
+Use the existing duplicate detection logic if available.
+
+Possible matching fields:
+
+* Email
+* Phone number
+* Existing candidate profile
+
+Suggested flow:
+
+Candidate submits application
+↓
+Check Email
+↓
+Check Phone
+↓
+Existing Candidate?
+
+YES
+↓
+Create new Job Application
+↓
+Attach new resume if appropriate
+↓
+Do not unnecessarily create duplicate candidate
+
+NO
+↓
+Create New Candidate
+↓
+Create Candidate Profile
+↓
+Create Job Application
+
+Do not blindly overwrite an existing candidate's information.
+
+If information conflicts, follow a safe update strategy.
+
+Document the strategy clearly.
+
+---
+
+# FEATURE 7 — APPLICATION RECORD
+
+Do not only create a Candidate.
+
+Also create a separate application relationship between:
+
+Candidate
+↓
+Job Opening
+↓
+Application
+
+A candidate may apply for multiple jobs.
+
+Therefore, do not design the system so that a candidate can only belong to one job.
+
+The conceptual relationship should support:
+
+Candidate
+├── Application → Job A
+├── Application → Job B
+└── Application → Job C
+
+Each application should have its own status.
+
+Suggested statuses:
+
+APPLIED
+UNDER_REVIEW
+SHORTLISTED
+CONTACTED
+SCREENING
+INTERVIEW_SCHEDULED
+INTERVIEW_IN_PROGRESS
+REJECTED
+HIRED
+WITHDRAWN
+
+IMPORTANT:
+
+Inspect the existing status system first.
+
+Reuse existing application/candidate pipeline statuses if available.
+
+Do not create duplicate status systems unnecessarily.
+
+---
+
+# FEATURE 8 — AUTOMATIC CANDIDATE PROFILE
+
+After successful submission, automatically populate the Candidate Profile.
+
+Example:
+
+Candidate Profile
+
+---
+
+John Doe
+
+[john@example.com](mailto:john@example.com)
+
++91 XXXXX XXXXX
+
+Experience: 3 Years
+
+Location: Noida
+
+---
+
+Resume
+
+John_Doe_Resume.pdf
+
+[ View Resume ]
+
+---
+
+Applications
+
+Senior Python Developer
+
+Status: Applied
+
+Applied Date: August 21, 2026
+
+---
+
+Application Answers
+
+[ View Submitted Form ]
+
+---
+
+All information should come from the submitted application and existing candidate architecture.
+
+Do not create a separate "Application Candidate" profile.
+
+Use the actual existing Candidate Profile.
+
+---
+
+# FEATURE 9 — APPLICATION RESPONSES
+
+All custom form responses must also be saved.
+
+For example:
+
+Question:
+Why are you interested in this position?
+
+Answer:
+I have experience working with Python and Generative AI...
+
+These responses should be available from:
+
+Candidate Profile
+↓
+Applications
+↓
+Selected Job
+↓
+Application Details
+
+The recruiter should be able to view:
+
+* Candidate information.
+* Resume.
+* Custom question answers.
+* Application date.
+* Job applied for.
+* Application status.
+
+---
+
+# FEATURE 10 — APPLICATION MANAGEMENT
+
+Add an Application Management view if the existing project architecture supports it.
+
+Example:
+
+Applications
+
+| Candidate | Job | Applied Date | Status | Resume | Actions |
+
+Actions may include:
+
+* View Candidate
+* View Application
+* View Resume
+* Contact Candidate
+* Change Status
+* Schedule Interview
+* Reject Application
+
+Reuse existing Candidate tables, search, filtering, and pagination components where possible.
+
+Support appropriate:
+
+* Search
+* Job filter
+* Status filter
+* Date filter
+* Loading state
+* Empty state
+* Error state
+
+---
+
+# FEATURE 11 — CONTACT AND COMMUNICATION
+
+After an application is submitted, the recruiter should be able to contact the candidate through the communication methods supported by the existing platform.
+
+First inspect whether the project already supports:
+
+* Email
+* WhatsApp
+* SMS
+* Phone/contact links
+* Notifications
+
+Reuse existing communication functionality.
+
+Do not create duplicate communication systems.
+
+Example actions:
+
+[ Send Email ]
+
+[ Send WhatsApp ]
+
+[ Schedule Interview ]
+
+If email or WhatsApp integration already exists, allow the recruiter to communicate with the candidate using the application/candidate information.
+
+All communication should remain connected to the correct candidate where possible.
+
+---
+
+# FEATURE 12 — MOVE CANDIDATE INTO INTERVIEW PROCESS
+
+The application flow should connect naturally with the Interview Module.
+
+Example:
+
+Candidate applies
+↓
+Status: Applied
+↓
+Recruiter reviews profile
+↓
+Status: Shortlisted
+↓
+Recruiter contacts candidate
+↓
+Schedule Interview
+↓
+Interview created
+↓
+Candidate enters Interview Process
+
+Inside the candidate or application page, provide an appropriate action:
+
+[ Schedule Interview ]
+
+or reuse the existing interview creation flow.
+
+Do not create a second interview system.
+
+The existing Interview Module should remain the source of truth for interviews.
+
+---
+
+# FEATURE 13 — PRE-INTERVIEW FORM
+
+The system should also support assigning additional forms to candidates before or during the interview process.
+
+Example:
+
+Candidate is shortlisted
+↓
+Recruiter assigns Pre-Interview Form
+↓
+System generates secure link
+↓
+Candidate receives link
+↓
+Candidate fills questionnaire
+↓
+Response is saved in Candidate Profile
+↓
+Recruiter reviews response
+↓
+Interview proceeds
+
+Examples of pre-interview forms:
+
+* Candidate Confirmation Form
+* Availability Form
+* Technical Questionnaire
+* Candidate Information Update
+* Interview Preparation Questionnaire
+* Document Collection Form
+
+These forms should reuse the same Dynamic Forms infrastructure.
+
+---
+
+# FEATURE 14 — CANDIDATE INTERVIEW PREPARATION
+
+Support a possible future flow where, after an interview is scheduled, the candidate can receive information such as:
+
+* Interview date.
+* Interview time.
+* Interview instructions.
+* Meeting link if appropriate.
+* Required preparation.
+* Documents to complete.
+* Pre-interview questionnaire.
+
+The system should allow this information to be connected to the existing interview.
+
+Example:
+
+Interview Scheduled
+↓
+Candidate receives communication
+↓
+Candidate receives preparation information
+↓
+Candidate completes required form
+↓
+Candidate joins interview
+↓
+Interview results are saved
+
+Do not overbuild this feature if the existing application is not ready.
+
+Build the data relationships so this can be added later.
+
+---
+
+# FEATURE 15 — DATABASE DESIGN
+
+Before changing the database, inspect the existing schema.
+
+The conceptual architecture should support:
+
+Candidate
+↓
+Application
+↓
+Job Opening
+
+And optionally:
+
+Application
+↓
+Application Form
+↓
+Form Response
+
+And later:
+
+Candidate
+↓
+Interview
+↓
+Interview Forms / Coding Sessions
+
+A possible conceptual structure is:
+
+APPLICATION_FORMS
+
+* id
+* job_id
+* name
+* description
+* status
+* created_by
+* public_access_token
+* created_at
+* updated_at
+
+APPLICATIONS
+
+* id
+* candidate_id
+* job_id
+* application_form_id
+* status
+* applied_at
+* source
+* created_at
+* updated_at
+
+APPLICATION_RESPONSES
+
+* id
+* application_id
+* form_id
+* response_data
+* submitted_at
+* created_at
+* updated_at
+
+IMPORTANT:
+
+Do not blindly implement this schema.
+
+Adapt it to the existing database architecture.
+
+Reuse:
+
+* Candidate IDs.
+* Job IDs.
+* User IDs.
+* Existing application models if available.
+* Existing form models if available.
+
+Avoid duplicate data.
+
+---
+
+# FEATURE 16 — SECURITY
+
+Implement appropriate security.
+
+Ensure:
+
+1. Public users can only access the specific application form.
+2. Public users cannot access the internal dashboard.
+3. Public tokens are secure and difficult to guess.
+4. Disabled applications cannot accept new submissions.
+5. Candidate cannot access another candidate's private profile.
+6. Recruiters can only access data according to existing permissions.
+7. Resume uploads are handled securely.
+8. Sensitive data is not unnecessarily exposed in public URLs.
+9. Duplicate submissions are handled safely.
+
+Reuse existing security patterns.
+
+---
+
+# FEATURE 17 — VALIDATION
+
+Validate all configured fields.
+
+Examples:
+
+* Required fields.
+* Valid email.
+* Valid phone number.
+* Resume file type.
+* Resume file size.
+* URL validation.
+* Number ranges.
+* Required custom questions.
+
+Validation should occur appropriately on both frontend and backend.
+
+Use the existing validation architecture where possible.
+
+---
+
+# FEATURE 18 — APPLICATION SUBMISSION FLOW
+
+The complete flow must work like this:
+
+Candidate opens Job Application Link
+↓
+Application page loads
+↓
+Candidate enters contact details
+↓
+Candidate enters profile information
+↓
+Candidate uploads resume
+↓
+Candidate answers custom questions
+↓
+Candidate clicks Submit
+↓
+Frontend validates data
+↓
+Backend validates data
+↓
+Resume is securely stored
+↓
+System checks for existing candidate
+↓
+Candidate found?
+
+YES
+↓
+Create or update application relationship safely
+
+NO
+↓
+Create Candidate
+↓
+Create Candidate Profile
+
+Then:
+
+Create Application
+↓
+Connect Candidate to Job Opening
+↓
+Save Application Form Responses
+↓
+Set Application Status
+↓
+Show Success Page
+
+The candidate should receive a clear confirmation.
+
+Example:
+
+"Thank you! Your application has been submitted successfully."
+
+If communication infrastructure already exists, optionally trigger the existing confirmation workflow.
+
+---
+
+# FEATURE 19 — MANUAL TESTING
+
+After implementation, create:
+
+docs/job-application-module.md
+
+Include complete documentation and manual test cases.
+
+Test:
+
+## Public Application
+
+* Valid application.
+* Missing required fields.
+* Invalid email.
+* Invalid phone.
+* Invalid resume.
+* Large resume file.
+* Duplicate candidate.
+* Same candidate applying to multiple jobs.
+* Disabled form.
+* Invalid public link.
+* Expired link if supported.
+
+## Candidate Creation
+
+* New candidate creates profile.
+* Existing candidate is detected.
+* Resume is attached.
+* Profile data is saved correctly.
+* Custom answers are saved.
+
+## Application
+
+* Application connects to correct job.
+* Correct status is assigned.
+* Multiple applications work.
+* Candidate profile displays all applications.
+
+## Recruiter Flow
+
+* View application.
+* View candidate.
+* View resume.
+* View answers.
+* Change status.
+* Contact candidate.
+* Schedule interview.
+
+## Pre-Interview Form
+
+* Assign form.
+* Candidate receives/accesses form.
+* Candidate submits form.
+* Response appears in profile.
+
+## Regression Testing
+
+Verify existing:
+
+* Candidate creation.
+* Candidate listing.
+* Candidate profile.
+* Job management.
+* Interview creation.
+* Authentication.
+* Authorization.
+* Existing Forms Module.
+* Existing Live Coding Interview functionality.
+
+---
+
+# FINAL END-TO-END FLOW
+
+The complete intended product flow is:
+
+RECRUITER CREATES JOB
+↓
+RECRUITER CREATES OR CONFIGURES APPLICATION FORM
+↓
+APPLICATION FORM IS PUBLISHED
+↓
+PUBLIC LINK / QR CODE IS GENERATED
+↓
+CANDIDATE OPENS LINK
+↓
+CANDIDATE FILLS PROFILE AND CONTACT INFORMATION
+↓
+CANDIDATE UPLOADS RESUME
+↓
+CANDIDATE ANSWERS CUSTOM QUESTIONS
+↓
+CANDIDATE SUBMITS APPLICATION
+↓
+SYSTEM VALIDATES DATA
+↓
+SYSTEM CHECKS FOR EXISTING CANDIDATE
+↓
+CREATE NEW CANDIDATE OR SAFELY LINK EXISTING CANDIDATE
+↓
+RESUME IS SAVED TO CANDIDATE PROFILE
+↓
+APPLICATION IS LINKED TO JOB OPENING
+↓
+CUSTOM FORM RESPONSES ARE SAVED
+↓
+RECRUITER REVIEWS APPLICATION
+↓
+RECRUITER CONTACTS CANDIDATE
+↓
+CANDIDATE IS SHORTLISTED
+↓
+PRE-INTERVIEW FORM MAY BE ASSIGNED
+↓
+INTERVIEW IS SCHEDULED
+↓
+CANDIDATE ENTERS INTERVIEW PROCESS
+↓
+OPTIONAL CODING ROUND / ASSESSMENT
+↓
+INTERVIEW RESULTS ARE SAVED TO CANDIDATE PROFILE
+
+---
+
+# FINAL RULES
+
+1. First analyze the existing project.
+2. Reuse the existing Candidate system.
+3. Reuse the existing Job system.
+4. Reuse the existing Forms system if available.
+5. Reuse the existing Interview system.
+6. Do not create duplicate Candidate records unnecessarily.
+7. A single Candidate must be able to apply to multiple Jobs.
+8. Each application must remain connected to its specific Job.
+9. Resume and profile information should be automatically available in the existing Candidate Profile.
+10. Public candidates must not need access to the internal dashboard.
+11. Follow the existing UI design system.
+12. Do not break existing functionality.
+13. Do not unnecessarily refactor unrelated code.
+14. After implementation, create complete documentation and a manual testing guide.
+
+First provide the implementation analysis and plan.
+
+Then implement the feature only after understanding the existing architecture.

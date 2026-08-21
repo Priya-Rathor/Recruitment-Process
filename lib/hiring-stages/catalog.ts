@@ -90,12 +90,24 @@ export const STAGES: StageDefinition[] = [
     engine: null,
   },
   {
+    /**
+     * LIVE as of Module 20. This stage spent its whole life as
+     * configuration-only — a job could describe a coding test and nothing ran
+     * it — and the live coding round is the engine it was waiting for.
+     *
+     * The honesty test in config.test.ts asserts the exact set of live stages
+     * and that each names a real engine, so promoting a stage without wiring one
+     * fails there rather than quietly promising something the product cannot do.
+     * This entry passes it because the engine exists: an interviewer starts a
+     * round from the interview, the candidate writes code in their browser, and
+     * the submission lands in application_evaluations against this stage_key.
+     */
     key: "written_assessment",
     kind: "pipeline",
     label: "Written Assessment",
-    description: "A take-home or timed written test",
-    execution: "configuration_only",
-    engine: null,
+    description: "A live coding round, or a take-home written test",
+    execution: "live",
+    engine: "Live coding rounds (Module 20)",
   },
 ];
 
