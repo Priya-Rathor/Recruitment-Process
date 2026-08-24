@@ -1,3 +1,643 @@
+=================================================================
+MODULE 23 — FORMS & PUBLIC APPLICATIONS
+=================================================================
+
+*** BUILT. 2026-08-22. ***
+
+This module has been implemented. The specification below is what it
+was built from and still describes it accurately; the authoritative
+record of what actually exists — files, reuse, security decisions,
+manual test cases and the remaining gaps — is:
+
+    docs/modules/23-forms-public-applications.md
+
+Migration: supabase/migrations/0033_module23_forms_public_applications.sql
+
+Deviations from this spec, all deliberate and explained in that doc:
+
+  1. A DISABLED form and an UNKNOWN token show DIFFERENT messages.
+     Section 9 below asked for one neutral page for both. Reaching the
+     "no longer accepting applications" page requires a signature this
+     server produced, which cannot be forged — so anybody who gets
+     there was genuinely given the link, and telling them the role has
+     closed is both true and kinder. A regenerated-away link is still
+     treated as invalid, so an old QR code's holder is told to ask for
+     the current link.
+  2. FILE UPLOAD is only the resume, only on a job application form.
+     The type is not offered as a custom question and is refused
+     server-side elsewhere: nothing in this module stores an arbitrary
+     attachment, so offering it would take somebody's document and drop
+     it. Same call Module 19 made about its upload link.
+  3. A STANDALONE FORM CANNOT YET BE ASSIGNED TO A CANDIDATE. Its
+     answers are stored and readable, but the "send this questionnaire
+     to this shortlisted person" step (Feature 13) is not built. The
+     data model supports it — form_responses.candidate_id exists.
+  4. NO CANDIDATE COLUMNS were added for current salary, LinkedIn,
+     GitHub or portfolio, as section 6 required. Those answers live on
+     the application's responses card.
+
+Also fixed on the way through: activity_entity_type was missing
+'message_template' and 'privacy', which had been declared in TypeScript
+for some time — every audit row for those two entity types was being
+silently dropped, including privacy-log entries.
+
+-----------------------------------------------------------------
+
+Build a generic form engine plus a public, no-login job application
+page for my recruitment SaaS.
+
+This prompt has been checked against the repo as it stands (last
+migration 0033 pending; 0032 = Module 22 privacy). Every file path,
+function name, table name and enum value below is real — verify, don't
+re-derive. Where the earlier draft of this prompt was wrong about the
+codebase, section 1 says so explicitly; treat those as binding
+corrections, not suggestions.
+
+The original free-form brief is kept verbatim in Appendix A at the
+bottom as the feature checklist. Where the two disagree, THIS document
+wins.
+
+=================================================================
+0. READ BEFORE WRITING ANY CODE
+=================================================================
+Read these files. They are the logic this module must reuse rather than
+reimplement:
+
+  AGENTS.md                          — the architecture rules that bind
+                                       every module (RLS is the real
+                                       boundary; AI never writes to
+                                       trusted tables; time via lib/time.ts)
+  docs/modules/03-jobs-management.md — Jobs
+  docs/modules/04-candidates-management.md
+  docs/modules/05-applications-management.md
+  docs/modules/06-resume-ai-parsing.md
+  docs/modules/18-bulk-resume-intake.md  — THE closest precedent: the
+                                       existing "upload a folder of
+                                       resumes against a job" flow does
+                                       almost exactly what a public
+                                       application submission must do
+  docs/live-coding-interview.md      — the precedent for a public,
+                                       token-authorised, no-login page
+  docs/modules/19-onboarding-documents.md, section
+    "Candidate-facing upload: SCOPED OUT" — read this. It lists the
+    exact work a public unauthenticated write path needs, and it is the
+    work this module is signing up for.
+
+  lib/candidates/dedupe.ts     — normalizeEmail, normalizePhone,
+                                 findDuplicates, PHONE_MATCH_DIGITS
+  lib/intake/match.ts          — resolveCandidateMatch,
+                                 hasIdentifyingDetails, candidateNameFrom,
+                                 IntakeConflictReason
+  lib/intake/process.ts        — processIntakeFile (the whole pipeline),
+                                 ensureApplicationForCandidate
+  lib/resumes/extract.ts       — extractResumeText
+  lib/resumes/uploadPolicy.ts  — isAllowedResumeUpload,
+                                 RESUME_UPLOAD_ACCEPT,
+                                 RESUME_UPLOAD_REJECTION
+  lib/resumes/review.ts        — buildFieldComparisons,
+                                 applyReviewDecisions, REVIEWABLE_FIELDS
+  lib/resumes/pending.ts       — pendingReviewSummary
+  lib/resumes/queries.ts       — RESUME_BUCKET
+  lib/ai/parseResume.ts        — parseResume (returns AiResult<ParsedResume>)
+  lib/applications/stages.ts   — DEFAULT_APPLICATION_STAGE
+  lib/communications/triggers.ts — trySendForEvent
+  lib/communications/events.ts   — COMMUNICATION_EVENTS
+  lib/coding/token.ts         — the signed-token construction to copy
+  lib/coding/candidate.ts     — how a public route reads/writes the DB
+  lib/supabase/session.ts     — PUBLIC_PATHS and isPublicPath
+  lib/supabase/admin.ts       — createAdminClient
+  lib/privacy/settings.ts     — PrivacyNoticeSettings, DEFAULT_PRIVACY_NOTICE
+  app/api/coding/[token]/submit/route.ts — the shape a public POST takes
+  app/api/coding-sessions/[id]/qr/route.ts — QR generation, already built
+  app/api/jobs/[id]/intake/route.ts — file validation + size cap
+  app/jobs/[id]/page.tsx      — where the new card goes
+  app/settings/SettingsShell.tsx — where the standalone Forms section goes
+
+=================================================================
+1. CORRECTIONS TO THE EARLIER DRAFT OF THIS PROMPT
+=================================================================
+These are things the earlier version of this prompt asserted about the
+codebase that are FALSE. Do not build to the old assumption.
+
+1.1  MODULE NUMBER. This is not Module 18. Module 18 is the bulk resume
+     intake feature (docs/modules/18-bulk-resume-intake.md), 19 is
+     Onboarding & Documents, 20 is the live coding round, 21 is the
+     public marketing website, 22 is Privacy & Consent. This is
+     MODULE 23. Doc goes at docs/modules/23-forms-public-applications.md,
+     migration at
+     supabase/migrations/0033_module23_forms_public_applications.sql.
+
+1.2  THE ONBOARDING PRECEDENT DOES NOT EXIST. The old prompt said the
+     public page should be "consistent with how Module 17's Onboarding
+     document links were scoped". Onboarding is Module 19, and its
+     tokenised no-login link was explicitly NOT BUILT — the doc says so
+     and lists why. The real precedents for a no-login candidate page
+     are Module 15's /unsubscribe and Module 20's /coding. Copy those.
+
+1.3  THE PUBLIC PATH DOES NOT USE RLS. The old prompt said the public
+     submission endpoint should be "a token-scoped, unauthenticated
+     path" enforced by policy. There is no such thing in this codebase
+     and Supabase cannot express it: an anonymous request has no JWT for
+     a policy to key on. The real pattern (lib/coding/candidate.ts) is:
+       verify the signed token in application code
+         -> createAdminClient()   (service role, BYPASSES RLS)
+         -> every single query filters organization_id explicitly.
+     Follow it exactly, including the failure mode: createAdminClient()
+     returns null when the secret key is unset, and the route must then
+     return a 503 "not configured", never fall through to an
+     unauthorised read.
+
+1.4  THE PUBLIC TOKEN SHOULD NOT BE A STORED RANDOM SLUG. The old prompt
+     said "public_token (unique, unguessable — a UUID or long random
+     slug)". This codebase already made the opposite choice twice, for
+     a good reason spelled out at the top of lib/coding/token.ts: the
+     token is a stateless HMAC, so a database dump contains no working
+     links and there is no token column for a mistaken SELECT to leak.
+     See section 4 for how to keep that property AND still support
+     "regenerate link".
+
+1.5  source = "Public Application Form" IS NOT A VALID VALUE.
+     applications.source and candidates.source are both the Postgres
+     enum public.candidate_source, whose values are: career_page,
+     resume_upload, email, referral, job_board, agency_database, manual.
+     Add a new value 'application_form' in the migration, following the
+     guarded ALTER TYPE ... ADD VALUE pattern already used in
+     supabase/migrations/0032_module21_privacy_consent.sql, and extend
+     CANDIDATE_SOURCES + CANDIDATE_SOURCE_LABELS in lib/types.ts.
+     TRAP: a newly added enum value cannot be USED in the same
+     transaction that added it — so the ALTER must not sit in the same
+     statement batch as an insert or a default that references it.
+
+1.6  THE CANDIDATE TABLE DOES NOT HAVE THE COLUMNS THE OLD FIELD LIST
+     ASSUMED. See the mapping table in section 6. Specifically:
+     candidates.name is ONE column (not first/last), there is NO
+     current-salary/current-CTC column (only expected_salary), and there
+     are NO linkedin / portfolio / github columns.
+
+1.7  DO NOT INVENT A CONFLICT TABLE. The old prompt said to "queue
+     conflicting fields through the same conflict-review pattern".
+     That pattern is concrete: bulk intake never writes a parsed field
+     onto an existing candidate. It writes the proposal into
+     resume_parse_results with reviewed_at = null, and Module 6's
+     buildFieldComparisons / applyReviewDecisions (lib/resumes/review.ts)
+     let a human accept or keep each field. Reuse that. The unresolved
+     queue already surfaces on the job page via
+     lib/intake/queries.ts listUnresolvedConflicts.
+
+1.8  MODULE 15 IS BUILT — DO NOT "SKIP SILENTLY". The old prompt hedged
+     that the notification hook might not exist. It does:
+     'application_received' is already in COMMUNICATION_EVENTS
+     (lib/communications/events.ts) and lib/intake/process.ts already
+     calls trySendForEvent for it. Wire it for real.
+
+1.9  QR GENERATION IS ALREADY SOLVED. `qrcode` is already a dependency
+     and app/api/coding-sessions/[id]/qr/route.ts already renders one
+     server-side. Add a sibling route; do not add a client-side QR
+     library.
+
+1.10 THERE IS NO RATE LIMITER TO REUSE. Nothing in lib/ does IP rate
+     limiting today, so this module builds the first one — and it has to
+     be durable, because the app runs serverless and an in-process Map
+     is per-instance and resets constantly. See section 11.
+
+1.11 submission_count AS A PLAIN COLUMN IS A LIE WAITING TO HAPPEN. Any
+     signed-in user can PATCH it directly through PostgREST. Either
+     derive it (count over form_responses) or maintain it with an
+     AFTER INSERT trigger and REVOKE UPDATE on the column. Do not let
+     the client set it.
+
+1.12 job_screening_questions ALREADY EXISTS AND IS NOT THIS. That table
+     (migration 0002, shown as "Screening questions" on the job page)
+     feeds the Module 8 AI phone screen. It is NOT the application
+     form's custom questions. Do not merge them, do not migrate one into
+     the other, and make sure the job page's two cards read as clearly
+     different things.
+
+=================================================================
+2. CORE PRINCIPLE — ONE FORM ENGINE, NOT TWO SYSTEMS
+=================================================================
+One reusable form builder. A job's public application form is just the
+first form created against that engine, auto-generated with sensible
+defaults when a job is created. Recruiters can also create standalone
+forms later (pre-interview questionnaires, document collection) with the
+same engine. Do not build a special-cased "job application form" system
+alongside a generic one.
+
+=================================================================
+3. DATA MODEL
+=================================================================
+forms (
+  id                uuid pk
+  organization_id   uuid not null references organizations
+  name              text not null
+  description       text
+  purpose           enum form_purpose: 'job_application' | 'pre_interview' | 'general'
+  job_id            uuid null references jobs (set when purpose =
+                    'job_application', null otherwise) — enforce that
+                    pairing with a CHECK, not just in code
+  status            enum form_status: 'draft' | 'published' | 'disabled'
+  token_version     integer not null default 1   -- see section 4
+  created_by        uuid references auth.users
+  created_at, updated_at
+)
+  unique (job_id) where purpose = 'job_application'  -- one application
+                                                      form per job
+
+form_fields (
+  id, form_id (on delete cascade), organization_id (denormalised so RLS
+  can key on it without a join — same choice job_screening_questions
+  made), field_key text, label text, field_type enum form_field_type
+  ('short_text','long_text','email','phone','number','dropdown','radio',
+   'checkbox','date','file_upload','url','yes_no'),
+  options jsonb not null default '[]',
+  required boolean not null default false,
+  is_standard boolean not null default false,
+  display_order integer not null,   -- name it display_order, matching
+                                    -- job_screening_questions, not "order"
+                                    -- ("order" is a reserved word)
+  created_at
+)
+  unique (form_id, field_key)
+
+form_responses (
+  id, organization_id, form_id, application_id null, candidate_id null,
+  raw_answers jsonb not null,     -- field_key -> value, verbatim
+  resume_id uuid null references resumes,
+  submitted_at timestamptz not null default now(),
+  submitter_ip inet null,         -- see the privacy note below
+  created_at
+)
+
+form_submission_attempts (          -- the rate limiter's ledger; see §11
+  id, form_id, ip_hash text not null, attempted_at timestamptz not null
+    default now()
+)
+  index (form_id, ip_hash, attempted_at desc)
+
+RLS
+  forms / form_fields / form_responses: organization-scoped SELECT for
+  members via the existing is_org_member() helper. Writes restricted by
+  role IN THE POLICY, not only in the route — AGENTS.md's rule, and it
+  matters concretely here: without it a Viewer with a browser PostgREST
+  client could publish a form, and publishing a form makes a URL
+  world-reachable. Encode in WITH CHECK:
+    - insert/update of forms and form_fields: Owner/Admin/Recruiter only
+    - a status transition to 'published' or 'disabled': Owner/Admin/Recruiter
+    - token_version bump: Owner/Admin only
+    - form_responses: NO client insert path at all (the public route
+      writes with the service role), members SELECT only, nobody UPDATEs
+  form_submission_attempts: no client access whatsoever.
+
+PRIVACY NOTE ON submitter_ip. An IP address is personal data under GDPR,
+and Module 22 exists precisely so this product does not collect things
+casually. Store a salted hash for rate limiting (that is all rate
+limiting needs), and keep the raw IP only if the retention settings in
+lib/privacy/settings.ts can express dropping it. If you store the raw
+value, say so in the completion report and add it to the retention
+sweep — do not leave it undocumented.
+
+=================================================================
+4. THE PUBLIC TOKEN
+=================================================================
+Copy lib/coding/token.ts's construction: an HMAC over the form id,
+keyed on INTEGRATION_ENCRYPTION_KEY, base64url, version-prefixed.
+Nothing secret stored in the database.
+
+The one thing coding sessions did not need and this does is REGENERATION.
+Sign over (form_id, token_version) and have the verifier check the
+signature against the CURRENT token_version read from the row. Bumping
+forms.token_version therefore invalidates every previously issued link
+and QR code in one UPDATE, with no token column anywhere.
+
+Rules:
+  - No key set -> createAccessToken() returns null and publish is
+    REFUSED with the actionable message (copy SIGNING_UNAVAILABLE_MESSAGE's
+    wording). Never issue an unsigned link.
+  - The URL exposes forms.id and nothing else. No organization id, no
+    job id, no candidate id.
+  - Revocation is expressed on the ROW, like coding sessions: status
+    'disabled' stops the page from accepting submissions within the same
+    request, without touching the token.
+  - Regenerating is Owner/Admin only and must warn, before confirming,
+    that every shared link and printed QR code stops working.
+
+=================================================================
+5. PUBLIC ROUTE AND THE AUTH ALLOWLIST
+=================================================================
+Route: /apply/[token] (page) and /api/apply/[token] + 
+/api/apply/[token]/submit (API).
+
+Add "/apply" to PUBLIC_PATHS in lib/supabase/session.ts, with a comment
+in the same style as the /unsubscribe and /coding entries explaining WHY
+this one is public. Then add a case to the publicPaths test.
+
+CHECK THE NEAR-MISS EXPLICITLY, because the comment in that file warns
+about exactly this: matches() frees the entry and anything beneath it,
+so "/apply" must not free a private route. "/applications" (the internal
+list) does not equal "/apply" and does not start with "/apply/", so it
+stays protected — but write a test that pins it, because an entry of
+"/app" would silently publish the entire application.
+
+=================================================================
+6. DEFAULT JOB APPLICATION FORM, AND WHERE EACH FIELD LANDS
+=================================================================
+When a job is created (POST /api/jobs), create one forms row,
+purpose 'job_application', status 'draft', linked to the job, with the
+default fields below. Do it in the same request as the job insert and
+do not fail job creation if it fails — a job with no form is
+recoverable, a failed job creation is not. Log it and let the job page
+offer "Create application form" when the row is missing.
+
+FIELD -> CANDIDATE COLUMN MAPPING. This is the part the old prompt got
+wrong; the candidates table (migration 0003) has exactly these
+writable profile columns: name, email, phone, location, current_company,
+current_role, total_experience_years, skills, expected_salary,
+notice_period_days, education, employment_history, source, resume_url.
+
+  First Name *     ) both required; joined with a single space into
+  Last Name *      ) candidates.name. THERE IS NO first/last column.
+                     Validate that the joined value is non-blank —
+                     candidates has check (length(btrim(name)) > 0).
+  Email *          -> candidates.email (load-bearing: dedupe matches on
+                      email_normalized, maintained by a trigger)
+  Phone *          -> candidates.phone (same; PHONE_MATCH_DIGITS = last
+                      10 digits)
+  Location         -> candidates.location
+  Current Company  -> candidates.current_company
+  Current Role     -> candidates.current_role (quoted in raw SQL only —
+                      it is the reserved word CURRENT_ROLE)
+  Total Experience -> candidates.total_experience_years
+                      numeric(4,1), CHECK 0..60 — validate the range
+                      server-side or the insert throws
+  Expected CTC     -> candidates.expected_salary numeric(12,2), CHECK >= 0
+  Notice Period    -> candidates.notice_period_days integer, CHECK 0..365.
+                      The form should ask in a human unit; convert.
+  Resume Upload *  -> resumes row + 'resumes' bucket (see §10)
+
+  Current CTC, LinkedIn, Portfolio URL, GitHub URL: THERE ARE NO COLUMNS
+  FOR THESE. Ship them as ordinary form fields whose answers live in
+  form_responses.raw_answers and render on the Application detail card.
+  Do NOT add columns to candidates for them in this module — that is a
+  candidate-profile change with its own UI, filters, exports and
+  retention implications, and it is not what this module is for. Note
+  the gap in the completion report instead.
+
+Email and Resume Upload can have their labels edited but cannot be
+removed or made optional: dedupe and parsing both depend on them.
+Everything else is fully editable — label, required/optional, options,
+order — and removable.
+
+Standalone forms (purpose 'general') start with ZERO fields.
+
+=================================================================
+7. JOB DETAIL PAGE — FORM MANAGEMENT CARD
+=================================================================
+Add an "Application form" card to app/jobs/[id]/page.tsx, alongside the
+existing Hiring stages / Resume scoring / Screening questions cards.
+Follow the card conventions in AGENTS.md (flat, 1px border, 12px
+radius, no shadow) and use components/states.tsx for loading/empty/error.
+
+  draft      -> "Manage application form" opens the field editor
+  published -> public link + Copy link, Show QR code, submission count
+               ("24 applications received"), "View applications" linking
+               to the EXISTING applications list filtered to this job
+               (reuse Module 5's job filter — do not build a second
+               list), and a Disable toggle
+  disabled  -> the same summary plus Re-enable
+  Regenerate link (Owner/Admin) with the warning from §4
+
+Config edits use an explicit Save, never auto-save (AGENTS.md).
+
+=================================================================
+8. STANDALONE FORMS SECTION
+=================================================================
+Nest it under Settings (app/settings/forms) via the existing
+SettingsShell nav — it is configuration-heavy and infrequent, and the
+top-level nav is already long. Lists every form in the organization,
+job-linked and standalone, with the same states and the same field
+editor. A job-linked form's row should link back to its job.
+
+=================================================================
+9. PUBLIC APPLICATION PAGE
+=================================================================
+/apply/[token] — fully public, no nav bar, no org switcher, no links
+into the dashboard, but using app/globals.scss tokens so it still looks
+like the product. Mobile-first: this gets opened from WhatsApp and
+LinkedIn on a phone, so design that width first and treat desktop as the
+widening case.
+
+  Header: job title, location, experience range, work mode — read-only,
+    pulled from the job row. Nothing else about the organization's
+    internals.
+  Fields rendered in display_order with client-side validation per
+    field_type (required, email shape, phone shape, file type/size, URL
+    shape, number range).
+  A PRIVACY DISCLOSURE ABOVE THE SUBMIT BUTTON. This is the first point
+    of collection from the candidate, and the product already has a
+    configurable notice: render the organization's PrivacyNoticeSettings
+    (lib/privacy/settings.ts, falling back to DEFAULT_PRIVACY_NOTICE) —
+    that the data is used for recruitment, that a resume may be
+    AI-parsed, and who holds it. Per AGENTS.md this disclosure cannot be
+    switched off.
+  Success: an in-place confirmation ("Thank you! Your application has
+    been submitted successfully"), no redirect into the dashboard, no
+    internal ids echoed back.
+  Disabled form, unknown token, regenerated-away token, or a token
+    whose signature fails: ONE neutral page — "This application link is
+    no longer available." Never a raw 404, never a stack trace, and
+    never a message that distinguishes "disabled" from "never existed"
+    (that difference is information about the organization).
+
+=================================================================
+10. SUBMISSION FLOW — ORDER MATTERS
+=================================================================
+POST /api/apply/[token]/submit, multipart. Server-side, in this order:
+
+  1. Verify the token signature against the row's current
+     token_version. Load the form + fields with createAdminClient(),
+     filtering organization_id explicitly.
+  2. Reject if status != 'published' — with the neutral message.
+  3. Rate-limit check (§11) BEFORE any file work.
+  4. Validate the resume file BEFORE parsing: isAllowedResumeUpload()
+     from lib/resumes/uploadPolicy.ts and a 10 MB cap
+     (MAX_FILE_BYTES in app/api/jobs/[id]/intake/route.ts mirrors the
+     bucket's file_size_limit — use the same number, and reuse
+     RESUME_UPLOAD_REJECTION's wording). Rejections come back as inline
+     field errors, not a generic 500.
+  5. Re-validate EVERY field against its form_fields config. Never
+     trust the client. Required, type shape, dropdown/radio values
+     within options, numeric ranges that match the candidate column
+     CHECKs from §6.
+  6. Insert form_responses with raw_answers, application_id and
+     candidate_id still null. The submission is now durable — this is
+     the same "save the artifact first" ordering as the coding submit
+     route.
+  7. Store the file in the 'resumes' bucket under
+     <organization_id>/... and insert the resumes row, mirroring
+     lib/intake/process.ts. Compute file_hash the same way it does.
+  8. extractResumeText() -> parseResume(). Both are expected to fail
+     sometimes; a failure must NOT fail the submission. The candidate
+     typed their details in; a broken PDF is not their problem and they
+     must not be told to resubmit. Record the failure and continue.
+  9. Duplicate match: normalizeEmail / normalizePhone
+     (lib/candidates/dedupe.ts), then resolveCandidateMatch
+     (lib/intake/match.ts). Do not write a second matcher.
+       matched  -> do NOT create a candidate and do NOT overwrite their
+                   profile. Write the parsed proposal to
+                   resume_parse_results with reviewed_at null so it
+                   surfaces in the existing conflict queue (§1.7).
+                   Typed answers that conflict with the stored profile
+                   go through the SAME review, not straight onto the row.
+       no match -> create the candidate from the TYPED answers, then
+                   fill only the still-empty fields from the parsed
+                   resume. Typed wins over parsed wherever both exist —
+                   the candidate told you that value directly.
+ 10. ensureApplicationForCandidate() from lib/intake/process.ts for the
+     application. It already handles both the "already applied" SELECT
+     and the 23505 unique-violation race on (candidate_id, job_id) —
+     which a public endpoint will hit for real, because people
+     double-tap Submit on a phone. Stage = DEFAULT_APPLICATION_STAGE
+     from lib/applications/stages.ts, never a literal ('new' was
+     renamed to 'applied' by migration 0021 and the literal silently
+     broke intake once already). source = 'application_form' (§1.5).
+ 11. Patch form_responses.application_id / .candidate_id / .resume_id
+     now that they are resolved.
+ 12. logActivity() from lib/activity/log.ts, and logAiCall() for the
+     parse, exactly as intake does.
+ 13. trySendForEvent('application_received', ...) from
+     lib/communications/triggers.ts, and dispatch() from
+     lib/automations/engine.ts. Awaited — a serverless function can be
+     frozen the moment it responds — but wrapped so neither can fail a
+     submission that is already durable.
+ 14. Custom answers (is_standard = false) render as an "Application form
+     responses" card on the Application detail page: label + answer, in
+     display_order, including the standard fields that have no candidate
+     column (§6).
+
+If a step after 6 fails, the response is still recorded and visible to
+recruiters with a clear "needs attention" state. A submission that
+reached the database must never be silently dropped because a downstream
+step broke — the candidate has already been told it worked.
+
+=================================================================
+11. RATE LIMITING AND ABUSE
+=================================================================
+There is nothing to reuse (§1.10), so build it durably: insert a row
+into form_submission_attempts on every attempt, keyed by
+(form_id, ip_hash), and reject when the count within the last hour
+exceeds the cap (default 3). An in-memory counter would reset on every
+cold start and is not a limit.
+
+  - Hash the IP with a server-side salt; never key on the raw value.
+  - Read the client IP from the platform header the way Next 16 exposes
+    it on this deployment (check the runtime docs in
+    node_modules/next/dist/docs/ — do not assume request.ip exists).
+    If no IP can be determined, apply a per-form global cap rather than
+    silently letting it through unlimited.
+  - The limit message must be honest and human: "You've already
+    submitted this application a few times. If something went wrong,
+    contact the recruiter." Not "429".
+  - Sweep old attempt rows (they are only useful for an hour).
+  - Reject oversized or wrong-type files before parsing (§10 step 4) —
+    parsing is the expensive path and must not be reachable by an
+    anonymous caller with a 10 MB junk file.
+
+=================================================================
+12. PERMISSIONS
+=================================================================
+  Owner, Admin, Recruiter — create, edit, publish, disable forms; view
+    submissions.
+  Owner, Admin only — regenerate the public link.
+  Viewer — read-only on form configuration and submissions; cannot
+    publish, disable or regenerate.
+Enforced with requireRole() in the API AND in the RLS policies (§3).
+
+=================================================================
+13. WHAT NOT TO BUILD YET
+=================================================================
+  - No candidate login or authenticated portal. The page stays
+    anonymous and token-authorised.
+  - No conditional/branching field logic. Flat, linear field list.
+  - No form versioning or A/B testing per job.
+  - No new candidate columns for LinkedIn/GitHub/portfolio/current CTC
+    (§6).
+  - Do not touch job_screening_questions (§1.12).
+
+=================================================================
+14. TESTS
+=================================================================
+Unit (vitest, alongside the code):
+  - token: sign/verify round trip; a token signed at token_version 1
+    fails after a bump; a tampered form id fails; no signing key ->
+    null, and publish refuses.
+  - public path allowlist: "/apply" and "/apply/abc" are public;
+    "/applications" and "/applications/xyz" are NOT.
+  - field validation: every field_type, required/optional, options
+    membership, and the numeric ranges that match the candidate column
+    CHECKs (61 years experience, 400 days notice, negative salary).
+  - first+last -> name joining, including a whitespace-only surname.
+  - rate limit window arithmetic, using lib/time.ts (half-open ranges)
+    with an injected clock — not Date.now() in the test.
+  - typed-beats-parsed precedence when merging a new candidate.
+
+Manual, documented in docs/modules/23-forms-public-applications.md:
+  - creating a job auto-creates a draft form with the default fields
+  - publishing yields a working link; the QR code resolves to it
+  - a new email creates exactly ONE candidate and ONE application
+  - the same email again (with some different typed answers) matches the
+    existing candidate, creates no duplicate, and queues the conflicting
+    fields for review
+  - the same candidate submitting to the same job twice creates no
+    second application
+  - double-tapping Submit creates no second application
+  - a disabled form, an unknown token and a regenerated-away token all
+    show the same neutral page
+  - rate limiting blocks the 4th submission within an hour
+  - a corrupt/scanned PDF still produces a candidate and application
+  - an 11 MB file and a .txt file are both rejected inline, before parsing
+  - custom answers appear on the Application detail page in order
+  - the whole page is usable at 360px width
+  - Viewer cannot publish, disable or regenerate — via the UI AND via a
+    direct PostgREST write from the browser console
+
+Regression: candidate creation and listing, job create/edit, the
+existing bulk resume intake flow, application stage transitions,
+interview scheduling, the marketing site (it shares the public path
+allowlist).
+
+=================================================================
+15. COMPLETION REPORT
+=================================================================
+State plainly:
+  - files and migrations created
+  - that duplicate matching, resume text extraction, AI parsing, the
+    conflict-review queue and application creation were REUSED from
+    Modules 4/5/6 and the bulk-intake code — naming the functions — not
+    reimplemented
+  - the token construction, why it is unguessable, and how regeneration
+    revokes old links
+  - the rate-limiting approach and its cap
+  - whether the raw IP is stored, and if so where it is swept
+  - what "Application form" appears as in the retrofit checklist for any
+    module that will later need it
+  - remaining gaps, explicitly: conditional logic, candidate portal, no
+    profile columns for LinkedIn/GitHub/portfolio/current CTC, and
+    anything you deferred
+
+Do not report a step as done if it is not. If something in here turns
+out to be wrong about the codebase, say so in the report rather than
+building around it silently.
+
+
+=================================================================
+APPENDIX A — ORIGINAL BRIEF (superseded, kept as the feature checklist)
+=================================================================
+Everything below is the earlier free-form version of this prompt. It is
+useful for the feature-by-feature wishlist (Features 1-19) and the
+end-to-end flow narrative. Its claims ABOUT THE CODEBASE are superseded
+by sections 0-1 above, and its "first inspect whether X exists"
+instructions are already answered there.
+
 I want to implement a new **Public Job Application and Candidate Form Module** in my existing recruitment platform.
 
 IMPORTANT:
@@ -1086,3 +1726,4 @@ INTERVIEW RESULTS ARE SAVED TO CANDIDATE PROFILE
 First provide the implementation analysis and plan.
 
 Then implement the feature only after understanding the existing architecture.
+

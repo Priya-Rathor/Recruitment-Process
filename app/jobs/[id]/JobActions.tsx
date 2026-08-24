@@ -34,10 +34,13 @@ export function ArchiveJobButton({ jobId, title }: { jobId: string; title: strin
     return (
       <div>
         <FormError message={error} />
+        {/* Danger-light, matching the red border and heading of the section it
+            sits in. It was inheriting Bulma's default button, which this theme
+            paints near-black — the one control on the page whose colour carried
+            no meaning at all. */}
         <button
           type="button"
-          className="button is-small"
-          style={{ color: "var(--color-error)" }}
+          className="button is-small is-danger-soft"
           onClick={() => setConfirming(true)}
         >
           Archive job
@@ -58,8 +61,7 @@ export function ArchiveJobButton({ jobId, title }: { jobId: string; title: strin
       <div className="buttons">
         <button
           type="button"
-          className={`button is-small ${busy ? "is-loading" : ""}`}
-          style={{ background: "var(--color-error)", color: "#fff" }}
+          className={`button is-small is-danger-solid ${busy ? "is-loading" : ""}`}
           onClick={archive}
           disabled={busy}
         >
@@ -67,7 +69,7 @@ export function ArchiveJobButton({ jobId, title }: { jobId: string; title: strin
         </button>
         <button
           type="button"
-          className="button is-small"
+          className="button is-small is-quiet"
           onClick={() => setConfirming(false)}
           disabled={busy}
         >

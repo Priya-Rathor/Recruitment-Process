@@ -53,8 +53,18 @@ export async function POST(request: NextRequest) {
   // Our id, echoed back in metadata. Not the provider's, and not a tenant id.
   const metadata = (payload.metadata ?? {}) as Record<string, unknown>;
   const screeningCallId = metadata.screening_call_id;
+  /*
+    MODULE 24. A test call from the Voice Agent Console carries a DIFFERENT key,
+    so this handler can tell a configuration test from a candidate call without
+    guessing — and a test can never be written into a candidate's screening
+    history by a mislabelled payload.
+  */
+  const testCallId = metadata.voice_agent_test_call_id;
 
-  if (typeof screeningCallId !== "string" || screeningCallId.length === 0) {
+  const hasScreeningId = typeof screeningCallId === "string" && screeningCallId.length > 0;
+  const hasTestId = typeof testCallId === "string" && testCallId.length > 0;
+
+  if (!hasScreeningId && !hasTestId) {
     return NextResponse.json({ error: "Missing call reference." }, { status: 400 });
   }
 
@@ -64,11 +74,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not configured." }, { status: 503 });
   }
 
+  if (hasTestId) {
+    return await recordTestCallOutcome({
+      admin,
+      testCallId: testCallId as string,
+      payload,
+    });
+  }
+
   // Tenancy is resolved from OUR row, never from the payload.
+  // Narrowed by hasScreeningId above — the test-call branch has already returned
+  // for the other shape, so this is a screening call.
+  const resolvedScreeningCallId = screeningCallId as string;
+
   const { data: existing } = await admin
     .from("screening_calls")
     .select("id, organization_id, application_id, status, consent_confirmed")
-    .eq("id", screeningCallId)
+    .eq("id", resolvedScreeningCallId)
     .maybeSingle();
 
   if (!existing) {
@@ -314,4 +336,76 @@ async function isValidSignature(
     console.error(`[bolna webhook] signature check failed: ${formatDbError(error)}`);
     return false;
   }
+}
+
+/**
+ * MODULE 24 — records the outcome of a Voice Agent Console test call.
+ *
+ * Same three rules as the screening branch above, for the same reasons:
+ *
+ *   1. The row is found by the id WE generated and echoed through metadata.
+ *   2. organization_id is read from that row, never from the payload.
+ *   3. Nothing is created — an unknown id gets a 200 so the provider stops
+ *      retrying an event that will never match.
+ *
+ * Deliberately does NOT log an activity event or send a notification. The person
+ * who pressed "Call me" is watching the console when the result lands, and an
+ * audit entry already exists for the act of placing the call — recording its
+ * outcome as a second sensitive event would bury the candidate-facing entries
+ * that matter in the audit log under configuration tests.
+ */
+async function recordTestCallOutcome({
+  admin,
+  testCallId,
+  payload,
+}: {
+  admin: NonNullable<ReturnType<typeof createAdminClient>>;
+  testCallId: string;
+  payload: Record<string, unknown>;
+}) {
+  const { data: existing } = await admin
+    .from("voice_agent_test_calls")
+    .select("id, organization_id, status")
+    .eq("id", testCallId)
+    .maybeSingle();
+
+  if (!existing) {
+    return NextResponse.json({ received: true, matched: false });
+  }
+
+  const call = existing as unknown as { id: string; organization_id: string; status: string };
+
+  // No consent answer is threaded through here: a test call has no candidate to
+  // treat as consenting, and mapProviderStatus's refusal handling would turn the
+  // tester saying "no thanks" into a callback request.
+  const status = mapProviderStatus(payload.status, null);
+
+  const updates: Record<string, unknown> = {
+    status,
+    ended_at: new Date().toISOString(),
+  };
+
+  if (typeof payload.transcript === "string") {
+    // Capped: a transcript preview is what this row exists for, not an archive.
+    updates.transcript = payload.transcript.slice(0, 20_000);
+  }
+  if (typeof payload.duration_seconds === "number" && payload.duration_seconds >= 0) {
+    updates.duration_seconds = Math.floor(payload.duration_seconds);
+  }
+  if (typeof payload.error === "string") {
+    updates.failure_reason = payload.error.slice(0, 500);
+  }
+
+  const { error } = await admin
+    .from("voice_agent_test_calls")
+    .update(updates)
+    .eq("id", call.id)
+    .eq("organization_id", call.organization_id);
+
+  if (error) {
+    console.error(`[bolna webhook] test call update failed: ${formatDbError(error)}`);
+    return NextResponse.json({ error: "Could not record the outcome." }, { status: 500 });
+  }
+
+  return NextResponse.json({ received: true, matched: true });
 }

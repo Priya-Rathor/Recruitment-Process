@@ -24,7 +24,7 @@ describe("isPublicPath", () => {
   // ---------------------------------------------------------------------------
   describe("public routes", () => {
     const auth = ["/login", "/signup", "/forgot-password", "/reset-password", "/invite"];
-    const tokenAuthorised = ["/unsubscribe", "/coding"];
+    const tokenAuthorised = ["/unsubscribe", "/coding", "/apply"];
     const marketing = [
       "/",
       "/how-it-works",
@@ -46,6 +46,7 @@ describe("isPublicPath", () => {
       expect(isPublicPath("/coding/abc123")).toBe(true);
       expect(isPublicPath("/unsubscribe/some-token")).toBe(true);
       expect(isPublicPath("/invite/token-value")).toBe(true);
+      expect(isPublicPath("/apply/eyJhbGciOi.signature")).toBe(true);
     });
   });
 
@@ -106,6 +107,20 @@ describe("isPublicPath", () => {
       // A naive startsWith without the "/" would publish it.
       expect(isPublicPath("/coding-sessions")).toBe(false);
       expect(isPublicPath("/coding-sessions/42")).toBe(false);
+
+      /*
+        THE WORST NEAR MISS IN THE LIST. Module 23 added "/apply", and
+        "/applications" is the internal pipeline — every candidate the
+        organization is considering, with names, salaries and stage history.
+
+        It stays private because "/applications" is not equal to "/apply" and
+        does not start with "/apply/". Shortening the entry to "/app", or
+        dropping the trailing slash from matches(), publishes it. This is the
+        assertion that catches either.
+      */
+      expect(isPublicPath("/applications")).toBe(false);
+      expect(isPublicPath("/applications/8f3a")).toBe(false);
+      expect(isPublicPath("/applyx")).toBe(false);
     });
 
     it("does not free near-miss names of the marketing prefixes", () => {

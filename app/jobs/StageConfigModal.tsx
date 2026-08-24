@@ -301,6 +301,22 @@ export function StageConfigModal({
                   placeholder="e.g. How many years have you worked with Java?"
                 />
 
+                {/*
+                  MODULE 24 changed what an EMPTY list means, so it is said here.
+
+                  It used to mean "this call cannot run". It now means "fall back
+                  to the organization's default questions, if any are set". An
+                  admin leaving this list empty needs to know a call may still
+                  happen — and with questions they did not write on this screen.
+                */}
+                {questions.length === 0 && (
+                  <p className="stage-note">
+                    With no questions here, the call falls back to your organization&apos;s default
+                    screening questions from the Voice Agent Console. If there are none there
+                    either, no call can be placed.
+                  </p>
+                )}
+
                 <div className="columns is-variable is-3 mt-4">
                   <div className="column is-half">
                     <label className="label" htmlFor="stage-attempts">Max call attempts</label>

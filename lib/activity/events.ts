@@ -496,6 +496,50 @@ export const EVENT_CATALOGUE = {
   },
 
   // ---------------------------------------------------------------------------
+  // Module 24 — the Voice Agent Console.
+  //
+  // Sensitive, like everything else under `integration`: these entries change
+  // what an automated caller says to members of the public, and one of them
+  // telephones somebody.
+  // ---------------------------------------------------------------------------
+  "voice_agent.saved": {
+    entity: "integration",
+    sensitive: true,
+    label: "Voice agent settings saved",
+    describe: (m) => {
+      const name = text(m.agent_name, "A voice agent");
+      // Whether the provider actually received it is the part worth reading in
+      // an audit trail six weeks later — "saved" alone would be misleading for a
+      // save that never reached the provider.
+      return m.synced === false
+        ? `${name} was saved locally but not synced to the provider`
+        : `${name} was saved and synced`;
+    },
+  },
+  "voice_agent.created": {
+    entity: "integration",
+    sensitive: true,
+    label: "Voice agent created",
+    describe: (m) => `Created the voice agent ${text(m.agent_name, "(unnamed)")}`,
+  },
+  "voice_agent.deleted": {
+    entity: "integration",
+    sensitive: true,
+    label: "Voice agent deleted",
+    describe: (m) => `Deleted the voice agent ${text(m.agent_name, "(unnamed)")}`,
+  },
+  "voice_agent.test_called": {
+    entity: "integration",
+    sensitive: true,
+    label: "Voice agent test call",
+    describe: (m) =>
+      `Placed a test call to ${text(m.phone_number, "a number")} using ${text(
+        m.agent_name,
+        "a voice agent"
+      )}`,
+  },
+
+  // ---------------------------------------------------------------------------
   // Module 15 — candidate communication.
   //
   // A message to a candidate is filed against the APPLICATION, so it lands on the
@@ -676,6 +720,69 @@ export const EVENT_CATALOGUE = {
       return reason ? `A call recording was deleted — ${reason}` : "A call recording was deleted";
     },
   },
+  // ---------------------------------------------------------------------------
+  // Module 23 — forms and public applications.
+  //
+  // PUBLISHING AND REGENERATING ARE SENSITIVE; editing questions is not.
+  //
+  // Publishing puts a URL on the public internet that anybody who receives it
+  // can submit personal data to. Regenerating breaks every link and QR code
+  // already in circulation, which is the kind of act somebody comes looking for
+  // an explanation of when applications suddenly stop arriving. Both belong in
+  // the Owner/Admin audit log.
+  //
+  // Renaming a question does not: it is ordinary configuration, and burying it
+  // in /audit-log would hide it from the recruiters who actually maintain the
+  // form.
+  // ---------------------------------------------------------------------------
+  "form.created": {
+    entity: "form",
+    label: "Form created",
+    describe: (m) => `Created the form ${text(m.name, "")}`.trim(),
+  },
+  "form.fields_updated": {
+    entity: "form",
+    label: "Form questions changed",
+    describe: (m) => {
+      const count = num(m.field_count);
+      return count === null
+        ? `Changed the questions on ${text(m.name, "a form")}`
+        : `Changed the questions on ${text(m.name, "a form")} (${count} now)`;
+    },
+  },
+  "form.published": {
+    entity: "form",
+    sensitive: true,
+    label: "Form published",
+    describe: (m) =>
+      `Published ${text(m.name, "a form")} — its public application link is now live`,
+  },
+  "form.disabled": {
+    entity: "form",
+    sensitive: true,
+    label: "Form disabled",
+    describe: (m) => `Disabled ${text(m.name, "a form")}; its link no longer accepts applications`,
+  },
+  "form.link_regenerated": {
+    entity: "form",
+    sensitive: true,
+    label: "Form link regenerated",
+    describe: (m) =>
+      `Regenerated the public link for ${text(m.name, "a form")} — every previously shared link and QR code stopped working`,
+  },
+  "form.deleted": {
+    entity: "form",
+    sensitive: true,
+    label: "Form deleted",
+    describe: (m) => {
+      const responses = num(m.response_count);
+      const name = text(m.name, "a form");
+      return responses && responses > 0
+        ? `Deleted ${name}, along with ${responses} submitted ${responses === 1 ? "response" : "responses"}`
+        : `Deleted ${name}`;
+    },
+  },
+
   "privacy.transcript_viewed": {
     entity: "screening_call",
     sensitive: true,

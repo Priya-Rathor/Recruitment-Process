@@ -35,7 +35,8 @@ import { DEFAULT_APPLICATION_STAGE } from "@/lib/applications/stages";
 import { logActivity, logAiCall } from "@/lib/activity/log";
 import { dispatch } from "@/lib/automations/engine";
 import { trySendForEvent } from "@/lib/communications/triggers";
-import type { Candidate } from "@/lib/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Candidate, CandidateSource } from "@/lib/types";
 import { formatDbError } from "@/lib/supabase/errors";
 
 export type ProcessOutcome = {
@@ -585,6 +586,18 @@ async function parkFile({
  * concurrently, both seeing no application and both inserting. The unique
  * (candidate_id, job_id) index is what actually makes the guarantee — this code
  * only decides how to report it.
+ *
+ * SHARED WITH MODULE 23's PUBLIC APPLICATION FORM, which is why the client, the
+ * source and the actor are parameters rather than constants.
+ *
+ * That path has no session (the applicant is not a user of this product) and no
+ * actor, so it passes the service-role client and a null actorId. Everything
+ * else — the double guard, the stage, the activity log, the acknowledgement
+ * message, the automation dispatch — is deliberately the same code: two ways to
+ * create an application would be two places for "did the candidate get told?"
+ * to diverge, and the public form is precisely the path where somebody is
+ * waiting for that reply. The double-tap on a phone is also the most likely
+ * source of the 23505 race this function was written for.
  */
 export async function ensureApplicationForCandidate({
   organizationId,
@@ -593,15 +606,28 @@ export async function ensureApplicationForCandidate({
   jobId,
   actorId,
   webhookUrl,
+  client,
+  source = "resume_upload",
+  via = "bulk_intake",
 }: {
   organizationId: string;
   organizationName: string;
   candidateId: string;
   jobId: string;
-  actorId: string;
+  /** Null when nobody was there — a public application form submission. */
+  actorId: string | null;
   webhookUrl: string;
+  /**
+   * Service-role client, for a caller with no session. It BYPASSES RLS, so
+   * organizationId must already have been resolved from our own data.
+   */
+  client?: SupabaseClient;
+  /** public.candidate_source. Not free text — the column is an enum. */
+  source?: CandidateSource;
+  /** Which flow created this, for the activity log's metadata. */
+  via?: string;
 }): Promise<{ applicationId: string | null; alreadyExisted: boolean }> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
 
   const { data: existing } = await supabase
     .from("applications")
@@ -625,7 +651,10 @@ export async function ensureApplicationForCandidate({
       // 'applied'; this insert kept the old spelling and every intake
       // application was rejected by the database from that migration onward.
       stage: DEFAULT_APPLICATION_STAGE,
-      source: "resume_upload",
+      source,
+      // Null for a public submission: an unassigned application shows as
+      // "Unassigned" and gets picked up, whereas assigning it to nobody-in-
+      // particular would hide it in somebody's queue.
       assigned_recruiter_id: actorId,
     })
     .select("id")
@@ -658,7 +687,9 @@ export async function ensureApplicationForCandidate({
     entityId: applicationId,
     eventType: "application.created",
     actorId,
-    metadata: { stage: DEFAULT_APPLICATION_STAGE, source: "resume_upload", via: "bulk_intake" },
+    // A sessionless caller cannot write the audit row with a session client.
+    useAdminClient: Boolean(client),
+    metadata: { stage: DEFAULT_APPLICATION_STAGE, source, via },
   });
 
   /**
@@ -678,6 +709,7 @@ export async function ensureApplicationForCandidate({
     applicationId,
     eventKey: "application_received",
     origin: originOf(webhookUrl),
+    useAdminClient: Boolean(client),
   });
 
   // Module 13, same as every other application-creation path. Wrapped so a
@@ -690,6 +722,8 @@ export async function ensureApplicationForCandidate({
       trigger: "application_created",
       triggeredBy: actorId,
       webhookUrl,
+      // Sessionless: the engine needs the service-role client too.
+      mode: client ? "service" : undefined,
     });
   } catch (automationError) {
     console.error("[intake] automations after application create failed:", automationError);

@@ -1520,7 +1520,10 @@ a {
   color: var(--color-primary);
 
   &:hover:not(:disabled) {
-    background-color: rgba(79, 70, 229, 0.06);
+    // Was rgba(79, 70, 229, 0.06) — the pre-rebrand indigo, left behind when the
+    // palette moved to the logo blue. It only showed on hover, which is why it
+    // survived: a wrong hue nobody sees at rest. Now the brand tint token.
+    background-color: var(--color-primary-tint);
     border-color: var(--color-primary-hover);
     color: var(--color-primary-hover);
   }
@@ -3817,4 +3820,1519 @@ a {
   tab-size: 4;
 
   &:focus-visible { box-shadow: var(--focus-ring); }
+}
+
+// =============================================================================
+// JOB DETAIL PAGE
+//
+// One 24px rhythm for the whole page, set once on the stack rather than as a
+// margin on each card — cards were carrying `mb-4`, which is 16px in Bulma's
+// scale, not the 24px the design system asks for. A gap on the parent cannot
+// drift the way twelve individual margins can.
+// =============================================================================
+.job-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+// --- Header ------------------------------------------------------------------
+.job-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.job-header__crumbs {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.job-header__title {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+}
+
+.job-header__badges {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.job-header__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+// --- Card furniture ----------------------------------------------------------
+.job-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.job-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-heading);
+  font-size: var(--text-section);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+
+  &.is-danger { color: var(--color-error); }
+  &.is-attention { color: var(--status-attention-text); }
+}
+
+.job-card__subtitle {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin: var(--space-1) 0 0;
+}
+
+// Save row on a card that writes. Divider above it, so it reads as the card's
+// footer rather than as one more item in the list.
+.job-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.job-card__hint {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+// A card whose whole job is one action does not need a full card's height.
+.card.is-snug {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-6);
+  flex-wrap: wrap;
+}
+
+.card.is-danger { border-color: var(--color-error); }
+.card.is-attention { border-color: var(--status-attention-text); }
+
+// --- Structured fields -------------------------------------------------------
+.job-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4) var(--space-6);
+}
+
+.job-fields__label {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.job-fields__value {
+  font-size: 15px;
+  color: var(--color-text);
+}
+
+.job-skills { margin-top: var(--space-4); }
+
+.job-description {
+  font-size: var(--text-body);
+  color: var(--color-text);
+  white-space: pre-wrap;
+  // Prose, not a table: a measure this wide is where a paragraph stops being
+  // readable, and this card holds nothing but the paragraph.
+  max-width: 70ch;
+}
+
+// --- Stat strip (resume scoring) ---------------------------------------------
+.job-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+}
+
+.job-stats__label {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.job-stats__value {
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.job-weights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+// --- Row lists (pipeline, conflicts) -----------------------------------------
+.job-rows { list-style: none; margin: 0; padding: 0; }
+
+.job-rows__row {
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+
+  &:first-child { border-top: 0; padding-top: 0; }
+
+  &.is-split {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+}
+
+.job-rows__name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+
+.job-rows__meta {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.job-rows__links {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+.job-rows__end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+// --- Screening questions -----------------------------------------------------
+// Numbered badge + divider, matching the product's row lists. The `<ol>` is kept
+// so the reading order survives for a screen reader; the marker is replaced, not
+// the semantics.
+.qlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: none;
+}
+
+.qlist__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+
+  &:first-child { border-top: 0; padding-top: 0; }
+}
+
+.qlist__num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background-color: var(--status-disconnected-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+}
+
+.qlist__text {
+  font-size: var(--text-body);
+  color: var(--color-text);
+}
+
+// --- Empty states ------------------------------------------------------------
+.job-empty {
+  font-size: var(--text-body);
+  color: var(--color-text-secondary);
+
+  &.is-warning { color: var(--status-attention-text); }
+
+  &.is-centred {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-8) var(--space-4);
+    text-align: center;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--card-radius);
+  }
+}
+
+.job-empty__text { font-size: var(--text-body); }
+
+// =============================================================================
+// DANGER BUTTONS
+//
+// Bulma derives a default button's colours from HSL channels this theme does not
+// override, so `.button` with no modifier lands near-black — carrying visual
+// weight that means nothing. These two give a destructive action the red it
+// should have had, from the token palette.
+// =============================================================================
+.button.is-danger-soft {
+  background-color: var(--status-error-bg, #fee2e2);
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-error);
+    color: #fff;
+  }
+}
+
+.button.is-danger-solid {
+  background-color: var(--color-error);
+  border: 1px solid var(--color-error);
+  color: #fff;
+
+  &:hover:not(:disabled) { filter: brightness(0.94); }
+}
+
+// The neutral partner to the two above: a cancel that recedes instead of
+// competing with the action it cancels.
+.button.is-quiet {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+
+  &:hover:not(:disabled) {
+    border-color: #cbd5e1;
+    color: var(--color-text);
+  }
+}
+
+// =============================================================================
+// MODULE 23 — FORMS & PUBLIC APPLICATIONS
+//
+// Two surfaces, and only one of them is inside the product.
+//
+// /apply/{token} is the second page in this codebase built for somebody with no
+// account (the first was the candidate's coding round), and the only one built
+// for somebody who has never heard of us. It borrows the tokens so it still
+// looks like the product, and nothing else: no nav, no shell, no chrome.
+//
+// MOBILE FIRST, LITERALLY. This link arrives on WhatsApp and is opened one-handed
+// on a phone, so the base rules ARE the phone layout and the media query is what
+// widens it. Writing it the other way round is how a form ends up with a
+// horizontal scrollbar at 360px.
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// The public application page
+// -----------------------------------------------------------------------------
+.apply-page {
+  min-height: 100vh;
+  // The dashboard's ground rather than white, so the form card reads as the
+  // thing to fill in rather than as the page itself.
+  background-color: var(--color-background);
+  padding: var(--space-3) var(--space-3) var(--space-6);
+}
+
+.apply-page__brand {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0 var(--space-4);
+  opacity: 0.85;
+}
+
+.apply-shell {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.apply-hero {
+  margin-bottom: var(--space-4);
+}
+
+.apply-hero__org {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-1);
+}
+
+.apply-hero__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-page);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+  // A long job title wraps rather than pushing the layout sideways: this page
+  // has no horizontal room to give away.
+  overflow-wrap: anywhere;
+}
+
+.apply-hero__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.apply-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+
+  svg { flex-shrink: 0; }
+}
+
+.apply-hero__intro {
+  margin-top: var(--space-3);
+  font-size: var(--text-body);
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+}
+
+.apply-form__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-section);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-4);
+}
+
+.apply-label {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.apply-label__required {
+  color: var(--color-error);
+  font-weight: var(--weight-semibold);
+}
+
+.apply-error {
+  // Loud enough to find after a failed submit, which is the only time it exists.
+  font-weight: var(--weight-medium);
+}
+
+// Radio and checkbox groups. Each option is a full-width hit area, because the
+// finger tapping it is on a phone and a bare 13px radio dot is not a target.
+.apply-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.apply-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: var(--text-body);
+  cursor: pointer;
+
+  &:hover { border-color: var(--color-primary); }
+
+  input { margin: 0; flex-shrink: 0; }
+}
+
+// The file picker. The native input is hidden and its label styled as a button —
+// the standard trick, and the only way to get a control that matches the rest of
+// the form. `is-quiet` keeps it from competing with Submit.
+.apply-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.apply-file__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Focus has to be visible on the LABEL, since the input it belongs to is
+// off-screen — without this, tabbing to the file picker looks like nothing.
+.apply-file__input:focus-visible + .apply-file__button {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.apply-file__name {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.apply-privacy {
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-background);
+}
+
+.apply-privacy__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 6px;
+}
+
+.apply-privacy__text {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.apply-submit {
+  // Full width on a phone: it is the only action on the page, and a
+  // right-aligned button is a worse target one-handed.
+  width: 100%;
+  justify-content: center;
+}
+
+.apply-spin {
+  animation: apply-spin 1s linear infinite;
+}
+
+@keyframes apply-spin {
+  to { transform: rotate(360deg); }
+}
+
+.apply-form__foot {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.apply-done {
+  text-align: center;
+}
+
+.apply-done__icon {
+  color: var(--color-success, #16a34a);
+  margin: 0 0 var(--space-2);
+}
+
+.apply-done__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-section);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-2);
+}
+
+.apply-done__text {
+  font-size: var(--text-body);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  .apply-page { padding: var(--space-4) var(--space-4) var(--space-6); }
+
+  .apply-submit { width: auto; min-width: 220px; }
+}
+
+// -----------------------------------------------------------------------------
+// The recruiter's side: the link on the job page
+// -----------------------------------------------------------------------------
+.apply-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-background);
+  margin-bottom: var(--space-3);
+}
+
+.apply-link__url {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-caption);
+  color: var(--color-text);
+  // A signed token is long. It wraps instead of scrolling the card sideways,
+  // and stays selectable so a browser that blocks the clipboard API is not a
+  // dead end.
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.apply-link__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.apply-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+
+  img { background: #fff; padding: 8px; border-radius: 6px; }
+}
+
+.apply-qr__hint {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: 0;
+  text-align: center;
+}
+
+// -----------------------------------------------------------------------------
+// The answers, on the application detail page
+// -----------------------------------------------------------------------------
+.apply-answers {
+  margin: 0;
+}
+
+.apply-answers__row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-child { border-bottom: 0; padding-bottom: 0; }
+}
+
+.apply-answers__q {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.apply-answers__a {
+  font-size: var(--text-body);
+  color: var(--color-text);
+  // A paragraph answer keeps the line breaks the candidate typed.
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.apply-flag {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: 8px;
+  font-size: var(--text-label);
+  margin-bottom: var(--space-3);
+
+  p { margin: 0; }
+  svg { flex-shrink: 0; margin-top: 2px; }
+
+  &.is-warning {
+    background-color: var(--status-attention-bg);
+    color: var(--status-attention-text);
+  }
+
+  &.is-error {
+    background-color: var(--status-error-bg, #fee2e2);
+    color: var(--color-error);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// The question editor
+// -----------------------------------------------------------------------------
+.form-editor {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+
+.form-editor__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-child { border-bottom: 0; }
+}
+
+.form-editor__handle {
+  color: var(--color-text-secondary);
+  padding-top: 10px;
+  // Decoration, not a control: reordering is the two arrow buttons, which work
+  // with a keyboard and on a touchscreen. A drag handle that only responds to a
+  // mouse would be a worse promise than no handle at all.
+  opacity: 0.5;
+}
+
+.form-editor__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.form-editor__line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+
+  .input { flex: 1 1 220px; min-width: 0; }
+}
+
+.form-editor__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.form-editor__required {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-editor__locked,
+.form-editor__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.form-editor__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-editor__saved {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+@media (min-width: 768px) {
+  .form-editor__actions { flex-direction: row; }
+}
+
+// =============================================================================
+// MODULE 24 — Voice Agent Console (/settings/integrations/bolna)
+//
+// Tokens only, and the SAME tokens as the rest of the product. The reference
+// spec for a page like this asks for a near-black console with a phosphor-green
+// accent; this is one settings page inside an existing product, so it uses
+// --color-primary, --color-card, --color-border and the shared card geometry
+// (12px radius, 1px border, no shadow) like every other page. No new palette, no
+// new radius, no monospace labels.
+//
+// Prefix `vac-` so nothing here can collide with the `stage-` and `list-editor`
+// classes this page also uses — it deliberately reuses those components rather
+// than restyling them.
+// =============================================================================
+.vac {
+  // Leaves room for the sticky save bar, so the last section is never trapped
+  // underneath it.
+  padding-bottom: 96px;
+}
+
+// --- Agent switcher ----------------------------------------------------------
+.vac-switcher {
+  margin-bottom: var(--space-4);
+}
+
+.vac-switcher__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+
+  .label { margin-bottom: 0; }
+}
+
+.vac-confirm {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--control-radius);
+  background: var(--status-attention-bg);
+
+  p {
+    font-size: var(--text-body);
+    margin-bottom: var(--space-3);
+  }
+
+  .buttons { margin-bottom: 0; }
+}
+
+// --- Anchor nav --------------------------------------------------------------
+//
+// Scrolls horizontally on a narrow screen rather than wrapping into three rows
+// that push the first section below the fold.
+.vac-anchors {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding: var(--space-1) 0 var(--space-3);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  scrollbar-width: thin;
+}
+
+.vac-anchors__link {
+  position: relative;
+  flex: 0 0 auto;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 4px 10px 8px;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast) var(--ease);
+
+  &:hover {
+    color: var(--color-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /*
+    Active: primary text plus a 2px underline, no background pill — the SAME
+    treatment .topnav__link.is-active uses, so in-page navigation and app
+    navigation signal "you are here" identically.
+
+    The underline is drawn at the row's own bottom border, which is why the
+    padding above is asymmetric: the 8px at the bottom is the gap between label
+    and rule.
+  */
+  &.is-active {
+    color: var(--color-primary);
+    font-weight: var(--weight-semibold);
+
+    &::after {
+      content: "";
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: -1px;
+      height: 2px;
+      background-color: var(--color-primary);
+      border-radius: 2px 2px 0 0;
+    }
+  }
+}
+
+// --- Banners ----------------------------------------------------------------
+.vac-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  border-color: var(--color-warning);
+  // The amber tint the page already used for this banner, kept as-is — it is the
+  // right treatment; only the message inside it was doubled up.
+  background-color: var(--status-attention-bg);
+  margin-bottom: var(--space-4);
+
+  svg { color: var(--status-attention-text); flex-shrink: 0; margin-top: 2px; }
+  p { font-size: var(--text-body); margin: 0; }
+}
+
+// One column so the inline action sits under the sentence it answers, aligned
+// with it rather than with the icon.
+.vac-banner__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+// --- Sections ---------------------------------------------------------------
+.vac-section {
+  margin-bottom: var(--space-4);
+}
+
+.vac-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.vac-section__title {
+  font-size: var(--text-section);
+  font-weight: var(--weight-semibold);
+  margin: 0;
+  min-width: 0;
+}
+
+.vac-section__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
+
+.vac-section__chevron {
+  color: var(--color-text-secondary);
+  transition: transform 150ms ease;
+  transform: rotate(-90deg);
+
+  &.is-open { transform: rotate(0deg); }
+}
+
+.vac-section__description {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  // Aligned with the title text rather than the chevron, so the two read as one
+  // block instead of a heading with a stray indent.
+  margin: var(--space-1) 0 0 24px;
+}
+
+.vac-section__body {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+// --- Layout helpers ---------------------------------------------------------
+.vac-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+@media (min-width: 720px) {
+  .vac-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.vac-field {
+  min-width: 0;
+
+  .label { margin-bottom: var(--space-1); }
+}
+
+.vac-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--control-radius);
+  background: var(--color-primary-tint);
+
+  svg { color: var(--color-primary); flex-shrink: 0; margin-top: 2px; }
+
+  p {
+    font-size: var(--text-label);
+    color: var(--color-text);
+    margin: 0;
+  }
+}
+
+// --- Toggle rows ------------------------------------------------------------
+.vac-toggle-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-of-type { border-bottom: 0; }
+}
+
+.vac-toggle-row__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.vac-toggle-row__text { min-width: 0; }
+
+.vac-toggle-row__label {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+
+.vac-toggle-row__hint {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: 2px 0 0;
+}
+
+.vac-toggle-row__body {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--color-border);
+  background: var(--color-background);
+  border-radius: 0 var(--control-radius) var(--control-radius) 0;
+}
+
+// --- Slider -----------------------------------------------------------------
+.vac-slider { min-width: 0; }
+
+.vac-slider__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+
+  .label { margin-bottom: 0; }
+}
+
+.vac-slider__value {
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+  // Tabular so the readout does not jitter horizontally as the digits change.
+  font-variant-numeric: tabular-nums;
+}
+
+.vac-slider__input {
+  width: 100%;
+  margin-top: var(--space-2);
+  accent-color: var(--color-primary);
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 4px;
+  }
+}
+
+// --- Number with a unit -----------------------------------------------------
+.vac-number { min-width: 0; }
+
+.vac-number__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  .input { max-width: 120px; }
+}
+
+.vac-number__unit {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+// --- Default call data ------------------------------------------------------
+.vac-calldata { margin-bottom: var(--space-6); }
+
+.vac-calldata__entry { margin-bottom: var(--space-2); }
+
+.vac-calldata__editor {
+  margin: var(--space-2) 0 var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  background: var(--color-background);
+}
+
+.vac-calldata__add {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+
+  .input { flex: 1 1 auto; }
+}
+
+.vac-calldata__questions {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  margin-bottom: var(--space-6);
+}
+
+.vac-suggestions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.vac-suggestions__label {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.vac-suggestions__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  appearance: none;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: var(--text-caption);
+  color: var(--color-text);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+// --- Precedence preview -----------------------------------------------------
+.vac-preview {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.vac-preview__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+// A wide table must scroll INSIDE its own container. Letting the page scroll
+// sideways would move the sticky save bar off-screen.
+.vac-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vac-preview__table {
+  font-size: var(--text-label);
+  min-width: 720px;
+
+  td { vertical-align: top; }
+}
+
+.vac-preview__field {
+  display: block;
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.vac-preview__note {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  max-width: 260px;
+}
+
+// The losing side of a precedence pair is dimmed, so the eye lands on the value
+// that actually applies. Still fully readable — this is de-emphasis, not disabling.
+.vac-preview__muted { color: var(--color-text-secondary); }
+
+.vac-preview__unset {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.vac-preview__effective {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+// --- Test agent -------------------------------------------------------------
+.vac-test {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  max-width: 480px;
+
+  .vac-field { width: 100%; }
+}
+
+.vac-test__confirm {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--control-radius);
+  background: var(--status-attention-bg);
+
+  p { font-size: var(--text-body); margin-bottom: var(--space-3); }
+  .buttons { margin-bottom: 0; }
+}
+
+.vac-result {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.vac-result__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+// --- Danger zone ------------------------------------------------------------
+.vac-danger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-color: var(--color-error);
+  flex-wrap: wrap;
+
+  .buttons { margin-bottom: 0; }
+}
+
+// --- Sticky save bar --------------------------------------------------------
+//
+// Fixed to the bottom of the viewport, so Save is reachable from any section of a
+// page this long without scrolling back to the top.
+.vac-savebar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  background: var(--color-card);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+  // Keeps the bar clear of an iOS home indicator.
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+}
+
+.vac-savebar__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.vac-savebar__status {
+  min-width: 0;
+  font-size: var(--text-label);
+}
+
+.vac-savebar__dot,
+.vac-savebar__saved,
+.vac-savebar__warn,
+.vac-savebar__error {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.vac-savebar__dot { color: var(--color-text-secondary); }
+
+// The unsaved indicator carries a WORD as well as the dot. A coloured dot alone
+// is invisible to a colour-blind reader and meaningless to a screen reader.
+.vac-savebar__dot-mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-warning);
+  flex-shrink: 0;
+}
+
+.vac-savebar__saved { color: var(--color-success); }
+.vac-savebar__warn { color: var(--status-attention-text); }
+.vac-savebar__error { color: var(--color-error); }
+
+@media (max-width: 720px) {
+  .vac-savebar__inner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .vac { padding-bottom: 140px; }
+}
+
+// =============================================================================
+// MODULE 17 — INTEGRATIONS PAGE
+//
+// A visual/consistency pass. No connection logic, OAuth flow or adapter changed.
+//
+// THE BUG THIS SECTION EXISTS TO FIX
+// ----------------------------------
+// Three "Connect" buttons rendered at three different visual weights for what is
+// one state. Two were solid primary; Google Calendar's was the SAME solid primary
+// at `opacity: 0.55`, because it was genuinely `disabled` (no OAuth app on this
+// deployment) and the only disabled treatment in the stylesheet is a global
+// opacity knock-down.
+//
+// A washed-out blue is not a disabled control — it reads as a second kind of
+// button. So "cannot be connected right now" gets its own state below rather than
+// a paler version of "connect me".
+//
+// WHY A NEW CLASS AND NOT A CHANGE TO `.button.is-primary:disabled`
+// ----------------------------------------------------------------
+// Changing the shared disabled rule would repaint every disabled primary button
+// in the product — a much wider change than this pass was asked for, on pages
+// nobody has looked at. `is-unavailable` is opt-in, so the blast radius is the
+// cards this pass covers. It is written generally enough to adopt elsewhere
+// deliberately, one page at a time.
+// =============================================================================
+
+// State 3 of 3: blocked. Grey, not blue-at-half-strength; not-allowed cursor; no
+// hover response at all, because a control that answers the mouse looks alive.
+.button.is-unavailable,
+.button.is-unavailable[disabled] {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+
+  // `transform: none` matters: without it the shared `.button:active` scale still
+  // fires on a disabled button in some browsers, so a dead control twitches.
+  &:hover,
+  &:focus,
+  &:active {
+    background-color: var(--color-background);
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+    transform: none;
+  }
+}
+
+// --- The status legend ------------------------------------------------------
+//
+// A key for the chips below. Worth the two lines of vertical space at four
+// integrations and clearly worth it at ten.
+.integrations-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.integrations-legend__label {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+// --- Category groups --------------------------------------------------------
+//
+// 32px between groups, 16px between cards inside one — the gap does the grouping,
+// the label only names it. Equal gaps everywhere would leave the labels floating
+// with nothing to attach to.
+.integration-group {
+  margin-bottom: var(--space-8);
+
+  &:last-of-type { margin-bottom: var(--space-4); }
+}
+
+.integration-group__label {
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3);
+}
+
+// --- The card ---------------------------------------------------------------
+.integration-card {
+  // Restated rather than inherited, so this padding is 24px (16px mobile)
+  // whatever the content length — the `.card` token, said out loud because the
+  // brief asks for it explicitly.
+  padding: var(--card-padding);
+  margin-bottom: var(--space-4);
+
+  &:last-child { margin-bottom: 0; }
+}
+
+.integration-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.integration-card__title {
+  font-size: var(--text-body-lg);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 2px;
+}
+
+.integration-card__description {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+// Every meta line — credential hint, "Max 3 attempts", last-worked, the OAuth
+// warning — lives in ONE block with one gap, so a card with four of them and a
+// card with none put their action row in the same place relative to the text
+// above it.
+.integration-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+
+  p { margin: 0; }
+  code { font-size: var(--text-caption); }
+}
+
+.integration-card__note--error { color: var(--color-error); }
+.integration-card__note--warn { color: var(--status-attention-text); }
+
+// The action row's offset is measured from the CONTENT ABOVE IT, not from the
+// bottom of a fixed-height card. Cards therefore differ in height — which is
+// honest, they hold different amounts — while every button row sits the same
+// distance below its own text, so nothing looks accidentally misaligned.
+.integration-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+// The expanding panels (credential entry, disconnect confirmation) sit below the
+// same rule, so opening one does not shift the buttons.
+.integration-card__panel {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.integration-card__panel--warning {
+  border: 1px solid var(--color-warning);
+  border-radius: var(--control-radius);
+  padding: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.integration-card__footnote {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-2);
+}
+
+// --- Settings left nav ------------------------------------------------------
+//
+// Moved out of inline styles when the icons went in: an icon column needs a grid,
+// and the active state now has to recolour three things at once (icon, label,
+// description), which is three conditional inline styles or one class.
+.settings-nav__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: var(--space-3);
+  padding: 8px 10px;
+  border-radius: var(--control-radius);
+  color: var(--color-text);
+  text-decoration: none;
+  margin-bottom: 2px;
+
+  svg {
+    color: var(--color-text-secondary);
+    // The icon's optical centre sits slightly above the label's baseline row.
+    margin-top: 1px;
+    flex-shrink: 0;
+  }
+
+  &:hover:not(.is-active) {
+    background-color: var(--color-primary-tint);
+
+    svg { color: var(--color-primary); }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+}
+
+.settings-nav__text { min-width: 0; }
+
+.settings-nav__label {
+  display: block;
+  font-size: var(--text-body);
+}
+
+.settings-nav__description {
+  display: block;
+  font-size: var(--text-caption);
+  // Was var(--color-secondary-text) — a token that does not exist, so the
+  // description inherited the label's near-black and the two lines carried the
+  // same weight. The real token is --color-text-secondary.
+  color: var(--color-text-secondary);
+}
+
+.settings-nav__item.is-active {
+  background-color: var(--color-primary);
+  color: #fff;
+
+  svg { color: #fff; }
+
+  .settings-nav__label { font-weight: var(--weight-semibold); }
+  .settings-nav__description { color: rgba(255, 255, 255, 0.82); }
 }

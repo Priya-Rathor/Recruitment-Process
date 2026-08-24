@@ -123,7 +123,23 @@ function StatusIcon({ status }: { status: IntakeStatus }) {
   return <CheckCircle2 size={14} aria-hidden="true" />;
 }
 
-export function IntakeModal({ jobId, jobTitle }: { jobId: string; jobTitle: string }) {
+export function IntakeModal({
+  jobId,
+  jobTitle,
+  variant = "outline",
+}: {
+  jobId: string;
+  jobTitle: string;
+  /**
+   * Same component, same words, two weights.
+   *
+   * "primary" is for the empty pipeline, where this is the only thing to do on
+   * the card; "outline" is the header, where Edit job carries the primary
+   * weight. Rendering the SAME component in both places is the point — the page
+   * previously had two differently-named buttons opening different flows.
+   */
+  variant?: "outline" | "primary";
+}) {
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
@@ -337,7 +353,7 @@ export function IntakeModal({ jobId, jobTitle }: { jobId: string; jobTitle: stri
     <>
       <button
         type="button"
-        className="button is-outlined-primary"
+        className={`button ${variant === "primary" ? "is-primary" : "is-outlined-primary"}`}
         onClick={() => setOpen(true)}
       >
         <Upload size={16} aria-hidden="true" />

@@ -5,6 +5,7 @@ import { requireMembership, requireRole } from "@/lib/tenant";
 import { isJobStatus, type Job } from "@/lib/types";
 import { parseJobPayload } from "@/lib/jobs/validation";
 import { logActivity } from "@/lib/activity/log";
+import { ensureJobApplicationForm } from "@/lib/forms/write";
 import { formatDbError } from "@/lib/supabase/errors";
 
 /**
@@ -151,6 +152,28 @@ export async function POST(request: NextRequest) {
       body,
     });
     if (questionError) return jsonError(questionError, 400);
+
+    /*
+      MODULE 23 — the job's application form, as a DRAFT.
+
+      Created here so that "share this role" is one click away from the moment a
+      job exists, rather than a setup step somebody has to know about. It arrives
+      as a draft, never published: publishing puts a URL on the public internet,
+      and that is a decision a person makes.
+
+      DELIBERATELY NOT AWAITED FOR ITS RESULT, and deliberately unable to fail
+      this request. A job whose form did not get created is recoverable — the
+      card on the job page offers to create one, via
+      POST /api/jobs/:id/application-form — whereas failing the job creation
+      would lose a requisition the recruiter just typed out.
+    */
+    await ensureJobApplicationForm({
+      organizationId: membership.organization.id,
+      jobId: job.id,
+      jobTitle: job.title,
+      actorId: membership.user_id,
+      client: supabase,
+    });
 
     // Module 14.
     await logActivity({

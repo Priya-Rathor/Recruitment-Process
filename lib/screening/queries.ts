@@ -11,6 +11,11 @@ import {
   type RetryPolicy,
 } from "@/lib/screening/retry";
 import { getStatus, placeCall } from "@/lib/integrations/bolna";
+// MODULE 24 — the Voice Agent Console's organization-wide fallbacks. Precedence
+// is resolved by the same pure function the console's preview renders, so what an
+// admin was shown is what gets dialled.
+import { loadJobScreeningOverrides, loadOrgCallDataContext } from "@/lib/voice/queries";
+import { resolveEffectiveCallData, resolveEffectiveQuestions } from "@/lib/voice/callData";
 import { formatDbError } from "@/lib/supabase/errors";
 
 export type ScreeningCall = {
@@ -200,14 +205,37 @@ export async function startScreeningCall({
     .eq("job_id", row.job.id)
     .order("display_order", { ascending: true });
 
-  const questions = ((questionRows ?? []) as { question: string }[]).map((q) => q.question);
+  const jobQuestions = ((questionRows ?? []) as { question: string }[]).map((q) => q.question);
+
+  /*
+    MODULE 24 — the organization's fallback question list.
+
+    The job's own list ALWAYS wins; the org fallback is reached only by a job that
+    has AI screening switched on and has not configured its questions yet. That is
+    the precedence rule the Voice Agent Console states in words and
+    lib/voice/callData.ts implements once, for both the preview and this call.
+
+    Loaded before the emptiness check, because "this job has no questions" is only
+    true if the organization has no fallback either — refusing a call the org
+    explicitly configured a fallback for would make that setting a decoration.
+  */
+  const [orgContext, jobOverrides] = await Promise.all([
+    loadOrgCallDataContext({ organizationId, companyName: organizationName }),
+    loadJobScreeningOverrides({ organizationId, jobId: row.job.id }),
+  ]);
+
+  const resolved = resolveEffectiveQuestions({
+    jobQuestions,
+    fallbackQuestions: orgContext.callData.fallbackQuestions,
+  });
+  const questions = resolved.questions;
 
   if (questions.length === 0) {
     return {
       ok: false,
       code: "no_questions",
       error:
-        "This job has no screening questions configured, so there is nothing to ask. Add some on the job first.",
+        "This job has no screening questions configured, and there are no organization defaults to fall back on. Add questions on the job, or set defaults in the voice agent console.",
     };
   }
 
@@ -299,12 +327,24 @@ export async function startScreeningCall({
     instructions,
   });
 
+  /*
+    The flat key/value context the agent is given — company name, sign-off name,
+    and anything else the organization configured — with the job's own settings
+    already taking priority. Omitted entirely when the job could not be read, so a
+    failure to load overrides can never silently apply an org default in place of
+    a job's own value.
+  */
+  const callContext = jobOverrides
+    ? resolveEffectiveCallData({ org: orgContext, job: jobOverrides })
+    : undefined;
+
   const result = await placeCall({
     organizationId,
     screeningCallId: callId,
     phoneNumber: row.candidate.phone,
     script,
     webhookUrl,
+    callContext,
   });
 
   if (!result.ok) {

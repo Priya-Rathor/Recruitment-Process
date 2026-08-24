@@ -14,7 +14,19 @@
 import type { ButtonHTMLAttributes, ComponentType, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-type Variant = "primary" | "secondary" | "danger" | "ghost";
+/**
+ * "outline" was added for the Voice Agent Console's secondary actions.
+ *
+ * It maps to `.button.is-outlined-primary`, which the stylesheet already had:
+ * white fill, primary border, primary text. Added as a NEW variant rather than
+ * by changing what "secondary" renders — "secondary" is the default, so
+ * redefining it would repaint every unstyled Button in the product at once.
+ *
+ * Worth knowing when choosing between them: "secondary" renders Bulma's
+ * unmodified `.button`, which this theme paints near-black. For a real secondary
+ * action beside a primary one, "outline" is almost always what is wanted.
+ */
+type Variant = "primary" | "secondary" | "outline" | "danger" | "ghost";
 
 export function Button({
   children,
@@ -39,11 +51,13 @@ export function Button({
   const variantClass =
     variant === "primary"
       ? "is-primary"
-      : variant === "danger"
-        ? "is-danger"
-        : variant === "ghost"
-          ? "is-ghost"
-          : "";
+      : variant === "outline"
+        ? "is-outlined-primary"
+        : variant === "danger"
+          ? "is-danger"
+          : variant === "ghost"
+            ? "is-ghost"
+            : "";
 
   const iconSize = size === "small" ? 14 : 16;
 

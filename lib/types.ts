@@ -130,6 +130,15 @@ export type JobQuestion = {
 
 export const CANDIDATE_SOURCES = [
   "career_page",
+  /**
+   * Module 23's public application form.
+   *
+   * Distinct from career_page on purpose: a career page is a jobs board somebody
+   * browsed, this is a link a recruiter shared with a specific audience. Folding
+   * them together would make "where do our candidates come from?" unanswerable
+   * for the one channel a recruiter directly controls.
+   */
+  "application_form",
   "resume_upload",
   "email",
   "referral",
@@ -145,6 +154,7 @@ export function isCandidateSource(value: unknown): value is CandidateSource {
 
 export const CANDIDATE_SOURCE_LABELS: Record<CandidateSource, string> = {
   career_page: "Career page",
+  application_form: "Application form",
   resume_upload: "Resume upload",
   email: "Email",
   referral: "Referral",

@@ -1,0 +1,173 @@
+Build a single-page Voice Agent Console as a new page inside my existing
+Settings & Integrations module (Module 17): /settings/integrations/bolna.
+Read the existing Module 17 Bolna integration card, the lib/integrations/
+bolna/ adapter, and the Job Hiring Stages AI Screening Call config screen
+(Module 3) before writing any code — this REPLACES the current minimal
+Bolna config card (default agent, caller number, language, Test
+Connection) with the fuller console below, and must connect to the
+per-job screening config that already exists rather than duplicating it.
+
+=================================================================
+IMPORTANT DEVIATION FROM A GENERIC VOICE-CONSOLE TEMPLATE
+=================================================================
+If you're working from a generic reference spec for this kind of page,
+ignore any instruction in it to use a dark near-black background with a
+phosphor-green accent, monospace labels, or a "console" aesthetic. This
+page must use the EXACT same design tokens as the rest of this product:
+Primary #4F46E5, Background #F8FAFC, Card #FFFFFF, Border #E2E8F0, Text
+#0F172A, Secondary #64748B, Success #16A34A, Warning #F59E0B, Error
+#DC2626, Info #2563EB — same card style (12px radius, 1px border, no
+drop shadow), same typography scale, same toggle-switch and status-chip
+components already built elsewhere in this app. This is one settings
+page inside an existing product, not a standalone branded console.
+
+=================================================================
+1. PAGE STRUCTURE — SINGLE CONTINUOUSLY SCROLLABLE PAGE
+=================================================================
+No sidebar, no tabs, no click-through sub-pages. Everything below lives
+on one page, in stacked cards, in this order:
+
+0. Agent switcher (top of page) — if the organization has more than one
+   configured voice agent (e.g. different agents per language, per job
+   category), a dropdown here loads that agent's values into the same
+   form below. A "+ New agent" option creates a fresh agent with
+   defaults. If there's only one agent, hide the switcher and show the
+   agent's name as a plain heading instead.
+1. General — agent name, agent type/purpose (e.g. "Screening,"
+   "Confirmation"), company name (prefill from organization_settings),
+   default caller number.
+2. Greeting — welcome message, closing message. Both support the same
+   {{field}} placeholder-insertion component already built for the Job
+   Hiring Stages prompt editors (job/candidate field picker) — reuse
+   that component exactly, don't rebuild it.
+3. AI Brain — persona, tone, base system prompt, guardrails (an
+   editable list — reuse the same repeatable-list UI pattern already
+   used for screening/assessment questions elsewhere), model choice
+   (dropdown, values come from the backend adapter's supported list, not
+   hardcoded provider model names in the frontend), response length
+   (short/medium/long or a slider), temperature (slider with numeric
+   readout).
+4. Voice — TTS voice selection (dropdown populated from the backend
+   adapter, showing voice names/language only — never a provider-
+   specific internal ID exposed as the visible label).
+5. Speech Recognition — STT model/language selection (same
+   backend-populated dropdown pattern).
+6. Conversation Behavior — allow-interruption toggle + a sensitivity
+   slider, backchanneling toggle, background ambience toggle + track
+   picker, max silence before hangup (seconds, number input), max call
+   duration (minutes, number input), AI-decided hangup toggle,
+   voicemail detection toggle, reject-unknown-callers toggle. Use the
+   existing toggle-switch component (the same pill-style on/off switch
+   already built for the Job Hiring Stages feature) for every boolean
+   here — do not introduce a different toggle style.
+7. Default Call Data — NEW SECTION (see section 4 below for full spec).
+8. Human Handoff — enable-transfer toggle, transfer number.
+9. Test Agent — phone number input, "Call me" button, call result
+   readout (status: ringing/connected/failed, plus a short transcript
+   preview once the test call completes — reuse the existing call-
+   status polling/display pattern from Module 8's screening call
+   tracking if one exists, rather than building a second one).
+
+Optional slim anchor-nav row directly under the page heading (e.g.
+"General · Greeting · Brain · Voice · Speech · Behavior · Call Data ·
+Handoff · Test") that smooth-scrolls to each section — implement this,
+it's a nice-to-have that fits the single-page requirement.
+
+Sections may be collapsible/accordion-style to reduce visual noise, but
+multiple sections must be independently expandable at once (not a
+strict one-open-at-a-time accordion) and nothing may require leaving
+this page.
+
+=================================================================
+2. SAVE BEHAVIOR
+=================================================================
+- Every field updates local component state immediately on change — no
+  per-field "edit mode."
+- One sticky "Save agent" button, visible while scrolling (fixed to
+  top or bottom of the viewport), using the standard primary button
+  style (#4F46E5). Clicking it persists the ENTIRE form as one request
+  — no per-section save buttons anywhere on this page.
+- Show an "unsaved changes" indicator (small dot or label near the Save
+  button) when local state differs from the last-saved values, and warn
+  before navigating away with unsaved changes.
+- On save success, a toast: "Agent settings saved." On failure, keep the
+  form populated with the user's edits (never clear the form on error)
+  and show a clear inline error near the Save button.
+
+=================================================================
+3. ARCHITECTURE — REUSE THE EXISTING ADAPTER PATTERN
+=================================================================
+- The frontend works with a neutral AgentSettings object shape — it must
+  never contain or display the provider name ("Bolna") or any API
+  key/secret anywhere in the UI copy, console logs, or network payloads
+  sent from the browser. (It's fine that this page lives under
+  /settings/integrations/bolna as a URL/internal route name — the
+  PAGE CONTENT itself stays provider-neutral in its labels, e.g. "Voice
+  Agent Console," not "Bolna Console.")
+- On save, the frontend sends the neutral AgentSettings object to a
+  backend route, which maps it to the real Bolna v2 agent API shape
+  inside the EXISTING lib/integrations/bolna/ adapter (extend it with an
+  updateAgentConfig() function following the same connect/test/
+  getStatus/placeCall pattern already established there) — do not create
+  a second, parallel integration path.
+- Model/voice/STT dropdown options are fetched from the backend adapter
+  (which calls Bolna's actual catalog), not hardcoded in the frontend,
+  so this page doesn't need a redeploy when the provider adds new
+  voices/models.
+- All of this remains Owner/Admin only, consistent with the rest of
+  Module 17's integration configuration permissions.
+
+=================================================================
+4. NEW SECTION — "DEFAULT CALL DATA"
+=================================================================
+This is the organization-wide fallback for the AI Screening Call. It
+must connect to, not duplicate, the per-job AI Screening Call
+configuration already built in Module 3's Job Hiring Stages feature:
+
+- A list of default call data fields (key/value or key/placeholder
+  pairs) that get passed into every screening call as context UNLESS a
+  specific job overrides them — e.g. default company_name, default
+  recruiter_signoff_name, a default set of fallback screening questions
+  used only when a job has AI Screening Call enabled but hasn't
+  configured its own question list yet.
+- Clearly label this section's relationship to job-level config with
+  inline helper text: "These are used when a job doesn't specify its
+  own AI Screening Call configuration. A job's own settings (under
+  Hiring Stages) always take priority over these defaults."
+- A read-only preview showing, for a sample job, which values would
+  actually be used (org default vs. job override) — small table: Field
+  | Org Default | This Job's Override (if any) | Effective Value — to
+  make the precedence rule visually obvious rather than just described
+  in text.
+- Reuse the same {{field}} placeholder picker component here too.
+
+=================================================================
+5. WHAT NOT TO BUILD
+=================================================================
+- No dashboard of multiple agent cards on a separate page — the agent
+  switcher (section 1, item 0) is the only multi-agent affordance.
+- No wizard/next-back step flow.
+- No per-section save buttons.
+- No dark/console visual theme — must match the existing product design
+  system exactly, per the deviation note above.
+
+=================================================================
+TESTING
+=================================================================
+Test: every field's change is reflected immediately in local state;
+Save persists the full form in one request and the adapter correctly
+maps the neutral AgentSettings shape to Bolna's real API shape (verify
+by inspecting the actual API payload in a test/staging call, not just
+trusting the mapping code); switching agents via the switcher loads
+that agent's saved values without leaking the previous agent's unsaved
+edits; the Default Call Data precedence preview correctly shows a job's
+override taking priority over the org default; Test Agent's "Call me"
+button places a real test call and displays its status/transcript;
+no API key or provider name appears anywhere in browser dev tools
+(network tab, console, page source) at any point; Viewer and Recruiter
+roles cannot access this page (Owner/Admin only).
+
+At completion report: files/migrations changed, the AgentSettings shape
+used, the adapter functions added to lib/integrations/bolna/, how the
+Default Call Data precedence logic was implemented, and confirmation no
+provider-identifying information reaches the frontend.

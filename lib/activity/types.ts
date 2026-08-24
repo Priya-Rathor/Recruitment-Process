@@ -24,6 +24,15 @@ export const ACTIVITY_ENTITY_TYPES = [
    * but only one of them belongs in a privacy report.
    */
   "privacy",
+  /**
+   * Module 23 — forms and public applications.
+   *
+   * Its own entity because publishing a form is not a settings change: it puts
+   * a URL on the public internet that anybody can submit personal data to, and
+   * "who published this, and who regenerated the link" is a question about that
+   * one form rather than about the organization.
+   */
+  "form",
 ] as const;
 
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
@@ -47,6 +56,7 @@ export const ENTITY_LABELS: Record<ActivityEntityType, string> = {
   integration: "Integration",
   message_template: "Message template",
   privacy: "Privacy & consent",
+  form: "Form",
 };
 
 export type ActivityEvent = {

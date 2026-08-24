@@ -45,6 +45,8 @@ import {
 import { getChannelAvailability } from "@/lib/communications/channels";
 import { loadMessageContext } from "@/lib/communications/triggers";
 import { createClient } from "@/lib/supabase/server";
+import { getResponseForApplication } from "@/lib/forms/queries";
+import { FormResponseCard } from "./FormResponseCard";
 import { PRIORITY_LABELS, PRIORITY_TONE, type ApplicationPriority } from "@/lib/applications/validation";
 import { Activity, Layers, Pencil } from "lucide-react";
 
@@ -112,6 +114,9 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     communicationPreferences,
     channels,
     messageContext,
+    // Module 23. Null for anybody who did not arrive through a public form,
+    // which is most applications — the card simply does not render.
+    formResponse,
   ] = await Promise.all([
     listApplicationMessages({
       organizationId: membership.organization.id,
@@ -125,6 +130,10 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     getChannelAvailability(membership.organization.id),
     loadMessageContext({
       client: await createClient(),
+      organizationId: membership.organization.id,
+      applicationId: application.id,
+    }),
+    getResponseForApplication({
       organizationId: membership.organization.id,
       applicationId: application.id,
     }),
@@ -317,6 +326,18 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
 
       {/* Spec section 7: AI summary renders at the top, timeline below. */}
       <ApplicationSummary applicationId={application.id} />
+
+      {/*
+        MODULE 23 — what they typed on the public form, if that is how they
+        arrived. Above Communications because it is what the recruiter reads
+        BEFORE deciding what to say to them.
+      */}
+      {formResponse && (
+        <FormResponseCard
+          response={formResponse}
+          timeZone={membership.organization.timezone}
+        />
+      )}
 
       {/*
         Communications. Its own section rather than folded into the Timeline,

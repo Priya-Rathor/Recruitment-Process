@@ -1,5 +1,20 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import {
+  Bell,
+  Briefcase,
+  Building,
+  ClipboardList,
+  FileCheck,
+  Kanban,
+  Lock,
+  Mail,
+  PhoneCall,
+  Plug,
+  Shield,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import type { OrgRole } from "@/lib/types";
 import { hasRole } from "@/lib/tenant";
@@ -8,6 +23,15 @@ type SettingsSection = {
   href: string;
   label: string;
   description: string;
+  /**
+   * One icon per row, matching the icon-per-item pattern the top nav already
+   * uses (components/nav/navItems.ts types its icons the same way).
+   *
+   * Not decoration: this list is twelve rows of similar-length text, and an icon
+   * is what makes a row findable by shape on the second visit rather than by
+   * reading every label. Typed as LucideIcon so a section cannot ship without one.
+   */
+  icon: LucideIcon;
   /** Roles that may open it. Omitted means everyone. */
   roles?: OrgRole[];
 };
@@ -23,64 +47,91 @@ type SettingsSection = {
 const SECTIONS: SettingsSection[] = [
   {
     href: "/settings/organization",
+    icon: Building,
     label: "Organization",
     description: "Name, timezone, branding",
     roles: ["owner", "admin"],
   },
   {
     href: "/settings/users",
+    icon: Users,
     label: "Team & permissions",
     description: "Who can do what",
   },
   {
     href: "/settings/recruitment",
+    icon: Briefcase,
     label: "Recruitment",
     description: "Defaults for new applications and interviews",
     roles: ["owner", "admin"],
   },
   {
     href: "/settings/screening",
+    icon: PhoneCall,
     label: "Screening",
     description: "Call attempts, retry delay, language",
     roles: ["owner", "admin"],
   },
   {
     href: "/settings/privacy",
+    icon: Shield,
     label: "Privacy & consent",
     description: "Recording, consent, retention, data rights",
     roles: ["owner", "admin"],
   },
   {
     href: "/settings/pipeline",
+    icon: Kanban,
     label: "Pipeline",
     description: "Stage SLA targets",
     roles: ["owner", "admin"],
   },
   {
     href: "/settings/onboarding",
+    icon: FileCheck,
     label: "Onboarding documents",
     description: "The checklist every new hire owes",
     roles: ["owner", "admin"],
   },
   {
+    href: "/settings/forms",
+    icon: ClipboardList,
+    label: "Forms",
+    description: "Application forms and questionnaires",
+    /*
+      RECRUITERS TOO, unlike most of this list.
+
+      A form is the thing a recruiter shares to fill their own pipeline — gating
+      it behind an Owner would make "put this role online" a request rather than
+      a task. It sits under Settings because it is configuration a person visits
+      occasionally, not a daily surface; the job page carries the shortcut that
+      actually gets used.
+    */
+    roles: ["owner", "admin", "recruiter"],
+  },
+  {
     href: "/settings/templates",
+    icon: Mail,
     label: "Message templates",
     description: "What candidates are told, and when",
     roles: ["owner", "admin"],
   },
   {
     href: "/settings/notifications",
+    icon: Bell,
     label: "Notifications",
     description: "What reaches you, and how",
   },
   {
     href: "/settings/integrations",
+    icon: Plug,
     label: "Integrations",
     description: "Bolna, Calendar, Email, WhatsApp, AI, n8n",
     roles: ["owner", "admin"],
   },
   {
     href: "/settings/security",
+    icon: Lock,
     label: "Security & data",
     description: "Retention, audit log, danger zone",
     roles: ["owner", "admin"],
@@ -122,31 +173,25 @@ export function SettingsShell({
         <nav className="card" style={{ flex: "0 0 240px", minWidth: 220, padding: 12 }}>
           {sections.map((section) => {
             const active = current === section.href;
+            const Icon = section.icon;
+
             return (
               <Link
                 key={section.href}
                 href={section.href}
-                className="is-block"
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  background: active ? "var(--color-primary)" : "transparent",
-                  color: active ? "#fff" : "var(--color-text)",
-                  textDecoration: "none",
-                  marginBottom: 2,
-                }}
+                className={`settings-nav__item${active ? " is-active" : ""}`}
               >
-                <span style={{ fontSize: 14, fontWeight: active ? 600 : 400 }}>
-                  {section.label}
-                </span>
-                <span
-                  className="is-block"
-                  style={{
-                    fontSize: 12,
-                    color: active ? "rgba(255,255,255,0.8)" : "var(--color-secondary-text)",
-                  }}
-                >
-                  {section.description}
+                {/*
+                  The icon sits in its own column beside the two lines of text,
+                  rather than inline with the label — inline, the description
+                  underneath would hang under the icon and the rows would lose
+                  their left edge. `aria-hidden` because the label already names
+                  the section; announcing "building, Organization" adds nothing.
+                */}
+                <Icon size={17} strokeWidth={1.75} aria-hidden="true" />
+                <span className="settings-nav__text">
+                  <span className="settings-nav__label">{section.label}</span>
+                  <span className="settings-nav__description">{section.description}</span>
                 </span>
               </Link>
             );

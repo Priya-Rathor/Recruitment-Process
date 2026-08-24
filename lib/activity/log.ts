@@ -118,6 +118,7 @@ export async function logAiCall({
   entityId = null,
   ok,
   errorCode,
+  useAdminClient,
 }: {
   organizationId: string;
   actorId?: string | null;
@@ -128,6 +129,12 @@ export async function logAiCall({
   entityId?: string | null;
   ok: boolean;
   errorCode?: string | null;
+  /**
+   * For callers with no session — the Bolna webhook, Module 23's public
+   * application form. Without it the insert is attempted with a session client
+   * that does not exist, and the AI call goes unaudited.
+   */
+  useAdminClient?: boolean;
 }): Promise<boolean> {
   return logActivity({
     organizationId,
@@ -136,6 +143,7 @@ export async function logAiCall({
     eventType: "ai.invoked",
     actorId,
     actorLabel,
+    useAdminClient,
     metadata: {
       feature,
       ok,

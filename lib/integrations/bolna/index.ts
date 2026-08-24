@@ -19,9 +19,22 @@
 // =============================================================================
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptSecret, encryptSecret, isEncryptionConfigured, maskSecret } from "@/lib/integrations/crypto";
-import { assertScriptIsCompliant, type CallScript } from "@/lib/screening/script";
+import { assertScriptIsCompliant, buildCallScript, type CallScript } from "@/lib/screening/script";
 import { normalizeRetryPolicy, type RetryPolicy } from "@/lib/screening/retry";
 import { formatDbError } from "@/lib/supabase/errors";
+// MODULE 24. Neutral types in, provider shapes built in agentMapping.ts — see
+// the section at the foot of this file.
+import type { AgentSettings } from "@/lib/voice/settings";
+import { degradedCatalog, type AgentCatalog, type CatalogOption } from "@/lib/voice/catalog";
+import {
+  AMBIENCE_TRACKS,
+  ambienceOptions,
+  extractCatalogArray,
+  parseCatalogEntry,
+  resolveCatalogKey,
+  toProviderAgentPayload,
+  type ResolvedProviderIds,
+} from "@/lib/integrations/bolna/agentMapping";
 
 export const BOLNA_PROVIDER = "bolna";
 
@@ -276,7 +289,34 @@ export type PlaceCallInput = {
   script: CallScript;
   language?: string;
   webhookUrl: string;
+  /**
+   * MODULE 24. The resolved call-data context — org defaults with the job's own
+   * settings already taking priority (lib/voice/callData.ts).
+   *
+   * OPTIONAL, and its absence changes nothing: omitting it produces exactly the
+   * payload this adapter sent before the console existed, which is why every
+   * existing caller still holds.
+   */
+  callContext?: Record<string, string>;
 };
+
+/**
+ * Keys the call payload owns, which Default Call Data may not overwrite.
+ *
+ * An admin typing `script` or `questions` into the Default Call Data section
+ * would otherwise replace the compliance-checked script with arbitrary text
+ * AFTER assertScriptIsCompliant() had passed — a hole with a text box in front of
+ * it. Dropped silently here, and the console warns about the key at edit time.
+ */
+function stripReservedContextKeys(
+  context: Record<string, string> | undefined
+): Record<string, string> {
+  if (!context) return {};
+  const reserved = new Set(["script", "questions", "language", "is_test"]);
+  return Object.fromEntries(
+    Object.entries(context).filter(([key]) => !reserved.has(key))
+  );
+}
 
 /**
  * Places the call.
@@ -321,6 +361,17 @@ export async function placeCall(
     agentId: string;
   };
 
+  /*
+    MODULE 24: the agent the Voice Agent Console marked as default is the one
+    that dials, falling back to the id captured at connect time.
+
+    This is what makes the console real rather than decorative — configuring an
+    agent nobody calls with would be a settings page that changes nothing. An
+    organization that has never opened the console resolves to exactly the id it
+    used before.
+  */
+  const dialingAgentId = await resolveDialingAgentId(input.organizationId, agentId);
+
   try {
     const response = await fetch(`${BOLNA_BASE_URL}/call`, {
       method: "POST",
@@ -329,7 +380,7 @@ export async function placeCall(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        agent_id: agentId,
+        agent_id: dialingAgentId,
         recipient_phone_number: input.phoneNumber,
         // Echoed back on the webhook so we can reconcile without trusting the
         // payload's own idea of which call it is.
@@ -339,6 +390,10 @@ export async function placeCall(
           script: input.script.fullText,
           questions: input.script.questions,
           language: input.language ?? "en",
+          // Spread LAST but guarded: the resolved call data must not be able to
+          // replace the script or the question list, whatever key an admin typed
+          // into Default Call Data.
+          ...stripReservedContextKeys(input.callContext),
         },
       }),
       signal: AbortSignal.timeout(30_000),
@@ -368,5 +423,422 @@ export async function placeCall(
     // crashing the application record". Never throws.
     console.error(`[bolna] placeCall failed: ${formatDbError(error)}`);
     return { ok: false, error: "Could not reach Bolna. The call was not placed." };
+  }
+}
+
+// =============================================================================
+// MODULE 24 — Voice Agent Console.
+//
+// Three additions, following the connect/test/getStatus/placeCall pattern above
+// rather than opening a second integration path:
+//
+//   listAgentCatalog()   the model / voice / speech-recognition options the
+//                        console's dropdowns are populated from
+//   updateAgentConfig()  pushes a neutral AgentSettings object to the provider
+//   placeTestCall()      the console's "Call me" button
+//
+// EVERYTHING PROVIDER-SHAPED STAYS ON THIS SIDE OF THE BOUNDARY. The functions
+// take and return neutral types (AgentSettings, AgentCatalog) — the mapping to
+// the provider's own schema is lib/integrations/bolna/agentMapping.ts, and the
+// opaque catalogue keys the browser sees are minted there too.
+// =============================================================================
+
+/**
+ * Catalogue endpoints, tried in order until one answers.
+ *
+ * A LIST rather than a single path, deliberately: provider catalogue routes move
+ * between versions, and an admin whose voice dropdown is empty cannot tell a
+ * renamed endpoint from an outage. Trying the known candidates and degrading
+ * honestly when none answer is the difference between "we could not load these"
+ * and a silently empty list that reads as "there are no voices".
+ *
+ * Override with BOLNA_CATALOG_PATHS (comma-separated, prefixed `kind:path`) when
+ * a deployment's provider account exposes them elsewhere — no redeploy needed.
+ */
+const DEFAULT_CATALOG_PATHS: Record<"model" | "voice" | "stt", string[]> = {
+  voice: ["/v2/voices", "/voices", "/v2/synthesizer/voices"],
+  model: ["/v2/models", "/models", "/v2/llm/models"],
+  stt: ["/v2/transcriber/models", "/v2/languages", "/languages"],
+};
+
+function catalogPaths(kind: "model" | "voice" | "stt"): string[] {
+  const override = process.env.BOLNA_CATALOG_PATHS;
+  if (!override) return DEFAULT_CATALOG_PATHS[kind];
+
+  const configured = override
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.startsWith(`${kind}:`))
+    .map((entry) => entry.slice(kind.length + 1))
+    .filter((path) => path.startsWith("/"));
+
+  return configured.length > 0 ? configured : DEFAULT_CATALOG_PATHS[kind];
+}
+
+/** The decrypted bundle. Never returned to a caller outside this file. */
+type BolnaCredentials = { apiKey: string; agentId: string };
+
+async function readApiKey(
+  organizationId: string
+): Promise<{ ok: true; credentials: BolnaCredentials } | { ok: false; error: string }> {
+  const integration = await loadIntegration(organizationId);
+
+  if (!integration || integration.status !== "connected" || !integration.encrypted_credentials) {
+    return { ok: false, error: "The voice provider isn't connected yet." };
+  }
+
+  const decrypted = await decryptSecret(integration.encrypted_credentials);
+  if (!decrypted.ok) return { ok: false, error: decrypted.error };
+
+  try {
+    const credentials = JSON.parse(decrypted.value) as BolnaCredentials;
+    if (!credentials.apiKey) return { ok: false, error: "Stored credentials are incomplete." };
+    return { ok: true, credentials };
+  } catch {
+    return { ok: false, error: "Stored credentials could not be read." };
+  }
+}
+
+/**
+ * Fetches one catalogue list.
+ *
+ * Returns the neutral options AND the provider ids they were minted from, so the
+ * caller can resolve a saved key back without a second round trip.
+ */
+async function fetchCatalogList(
+  kind: "model" | "voice" | "stt",
+  apiKey: string
+): Promise<{ options: CatalogOption[]; sourceIds: string[] } | null> {
+  for (const path of catalogPaths(kind)) {
+    try {
+      const response = await fetch(`${BOLNA_BASE_URL}${path}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(12_000),
+      });
+
+      if (!response.ok) continue;
+
+      const entries = extractCatalogArray(await response.json());
+      const options: CatalogOption[] = [];
+      const sourceIds: string[] = [];
+      const seen = new Set<string>();
+
+      for (const entry of entries) {
+        const parsed = parseCatalogEntry(kind, entry);
+        if (!parsed || seen.has(parsed.option.key)) continue;
+        seen.add(parsed.option.key);
+        options.push(parsed.option);
+        sourceIds.push(parsed.sourceId);
+      }
+
+      if (options.length === 0) continue;
+
+      options.sort((a, b) => a.label.localeCompare(b.label));
+      return { options, sourceIds };
+    } catch {
+      // Try the next candidate path. A single unreachable endpoint is not proof
+      // the provider is down.
+      continue;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The console's dropdown options.
+ *
+ * NEVER THROWS and never invents an option. When the provider cannot be reached
+ * the result is `degraded: true` with a plain reason and empty lists, and the
+ * console keeps whatever the agent already had selected — the architecture rule
+ * about not reporting a fake zero applies just as much to a fake list of voices.
+ */
+export async function listAgentCatalog(organizationId: string): Promise<AgentCatalog> {
+  const credentials = await readApiKey(organizationId);
+  if (!credentials.ok) {
+    return degradedCatalog(credentials.error);
+  }
+
+  const [voices, models, stt] = await Promise.all([
+    fetchCatalogList("voice", credentials.credentials.apiKey),
+    fetchCatalogList("model", credentials.credentials.apiKey),
+    fetchCatalogList("stt", credentials.credentials.apiKey),
+  ]);
+
+  // Ambience is a fixed set in the provider's schema rather than a served list,
+  // so it is always available — including while the rest is degraded.
+  const ambience = ambienceOptions();
+
+  if (!voices && !models && !stt) {
+    return {
+      ...degradedCatalog(
+        "Voice and model options couldn't be loaded from the provider just now. Your saved selections are unchanged."
+      ),
+      ambience,
+    };
+  }
+
+  return {
+    models: models?.options ?? [],
+    voices: voices?.options ?? [],
+    stt: stt?.options ?? [],
+    ambience,
+    // Partial success is still degraded: an empty Voice dropdown beside a full
+    // Model one needs to say why.
+    degraded: !voices || !models || !stt,
+    reason:
+      !voices || !models || !stt
+        ? "Some option lists couldn't be loaded from the provider. Your saved selections are unchanged."
+        : null,
+  };
+}
+
+/**
+ * Resolves the opaque catalogue keys in a settings object back to provider ids.
+ *
+ * Re-fetches the catalogue rather than keeping a mapping table, so a key that
+ * refers to a voice the provider has retired resolves to null — "use the account
+ * default" — instead of to a stale id the provider would reject.
+ */
+async function resolveIds(
+  organizationId: string,
+  settings: AgentSettings,
+  apiKey: string
+): Promise<ResolvedProviderIds> {
+  const [voices, models, stt] = await Promise.all([
+    settings.voice.voiceKey ? fetchCatalogList("voice", apiKey) : null,
+    settings.brain.modelKey ? fetchCatalogList("model", apiKey) : null,
+    settings.speech.sttKey ? fetchCatalogList("stt", apiKey) : null,
+  ]);
+
+  return {
+    voice: resolveCatalogKey("voice", settings.voice.voiceKey, voices?.sourceIds ?? []),
+    model: resolveCatalogKey("model", settings.brain.modelKey, models?.sourceIds ?? []),
+    stt: resolveCatalogKey("stt", settings.speech.sttKey, stt?.sourceIds ?? []),
+    ambienceTrack: resolveCatalogKey(
+      "amb",
+      settings.behavior.ambienceTrackKey,
+      AMBIENCE_TRACKS.map((track) => track.id)
+    ),
+  };
+}
+
+export type UpdateAgentConfigInput = {
+  organizationId: string;
+  settings: AgentSettings;
+  /** The provider's id for this agent, when it has already been created there. */
+  providerAgentId: string | null;
+  /** Where the provider should report call outcomes. */
+  webhookUrl: string;
+};
+
+/**
+ * Pushes an agent configuration to the provider.
+ *
+ * Creates on first save (no providerAgentId yet), updates thereafter. Returns the
+ * provider's id so the caller can store it.
+ *
+ * Never throws. A provider failure comes back as `ok: false` with a message safe
+ * to show a user — the console then keeps the form populated and says the save
+ * did not reach the provider, rather than reporting success over a failure.
+ */
+export async function updateAgentConfig(
+  input: UpdateAgentConfigInput
+): Promise<AdapterResult<{ providerAgentId: string }>> {
+  const credentials = await readApiKey(input.organizationId);
+  if (!credentials.ok) return { ok: false, error: credentials.error };
+
+  const { apiKey } = credentials.credentials;
+
+  const ids = await resolveIds(input.organizationId, input.settings, apiKey);
+  const payload = toProviderAgentPayload({
+    settings: input.settings,
+    ids,
+    webhookUrl: input.webhookUrl,
+  });
+
+  const creating = !input.providerAgentId;
+  const url = creating
+    ? `${BOLNA_BASE_URL}/v2/agent`
+    : `${BOLNA_BASE_URL}/v2/agent/${encodeURIComponent(input.providerAgentId!)}`;
+
+  try {
+    const response = await fetch(url, {
+      method: creating ? "POST" : "PUT",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!response.ok) {
+      // Logged server-side in full; the caller gets a plain sentence. The raw
+      // provider body never reaches a browser.
+      console.error(
+        `[bolna] updateAgentConfig rejected: ${response.status} ${await response.text()}`
+      );
+      return {
+        ok: false,
+        error:
+          response.status === 401
+            ? "The voice provider rejected the stored credentials. Reconnect the integration."
+            : "The voice provider wouldn't accept this configuration. It's saved here and can be retried.",
+      };
+    }
+
+    const body = (await response.json()) as { agent_id?: string; id?: string };
+    const providerAgentId = body.agent_id ?? body.id ?? input.providerAgentId;
+
+    if (!providerAgentId) {
+      return {
+        ok: false,
+        error: "The voice provider accepted the configuration but returned no agent reference.",
+      };
+    }
+
+    return { ok: true, data: { providerAgentId } };
+  } catch (error) {
+    console.error(`[bolna] updateAgentConfig failed: ${formatDbError(error)}`);
+    return {
+      ok: false,
+      error: "Couldn't reach the voice provider. Your settings are saved here and can be synced later.",
+    };
+  }
+}
+
+/**
+ * The provider agent id that should actually dial for this organization.
+ *
+ * Prefers the console's DEFAULT agent, falling back to the id captured when the
+ * integration was connected. That fallback is what keeps Module 8 working
+ * unchanged for an organization that has never opened this console — and it is
+ * why placeCall()'s signature did not have to change.
+ *
+ * Reads a column whose SELECT is revoked from every browser session, so this must
+ * stay server-side.
+ */
+async function resolveDialingAgentId(
+  organizationId: string,
+  credentialAgentId: string
+): Promise<string> {
+  const admin = createAdminClient();
+  if (!admin) return credentialAgentId;
+
+  const { data, error } = await admin
+    .from("voice_agents")
+    .select("provider_agent_id")
+    .eq("organization_id", organizationId)
+    .eq("is_default", true)
+    .maybeSingle();
+
+  if (error || !data) return credentialAgentId;
+
+  const configured = (data as { provider_agent_id: string | null }).provider_agent_id;
+  return configured?.trim() ? configured : credentialAgentId;
+}
+
+/** How many test calls one organization may place in a rolling hour. */
+export const TEST_CALL_HOURLY_CAP = 10;
+
+export type PlaceTestCallInput = {
+  organizationId: string;
+  /** Our voice_agent_test_calls row id, echoed back by the webhook. */
+  testCallId: string;
+  phoneNumber: string;
+  settings: AgentSettings;
+  providerAgentId: string | null;
+  webhookUrl: string;
+};
+
+/**
+ * Places the console's test call.
+ *
+ * SAME THREE GATES AS placeCall(), for the same reason: this dials a real
+ * telephone. The callee is usually the admin's own handset, which changes who is
+ * inconvenienced by a mistake but not whether the disclosure is required — the
+ * opening line still states the call is automated and may be recorded, because
+ * the person answering may not be the person who pressed the button.
+ *
+ * The hourly cap lives with the caller (it needs to count rows); what is enforced
+ * here is connection, compliance and a dialable number.
+ */
+export async function placeTestCall(
+  input: PlaceTestCallInput
+): Promise<AdapterResult<{ providerCallId: string }>> {
+  const digits = input.phoneNumber.replace(/\D/g, "");
+  if (digits.length < 8) {
+    return { ok: false, error: "That phone number doesn't look dialable." };
+  }
+
+  const credentials = await readApiKey(input.organizationId);
+  if (!credentials.ok) return { ok: false, error: credentials.error };
+
+  const agentId = input.providerAgentId?.trim() || credentials.credentials.agentId;
+  if (!agentId) {
+    return {
+      ok: false,
+      error: "Save this agent first — there's nothing configured at the provider to call with yet.",
+    };
+  }
+
+  // The disclosure is not optional, and it is built by the same function every
+  // candidate call uses rather than written out here.
+  const script = buildCallScript({
+    candidateName: "there",
+    jobTitle: "a test of your voice agent settings",
+    organizationName: input.settings.general.companyName ?? "your team",
+    questions: [
+      "This is a configuration test, so there's nothing you need to answer — but say a sentence or two if you'd like to check how the transcript reads.",
+    ],
+    instructions: input.settings.brain.systemPrompt,
+  });
+
+  const compliance = assertScriptIsCompliant(script);
+  if (!compliance.ok) return { ok: false, error: compliance.reason };
+
+  try {
+    const response = await fetch(`${BOLNA_BASE_URL}/call`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${credentials.credentials.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        agent_id: agentId,
+        recipient_phone_number: input.phoneNumber,
+        // Namespaced differently from a screening call so the webhook can tell a
+        // test from a candidate call without guessing.
+        metadata: { voice_agent_test_call_id: input.testCallId },
+        webhook_url: input.webhookUrl,
+        user_data: {
+          script: script.fullText,
+          questions: script.questions,
+          is_test: true,
+        },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!response.ok) {
+      console.error("[bolna] placeTestCall rejected:", response.status, await response.text());
+      return {
+        ok: false,
+        error:
+          response.status === 401
+            ? "The voice provider rejected the stored credentials. Reconnect the integration."
+            : "The voice provider couldn't start the test call. Try again shortly.",
+      };
+    }
+
+    const body = (await response.json()) as { call_id?: string; id?: string };
+    const providerCallId = body.call_id ?? body.id;
+    if (!providerCallId) {
+      return { ok: false, error: "The test call was accepted but no call reference came back." };
+    }
+
+    return { ok: true, data: { providerCallId } };
+  } catch (error) {
+    console.error(`[bolna] placeTestCall failed: ${formatDbError(error)}`);
+    return { ok: false, error: "Couldn't reach the voice provider. No call was placed." };
   }
 }

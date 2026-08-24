@@ -11,59 +11,89 @@ import { MatchScore, StageBadge } from "@/app/applications/StageBadge";
 import { WORK_MODE_LABELS, type JobQuestion } from "@/lib/types";
 import { listUnresolvedConflicts, loadConflictCandidates } from "@/lib/intake/queries";
 import { listJobStages } from "@/lib/hiring-stages/queries";
-import { listCandidates } from "@/lib/candidates/queries";
-import { STAGES, CONFIGURATION_ONLY_NOTE } from "@/lib/hiring-stages/catalog";
+import { STAGES } from "@/lib/hiring-stages/catalog";
 import { getOrganizationSettings } from "@/lib/settings/queries";
-import type { AiScreeningConfig } from "@/lib/hiring-stages/config";
+// MODULE 24 — the organization's screening fallbacks, so this page can say what
+// an empty question list actually means for this job.
+import { loadOrgCallDataContext } from "@/lib/voice/queries";
+import type { AiScreeningConfig, ResumeScoreConfig } from "@/lib/hiring-stages/config";
+import { getJobApplicationForm } from "@/lib/forms/queries";
+import { buildApplyUrl } from "@/lib/forms/token";
+import { requestOrigin } from "@/lib/forms/origin";
 import { ScreeningSummary } from "./ScreeningSummary";
+import { JobHiringStages, type PipelineStageRow } from "./JobHiringStages";
+import { ResumeScoringCard } from "./ResumeScoringCard";
 import { HealthBadge, HealthReasons, StatusBadge } from "../JobBadges";
 import { ArchiveJobButton } from "./JobActions";
 import { IntakeModal } from "./IntakeModal";
+import { ApplicationFormCard } from "./ApplicationFormCard";
 
 export const metadata = { title: "Job" };
 export const dynamic = "force-dynamic";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="column is-one-third">
-      <p className="has-text-secondary" style={{ fontSize: 12 }}>
-        {label}
-      </p>
-      <p style={{ fontSize: 15 }}>{value}</p>
+    <div className="job-fields__item">
+      <p className="job-fields__label">{label}</p>
+      <p className="job-fields__value">{value}</p>
     </div>
   );
 }
 
-function QuestionList({
-  title,
-  help,
-  questions,
-  emptyWarning,
-}: {
-  title: string;
-  help: string;
-  questions: JobQuestion[];
-  emptyWarning?: string;
-}) {
+function SkillTags({ label, skills }: { label: string; skills: string[] }) {
   return (
-    <div className="card mb-4">
-      <h2 className="title is-5">{title}</h2>
-      <p className="subtitle is-6 has-text-secondary">{help}</p>
+    <div className="job-skills">
+      <p className="job-fields__label">{label}</p>
+      {skills.length === 0 ? (
+        <p className="job-fields__value">—</p>
+      ) : (
+        <div className="tags mt-2">
+          {skills.map((skill) => (
+            <span key={skill} className="tag is-light">
+              {skill}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The screening question list.
+ *
+ * A numbered badge and a row divider rather than a bare `<ol>` marker, so the
+ * list reads like every other row list in the product. Still an ordered list in
+ * the markup: the order is the order they are asked in, which a screen reader
+ * should hear as well as see.
+ */
+function QuestionList({ questions }: { questions: JobQuestion[] }) {
+  return (
+    <section className="card">
+      <div className="job-card__head">
+        <div>
+          <h2 className="job-card__title">Screening questions</h2>
+          <p className="job-card__subtitle">Asked on the automated screening call.</p>
+        </div>
+      </div>
 
       {questions.length === 0 ? (
-        <p style={{ fontSize: 14, color: emptyWarning ? "var(--status-attention-text)" : undefined }}>
-          {emptyWarning ?? "None yet."}
+        <p className="job-empty is-warning">
+          None yet — automated screening can&apos;t run on this job until questions are added.
         </p>
       ) : (
-        <ol style={{ fontSize: 14, listStyle: "decimal", paddingLeft: "1.25rem" }}>
-          {questions.map((question) => (
-            <li key={question.id} className="mb-2">
-              {question.question}
+        <ol className="qlist">
+          {questions.map((question, index) => (
+            <li key={question.id} className="qlist__row">
+              <span className="qlist__num" aria-hidden="true">
+                {index + 1}
+              </span>
+              <p className="qlist__text">{question.question}</p>
             </li>
           ))}
         </ol>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -83,27 +113,55 @@ async function JobDetailContent({
 
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
+  /**
+   * Regenerating the public application link is the same bar as archiving: it
+   * takes something away from people outside the organization (every link
+   * already forwarded, every QR code already printed), which a Recruiter should
+   * not be able to do on their own.
+   */
+  const canManageLinks = hasRole(membership.role, ["owner", "admin"]);
 
-  const [{ applications }, intakeConflicts, hiringStages, orgSettings, candidatePool] =
-    await Promise.all([
-      listApplications({
-        organizationId: membership.organization.id,
-        filters: { jobId },
-        viewerRole: membership.role,
-        viewerId: membership.user_id,
-        limit: 50,
-      }),
-      listUnresolvedConflicts({ organizationId: membership.organization.id, jobId }),
-      listJobStages({ organizationId: membership.organization.id, jobId }),
-      getOrganizationSettings(membership.organization.id),
-      // Only the COUNT is wanted: "Add existing candidate" is offered when there
-      // is somebody to add, and hidden when the database is empty — a search box
-      // that can only ever return nothing is worse than no button. One row is
-      // fetched because the count comes back with the query either way.
-      listCandidates({ organizationId: membership.organization.id, filters: {}, limit: 1 }),
-    ]);
+  const [
+    { applications },
+    intakeConflicts,
+    hiringStages,
+    orgSettings,
+    applicationForm,
+    orgCallData,
+  ] = await Promise.all([
+    listApplications({
+      organizationId: membership.organization.id,
+      filters: { jobId },
+      viewerRole: membership.role,
+      viewerId: membership.user_id,
+      limit: 50,
+    }),
+    listUnresolvedConflicts({ organizationId: membership.organization.id, jobId }),
+    listJobStages({ organizationId: membership.organization.id, jobId }),
+    getOrganizationSettings(membership.organization.id),
+    getJobApplicationForm({ organizationId: membership.organization.id, jobId }),
+    loadOrgCallDataContext({
+      organizationId: membership.organization.id,
+      companyName: membership.organization.name,
+    }),
+  ]);
 
-  const hasCandidates = candidatePool.total > 0;
+  /*
+    THE PUBLIC LINK IS BUILT ON THE SERVER, never in the browser.
+
+    Signing it client-side would mean shipping INTEGRATION_ENCRYPTION_KEY into a
+    bundle. It is also only built for a PUBLISHED form: a draft has no link to
+    copy, and generating one anyway would put a working URL on screen for a form
+    that has not been opened to the public yet.
+  */
+  const applyUrl =
+    applicationForm?.status === "published"
+      ? await buildApplyUrl({
+          formId: applicationForm.id,
+          tokenVersion: applicationForm.token_version,
+          origin: await requestOrigin(),
+        })
+      : null;
 
   // Names for the candidates each conflicted file pointed at. One query for the
   // whole banner rather than one per row.
@@ -116,52 +174,64 @@ async function JobDetailContent({
     ).map((candidate) => [candidate.id, candidate.name])
   );
 
+  /*
+    THE FOUR STAGES, ALWAYS ALL FOUR.
+
+    listJobStages() already returns a row per stage whether or not one was ever
+    saved, so "off" and "never configured" arrive here identically shaped. The
+    only filter is by KIND: resume scoring is not a step candidates move
+    through, so it gets its own card rather than a row in this list.
+  */
+  const pipelineStages: PipelineStageRow[] = STAGES.filter(
+    (definition) => definition.kind === "pipeline"
+  ).map((definition) => {
+    const row = hiringStages.find((stage) => stage.stage_key === definition.key);
+    return {
+      key: definition.key,
+      label: definition.label,
+      description: definition.description,
+      live: definition.execution === "live",
+      engine: definition.engine,
+      enabled: row?.enabled ?? false,
+      promptTemplate: row?.prompt_template ?? null,
+      config: row?.config ?? {},
+      configured: Boolean(row?.prompt_template?.trim()),
+    } as PipelineStageRow;
+  });
+
+  const resumeScore = hiringStages.find((stage) => stage.stage_key === "resume_score");
+  const screening = hiringStages.find((stage) => stage.stage_key === "ai_screening_call");
+
   return (
-    <>
-      <div className="is-flex is-justify-content-space-between is-align-items-flex-start mb-5">
-        <div>
-          <p className="has-text-secondary mb-1" style={{ fontSize: 13 }}>
+    <div className="job-detail">
+      <header className="job-header">
+        <div className="job-header__text">
+          <p className="job-header__crumbs">
             <Link href="/jobs">Jobs</Link> / {job.title}
           </p>
-          <h1 className="title is-4 mb-2">{job.title}</h1>
-          <div className="is-flex" style={{ gap: "0.5rem" }}>
+          <h1 className="job-header__title">{job.title}</h1>
+          <div className="job-header__badges">
             <StatusBadge status={job.status} />
             <HealthBadge health={job.health} />
-            {job.archived_at && (
-              <span className="tag is-light" style={{ fontSize: 12 }}>
-                Archived
-              </span>
-            )}
+            {job.archived_at && <span className="tag is-light">Archived</span>}
           </div>
         </div>
 
         {/*
-          Two frequent actions, equal size, distinct styles. "Add candidates" is
-          outlined rather than filled so the pair reads as two choices instead of
-          one control with a shadow. Both are hidden for a Viewer — the API
-          refuses them anyway, but showing a button that always fails is worse
-          than not showing it.
+          ONE way to add people, not two. This used to sit beside a second
+          button that opened a different flow under a nearly identical name
+          ("Add candidates" / "Add a candidate"), which made the pair read as a
+          choice a recruiter had to understand before clicking either.
         */}
         {canEdit && !job.archived_at && (
-          <div className="is-flex" style={{ gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <div className="job-header__actions">
             <IntakeModal jobId={job.id} jobTitle={job.title} />
-            {/*
-              The SAME action as the Pipeline card's "Add a candidate", with the
-              same name and the same destination — surfaced up here because that
-              one sits below the fold. Shown only when there is somebody to add:
-              the form it opens can do nothing with an empty database.
-            */}
-            {hasCandidates && (
-              <Link className="button" href={`/applications/new?job_id=${job.id}`}>
-                Add a candidate
-              </Link>
-            )}
             <Link className="button is-primary" href={`/jobs/${job.id}/edit`}>
               Edit job
             </Link>
           </div>
         )}
-      </div>
+      </header>
 
       {/*
         Files the matcher refused to guess at. They created nothing, so this is
@@ -169,34 +239,30 @@ async function JobDetailContent({
         indistinguishable from a file nobody ever uploaded.
       */}
       {intakeConflicts.length > 0 && (
-        <div className="card mb-4" style={{ borderColor: "var(--status-attention-text)" }}>
-          <h2 className="title is-5" style={{ color: "var(--status-attention-text)" }}>
+        <section className="card is-attention">
+          <h2 className="job-card__title is-attention">
             {intakeConflicts.length === 1
               ? "1 resume needs manual review"
               : `${intakeConflicts.length} resumes need manual review`}
           </h2>
-          <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>
+          <p className="job-card__subtitle mb-3">
             Each of these matched more than one existing candidate, so no candidate or application
             was created. Open the candidates below and decide who the resume belongs to.
           </p>
-          <ul>
+          <ul className="job-rows">
             {intakeConflicts.map((item) => (
-              <li
-                key={item.id}
-                className="py-3"
-                style={{ borderTop: "1px solid var(--color-border)" }}
-              >
-                <p style={{ fontSize: 14, fontWeight: 600 }}>{item.file_name}</p>
-                <p className="has-text-secondary" style={{ fontSize: 13 }}>
+              <li key={item.id} className="job-rows__row">
+                <p className="job-rows__name">{item.file_name}</p>
+                <p className="job-rows__meta">
                   Matched{" "}
                   {item.conflict_candidate_ids
                     .map((id) => conflictNames.get(id) ?? "an archived candidate")
                     .join(" and ")}
                   .
                 </p>
-                <div className="is-flex mt-2" style={{ gap: "var(--space-3)", flexWrap: "wrap" }}>
+                <div className="job-rows__links">
                   {item.conflict_candidate_ids.map((id) => (
-                    <Link key={id} href={`/candidates/${id}`} style={{ fontSize: 13 }}>
+                    <Link key={id} href={`/candidates/${id}`} className="text-link">
                       {conflictNames.get(id) ?? "View candidate"}
                     </Link>
                   ))}
@@ -204,86 +270,85 @@ async function JobDetailContent({
               </li>
             ))}
           </ul>
-        </div>
+        </section>
       )}
 
       {stagesFailed && (
-        <div className="card mb-4" style={{ borderColor: "var(--status-attention-text)" }}>
-          <h2 className="title is-5" style={{ color: "var(--status-attention-text)" }}>
-            Hiring stages weren&apos;t saved
-          </h2>
-          <p className="has-text-secondary" style={{ fontSize: "var(--text-label)" }}>
-            The job itself saved correctly. Open Edit job and set the hiring stages again — if it
-            keeps failing, the <code>job_hiring_stages</code> table may not exist yet.
+        <section className="card is-attention">
+          <h2 className="job-card__title is-attention">Hiring stages weren&apos;t saved</h2>
+          <p className="job-card__subtitle">
+            The job itself saved correctly. Set the hiring stages again below — if it keeps
+            failing, ask an administrator to check the workspace setup.
           </p>
-        </div>
+        </section>
       )}
 
-      {/* ---- Hiring stages, at a glance --------------------------------- */}
-      {hiringStages.some((stage) => stage.enabled) && (
-        <div className="card mb-4">
-          <h2 className="title is-5">Hiring stages</h2>
-          <p className="has-text-secondary mb-3" style={{ fontSize: "var(--text-label)" }}>
-            What candidates for this role go through.
-          </p>
-          <ul className="stage-summary">
-            {STAGES.map((definition) => {
-              const stage = hiringStages.find((row) => row.stage_key === definition.key);
-              if (!stage?.enabled) return null;
-              return (
-                <li key={definition.key} className="stage-summary__row">
-                  <span className="stage-summary__name">{definition.label}</span>
-                  {definition.execution === "configuration_only" ? (
-                    <span className="intake-chip is-neutral">{CONFIGURATION_ONLY_NOTE}</span>
-                  ) : definition.kind === "scoring" ? (
-                    // Not a step candidates go through, so it does not get the
-                    // same "Active" chip as one that happens to them.
-                    <span className="intake-chip is-success">Custom scoring</span>
-                  ) : (
-                    <span className="intake-chip is-success">Active</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      {/* ---- Hiring stages: all four, on or off -------------------------- */}
+      <JobHiringStages jobId={job.id} stages={pipelineStages} canEdit={canEdit} />
+
+      {/* ---- Resume scoring: always on, so never a stage row ------------- */}
+      <ResumeScoringCard
+        jobId={job.id}
+        enabled={resumeScore?.enabled ?? false}
+        config={(resumeScore?.config ?? {}) as ResumeScoreConfig}
+        canEdit={canEdit}
+      />
 
       {/* The screening stage gets a fuller card of its own — it is the one that
           actually calls a candidate, so its setup is worth seeing in full. */}
-      {(() => {
-        const screening = hiringStages.find((row) => row.stage_key === "ai_screening_call");
-        if (!screening?.enabled) return null;
-        return (
-          <ScreeningSummary
-            jobId={job.id}
-            promptTemplate={screening.prompt_template}
-            config={screening.config as AiScreeningConfig}
-            questionCount={job.screeningQuestions.length}
-            organizationMaxAttempts={orgSettings.settings.screening_settings.maxAttempts}
-            canEdit={canEdit}
-          />
-        );
-      })()}
+      {screening?.enabled && (
+        <ScreeningSummary
+          jobId={job.id}
+          promptTemplate={screening.prompt_template}
+          config={screening.config as AiScreeningConfig}
+          questionCount={job.screeningQuestions.length}
+          organizationMaxAttempts={orgSettings.settings.screening_settings.maxAttempts}
+          organizationFallbackQuestions={orgCallData.callData.fallbackQuestions.length}
+          canEdit={canEdit}
+        />
+      )}
 
-      <div className="card mb-4">
-        <h2 className="title is-5">Health</h2>
+      {/* ---- Application form: how candidates get in here at all --------- */}
+      <ApplicationFormCard
+        jobId={job.id}
+        formId={applicationForm?.id ?? null}
+        status={applicationForm?.status ?? null}
+        fieldCount={applicationForm?.fieldCount ?? 0}
+        submissionCount={applicationForm?.submissionCount ?? 0}
+        publicUrl={applyUrl}
+        canEdit={canEdit}
+        canRegenerate={canManageLinks}
+        jobArchived={Boolean(job.archived_at)}
+      />
+
+      {/* ---- Health ------------------------------------------------------ */}
+      <section className="card">
+        <div className="job-card__head">
+          <div>
+            <h2 className="job-card__title">Health</h2>
+            <p className="job-card__subtitle">
+              Rule-based, not AI-scored — from how complete this job is, how long it has been open,
+              and whether candidates are moving.
+            </p>
+          </div>
+        </div>
         <HealthReasons health={job.health} />
-        <p className="has-text-secondary mt-3" style={{ fontSize: 12 }}>
-          Rule-based, not AI-scored. See <code>docs/modules/03-job-health-rules.md</code>.
-        </p>
-      </div>
+      </section>
 
-      <div className="card mb-4">
-        <h2 className="title is-5">Details</h2>
-        <div className="columns is-multiline">
+      {/* ---- Details: the structured facts ------------------------------- */}
+      <section className="card">
+        <div className="job-card__head">
+          <div>
+            <h2 className="job-card__title">Details</h2>
+          </div>
+        </div>
+
+        <div className="job-fields">
           <Field label="Experience" value={formatExperience(job.experience_min, job.experience_max)} />
           <Field label="Salary band" value={formatSalary(job.salary_min, job.salary_max)} />
           <Field label="Location" value={job.location ?? "—"} />
-          <Field
-            label="Work mode"
-            value={job.work_mode ? WORK_MODE_LABELS[job.work_mode] : "—"}
-          />
+          <Field label="Work mode" value={job.work_mode ? WORK_MODE_LABELS[job.work_mode] : "—"} />
+          <Field label="Client" value={job.clientName ?? "—"} />
           <Field label="Owner" value={job.ownerName ?? "Unassigned"} />
           <Field
             label="Created"
@@ -295,88 +360,63 @@ async function JobDetailContent({
           />
         </div>
 
-        <div className="mt-4">
-          <p className="has-text-secondary" style={{ fontSize: 12 }}>
-            Required skills
-          </p>
-          {job.required_skills.length === 0 ? (
-            <p style={{ fontSize: 14 }}>—</p>
-          ) : (
-            <div className="tags mt-2">
-              {job.required_skills.map((skill) => (
-                <span key={skill} className="tag is-light">
-                  {skill}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        <SkillTags label="Required skills" skills={job.required_skills} />
+        <SkillTags label="Preferred skills" skills={job.preferred_skills} />
+      </section>
 
-        <div className="mt-3">
-          <p className="has-text-secondary" style={{ fontSize: 12 }}>
-            Preferred skills
-          </p>
-          {job.preferred_skills.length === 0 ? (
-            <p style={{ fontSize: 14 }}>—</p>
-          ) : (
-            <div className="tags mt-2">
-              {job.preferred_skills.map((skill) => (
-                <span key={skill} className="tag is-light">
-                  {skill}
-                </span>
-              ))}
+      {/* ---- Description: the narrative, and nothing that is already above -- */}
+      {job.description && (
+        <section className="card">
+          <div className="job-card__head">
+            <div>
+              <h2 className="job-card__title">Description</h2>
             </div>
-          )}
-        </div>
-
-        {job.description && (
-          <div className="mt-4">
-            <p className="has-text-secondary mb-1" style={{ fontSize: 12 }}>
-              Description
-            </p>
-            <p style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{job.description}</p>
           </div>
-        )}
-      </div>
+          <p className="job-description">{job.description}</p>
+        </section>
+      )}
 
-      <QuestionList
-        title="Screening questions"
-        help="Asked on the automated screening call (Module 8)."
-        questions={job.screeningQuestions}
-        emptyWarning="None yet — AI screening can't run on this job until questions are added."
-      />
+      <QuestionList questions={job.screeningQuestions} />
 
-      <div className="card mb-4">
-        <div className="is-flex is-justify-content-space-between is-align-items-center mb-3">
-          <h2 className="title is-5 mb-0">Pipeline</h2>
-          {canEdit && !job.archived_at && (
-            <Link className="button is-small" href={`/applications/new?job_id=${job.id}`}>
-              Add a candidate
-            </Link>
+      {/* ---- Pipeline ---------------------------------------------------- */}
+      <section className="card">
+        <div className="job-card__head">
+          <div>
+            <h2 className="job-card__title">Pipeline</h2>
+            <p className="job-card__subtitle">
+              {applications.length === 0
+                ? "Nobody in this job's pipeline yet."
+                : `${applications.length} ${applications.length === 1 ? "candidate" : "candidates"} in this pipeline.`}
+            </p>
+          </div>
+
+          {/* The same action as the header's, by the same name and the same
+              component — a second entry point, not a second behaviour. */}
+          {canEdit && !job.archived_at && applications.length > 0 && (
+            <IntakeModal jobId={job.id} jobTitle={job.title} />
           )}
         </div>
 
         {applications.length === 0 ? (
-          <p className="has-text-secondary" style={{ fontSize: 14 }}>
-            No candidates in this job&apos;s pipeline yet.
-          </p>
+          <div className="job-empty is-centred">
+            <p className="job-empty__text">
+              Drop resumes here and each one becomes a candidate on this job.
+            </p>
+            {canEdit && !job.archived_at && (
+              <IntakeModal jobId={job.id} jobTitle={job.title} variant="primary" />
+            )}
+          </div>
         ) : (
-          <ul>
+          <ul className="job-rows">
             {applications.map((application) => (
-              <li
-                key={application.id}
-                className="py-3 is-flex is-justify-content-space-between is-align-items-center"
-                style={{ borderTop: "1px solid var(--color-border)" }}
-              >
+              <li key={application.id} className="job-rows__row is-split">
                 <div>
-                  <Link href={`/applications/${application.id}`} style={{ fontWeight: 600 }}>
+                  <Link href={`/applications/${application.id}`} className="job-rows__name">
                     {application.candidate_name}
                   </Link>
-                  <p className="has-text-secondary" style={{ fontSize: 12 }}>
-                    {application.recruiter_name ?? "Unassigned"}
-                  </p>
+                  <p className="job-rows__meta">{application.recruiter_name ?? "Unassigned"}</p>
                 </div>
-                <div className="is-flex is-align-items-center" style={{ gap: "0.5rem" }}>
+                <div className="job-rows__end">
                   <MatchScore score={application.match_score} />
                   <StageBadge stage={application.stage} />
                 </div>
@@ -384,25 +424,25 @@ async function JobDetailContent({
             ))}
           </ul>
         )}
-      </div>
+      </section>
 
+      {/* ---- Danger zone: sized to what it holds ------------------------- */}
       {canArchive && !job.archived_at && (
-        <div className="card" style={{ borderColor: "var(--color-error)" }}>
-          {/* Danger Zone, kept away from normal actions per the design spec. */}
-          <h2 className="title is-5" style={{ color: "var(--color-error)" }}>
-            Danger zone
-          </h2>
+        <section className="card is-danger is-snug">
+          <div>
+            <h2 className="job-card__title is-danger">Danger zone</h2>
+            <p className="job-card__subtitle">
+              Archiving closes this job and hides it from the list. Nothing is deleted, and
+              applications keep their history.
+            </p>
+          </div>
           <ArchiveJobButton jobId={job.id} title={job.title} />
-        </div>
+        </section>
       )}
 
       {/* Actions a role can't take are absent, not greyed out. */}
-      {!canEdit && (
-        <p className="has-text-secondary" style={{ fontSize: 13 }}>
-          Your role has read-only access to jobs.
-        </p>
-      )}
-    </>
+      {!canEdit && <p className="job-card__subtitle">Your role has read-only access to jobs.</p>}
+    </div>
   );
 }
 

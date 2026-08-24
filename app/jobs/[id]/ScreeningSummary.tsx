@@ -23,6 +23,7 @@ export function ScreeningSummary({
   config,
   questionCount,
   organizationMaxAttempts,
+  organizationFallbackQuestions,
   canEdit,
 }: {
   jobId: string;
@@ -32,6 +33,16 @@ export function ScreeningSummary({
   questionCount: number;
   /** Module 17's default, used when the stage does not override it. */
   organizationMaxAttempts: number;
+  /**
+   * MODULE 24. How many fallback questions the organization has configured in the
+   * Voice Agent Console.
+   *
+   * Needed because an empty job list no longer means "no call can run" — it means
+   * "fall back to these". Telling a recruiter the call would open and end, when
+   * it would actually ask five questions somebody else wrote, would be worse than
+   * saying nothing.
+   */
+  organizationFallbackQuestions: number;
   canEdit: boolean;
 }) {
   const script = promptTemplate?.trim() ?? "";
@@ -41,7 +52,7 @@ export function ScreeningSummary({
   const { known } = splitTokens(script);
 
   return (
-    <div className="card mb-4">
+    <div className="card">
       <div className="is-flex is-justify-content-space-between is-align-items-flex-start mb-3">
         <div>
           <h2 className="title is-5 mb-1">
@@ -87,15 +98,24 @@ export function ScreeningSummary({
       </div>
 
       {/*
-        A zero-question screen is worth flagging here rather than at dial time:
-        the call would consist of a consent disclosure and a goodbye.
+        A zero-question screen is worth flagging here rather than at dial time —
+        but WHICH warning depends on whether the organization set a fallback, and
+        the two are genuinely different situations for the recruiter reading this.
       */}
-      {questionCount === 0 && (
-        <p className="stage-warning mt-3">
-          No screening questions yet — the call would open, disclose, and end. Add questions before
-          this runs.
-        </p>
-      )}
+      {questionCount === 0 &&
+        (organizationFallbackQuestions > 0 ? (
+          <p className="stage-note mt-3">
+            No questions on this job, so the call falls back to your organization&apos;s{" "}
+            {organizationFallbackQuestions} default{" "}
+            {organizationFallbackQuestions === 1 ? "question" : "questions"}. Add questions here to
+            ask something specific to this role.
+          </p>
+        ) : (
+          <p className="stage-warning mt-3">
+            No screening questions here and no organization defaults, so no call can be placed. Add
+            questions before this runs.
+          </p>
+        ))}
 
       {script.length > 0 ? (
         <div className="screening-summary__script">

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { SlidersHorizontal } from "lucide-react";
 import { FormError } from "@/components/states";
 import type { IntegrationHealth } from "@/lib/settings/integrations";
 import { formatDateTimeInZone } from "@/lib/time";
@@ -48,6 +50,33 @@ export function IntegrationCard({
 
   const provider = integration.provider;
   const connected = integration.status === "connected";
+
+  /*
+    THE THREE BUTTON STATES, decided once here rather than at three call sites.
+
+    `blocked` is the state the old markup had no name for: the control was
+    rendered as a primary button with `disabled`, which the stylesheet showed as
+    the same blue at 55% opacity. Naming it makes it possible to style it as what
+    it is — and makes the rule readable: a card is connectable, connected, or
+    blocked, never two of those.
+
+    Both blocking conditions are pre-existing logic, unchanged:
+      serverUnavailable      — this deployment has no OAuth app (Calendar)
+      encryptionUnavailable  — no credential encryption key on this server
+  */
+  const blocked = integration.serverUnavailable || integration.encryptionUnavailable;
+  const blockedReason = integration.serverUnavailable
+    ? "This deployment can't connect this integration yet."
+    : "Credential encryption isn't configured on this server.";
+
+  const hasMeta = Boolean(
+    integration.credentialHint ||
+      integration.detail ||
+      integration.lastSuccessAt ||
+      (integration.errorMessage && !connected) ||
+      integration.encryptionUnavailable ||
+      (integration.serverUnavailable && integration.serverUnavailableReason)
+  );
 
   async function post(body: Record<string, unknown>) {
     setBusy(true);
@@ -143,56 +172,62 @@ export function IntegrationCard({
     setFields((previous) => ({ ...previous, [key]: value }));
 
   return (
-    <div className="card mb-4">
-      <div
-        className="is-flex is-justify-content-space-between is-align-items-flex-start mb-2"
-        style={{ gap: "1rem" }}
-      >
+    <div className="card integration-card">
+      <div className="integration-card__head">
         <div style={{ minWidth: 0 }}>
-          <h3 className="title is-6 mb-1">{integration.label}</h3>
-          <p className="has-text-secondary" style={{ fontSize: 13, margin: 0 }}>
-            {integration.description}
-          </p>
+          <h3 className="integration-card__title">{integration.label}</h3>
+          <p className="integration-card__description">{integration.description}</p>
         </div>
         <StatusChipFor status={integration.status} />
       </div>
 
-      {/* MASKED ONLY. The secret went in once and never comes back out. */}
-      {integration.credentialHint && (
-        <p className="has-text-secondary" style={{ fontSize: 13, margin: "8px 0 0" }}>
-          Credential: <code>{integration.credentialHint}</code>
-        </p>
-      )}
+      {/*
+        EVERY meta line in one block, with one gap.
 
-      {integration.detail && (
-        <p className="has-text-secondary" style={{ fontSize: 13, margin: "4px 0 0" }}>
-          {integration.detail}
-        </p>
-      )}
+        Before, each of these six paragraphs carried its own inline margin — 8px,
+        4px, 4px, 8px, 8px, 8px — so a card with three of them spaced its content
+        differently from a card with one, and the action rows below drifted out of
+        alignment for no reason a reader could name. One flex column with one gap
+        makes the spacing a property of the group rather than of whichever
+        paragraphs happen to be present.
+      */}
+      {hasMeta && (
+        <div className="integration-card__meta">
+          {/* MASKED ONLY. The secret went in once and never comes back out. */}
+          {integration.credentialHint && (
+            <p>
+              Credential: <code>{integration.credentialHint}</code>
+            </p>
+          )}
 
-      {integration.lastSuccessAt && (
-        <p className="has-text-secondary" style={{ fontSize: 12, margin: "4px 0 0" }}>
-          Last worked {formatDateTimeInZone(integration.lastSuccessAt, timeZone)}
-        </p>
-      )}
+          {integration.detail && <p>{integration.detail}</p>}
 
-      {integration.errorMessage && integration.status !== "connected" && (
-        <p style={{ fontSize: 13, margin: "8px 0 0", color: "var(--color-error)" }}>
-          {integration.errorMessage}
-        </p>
-      )}
+          {integration.lastSuccessAt && (
+            <p>Last worked {formatDateTimeInZone(integration.lastSuccessAt, timeZone)}</p>
+          )}
 
-      {integration.encryptionUnavailable && (
-        <p style={{ fontSize: 13, margin: "8px 0 0", color: "var(--color-error)" }}>
-          Credential encryption isn&apos;t configured on this server, so nothing can be connected
-          until an operator sets it up.
-        </p>
-      )}
+          {integration.errorMessage && integration.status !== "connected" && (
+            <p className="integration-card__note--error">{integration.errorMessage}</p>
+          )}
 
-      {integration.serverUnavailable && integration.serverUnavailableReason && (
-        <p style={{ fontSize: 13, margin: "8px 0 0", color: "var(--status-attention-text, #B45309)" }}>
-          {integration.serverUnavailableReason}
-        </p>
+          {integration.encryptionUnavailable && (
+            <p className="integration-card__note--error">
+              Credential encryption isn&apos;t configured on this server, so nothing can be
+              connected until an operator sets it up.
+            </p>
+          )}
+
+          {/*
+            The OAuth-app-missing explanation. Copy unchanged — it says exactly
+            what is wrong and who can fix it. What changed is the BUTTON below it,
+            which used to be a half-opacity primary and now reads as disabled.
+          */}
+          {integration.serverUnavailable && integration.serverUnavailableReason && (
+            <p className="integration-card__note--warn">
+              {integration.serverUnavailableReason}
+            </p>
+          )}
+        </div>
       )}
 
       <FormError message={error} />
@@ -202,14 +237,7 @@ export function IntegrationCard({
 
       {/* ---------------------------------------------------------------- */}
       {mode === "confirming_disconnect" ? (
-        <div
-          className="mt-4"
-          style={{
-            border: "1px solid var(--color-warning)",
-            borderRadius: 8,
-            padding: 16,
-          }}
-        >
+        <div className="integration-card__panel--warning">
           <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
             Before disconnecting {integration.label}
           </p>
@@ -254,7 +282,7 @@ export function IntegrationCard({
           </div>
         </div>
       ) : mode === "connecting" ? (
-        <div className="mt-4">
+        <div className="integration-card__panel">
           {provider === "bolna" && (
             <>
               <input
@@ -270,6 +298,16 @@ export function IntegrationCard({
                 value={field("agentId")}
                 onChange={(event) => setField("agentId", event.target.value)}
               />
+              {/*
+                MODULE 24. This id is now only the FALLBACK: calls use whichever
+                agent the Voice Agent Console marks as default, and drop back to
+                this one when no console agent has been synced. Said here so
+                nobody edits this field expecting it to change what the call says.
+              */}
+              <p className="has-text-secondary mb-3" style={{ fontSize: 12 }}>
+                The agent ID is a fallback. What the call actually says, sounds like and does is
+                configured in the Voice Agent Console below.
+              </p>
             </>
           )}
 
@@ -384,7 +422,7 @@ export function IntegrationCard({
             </>
           )}
 
-          <p className="has-text-secondary mb-3" style={{ fontSize: 12 }}>
+          <p className="integration-card__footnote mb-3">
             The key is encrypted before it&apos;s stored and is never shown again — only the last
             four characters.
           </p>
@@ -404,11 +442,36 @@ export function IntegrationCard({
           </div>
         </div>
       ) : (
-        <div className="buttons mt-4">
-          {integration.connectStyle === "oauth" ? (
+        /*
+          ONE RULE, NO EXCEPTIONS. Exactly one of the three states renders its
+          leading control, and the weight always means the same thing:
+
+            connectable  -> solid primary        "Connect"
+            connected    -> outline primary      "Replace credentials"/"Reconnect"
+            blocked      -> is-unavailable       "Connect", visibly dead
+
+          The connected case has NO solid button anywhere. There is nothing left
+          to urge, so the loudest control on the card would be pointing at an
+          action already taken. Module 17's established labels are kept —
+          "Replace credentials" says more than "Manage" — they are only demoted
+          to outline weight.
+        */
+        <div className="integration-card__actions">
+          {blocked ? (
             <button
               type="button"
-              className="button is-small is-primary"
+              className="button is-small is-unavailable"
+              disabled
+              // The reason is already spelled out above the row; the title
+              // repeats it for anyone who reaches the control before the text.
+              title={blockedReason}
+            >
+              Connect
+            </button>
+          ) : integration.connectStyle === "oauth" ? (
+            <button
+              type="button"
+              className={`button is-small ${connected ? "is-outlined-primary" : "is-primary"}`}
               // A FULL page navigation, not client-side routing. The lint rule
               // here suggests router.push(), which is wrong for this case: the
               // endpoint responds with a redirect to accounts.google.com, and
@@ -423,18 +486,14 @@ export function IntegrationCard({
                   ).toString()
                 );
               }}
-              // Disabled when the deployment has no Google app at all —
-              // clicking through to an error is worse than a clear "not yet".
-              disabled={integration.serverUnavailable}
             >
               {connected ? "Reconnect" : "Connect"}
             </button>
           ) : (
             <button
               type="button"
-              className="button is-small is-primary"
+              className={`button is-small ${connected ? "is-outlined-primary" : "is-primary"}`}
               onClick={() => setMode("connecting")}
-              disabled={integration.encryptionUnavailable}
             >
               {connected ? "Replace credentials" : "Connect"}
             </button>
@@ -444,21 +503,51 @@ export function IntegrationCard({
             <>
               <button
                 type="button"
-                className={`button is-small ${busy ? "is-loading" : ""}`}
+                className={`button is-small is-quiet ${busy ? "is-loading" : ""}`}
                 onClick={test}
                 disabled={busy}
               >
                 Test connection
               </button>
+              {/*
+                Disconnecting stops candidate-facing features, so it carries the
+                soft-danger treatment the product already uses for destructive
+                actions — not the same neutral grey as "Test connection", which is
+                the safest button on the card.
+              */}
               <button
                 type="button"
-                className={`button is-small ${busy ? "is-loading" : ""}`}
+                className={`button is-small is-danger-soft ${busy ? "is-loading" : ""}`}
                 onClick={startDisconnect}
                 disabled={busy}
               >
                 Disconnect
               </button>
             </>
+          )}
+
+          {/*
+            MODULE 24. Shown whether or not the integration is connected: an admin
+            can write the greeting, the guardrails and the org call-data defaults
+            before the credentials exist, and the console says plainly that
+            nothing dials until the integration is connected.
+
+            WAS `button is-small`, which Bulma paints from HSL channels this theme
+            does not override — landing on a near-black fill that made the least
+            important control the heaviest thing on the card. Now the product's
+            standard secondary: white fill, primary border, primary text.
+
+            Rendered LAST so the connect/disconnect actions that own this card come
+            first in both reading and tab order.
+          */}
+          {provider === "bolna" && (
+            <Link
+              className="button is-small is-outlined-primary"
+              href="/settings/integrations/bolna"
+            >
+              <SlidersHorizontal size={13} aria-hidden="true" />
+              Voice agent console
+            </Link>
           )}
         </div>
       )}

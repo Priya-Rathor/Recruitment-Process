@@ -43,6 +43,27 @@ const PUBLIC_PATHS = [
    */
   "/coding",
   /**
+   * Module 23's public job application form.
+   *
+   * SAME REASONING AGAIN, and this one is the widest of the three: the page is
+   * opened by somebody who has never had any relationship with this product at
+   * all — they were sent a link on WhatsApp or scanned a QR code on a poster.
+   * A login would make applying for the job impossible.
+   *
+   * Authorised by its own signed token (an HMAC over the form id AND the form's
+   * current token_version; see lib/forms/token.ts), so it can only ever open ONE
+   * form, cannot be pointed at another by editing the URL, stops working the
+   * moment the form is disabled or the link is regenerated, and carries no
+   * organization, job or candidate id.
+   *
+   * CHECK THE NEAR MISS BEFORE TOUCHING THIS ENTRY. matches() frees the entry
+   * and everything beneath it: "/apply" does NOT free "/applications" (the
+   * internal pipeline list), because that string neither equals "/apply" nor
+   * begins with "/apply/". An entry of "/app" would publish the entire product.
+   * publicPaths.test.ts pins both.
+   */
+  "/apply",
+  /**
    * Module 21's public product website.
    *
    * THIS IS THE FIRST ENTRY THAT IS PUBLIC BECAUSE IT IS MARKETING, not because
