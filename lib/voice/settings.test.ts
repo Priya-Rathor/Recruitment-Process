@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   AGENT_PURPOSES,
   LIMITS,
+  CONFIGURABLE_SECTIONS,
+  DEFAULT_DIAL_CODE,
+  canSaveAgent,
+  configuredSections,
   defaultAgentSettings,
+  isDialableNumber,
+  withDialCode,
   normalizeAgentSettings,
   normalizeCatalogKey,
   settingsFromRow,
@@ -233,5 +239,138 @@ describe("storage round trip", () => {
     const row = splitForStorage(defaultAgentSettings());
     expect(row.config).not.toHaveProperty("callData");
     expect(row.default_call_data).toHaveProperty("fallbackQuestions");
+  });
+});
+
+describe("setup progress", () => {
+  it("counts the eight CONFIGURABLE sections, not all nine", () => {
+    // Test Agent is an action, not a setting. Counting it would leave the
+    // indicator permanently short of its own total.
+    expect(CONFIGURABLE_SECTIONS).toHaveLength(8);
+    expect(CONFIGURABLE_SECTIONS).not.toContain("test");
+  });
+
+  it("counts a fresh agent's working defaults as decisions", () => {
+    // behavior and handoff ship with real positions (interruption on, transfer
+    // deliberately off). Nagging about a section whose defaults are correct
+    // teaches people to ignore the indicator.
+    const done = configuredSections(defaultAgentSettings({ companyName: "Acme" }));
+    expect(done).toContain("behavior");
+    expect(done).toContain("handoff");
+    expect(done).toContain("greeting");
+    expect(done).toContain("brain");
+    expect(done).toContain("general");
+  });
+
+  it("does NOT count a section whose value is still absent", () => {
+    const done = configuredSections(defaultAgentSettings({ companyName: "Acme" }));
+    // No voice or recogniser chosen, no call data set.
+    expect(done).not.toContain("voice");
+    expect(done).not.toContain("speech");
+    expect(done).not.toContain("calldata");
+  });
+
+  it("counts voice once a real selection exists", () => {
+    const settings = normalizeAgentSettings(
+      { voice: { voiceKey: "voice_9c1f0ab27d34" } },
+      { companyName: "Acme" }
+    );
+    expect(configuredSections(settings)).toContain("voice");
+  });
+
+  it("never reports more sections than exist", () => {
+    const full = normalizeAgentSettings(
+      {
+        voice: { voiceKey: "voice_9c1f0ab27d34" },
+        speech: { sttKey: "stt_1122aabbccdd" },
+        callData: { fields: [{ key: "company_name", value: "Acme" }] },
+      },
+      { companyName: "Acme" }
+    );
+    const done = configuredSections(full);
+    expect(done.length).toBeLessThanOrEqual(CONFIGURABLE_SECTIONS.length);
+    expect(done).toEqual([...new Set(done)]);
+  });
+});
+
+describe("caller number", () => {
+  it("treats an empty number as valid — the field is optional", () => {
+    expect(isDialableNumber(null)).toBe(true);
+    expect(isDialableNumber("")).toBe(true);
+    expect(isDialableNumber("   ")).toBe(true);
+  });
+
+  it("accepts the same number however it is written", () => {
+    for (const written of ["+91 98765 43210", "+919876543210", "091-98765-43210", "(022) 6100 4400"]) {
+      expect(isDialableNumber(written), written).toBe(true);
+    }
+  });
+
+  it("rejects too few and too many digits", () => {
+    expect(isDialableNumber("12345")).toBe(false);
+    // 15 is the E.164 maximum, so 16 is a real ceiling rather than a guess.
+    expect(isDialableNumber("1234567890123456")).toBe(false);
+  });
+
+  it("adds the dial code only to a bare national number", () => {
+    expect(withDialCode("9876543210")).toBe(`${DEFAULT_DIAL_CODE} 9876543210`);
+  });
+
+  it("LEAVES a number that already states its country alone", () => {
+    // Guessing a country for a number that states one is how a call reaches a
+    // stranger.
+    expect(withDialCode("+1 415 555 0134")).toBe("+1 415 555 0134");
+    expect(withDialCode("+44 20 7946 0958")).toBe("+44 20 7946 0958");
+    // A leading trunk zero is a national format, not a bare number.
+    expect(withDialCode("09876543210")).toBe("09876543210");
+  });
+
+  it("leaves formatted or implausible input alone rather than guessing", () => {
+    expect(withDialCode("98765 43210")).toBe("98765 43210");
+    expect(withDialCode("12345")).toBe("12345");
+    expect(withDialCode("")).toBe("");
+  });
+});
+
+describe("canSaveAgent — the state change item 1 asked to verify", () => {
+  const base = { dirty: false, unsynced: false, callerNumberValid: true };
+
+  it("is OFF on arrival, when nothing has been edited", () => {
+    // A muted button here is correct: there is genuinely nothing to save.
+    expect(canSaveAgent(base)).toBe(false);
+  });
+
+  it("turns ON the moment any field changes", () => {
+    /*
+      THE BUG THIS GUARDS. The page shipped with a Save that read as permanently
+      dead beside a banner promising "you can still configure and save this agent
+      now". Editing one field must flip it to full strength.
+    */
+    expect(canSaveAgent({ ...base, dirty: true })).toBe(true);
+  });
+
+  it("stays ON for an unsynced save even with no further edits", () => {
+    // Retrying the push to the provider is exactly what the button is for then.
+    expect(canSaveAgent({ ...base, unsynced: true })).toBe(true);
+  });
+
+  it("is OFF when the caller number is invalid, whatever else is true", () => {
+    // Highest priority: an unsaveable value must not be saveable via a dirty form
+    // or a pending retry.
+    expect(canSaveAgent({ dirty: true, unsynced: false, callerNumberValid: false })).toBe(false);
+    expect(canSaveAgent({ dirty: true, unsynced: true, callerNumberValid: false })).toBe(false);
+  });
+
+  it("agrees with isDialableNumber, so the field and the button cannot disagree", () => {
+    for (const [number, expected] of [
+      ["+91 98765 43210", true],
+      ["", true],
+      ["12345", false],
+    ] as const) {
+      expect(
+        canSaveAgent({ dirty: true, unsynced: false, callerNumberValid: isDialableNumber(number) }),
+        number || "(empty)"
+      ).toBe(expected);
+    }
   });
 });

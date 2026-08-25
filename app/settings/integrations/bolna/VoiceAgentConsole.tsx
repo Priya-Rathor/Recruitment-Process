@@ -46,6 +46,11 @@ import { StringListEditor } from "@/app/jobs/StringListEditor";
 import {
   AGENT_PURPOSES,
   AGENT_TONES,
+  CONFIGURABLE_SECTIONS,
+  canSaveAgent,
+  configuredSections,
+  isDialableNumber,
+  withDialCode,
   LIMITS,
   PURPOSE_LABELS,
   RESPONSE_LENGTHS,
@@ -176,7 +181,27 @@ export function VoiceAgentConsole({
     from the JSX so the button, its tooltip and its styling all read the same
     condition instead of three copies of it.
   */
-  const saveDisabled = !dirty && saveState.kind !== "saved_unsynced";
+  // The rule lives in lib/voice/settings.ts so it can be tested — see canSaveAgent.
+
+  // Recomputed on every render rather than stored, so it can never disagree with
+  // the form above it.
+  const configured = draft ? configuredSections(draft) : [];
+
+  /*
+    An invalid caller number blocks the save.
+
+    Not a silent correction: the field says what is wrong and Save says why it
+    cannot run, because rewriting somebody's phone number for them is exactly the
+    kind of help that ends in a call to the wrong person. Empty stays valid — the
+    field is optional.
+  */
+  const callerNumberValid = draft ? isDialableNumber(draft.general.callerNumber) : true;
+
+  const saveDisabled = !canSaveAgent({
+    dirty,
+    unsynced: saveState.kind === "saved_unsynced",
+    callerNumberValid,
+  });
 
   /**
    * The navigate-away warning.
@@ -497,6 +522,26 @@ export function VoiceAgentConsole({
         */}
         <AgentCostHeader estimate={costEstimate} />
 
+        {/*
+          How much of this agent has actually been decided.
+
+          EIGHT, not nine: Test Agent is an action, not a setting, so counting it
+          would leave this permanently short of its own total — which reads as an
+          unfinished agent rather than a finished one. See configuredSections().
+
+          Computed from the DRAFT, so it moves as you fill the form in rather than
+          only after a save.
+        */}
+        <p className="vac-progress">
+          <span className="vac-progress__track" aria-hidden="true">
+            <span
+              className="vac-progress__fill"
+              style={{ width: `${(configured.length / CONFIGURABLE_SECTIONS.length) * 100}%` }}
+            />
+          </span>
+          {configured.length} of {CONFIGURABLE_SECTIONS.length} sections configured
+        </p>
+
         {pendingSwitch && (
           <div className="vac-confirm">
             <p>
@@ -662,13 +707,32 @@ export function VoiceAgentConsole({
             <p className="stage-field__help">The number this agent calls from.</p>
             <input
               id="vac-caller"
-              className="input"
+              className={`input${callerNumberValid ? "" : " is-danger"}`}
               type="tel"
+              placeholder="+91 98765 43210"
               value={draft.general.callerNumber ?? ""}
               onChange={(event) =>
                 patch("general", { callerNumber: event.target.value || null })
               }
+              /*
+                The dial code is added on BLUR, not on every keystroke — prefixing
+                mid-typing moves the caret and fights the person entering the
+                number. Only a bare national-length number is touched: anything
+                already carrying a "+" or a leading trunk "0" is left exactly as
+                typed, because guessing a country for a number that states one is
+                how a call reaches a stranger.
+              */
+              onBlur={(event) => {
+                const next = withDialCode(event.target.value);
+                if (next !== event.target.value) patch("general", { callerNumber: next });
+              }}
             />
+            {!callerNumberValid && (
+              <p className="stage-warning">
+                That doesn&apos;t look like a dialable number — 8 to 15 digits, with the country
+                code. Leave it empty to use the account&apos;s own number.
+              </p>
+            )}
           </div>
         </div>
       </ConsoleSection>
@@ -1135,9 +1199,11 @@ export function VoiceAgentConsole({
             loading={saveState.kind === "saving"}
             disabled={saveDisabled}
             title={
-              saveDisabled
-                ? "No changes to save yet — edit any field to enable this."
-                : "Saves every section on this page in one request."
+              !callerNumberValid
+                ? "Fix the default caller number before saving."
+                : saveDisabled
+                  ? "No changes to save yet — edit any field to enable this."
+                  : "Saves every section on this page in one request."
             }
             onClick={save}
           >

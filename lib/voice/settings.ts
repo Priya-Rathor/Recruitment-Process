@@ -501,3 +501,143 @@ export function settingsFromRow(
     options
   );
 }
+
+// -----------------------------------------------------------------------------
+// Setup progress, and phone formatting.
+//
+// Both pure, both here rather than in the console, because both are rules about
+// what a valid agent looks like — and a rule that lives in a component is one the
+// API cannot apply.
+// -----------------------------------------------------------------------------
+
+/** The sections that hold configuration. */
+export const CONFIGURABLE_SECTIONS = [
+  "general",
+  "greeting",
+  "brain",
+  "voice",
+  "speech",
+  "behavior",
+  "calldata",
+  "handoff",
+] as const;
+
+export type ConfigurableSection = (typeof CONFIGURABLE_SECTIONS)[number];
+
+/**
+ * Which sections a person has actually made a decision about.
+ *
+ * EIGHT, NOT NINE. Test Agent is an action, not a setting — there is nothing in it
+ * to configure, so counting it would leave the indicator permanently short of its
+ * own total, which reads as an unfinished agent rather than a finished one.
+ *
+ * "Configured" means a DELIBERATE choice, which is not the same as non-empty.
+ * `behavior` and `handoff` ship with real working defaults, so they count as done
+ * from the start — an indicator that nagged about a section whose defaults are
+ * correct would teach people to ignore it. What does not count is a section whose
+ * value is still literally absent: no voice chosen, no company name, no call data.
+ */
+export function configuredSections(settings: AgentSettings): ConfigurableSection[] {
+  const done: ConfigurableSection[] = [];
+
+  if (settings.general.name.trim() && settings.general.companyName?.trim()) done.push("general");
+  if (settings.greeting.welcomeMessage.trim() && settings.greeting.closingMessage.trim()) {
+    done.push("greeting");
+  }
+  if (settings.brain.persona.trim() && settings.brain.systemPrompt.trim()) done.push("brain");
+
+  // A null key means "platform default" — a fallback, not a choice somebody made.
+  if (settings.voice.voiceKey !== null) done.push("voice");
+  if (settings.speech.sttKey !== null) done.push("speech");
+
+  // Defaults here are genuine positions (interruption on, 8-minute cap), so this
+  // section is complete unless somebody empties it, which the normaliser prevents.
+  done.push("behavior");
+
+  if (settings.callData.fields.length > 0 || settings.callData.fallbackQuestions.length > 0) {
+    done.push("calldata");
+  }
+
+  // Transfer deliberately OFF is a decision. Transfer ON with no number cannot be
+  // stored at all (see normalizeAgentSettings), so on-with-a-number is the only
+  // other reachable state.
+  done.push("handoff");
+
+  return done;
+}
+
+/**
+ * The default country dialling code.
+ *
+ * Matches the rest of this product's India-first defaults — currency INR, the
+ * `+91` samples in the placeholder catalogue. A DEFAULT, never a restriction:
+ * pasting a number with any other code is accepted unchanged, because a
+ * recruitment desk that hires across borders must not be told its candidate's
+ * number is invalid.
+ */
+export const DEFAULT_DIAL_CODE = "+91";
+
+/**
+ * Is this dialable?
+ *
+ * Counts DIGITS, not characters, so every way a person writes the same number
+ * passes — "+91 98765 43210", "+919876543210", "091-98765-43210". The lower bound
+ * is 8 because the shortest national numbers in use are around that; the upper is
+ * 15, which is the E.164 maximum and therefore a real ceiling rather than a guess.
+ *
+ * An EMPTY value is valid. The caller number is optional — an agent with none
+ * falls back to the provider's account number — so refusing empty would block a
+ * save for a field nobody has to fill.
+ */
+export function isDialableNumber(value: string | null): boolean {
+  if (value === null || value.trim().length === 0) return true;
+  const digits = value.replace(/\D/g, "").length;
+  return digits >= 8 && digits <= 15;
+}
+
+/**
+ * Prefixes the default dialling code when a number plainly has none.
+ *
+ * Only when the value is bare digits of national length. A value already carrying
+ * `+`, or a leading `0` trunk prefix, is left exactly as typed — guessing a
+ * country for a number that already states one is how a call reaches a stranger.
+ */
+export function withDialCode(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return trimmed;
+  if (trimmed.startsWith("+") || trimmed.startsWith("0")) return trimmed;
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length !== trimmed.length) return trimmed;
+  if (digits.length < 6 || digits.length > 11) return trimmed;
+
+  return `${DEFAULT_DIAL_CODE} ${trimmed}`;
+}
+
+/**
+ * Whether "Save agent" is available.
+ *
+ * EXTRACTED FROM THE CONSOLE so the rule can be tested rather than read. It is
+ * two booleans, but they decide whether the page's only primary button looks
+ * usable — and the bug this page shipped with was exactly that: a Save that read
+ * as permanently dead beside a banner promising you could save.
+ *
+ * Three facts, in priority order:
+ *   1. an invalid caller number blocks it, whatever else is true
+ *   2. an unsynced save is always retryable, even with no further edits
+ *   3. otherwise it follows `dirty` — nothing to save, nothing to press
+ */
+export function canSaveAgent({
+  dirty,
+  unsynced,
+  callerNumberValid,
+}: {
+  dirty: boolean;
+  /** A previous save stored locally but never reached the provider. */
+  unsynced: boolean;
+  callerNumberValid: boolean;
+}): boolean {
+  if (!callerNumberValid) return false;
+  if (unsynced) return true;
+  return dirty;
+}

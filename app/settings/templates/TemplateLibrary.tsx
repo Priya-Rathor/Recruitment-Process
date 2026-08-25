@@ -19,7 +19,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, Mail, MessageCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, Mail, MessageCircle, Pencil, Plug, Plus, Trash2 } from "lucide-react";
 import { FormError } from "@/components/states";
 import { formatDateTimeInZone } from "@/lib/time";
 import { StatusChip } from "@/components/ui/StatusChip";
@@ -28,7 +28,7 @@ import {
   COMMUNICATION_EVENT_DEFINITIONS,
   type CommunicationEventKey,
 } from "@/lib/communications/events";
-import { CHANNEL_LABELS, type MessageTemplate } from "@/lib/communications/templates";
+import type { MessageTemplate } from "@/lib/communications/templates";
 import type { TemplateGroup } from "@/lib/communications/queries";
 import { TemplateEditor } from "./TemplateEditor";
 
@@ -150,6 +150,7 @@ export function TemplateLibrary({
     return (
       <TemplateEditor
           readOnly={!canManage}
+          emailConnected={emailConnected}
         template={editing}
         eventKey={editing?.event_key ?? (creatingFor as CommunicationEventKey)}
         whatsappConnected={whatsappConnected}
@@ -207,7 +208,14 @@ export function TemplateLibrary({
             label={whatsappConnected ? "WhatsApp connected" : "WhatsApp not connected"}
             icon={MessageCircle}
           />
-          <Link className="text-link" href="/settings/integrations">
+          {/*
+            Lands on the Email card itself rather than the top of the
+            integrations page — the anchor the settings grid already uses, so
+            somebody sent here to fix a channel arrives at the control that
+            fixes it.
+          */}
+          <Link className="text-link" href="/settings/integrations#integration-email">
+            <Plug size={14} aria-hidden="true" />
             Manage channels
           </Link>
         </div>
@@ -270,9 +278,17 @@ export function TemplateLibrary({
         const definition = COMMUNICATION_EVENT_DEFINITIONS[group.eventKey];
 
         return (
-          <div className="card mb-4" key={group.eventKey}>
+          /*
+            SPACING SAYS WHAT BELONGS TO WHAT.
+
+            The header sat 8px from its own template row and 16px from the next
+            event's card — so each row read as if it belonged to the group BELOW
+            it. Backwards. Now 16px inside a group and 32px between groups, which
+            is the same 2:1 relationship the settings landing grid uses.
+          */
+          <div className="card tpl-group" key={group.eventKey}>
             <div
-              className="is-flex is-justify-content-space-between is-align-items-flex-start mb-2"
+              className="is-flex is-justify-content-space-between is-align-items-flex-start tpl-group__head"
               style={{ gap: "1rem" }}
             >
               <div style={{ minWidth: 0 }}>
@@ -298,7 +314,7 @@ export function TemplateLibrary({
               {canManage && (
                 <button
                   type="button"
-                  className="button is-small"
+                  className="button is-small is-outlined-primary"
                   onClick={() => setCreatingFor(group.eventKey)}
                 >
                   <Plus size={14} aria-hidden="true" />
@@ -330,20 +346,33 @@ export function TemplateLibrary({
                           style={{ gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}
                         >
                           {/*
-                            Icon AND word. The brief asks for an envelope or a
-                            chat bubble; the label stays because an icon alone is
-                            a guess, and a `both` template shows both marks so the
-                            row does not have to be read twice.
+                            ONE CHIP PER CHANNEL, each coloured by that channel's
+                            REAL connection state.
+
+                            The combined "Email + WhatsApp" chip could not carry
+                            this: a template that sends on both, with only one
+                            connected, is half-working — and a single flat label
+                            said nothing about which half. Two chips make the
+                            answer readable without opening anything.
+
+                            Same StatusChip and the same tones the Integrations
+                            page uses, so "connected" looks identical wherever it
+                            appears.
                           */}
-                          <span className="tpl-channel">
-                            {(template.channel === "email" || template.channel === "both") && (
-                              <Mail size={13} aria-hidden="true" />
-                            )}
-                            {(template.channel === "whatsapp" || template.channel === "both") && (
-                              <MessageCircle size={13} aria-hidden="true" />
-                            )}
-                            {CHANNEL_LABELS[template.channel]}
-                          </span>
+                          {(template.channel === "email" || template.channel === "both") && (
+                            <StatusChip
+                              tone={emailConnected ? "success" : "neutral"}
+                              label="Email"
+                              icon={Mail}
+                            />
+                          )}
+                          {(template.channel === "whatsapp" || template.channel === "both") && (
+                            <StatusChip
+                              tone={whatsappConnected ? "success" : "neutral"}
+                              label="WhatsApp"
+                              icon={MessageCircle}
+                            />
+                          )}
                           {template.active ? (
                             <StatusChip tone="success" label="Sending automatically" />
                           ) : (
@@ -355,6 +384,36 @@ export function TemplateLibrary({
                             Edited {formatDateTimeInZone(template.updated_at, timeZone)}
                           </span>
                         </div>
+
+                        {/*
+                          Said on the ROW, not only in the banner at the top.
+
+                          A template switched on against a disconnected channel is
+                          the one state that looks like it is working and is not —
+                          the toggle reads On, the chip reads "Sending
+                          automatically", and nothing arrives. The banner above
+                          says the channel is down; this says which template it
+                          costs.
+
+                          Only shown when ACTIVE. An inactive template on a
+                          disconnected channel is not a problem to solve today.
+                        */}
+                        {template.active && (
+                          <>
+                            {(template.channel === "email" || template.channel === "both") &&
+                              !emailConnected && (
+                                <p className="tpl-row-warning">
+                                  Email not connected — this won&apos;t send yet.
+                                </p>
+                              )}
+                            {(template.channel === "whatsapp" || template.channel === "both") &&
+                              !whatsappConnected && (
+                                <p className="tpl-row-warning">
+                                  WhatsApp not connected — this won&apos;t send yet.
+                                </p>
+                              )}
+                          </>
+                        )}
                       </div>
 
                       <div
@@ -381,15 +440,25 @@ export function TemplateLibrary({
                             />
                             <button
                               type="button"
-                              className="button is-small"
+                              className="button is-small is-outlined-primary"
                               onClick={() => setEditing(template)}
                             >
                               <Pencil size={14} aria-hidden="true" />
                               Edit
                             </button>
+                            {/*
+                              DELETE MUST NOT LOOK LIKE EDIT.
+
+                              These sat side by side in identical grey, which is a
+                              real hazard rather than an inconsistency: the two
+                              buttons are adjacent, one is reversible and one is
+                              not, and nothing but the label separated them.
+                              `is-danger-soft` is the treatment this product
+                              already uses for destructive actions.
+                            */}
                             <button
                               type="button"
-                              className="button is-small"
+                              className="button is-small is-danger-soft"
                               onClick={() => setConfirmingDelete(template.id)}
                               disabled={busyId === template.id}
                             >
@@ -400,7 +469,7 @@ export function TemplateLibrary({
                         ) : (
                           <button
                             type="button"
-                            className="button is-small"
+                            className="button is-small is-outlined-primary"
                             onClick={() => setEditing(template)}
                           >
                             <Eye size={14} aria-hidden="true" />
@@ -425,21 +494,21 @@ export function TemplateLibrary({
                           not a link to this template.
                         </p>
                         <div className="buttons">
+                          {/*
+                            `is-danger-solid` instead of three inline overrides —
+                            the class this product already uses for a confirmed
+                            destructive action, so it cannot drift from the others.
+                          */}
                           <button
                             type="button"
-                            className={`button is-small ${busyId === template.id ? "is-loading" : ""}`}
-                            style={{
-                              background: "var(--color-error)",
-                              color: "#fff",
-                              borderColor: "transparent",
-                            }}
+                            className={`button is-small is-danger-solid ${busyId === template.id ? "is-loading" : ""}`}
                             onClick={() => remove(template)}
                           >
                             Delete it
                           </button>
                           <button
                             type="button"
-                            className="button is-small"
+                            className="button is-small is-quiet"
                             onClick={() => setConfirmingDelete(null)}
                           >
                             Keep it

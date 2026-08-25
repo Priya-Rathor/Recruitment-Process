@@ -35,6 +35,7 @@ import {
   buildMessageValues,
   renderMessage,
   splitMessageTokens,
+  messageFieldsForEvent,
 } from "@/lib/communications/tokens";
 import { maskRecipient, optedOutOf, type OptOutState } from "@/lib/communications/send";
 import { optOutFooter, withOptOutFooter } from "@/lib/communications/optout";
@@ -634,3 +635,93 @@ describe("interview reminder settings", () => {
 // The README already records that anything needing real data has to be tested
 // against a Supabase project.
 // =============================================================================
+
+// -----------------------------------------------------------------------------
+// The placeholder catalogue, and narrowing it by trigger event.
+// -----------------------------------------------------------------------------
+describe("message placeholder catalogue", () => {
+  const tokens = MESSAGE_PLACEHOLDER_FIELDS.map((field) => field.token);
+
+  it("covers every group a template can draw on", () => {
+    // Candidate, application, job, recruiter, interview — the five the module's
+    // brief names. Asserted by token rather than by count, so adding a field
+    // never quietly satisfies this.
+    for (const token of [
+      "candidate.first_name",
+      "candidate.name",
+      "candidate.email",
+      "candidate.phone",
+      "candidate.notice_period",
+      "application.stage",
+      "application.match_score",
+      "application.applied_date",
+      "job.title",
+      "job.client_name",
+      "job.salary_range",
+      "recruiter.name",
+      "recruiter.email",
+      "interview.date",
+      "interview.time",
+      "interview.link",
+    ]) {
+      expect(tokens, `${token} missing from the template catalogue`).toContain(token);
+    }
+  });
+
+  it("gives every field a sample, so the preview never renders a blank", () => {
+    for (const field of MESSAGE_PLACEHOLDER_FIELDS) {
+      expect(field.sample.trim().length, field.token).toBeGreaterThan(0);
+    }
+  });
+
+  it("lists no token twice", () => {
+    expect(tokens).toEqual([...new Set(tokens)]);
+  });
+});
+
+describe("messageFieldsForEvent", () => {
+  const tokensFor = (event: Parameters<typeof messageFieldsForEvent>[0]) =>
+    messageFieldsForEvent(event).map((field) => field.token);
+
+  it("withholds interview fields from an event that has no interview", () => {
+    /*
+      THE POINT OF THE FEATURE. {{interview.time}} in a "Hired" template renders
+      as an em dash inside a sentence that reads as finished — "your interview is
+      at —." Not offering it is the only reliable prevention.
+    */
+    const hired = tokensFor("hired");
+    expect(hired).not.toContain("interview.time");
+    expect(hired).not.toContain("interview.date");
+    expect(hired).not.toContain("interview.link");
+
+    // The rest of the catalogue is untouched.
+    expect(hired).toContain("candidate.first_name");
+    expect(hired).toContain("job.title");
+  });
+
+  it("offers them for every event that actually schedules something", () => {
+    for (const event of [
+      "phone_interview_scheduled",
+      "video_interview_scheduled",
+      "director_round_scheduled",
+      "interview_reminder",
+      // A screening call is scheduled the same way and carries a time.
+      "ai_screening_call_scheduled",
+    ] as const) {
+      expect(tokensFor(event), event).toContain("interview.time");
+    }
+  });
+
+  it("offers everything when no event is chosen yet", () => {
+    // A picker that is empty until an unrelated dropdown is set reads as broken.
+    expect(tokensFor(null)).toEqual(MESSAGE_PLACEHOLDER_FIELDS.map((f) => f.token));
+  });
+
+  it("never offers a field the full catalogue does not have", () => {
+    for (const event of COMMUNICATION_EVENTS) {
+      for (const token of tokensFor(event)) {
+        expect(MESSAGE_PLACEHOLDER_FIELDS.map((f) => f.token)).toContain(token);
+      }
+    }
+  });
+});

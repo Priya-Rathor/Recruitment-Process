@@ -2295,7 +2295,15 @@ a {
   top: calc(100% + var(--space-2));
   z-index: 20;
   width: 320px;
-  max-height: 320px;
+  /*
+    Capped against the VIEWPORT as well as at 320px.
+
+    The panel opens downward from a button that often sits just above a tall
+    textarea, so on a short window the fixed 320px ran past the fold and the last
+    few fields were unreachable — the list scrolls inside the panel, but only the
+    part of the panel you can see. `min()` keeps it whichever is smaller.
+  */
+  max-height: min(320px, 60vh);
   display: flex;
   flex-direction: column;
   background-color: var(--color-card);
@@ -4691,7 +4699,54 @@ a {
 
 // --- Sections ---------------------------------------------------------------
 .vac-section {
-  margin-bottom: var(--space-4);
+  // 24px between every section card, the whole way down. Was 16px — the same gap
+  // used INSIDE a card between its fields, so the page read as one long form
+  // rather than nine grouped ones.
+  margin-bottom: var(--space-6);
+}
+
+// --- Setup progress ---------------------------------------------------------
+.vac-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.vac-progress__track {
+  flex: 0 0 120px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.vac-progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width var(--transition-base) var(--ease);
+}
+
+// A field chip that jumps to its own token in the textarea.
+.stage-chip--clickable {
+  appearance: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font: inherit;
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
 }
 
 .vac-section__head {
@@ -5837,4 +5892,123 @@ a {
   font-size: var(--text-caption);
   color: var(--color-text-secondary);
   margin: var(--space-3) 0 0;
+}
+
+// =============================================================================
+// MODULE 15 — the message template library.
+//
+// One list filtered by channel, not two pages. The tab geometry matches the
+// Voice Agent Console's Call/Chat tabs (`.vac-tabs`) rather than inventing a
+// third tab style — same product, same control.
+// =============================================================================
+.tpl-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-background);
+  // The count sits outside the pill group, so the group hugs its tabs.
+  width: fit-content;
+  max-width: 100%;
+}
+
+.tpl-filter__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+
+  &:hover:not(.is-active) { color: var(--color-text); }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  &.is-active {
+    background: var(--color-card);
+    color: var(--color-primary);
+    font-weight: var(--weight-semibold);
+    box-shadow: 0 1px 2px rgb(1 12 39 / 8%);
+  }
+}
+
+.tpl-filter__count {
+  padding: 0 var(--space-3) 0 var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+// Channel mark: icon(s) plus the word. A `both` template shows both marks, so a
+// row never has to be read twice to know where it sends.
+.tpl-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+
+  svg { flex-shrink: 0; }
+}
+
+.tpl-edited {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+// --- Template library: grouping by spacing ----------------------------------
+//
+// 16px inside a group, 32px between groups. The header used to sit 8px from its
+// own row and 16px from the next card, so a row read as belonging to the group
+// below it — the opposite of the truth. Same 2:1 relationship the settings
+// landing grid uses.
+.tpl-group {
+  // Restated: 24px on every group card whatever it holds (16px mobile, same token).
+  padding: var(--card-padding);
+  margin-bottom: var(--space-8);
+
+  &:last-of-type { margin-bottom: var(--space-4); }
+}
+
+.tpl-group__head {
+  margin-bottom: var(--space-4);
+}
+
+// The one state that looks like it is working and is not: switched on, channel
+// down. Amber — the same treatment every channel-connection warning in this
+// module uses, so the reader learns one colour for one meaning.
+.tpl-row-warning {
+  display: block;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-caption);
+  color: var(--status-attention-text);
+}
+
+// The one channel-connection warning treatment, used for BOTH channels in the
+// template editor. A class rather than an inline colour, so "email is down" and
+// "WhatsApp is down" cannot end up looking like different kinds of problem.
+.tpl-channel-warning {
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  color: var(--status-attention-text);
+  margin: var(--space-2) 0 0;
 }

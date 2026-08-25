@@ -46,6 +46,7 @@ import {
 export function TemplateEditor({
   template,
   eventKey,
+  emailConnected,
   whatsappConnected,
   readOnly = false,
   onDone,
@@ -54,6 +55,7 @@ export function TemplateEditor({
   /** Null when creating. */
   template: MessageTemplate | null;
   eventKey: CommunicationEventKey;
+  emailConnected: boolean;
   whatsappConnected: boolean;
   /**
    * True for a Recruiter or Viewer: the same editor, every field locked and no
@@ -206,10 +208,27 @@ export function TemplateEditor({
             ))}
           </select>
         </div>
+        {/*
+          ONE TREATMENT FOR BOTH CHANNELS.
+
+          Only WhatsApp warned here, so a disconnected EMAIL integration said
+          nothing at all on the page where somebody writes an email — the exact
+          asymmetry that teaches people a warning's absence means everything is
+          fine. Same class, same amber, same shape of sentence; only the channel
+          and the reassurance differ.
+        */}
+        {emailIncluded && !emailConnected && (
+          <p className="tpl-channel-warning">
+            Email isn&apos;t connected yet, so the email half of this template will be recorded as
+            “not sent” until it is.
+            {whatsappIncluded && " The WhatsApp half is unaffected."}
+          </p>
+        )}
         {whatsappIncluded && !whatsappConnected && (
-          <p className="help" style={{ color: "var(--status-attention-text)" }}>
+          <p className="tpl-channel-warning">
             WhatsApp isn&apos;t connected yet, so the WhatsApp half of this template will be
-            recorded as “not sent” until it is. The email half is unaffected.
+            recorded as “not sent” until it is.
+            {emailIncluded && " The email half is unaffected."}
           </p>
         )}
       </div>
@@ -282,7 +301,7 @@ export function TemplateEditor({
             Saved anyway. Fix the field and save again, or leave it — it will be sent exactly as
             written.
           </p>
-          <button type="button" className="button is-small mt-2" onClick={onDone}>
+          <button type="button" className="button is-small is-quiet mt-2" onClick={onDone}>
             Done
           </button>
         </div>
@@ -311,7 +330,7 @@ export function TemplateEditor({
             >
               {template ? "Save changes" : "Create template"}
             </button>
-            <button type="button" className="button" onClick={onCancel} disabled={busy}>
+            <button type="button" className="button is-quiet" onClick={onCancel} disabled={busy}>
               Cancel
             </button>
           </div>

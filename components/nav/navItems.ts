@@ -29,7 +29,6 @@ import {
   Settings,
   UserCheck,
   Users,
-  Zap,
 } from "lucide-react";
 
 export type NavItem = {
@@ -116,14 +115,32 @@ export const NAV_GROUPS: NavItem[][] = [
  * overflowed 70px. It now fits. The first width that still clips is 1280px, at
  * 25px, down from 156px.
  *
- * Neither is adminOnly, so a Recruiter still reaches both — AccountRows filters
- * on adminOnly, not on membership of this list.
+ * AUTOMATIONS WAS REMOVED FROM THIS MENU.
+ *
+ * It now lives in Settings → AI & automation, and two entry points to one page is
+ * the duplicate navigation this product has already corrected elsewhere. Only the
+ * menu row went; the page, its route and its Settings link are untouched.
+ *
+ * ANALYTICS AND THE AUDIT LOG STAY. Neither is duplicated in Settings as a page —
+ * the Settings grid links OUT to both, marked as leaving the settings area, which
+ * is a pointer rather than a second home. Removing them would take away the only
+ * direct route to each.
+ *
+ * SETTINGS IS NO LONGER adminOnly, and that is a consequence of the removal
+ * rather than an unrelated change. Automations was the last row here a Recruiter
+ * or Viewer could see besides Analytics; with it gone and Settings hidden from
+ * them, they would have had no route to /automations at all — the page is open to
+ * every member (requireMembershipOrRedirect; only EDITING is Owner/Admin), so
+ * hiding the door to it would have been a regression dressed as a tidy-up.
+ *
+ * Showing them Settings is correct on its own terms too: /settings role-filters
+ * its grid, and a Recruiter sees five real destinations there — Team, their own
+ * notification preferences, Forms, Automations and the analytics export.
  */
 export const ACCOUNT_NAV_ITEMS: NavItem[] = [
-  { href: "/automations", label: "Automations", icon: Zap },
   { href: "/analytics", label: "Analytics", icon: BarChart2 },
   { href: "/audit-log", label: "Audit log", icon: History, adminOnly: true },
-  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 /**

@@ -76,8 +76,18 @@ export function AccountRows({
         )}
       </Link>
 
-      {/* Audit log and Settings — moved here from the bar, which could not
-          hold eleven items. Hidden entirely for non-admins, as everywhere. */}
+      {/*
+        Analytics, the Audit log and Settings — moved here from the bar, which
+        could not hold eleven items.
+
+        Automations used to sit at the top of this list and was removed: it has a
+        home in Settings → AI & automation, and two doors to one page is the
+        duplicate navigation this product corrects elsewhere.
+
+        The filter is still per-item. Only the Audit log is adminOnly now —
+        Settings is open to every member, because with Automations gone it became
+        a Recruiter's only route to a page they are allowed to open.
+      */}
       {ACCOUNT_NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map((item) => {
         const Icon = item.icon;
         return (
