@@ -1,220 +1,86 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  Bell,
-  Briefcase,
-  Building,
-  ClipboardList,
-  FileCheck,
-  Kanban,
-  Lock,
-  Mail,
-  PhoneCall,
-  Plug,
-  Shield,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import type { OrgRole } from "@/lib/types";
-import { hasRole } from "@/lib/tenant";
 
-type SettingsSection = {
-  href: string;
-  label: string;
-  description: string;
-  /**
-   * One icon per row, matching the icon-per-item pattern the top nav already
-   * uses (components/nav/navItems.ts types its icons the same way).
-   *
-   * Not decoration: this list is twelve rows of similar-length text, and an icon
-   * is what makes a row findable by shape on the second visit rather than by
-   * reading every label. Typed as LucideIcon so a section cannot ship without one.
-   */
-  icon: LucideIcon;
-  /** Roles that may open it. Omitted means everyone. */
-  roles?: OrgRole[];
-};
+/*
+  THE SIDEBAR IS GONE.
 
-/**
- * Left navigation.
- *
- * Sections a role may not open are HIDDEN, not greyed out — the spec requires
- * "hide or disable (not just visually gray out without blocking)", and every
- * page re-checks independently. A Recruiter sees the two sections that are
- * genuinely theirs rather than a wall of locked doors.
- */
-const SECTIONS: SettingsSection[] = [
-  {
-    href: "/settings/organization",
-    icon: Building,
-    label: "Organization",
-    description: "Name, timezone, branding",
-    roles: ["owner", "admin"],
-  },
-  {
-    href: "/settings/users",
-    icon: Users,
-    label: "Team & permissions",
-    description: "Who can do what",
-  },
-  {
-    href: "/settings/recruitment",
-    icon: Briefcase,
-    label: "Recruitment",
-    description: "Defaults for new applications and interviews",
-    roles: ["owner", "admin"],
-  },
-  {
-    href: "/settings/screening",
-    icon: PhoneCall,
-    label: "Screening",
-    description: "Call attempts, retry delay, language",
-    roles: ["owner", "admin"],
-  },
-  {
-    href: "/settings/privacy",
-    icon: Shield,
-    label: "Privacy & consent",
-    description: "Recording, consent, retention, data rights",
-    roles: ["owner", "admin"],
-  },
-  {
-    href: "/settings/pipeline",
-    icon: Kanban,
-    label: "Pipeline",
-    description: "Stage SLA targets",
-    roles: ["owner", "admin"],
-  },
-  {
-    href: "/settings/onboarding",
-    icon: FileCheck,
-    label: "Onboarding documents",
-    description: "The checklist every new hire owes",
-    roles: ["owner", "admin"],
-  },
-  {
-    href: "/settings/forms",
-    icon: ClipboardList,
-    label: "Forms",
-    description: "Application forms and questionnaires",
-    /*
-      RECRUITERS TOO, unlike most of this list.
+  Settings used to be a permanent left nav beside a detail panel. Twelve rows of
+  similar-length text, always on screen, competing with the page you actually
+  opened — and the deeper the section list grew, the more of the panel it ate.
 
-      A form is the thing a recruiter shares to fill their own pipeline — gating
-      it behind an Owner would make "put this role online" a request rather than
-      a task. It sits under Settings because it is configuration a person visits
-      occasionally, not a daily surface; the job page carries the shortcut that
-      actually gets used.
-    */
-    roles: ["owner", "admin", "recruiter"],
-  },
-  {
-    href: "/settings/templates",
-    icon: Mail,
-    label: "Message templates",
-    description: "What candidates are told, and when",
-    roles: ["owner", "admin"],
-  },
-  {
-    href: "/settings/notifications",
-    icon: Bell,
-    label: "Notifications",
-    description: "What reaches you, and how",
-  },
-  {
-    href: "/settings/integrations",
-    icon: Plug,
-    label: "Integrations",
-    description: "Bolna, Calendar, Email, WhatsApp, AI, n8n",
-    roles: ["owner", "admin"],
-  },
-  {
-    href: "/settings/security",
-    icon: Lock,
-    label: "Security & data",
-    description: "Retention, audit log, danger zone",
-    roles: ["owner", "admin"],
-  },
-];
+  The replacement is a categorised grid at /settings and this shell, which now
+  does one job: frame a single settings page and give it an explicit way back.
+  The navigation is a place you go, not furniture you carry.
 
-export function visibleSections(role: OrgRole): SettingsSection[] {
-  return SECTIONS.filter((section) => !section.roles || hasRole(role, section.roles));
-}
+  WHAT DID NOT CHANGE: every individual settings page's content, its role checks,
+  and RestrictedPanel. The `current` prop is gone because there is no longer an
+  active row to mark; `title` already names the page.
 
+  The catalogue moved to ./catalog.ts so the grid and the role gating read one
+  list. `visibleSections` is re-exported for anything still importing it from
+  here.
+*/
+export { visibleLinks as visibleSections, firstVisibleHref } from "./catalog";
+
+/*
+  NO `role` PROP.
+
+  The old shell needed it to decide which sidebar rows to draw. With the sidebar
+  gone the frame has no role-dependent output at all — every page still does its
+  own check and renders RestrictedPanel itself, which is where that decision
+  belongs. Keeping the prop "for later" would have meant a permanently unused
+  argument on fifteen call sites; it can come back the day something here needs it.
+*/
 export function SettingsShell({
-  role,
-  current,
   title,
   description,
+  back,
   children,
 }: {
-  role: OrgRole;
-  /** The href of the active section. */
-  current: string;
   title: string;
   description?: string;
+  /**
+   * Where "back" goes. Defaults to the landing grid.
+   *
+   * Overridden by a page nested one level deeper — the Voice Agent Console lives
+   * under Integrations, and sending it to /settings would skip the page it
+   * actually belongs to. Without this the console needed its own second back
+   * link, which meant two stacked arrows saying different things.
+   */
+  back?: { href: string; label: string };
   children: ReactNode;
 }) {
-  const sections = visibleSections(role);
+  const target = back ?? { href: "/settings", label: "Settings" };
 
   return (
     <AppShell>
-      <div className="mb-5">
-        <h1 className="title is-4 mb-1">Settings</h1>
-        <p className="has-text-secondary" style={{ fontSize: 13 }}>
-          Configure the product without touching code.
-        </p>
-      </div>
+      {/*
+        The back link IS the navigation now, so it comes first and it is a real
+        link with a visible focus state — not a chevron glued to the heading.
+      */}
+      <Link className="settings-back" href={target.href}>
+        <ArrowLeft size={14} aria-hidden="true" />
+        {target.label}
+      </Link>
 
-      <div className="is-flex" style={{ gap: "1.5rem", alignItems: "flex-start", flexWrap: "wrap" }}>
-        {/* Stacks above the panel on narrow screens rather than becoming a
-            cramped sidebar. */}
-        <nav className="card" style={{ flex: "0 0 240px", minWidth: 220, padding: 12 }}>
-          {sections.map((section) => {
-            const active = current === section.href;
-            const Icon = section.icon;
-
-            return (
-              <Link
-                key={section.href}
-                href={section.href}
-                className={`settings-nav__item${active ? " is-active" : ""}`}
-              >
-                {/*
-                  The icon sits in its own column beside the two lines of text,
-                  rather than inline with the label — inline, the description
-                  underneath would hang under the icon and the rows would lose
-                  their left edge. `aria-hidden` because the label already names
-                  the section; announcing "building, Organization" adds nothing.
-                */}
-                <Icon size={17} strokeWidth={1.75} aria-hidden="true" />
-                <span className="settings-nav__text">
-                  <span className="settings-nav__label">{section.label}</span>
-                  <span className="settings-nav__description">{section.description}</span>
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div style={{ flex: "1 1 420px", minWidth: 0 }}>
-          <div className="mb-4">
-            <h2 className="title is-5 mb-1">{title}</h2>
-            {description && (
-              <p className="has-text-secondary" style={{ fontSize: 13 }}>
-                {description}
-              </p>
-            )}
-          </div>
-          {children}
+      <div className="settings-page">
+        <div className="mb-5">
+          <h1 className="title is-4 mb-1">{title}</h1>
+          {description && (
+            <p className="has-text-secondary" style={{ fontSize: 13 }}>
+              {description}
+            </p>
+          )}
         </div>
+        {children}
       </div>
     </AppShell>
   );
 }
 
-/** The shared "your role can't open this" panel. */
+/** The shared "your role can't open this" panel. Unchanged. */
 export function RestrictedPanel({ what }: { what: string }) {
   return (
     <div className="card">
@@ -223,8 +89,8 @@ export function RestrictedPanel({ what }: { what: string }) {
         Only an Owner or Admin can change this. You can still see the settings that affect your own
         work.
       </p>
-      <Link className="button" href="/settings/notifications">
-        Your notification settings
+      <Link className="button is-small is-outlined-primary" href="/settings">
+        Back to settings
       </Link>
     </div>
   );

@@ -27,8 +27,6 @@ export default async function PipelineSettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/pipeline"
       title="Pipeline SLA"
       description="How long an application should sit in each stage before it needs attention."
     >

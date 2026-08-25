@@ -5276,33 +5276,98 @@ a {
   margin-top: var(--space-2);
 }
 
-// --- Settings left nav ------------------------------------------------------
+// =============================================================================
+// SETTINGS — the landing grid, and the frame around each settings page.
 //
-// Moved out of inline styles when the icons went in: an icon column needs a grid,
-// and the active state now has to recolour three things at once (icon, label,
-// description), which is three conditional inline styles or one class.
-.settings-nav__item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: start;
-  gap: var(--space-3);
-  padding: 8px 10px;
-  border-radius: var(--control-radius);
-  color: var(--color-text);
-  text-decoration: none;
-  margin-bottom: 2px;
+// Replaces the permanent left sidebar. The old `.settings-nav__*` rules are gone
+// with it rather than left behind: dead CSS is the kind of thing a later reader
+// treats as load-bearing.
+// =============================================================================
 
-  svg {
-    color: var(--color-text-secondary);
-    // The icon's optical centre sits slightly above the label's baseline row.
-    margin-top: 1px;
-    flex-shrink: 0;
+.settings-landing,
+.settings-page {
+  // Settings is read, not scanned across — a full-width column of prose and
+  // forms is harder to use than a bounded one.
+  max-width: 1100px;
+}
+
+.settings-page { max-width: 900px; }
+
+// --- Back link --------------------------------------------------------------
+//
+// The whole navigation affordance for a settings page now, so it gets a real
+// hover and focus state rather than being a decorative chevron.
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-primary);
   }
 
-  &:hover:not(.is-active) {
-    background-color: var(--color-primary-tint);
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
 
-    svg { color: var(--color-primary); }
+// --- Search -----------------------------------------------------------------
+.settings-search {
+  position: relative;
+  max-width: 420px;
+  margin-bottom: var(--space-3);
+}
+
+.settings-search__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.settings-search__input {
+  padding-left: 38px;
+  padding-right: 36px;
+
+  // Safari draws its own clear button on type="search", which would sit under
+  // ours. Hidden so there is one clear affordance, not two.
+  &::-webkit-search-decoration,
+  &::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+.settings-search__clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-background);
+    color: var(--color-text);
   }
 
   &:focus-visible {
@@ -5311,28 +5376,465 @@ a {
   }
 }
 
-.settings-nav__text { min-width: 0; }
-
-.settings-nav__label {
-  display: block;
-  font-size: var(--text-body);
+.settings-count {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-4);
 }
 
-.settings-nav__description {
+// --- The grid ---------------------------------------------------------------
+//
+// EXPLICIT COLUMN COUNTS, and equal tracks at every step.
+//
+// This was `repeat(auto-fill, minmax(260px, 1fr))`. auto-fill is the right tool
+// when you do not care how many columns you get, and the wrong one here: the
+// count changed with every few pixels of window width, so the same seven cards
+// landed as 4+3, then 3+3+1, then 2+2+2+1 with no breakpoint anyone chose. Fixed
+// counts mean the last row is predictable, which is the thing being fixed.
+//
+// `minmax(0, 1fr)` rather than plain `1fr`: a track's implicit minimum is
+// `auto`, so a single long unbroken word in a description can push a column
+// wider than its share and make the columns unequal. Zero as the floor removes
+// that.
+//
+// NOTHING STRETCHES TO FILL A SHORT LAST ROW. The tracks are defined by the
+// grid, not by the items in it, so the two cards in the final row occupy two
+// tracks at the same width as every other card and leave the remaining tracks
+// genuinely empty. `justify-content: start` keeps them left-aligned rather than
+// distributed across the space.
+//
+// `align-items: start` is what stops the OTHER kind of stretching — a card
+// growing to match the tallest in its row. Heights are content-driven, which is
+// only pleasant because the content is now balanced: after the Integrations
+// split every card holds 2-3 items, so natural heights land within a line of
+// each other. That is the fix. No masonry, no dense packing, no JS measuring —
+// those compensate for imbalance rather than removing it.
+.settings-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  justify-content: start;
+}
+
+// 2 columns from a large phone, 3 from a tablet, 4 on desktop.
+@media (min-width: 560px) {
+  .settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 860px) {
+  .settings-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1120px) {
+  .settings-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.settings-card {
+  // The design system's card, restated for clarity: white, 1px border, 12px
+  // radius, no shadow — and 24px of padding on EVERY card regardless of how many
+  // items it holds (16px on mobile, from the same token). A two-item card and a
+  // three-item card are inset identically; only their height differs.
+  padding: var(--card-padding);
+}
+
+.settings-card__title {
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3);
+}
+
+// 20px between one item's description and the next item's title.
+//
+// THE ARITHMETIC IS DELIBERATE, so nobody "corrects" this to gap: 20px and
+// doubles the rhythm: each row carries 8px of its own vertical padding (it needs
+// that padding, because the row is the hover and focus target, not just text), so
+// two adjacent rows already contribute 16px. The 4px gap makes 20px.
+//
+//     8px padding-bottom + 4px gap + 8px padding-top = 20px
+.settings-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-card__link {
+  display: block;
+  // Negative inline margin so the hover fill bleeds to the card's padding edge
+  // instead of stopping short of it, which reads as a misaligned box.
+  margin: 0 calc(var(--space-2) * -1);
+  padding: var(--space-2);
+  border-radius: var(--control-radius);
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-primary-tint);
+
+    .settings-card__label { color: var(--color-primary); }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+  }
+}
+
+.settings-card__label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.settings-card__external { color: var(--color-text-secondary); flex-shrink: 0; }
+
+.settings-card__description {
   display: block;
   font-size: var(--text-caption);
-  // Was var(--color-secondary-text) — a token that does not exist, so the
-  // description inherited the label's near-black and the two lines carried the
-  // same weight. The real token is --color-text-secondary.
   color: var(--color-text-secondary);
+  margin-top: 1px;
 }
 
-.settings-nav__item.is-active {
-  background-color: var(--color-primary);
+// A matched character. Underline as well as tint, so the match is visible to a
+// reader who cannot distinguish the tint from the surrounding text.
+.settings-hit {
+  background: transparent;
+  color: var(--color-primary);
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .settings-search { max-width: none; }
+}
+
+// --- Credential trust disclosure --------------------------------------------
+//
+// One component, two placements. Quiet by design: it is a standing reassurance,
+// not a warning, so it carries no colour beyond secondary text.
+.credential-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 0;
+
+  svg { flex-shrink: 0; margin-top: 2px; }
+}
+
+// The footer version stands alone under the cards, so it needs an edge to read as
+// a distinct note. Bordered and flat — NOT a card, or it would look like a sixth
+// integration in the list.
+.credential-note--footer {
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  background: transparent;
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-2);
+}
+
+// Anchor targets clear the sticky top nav. Without this, deep-linking from the
+// Settings grid parks the card's heading underneath the bar.
+.integration-card[id] {
+  scroll-margin-top: 84px;
+}
+
+// =============================================================================
+// MODULE 24 — agent header cost, test tabs, chat rehearsal, AI Edit.
+//
+// Same tokens as everything else. The cost bar borrows the analytics FUNNEL_RAMP
+// via inline background (the colours are data, not style), so nothing here
+// hardcodes a chart colour.
+// =============================================================================
+
+// --- Cost line and segmented bar --------------------------------------------
+.vac-cost {
+  margin: var(--space-3) 0 0;
+  max-width: 460px;
+}
+
+// The not-tracked / failed / no-data states. Deliberately quiet: it is an absence
+// of data, not a problem the reader caused.
+.vac-cost--pending {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+
+  svg { flex-shrink: 0; margin-top: 2px; }
+}
+
+.vac-cost__headline {
+  font-size: var(--text-label);
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+
+  strong { font-variant-numeric: tabular-nums; }
+}
+
+.vac-cost__basis,
+.vac-cost__note {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-regular);
+}
+
+.vac-cost__note { display: block; margin: var(--space-2) 0 0; }
+
+.vac-costbar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  // A track behind the segments, so a bar that does not reach 100% (rounding, a
+  // clamped sliver) reads as a bar rather than as a gap.
+  background: var(--color-border);
+}
+
+.vac-costbar__segment {
+  height: 100%;
+  // No gap between segments: a 1px seam would read as a value.
+  flex: 0 0 auto;
+}
+
+.vac-costlegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-caption);
+    color: var(--color-text-secondary);
+  }
+}
+
+.vac-costlegend__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.vac-costlegend__value {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+// --- Call / Chat tabs -------------------------------------------------------
+.vac-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-background);
+}
+
+.vac-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+
+  &:hover:not(.is-active) { color: var(--color-text); }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  // A filled pill here rather than the anchor nav's underline: this is a control
+  // that switches content, not a marker of where you are on a page.
+  &.is-active {
+    background: var(--color-card);
+    color: var(--color-primary);
+    font-weight: var(--weight-semibold);
+    box-shadow: 0 1px 2px rgb(1 12 39 / 8%);
+  }
+}
+
+.vac-tabs__note {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: var(--space-3) 0 var(--space-4);
+  max-width: 62ch;
+}
+
+// --- Chat rehearsal ---------------------------------------------------------
+//
+// NEW, not a second copy of something. This product had no conversation UI — the
+// communication log is a list of sent messages, not a thread — so these are the
+// first chat bubbles in it.
+.vac-chat { max-width: 560px; }
+
+.vac-chat__meta {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3);
+}
+
+.vac-chat__thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  // Scrolls itself rather than growing the page: this sits inside a long console,
+  // and a thread that pushed the sections below it down would move the ground
+  // under the reader on every reply.
+  max-height: 340px;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  background: var(--color-background);
+}
+
+.vac-chat__empty {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.vac-chat__bubble {
+  max-width: 82%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 12px;
+  font-size: var(--text-label);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  // Long unbroken input (a pasted URL) must wrap rather than widen the thread.
+  overflow-wrap: anywhere;
+}
+
+.vac-chat__who {
+  display: block;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.vac-chat__bubble--operator {
+  align-self: flex-end;
+  background: var(--color-primary);
   color: #fff;
+  border-bottom-right-radius: 4px;
+}
 
-  svg { color: #fff; }
+.vac-chat__bubble--agent {
+  align-self: flex-start;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-bottom-left-radius: 4px;
+}
 
-  .settings-nav__label { font-weight: var(--weight-semibold); }
-  .settings-nav__description { color: rgba(255, 255, 255, 0.82); }
+.vac-chat__bubble--waiting { color: var(--color-text-secondary); font-style: italic; }
+
+.vac-chat__compose {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+
+  .input { flex: 1 1 auto; }
+}
+
+// --- AI Edit ----------------------------------------------------------------
+.vac-aiedit { margin-bottom: var(--space-3); }
+
+.vac-aiedit__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  appearance: none;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+  cursor: pointer;
+
+  &:hover { border-color: var(--color-primary); background: var(--color-primary-tint); }
+
+  &:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+}
+
+.vac-aiedit__panel {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--control-radius);
+  background: var(--color-primary-tint);
+
+  .buttons { margin-bottom: 0; }
+}
+
+.vac-aiedit__summary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  margin: 0 0 var(--space-3);
+
+  svg { color: var(--color-primary); flex-shrink: 0; margin-top: 2px; }
+}
+
+// The proposal, shown in full. Same treatment as the script preview elsewhere, so
+// "text a machine produced, for you to read before accepting" looks consistent.
+.vac-aiedit__proposed {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: var(--space-1) 0 var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  background: var(--color-card);
+  font-family: var(--font-body);
+  font-size: var(--text-label);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vac-aiedit__checked {
+  font-size: var(--text-caption);
+  color: var(--color-success);
+  margin: 0;
+}
+
+.vac-aiedit__note {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: var(--space-3) 0 0;
 }

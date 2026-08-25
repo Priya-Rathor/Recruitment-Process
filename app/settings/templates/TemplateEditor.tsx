@@ -17,7 +17,19 @@
 import { useState } from "react";
 import { FormError } from "@/components/states";
 import { PlaceholderEditor } from "@/components/PlaceholderEditor";
-import { MESSAGE_PLACEHOLDER_FIELDS } from "@/lib/communications/tokens";
+/*
+  messageFieldsForEvent, not the whole catalogue.
+
+  Interview fields are withheld unless the trigger is interview-related: an offer
+  letter has no interview, so {{interview.time}} in a "Hired" template resolves to
+  an em dash inside a sentence that reads as finished. Not offering it is the only
+  reliable prevention — a warning afterwards is read by nobody.
+
+  Still the SAME picker. components/PlaceholderEditor takes a `fields` prop for
+  exactly this ("each caller passes the vocabulary that is true where it renders"),
+  so this narrows an argument rather than forking a component.
+*/
+import { messageFieldsForEvent } from "@/lib/communications/tokens";
 import {
   CHANNEL_LABELS,
   MAX_WHATSAPP_BODY_LENGTH,
@@ -35,6 +47,7 @@ export function TemplateEditor({
   template,
   eventKey,
   whatsappConnected,
+  readOnly = false,
   onDone,
   onCancel,
 }: {
@@ -42,6 +55,16 @@ export function TemplateEditor({
   template: MessageTemplate | null;
   eventKey: CommunicationEventKey;
   whatsappConnected: boolean;
+  /**
+   * True for a Recruiter or Viewer: the same editor, every field locked and no
+   * Save.
+   *
+   * The SAME component rather than a separate read-only view, so what a recruiter
+   * reads is laid out exactly like what an admin writes — including the preview,
+   * which is the part they actually came for ("what will this candidate get?").
+   * A second display-only component would be a second thing to keep in step.
+   */
+  readOnly?: boolean;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -135,7 +158,8 @@ export function TemplateEditor({
           value={name}
           onChange={(changed) => setName(changed.target.value)}
           placeholder="e.g. Shortlisted — engineering roles"
-        />
+        readOnly={readOnly}
+          />
         <p className="help">Only your team sees this. Candidates never do.</p>
       </div>
 
@@ -148,6 +172,7 @@ export function TemplateEditor({
             id="template-event"
             value={event}
             onChange={(changed) => setEvent(changed.target.value as CommunicationEventKey)}
+            disabled={readOnly}
           >
             {COMMUNICATION_EVENTS.map((key) => (
               <option key={key} value={key}>
@@ -172,6 +197,7 @@ export function TemplateEditor({
             id="template-channel"
             value={channel}
             onChange={(changed) => setChannel(changed.target.value as TemplateChannel)}
+            disabled={readOnly}
           >
             {TEMPLATE_CHANNELS.map((option) => (
               <option key={option} value={option}>
@@ -199,6 +225,7 @@ export function TemplateEditor({
             value={subject}
             onChange={(changed) => setSubject(changed.target.value)}
             placeholder="e.g. Your application for {{job.title}}"
+          readOnly={readOnly}
           />
           <p className="help">
             Placeholders work here too. WhatsApp has no subject line, so this is email only.
@@ -217,7 +244,8 @@ export function TemplateEditor({
         value={body}
         onChange={setBody}
         rows={channel === "both" ? 10 : 8}
-        fields={MESSAGE_PLACEHOLDER_FIELDS}
+        fields={messageFieldsForEvent(event)}
+          readOnly={readOnly}
         placeholder="Hi {{candidate.name}}, …"
         footer={
           singleBodyIsWhatsApp ? (
@@ -234,7 +262,8 @@ export function TemplateEditor({
           value={whatsappBody}
           onChange={setWhatsappBody}
           rows={5}
-          fields={MESSAGE_PLACEHOLDER_FIELDS}
+          fields={messageFieldsForEvent(event)}
+          readOnly={readOnly}
           placeholder="Hi {{candidate.name}}, …"
           footer={<CharacterCount value={whatsappBody} limit={MAX_WHATSAPP_BODY_LENGTH} />}
         />
@@ -259,20 +288,34 @@ export function TemplateEditor({
         </div>
       )}
 
-      {warnings.length === 0 && (
+      {/*
+        NO SAVE AT ALL in read-only mode, rather than a disabled one.
+
+        A greyed-out Save invites a recruiter to hunt for the permission that would
+        enable it. "Close" says the truth: this is a thing you read.
+      */}
+      {readOnly ? (
         <div className="buttons mt-4">
-          <button
-            type="button"
-            className={`button is-primary ${busy ? "is-loading" : ""}`}
-            onClick={save}
-            disabled={busy}
-          >
-            {template ? "Save changes" : "Create template"}
-          </button>
-          <button type="button" className="button" onClick={onCancel} disabled={busy}>
-            Cancel
+          <button type="button" className="button is-outlined-primary" onClick={onCancel}>
+            Close
           </button>
         </div>
+      ) : (
+        warnings.length === 0 && (
+          <div className="buttons mt-4">
+            <button
+              type="button"
+              className={`button is-primary ${busy ? "is-loading" : ""}`}
+              onClick={save}
+              disabled={busy}
+            >
+              {template ? "Save changes" : "Create template"}
+            </button>
+            <button type="button" className="button" onClick={onCancel} disabled={busy}>
+              Cancel
+            </button>
+          </div>
+        )
       )}
 
       {template?.active && (

@@ -34,6 +34,7 @@ import {
   ArrowRight,
   Check,
   CircleDot,
+  PhoneCall,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -60,6 +61,11 @@ import { ConsoleSection } from "./ConsoleSection";
 import { CallDataSection } from "./CallDataSection";
 import { TestAgentSection } from "./TestAgentSection";
 import { CatalogSelect, NumberField, Slider, ToggleRow } from "./controls";
+import { AgentCostHeader } from "./AgentCostHeader";
+import { PromptAiEdit } from "./PromptAiEdit";
+import { useTestCall } from "./useTestCall";
+import type { Mode as TestMode } from "./TestAgentSection";
+import type { CostEstimate } from "@/lib/voice/costModel";
 
 /** The anchor-nav row, and the section ids it scrolls to. */
 const SECTIONS = [
@@ -73,6 +79,21 @@ const SECTIONS = [
   { id: "handoff", label: "Handoff" },
   { id: "test", label: "Test" },
 ];
+
+/**
+ * The header's call button.
+ *
+ * Solid primary: it is the most consequential thing on the header row. Save is
+ * the page's other solid button and they never appear in the same row — this one
+ * sits beside the agent name, Save sits in the fixed bar at the bottom.
+ */
+function GetCallButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button size="small" variant="primary" icon={PhoneCall} onClick={onClick}>
+      Get call from agent
+    </Button>
+  );
+}
 
 type SaveState =
   | { kind: "idle" }
@@ -88,6 +109,7 @@ export function VoiceAgentConsole({
   connection,
   jobs,
   initialTestCall,
+  costEstimate,
   organizationName,
 }: {
   initialAgents: VoiceAgent[];
@@ -95,6 +117,8 @@ export function VoiceAgentConsole({
   connection: { connected: boolean; encryptionUnavailable: boolean };
   jobs: PreviewJobOption[];
   initialTestCall: TestCall | null;
+  /** From OUR usage ledger, or an explicit not-tracked state. See lib/voice/cost. */
+  costEstimate: CostEstimate;
   organizationName: string;
 }) {
   const router = useRouter();
@@ -103,6 +127,13 @@ export function VoiceAgentConsole({
   const [activeId, setActiveId] = useState(initialAgents[0]?.id ?? null);
 
   const active = agents.find((agent) => agent.id === activeId) ?? null;
+
+  const testCall = useTestCall({
+    agentId: activeId ?? "",
+    // Only the agent the console opened on has a preloaded history; switching
+    // agents starts with none and the section's own poll fills it in.
+    initialCall: activeId === initialAgents[0]?.id ? initialTestCall : null,
+  });
 
   const [draft, setDraft] = useState<AgentSettings | null>(active?.settings ?? null);
   const [baseline, setBaseline] = useState<AgentSettings | null>(active?.settings ?? null);
@@ -120,6 +151,17 @@ export function VoiceAgentConsole({
    */
   const scrollingTo = useRef<number | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  /*
+    Test-call state lives HERE so the header button and the Test Agent section
+    drive the same flow. See useTestCall — one place that dials, one confirmation.
+
+    `testOpen` and `testMode` are here for the same reason: the header button has
+    to open that section and switch it to Call before arming a confirmation the
+    reader needs to see.
+  */
+  const [testOpen, setTestOpen] = useState(false);
+  const [testMode, setTestMode] = useState<TestMode>("call");
 
   const dirty = useMemo(
     () => draft !== null && baseline !== null && JSON.stringify(draft) !== JSON.stringify(baseline),
@@ -236,6 +278,27 @@ export function VoiceAgentConsole({
       return;
     }
     selectAgent(id);
+  }
+
+  /**
+   * The header's "Get call from agent".
+   *
+   * A SHORTCUT, not a second dialler. It opens the Test Agent section, switches it
+   * to Call and arms the confirmation — then scrolls there, because this product's
+   * rule for anything that telephones a person is a confirmation that NAMES THE
+   * NUMBER, and that confirmation lives in the section. Dialling straight from a
+   * header click would be a second, weaker safety path.
+   */
+  function startCallFromHeader() {
+    setTestOpen(true);
+    setTestMode("call");
+    testCall.arm();
+
+    // After the section has actually expanded, or the scroll lands on a heading
+    // whose content is still collapsed.
+    requestAnimationFrame(() => {
+      document.getElementById("test")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function createAgent() {
@@ -387,6 +450,8 @@ export function VoiceAgentConsole({
             */}
             {active.isDefault && <StatusChip tone="success" label="Default" />}
 
+            <GetCallButton onClick={startCallFromHeader} />
+
             <Button
               size="small"
               variant="outline"
@@ -402,6 +467,7 @@ export function VoiceAgentConsole({
           <div className="vac-switcher__row">
             <h2 className="title is-5 mb-0">{draft.general.name}</h2>
             {active.isDefault && <StatusChip tone="success" label="Default" />}
+            <GetCallButton onClick={startCallFromHeader} />
             {/*
               Outline, not the default Button. "Secondary" renders Bulma's
               unmodified `.button`, which this theme paints near-black — making the
@@ -419,6 +485,17 @@ export function VoiceAgentConsole({
             </Button>
           </div>
         )}
+
+        {/*
+          The cost breakdown, directly under the name and the Default chip.
+
+          Rendered from OUR OWN usage ledger — never from the provider's account
+          balance, and there is deliberately no "add funds" control here. Billing
+          is the provider's own surface; surfacing a balance in this console would
+          also be wrong in a multi-tenant deployment, where the balance is not
+          per-organization.
+        */}
+        <AgentCostHeader estimate={costEstimate} />
 
         {pendingSwitch && (
           <div className="vac-confirm">
@@ -715,6 +792,20 @@ export function VoiceAgentConsole({
           />
         </div>
 
+        {/*
+          AI Edit sits ABOVE the field rather than absolutely positioned inside
+          PlaceholderEditor's header. That header already holds "Insert field" and
+          its picker menu; adding a second control into a shared component used by
+          three other screens would have changed all of them.
+        */}
+        <PromptAiEdit
+          agentId={active.id}
+          currentPrompt={draft.brain.systemPrompt}
+          // Writes into the FORM only. Persisting still needs the page's Save, so
+          // an accepted revision is as reversible as any other edit.
+          onAccept={(systemPrompt) => patch("brain", { systemPrompt })}
+        />
+
         <PlaceholderEditor
           id="vac-prompt"
           label="Base instructions"
@@ -928,13 +1019,19 @@ export function VoiceAgentConsole({
       <ConsoleSection
         id="test"
         title="Test Agent"
-        description="Call yourself and hear what a candidate would hear."
-        defaultOpen={false}
+        description="Call yourself and hear what a candidate would hear, or rehearse the prompt in text."
+        open={testOpen}
+        onToggle={setTestOpen}
       >
         <TestAgentSection
           key={active.id}
           agentId={active.id}
-          initialCall={active.id === initialAgents[0]?.id ? initialTestCall : null}
+          controller={testCall}
+          // The DRAFT, not the saved row: Chat exists to rehearse edits before
+          // committing them, which is the one thing a real call cannot do.
+          settings={draft}
+          mode={testMode}
+          onModeChange={setTestMode}
           connected={connection.connected}
           synced={active.synced}
           hasUnsavedChanges={dirty}

@@ -8,7 +8,6 @@ import { listTeamMembers } from "@/lib/automations/queries";
 import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
 import { getStatus as getEmailStatus } from "@/lib/integrations/email";
 import { getStatus as getLlmStatus } from "@/lib/integrations/llm";
-import { getStatus as getN8nStatus } from "@/lib/integrations/n8n";
 import { getStatus as getWhatsAppStatus } from "@/lib/integrations/whatsapp";
 import { listMessageTemplates } from "@/lib/communications/queries";
 
@@ -40,12 +39,11 @@ export default async function NewAutomationPage() {
   // Which integrations are missing, so a template can say so BEFORE it is picked
   // rather than at activation. Read in parallel; a failed read reports the
   // integration as not connected, which is the cautious direction for a warning.
-  const [teamMembers, bolna, email, llm, n8n, whatsapp, { templates }] = await Promise.all([
+  const [teamMembers, bolna, email, llm, whatsapp, { templates }] = await Promise.all([
     listTeamMembers(membership.organization.id),
     getBolnaStatus(membership.organization.id),
     getEmailStatus(membership.organization.id),
     getLlmStatus(membership.organization.id),
-    getN8nStatus(membership.organization.id),
     // Module 15's channel, so a rule using "Send templated message" is warned
     // about a disconnected WhatsApp the same way one using a call is warned about
     // Bolna.
@@ -57,7 +55,6 @@ export default async function NewAutomationPage() {
     bolna.status !== "connected" ? "bolna" : null,
     email.status !== "connected" ? "email" : null,
     llm.status !== "connected" ? "llm" : null,
-    n8n.status !== "connected" ? "n8n" : null,
     whatsapp.status !== "connected" ? "whatsapp" : null,
   ].filter((provider): provider is string => provider !== null);
 

@@ -273,7 +273,11 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     ],
     modules: [
       { name: "Analytics and reporting", what: "Metric calculators, trend direction, filters and CSV export. Every 'this week' uses the organization's configured timezone." },
-      { name: "Automation engine", what: "A rule catalogue, evaluator and execution engine, orchestrated through n8n." },
+      // Was "orchestrated through n8n" — wrong on two counts. It named a provider
+      // that is not customer-facing, and the engine does not run through it:
+      // Module 13 evaluates and executes rules in-process, deliberately. A public
+      // page claiming otherwise is a promise about architecture nobody can keep.
+      { name: "Automation engine", what: "A rule catalogue, evaluator and execution engine that runs in-process, with an approval gate on anything that contacts a candidate." },
       { name: "Notifications and communication", what: "Internal notifications plus the candidate-facing half — templates, pipeline-event triggers, email and WhatsApp, and a working opt-out." },
       { name: "Activity and audit", what: "An append-only event log across every module, with narrative grounding so a summary cannot contradict the numbers." },
       { name: "Settings and integrations", what: "Organization settings, preferences, and integration health for every connected provider." },

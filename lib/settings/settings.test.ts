@@ -16,7 +16,10 @@ import {
 } from "@/lib/integrations/store";
 import { isExpired } from "@/lib/integrations/calendar/oauth";
 import { signState, verifyState } from "@/lib/integrations/calendar/state";
-import { PROVIDER_DESCRIPTORS } from "@/lib/settings/integrations";
+import {
+  isCustomerFacingProvider,
+  PROVIDER_DESCRIPTORS,
+} from "@/lib/settings/integrations";
 
 // -----------------------------------------------------------------------------
 // "Encrypted credentials never appear un-masked in any API response."
@@ -284,8 +287,8 @@ describe("token expiry", () => {
 // Provider catalogue
 // -----------------------------------------------------------------------------
 describe("provider descriptors", () => {
-  it("describes every provider the store knows about", () => {
-    for (const provider of PROVIDERS) {
+  it("describes every CUSTOMER-FACING provider the store knows about", () => {
+    for (const provider of PROVIDERS.filter(isCustomerFacingProvider)) {
       const descriptor = PROVIDER_DESCRIPTORS[provider];
       expect(descriptor, provider).toBeTruthy();
       expect(descriptor.label.length, provider).toBeGreaterThan(0);
@@ -293,6 +296,26 @@ describe("provider descriptors", () => {
       // admin that disconnecting is free when it isn't.
       expect(descriptor.featureImpact.length, provider).toBeGreaterThan(0);
     }
+  });
+
+  /*
+    n8n is platform-managed infrastructure: it stays in the Provider union
+    because rows and a CHECK constraint reference it, but it has no descriptor,
+    so it can never grow a card, a dependency warning or a connect form.
+  */
+  it("gives n8n no descriptor, so it cannot reach any customer surface", () => {
+    expect(isCustomerFacingProvider("n8n")).toBe(false);
+    expect(Object.keys(PROVIDER_DESCRIPTORS)).not.toContain("n8n");
+  });
+
+  it("describes exactly the five integrations a customer sees", () => {
+    expect(Object.keys(PROVIDER_DESCRIPTORS).sort()).toEqual([
+      "bolna",
+      "calendar",
+      "email",
+      "llm",
+      "whatsapp",
+    ]);
   });
 
   it("marks only Calendar as OAuth", () => {

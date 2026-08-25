@@ -1,14 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { handleRouteError, jsonError } from "@/lib/api";
 import { requireCurrentUser, requireRole } from "@/lib/tenant";
-import { isProvider, type Provider } from "@/lib/integrations/store";
-import { findDependencies, PROVIDER_DESCRIPTORS } from "@/lib/settings/integrations";
+import { isProvider } from "@/lib/integrations/store";
+import {
+  findDependencies,
+  isCustomerFacingProvider,
+  PROVIDER_DESCRIPTORS,
+  type CustomerFacingProvider,
+} from "@/lib/settings/integrations";
 import { logActivity } from "@/lib/activity/log";
 import * as bolna from "@/lib/integrations/bolna";
 import * as email from "@/lib/integrations/email";
 import * as calendar from "@/lib/integrations/calendar";
 import * as llm from "@/lib/integrations/llm";
-import * as n8n from "@/lib/integrations/n8n";
 import * as whatsapp from "@/lib/integrations/whatsapp";
 
 // Connect and Test both make a provider round trip.
@@ -27,6 +31,19 @@ export async function GET(
   try {
     const { provider } = await params;
     if (!isProvider(provider)) return jsonError("Unknown integration.", 404);
+
+    /*
+      N8N IS NOT CONNECTABLE THROUGH THIS ENDPOINT.
+
+      It has no card, so nothing in the product posts here for it — but leaving
+      the route open would mean an Owner could still store credentials for an
+      integration the UI says does not exist, and nothing would ever read them.
+      404, the same answer an unknown provider gets, because from a customer's
+      point of view that is what it is.
+    */
+    if (!isCustomerFacingProvider(provider)) {
+      return jsonError("Unknown integration.", 404);
+    }
 
     const membership = await requireRole(["owner", "admin"]);
     const { dependencies, failed } = await findDependencies({
@@ -66,6 +83,19 @@ export async function POST(
   try {
     const { provider } = await params;
     if (!isProvider(provider)) return jsonError("Unknown integration.", 404);
+
+    /*
+      N8N IS NOT CONNECTABLE THROUGH THIS ENDPOINT.
+
+      It has no card, so nothing in the product posts here for it — but leaving
+      the route open would mean an Owner could still store credentials for an
+      integration the UI says does not exist, and nothing would ever read them.
+      404, the same answer an unknown provider gets, because from a customer's
+      point of view that is what it is.
+    */
+    if (!isCustomerFacingProvider(provider)) {
+      return jsonError("Unknown integration.", 404);
+    }
 
     const [membership, user] = await Promise.all([
       requireRole(["owner", "admin"]),
@@ -141,6 +171,19 @@ export async function DELETE(
     const { provider } = await params;
     if (!isProvider(provider)) return jsonError("Unknown integration.", 404);
 
+    /*
+      N8N IS NOT CONNECTABLE THROUGH THIS ENDPOINT.
+
+      It has no card, so nothing in the product posts here for it — but leaving
+      the route open would mean an Owner could still store credentials for an
+      integration the UI says does not exist, and nothing would ever read them.
+      404, the same answer an unknown provider gets, because from a customer's
+      point of view that is what it is.
+    */
+    if (!isCustomerFacingProvider(provider)) {
+      return jsonError("Unknown integration.", 404);
+    }
+
     const [membership, user] = await Promise.all([
       requireRole(["owner", "admin"]),
       requireCurrentUser(),
@@ -176,13 +219,14 @@ export async function DELETE(
 // Provider dispatch.
 //
 // A switch rather than a map of adapters, because their connect() signatures
-// genuinely differ — Bolna needs an agent id, email a From address, n8n a URL.
+// genuinely differ — Bolna needs an agent id, email a From address, WhatsApp a
+// phone number id.
 // Flattening them into one shape would mean validating provider-specific fields
 // in this file, which is exactly what the adapter layer exists to prevent.
 // -----------------------------------------------------------------------------
 
 async function runTest(
-  provider: Provider,
+  provider: CustomerFacingProvider,
   organizationId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   switch (provider) {
@@ -202,10 +246,6 @@ async function runTest(
       const result = await llm.test(organizationId);
       return result.ok ? { ok: true } : { ok: false, error: result.error };
     }
-    case "n8n": {
-      const result = await n8n.test(organizationId);
-      return result.ok ? { ok: true } : { ok: false, error: result.error };
-    }
     case "whatsapp": {
       const result = await whatsapp.test(organizationId);
       return result.ok ? { ok: true } : { ok: false, error: result.error };
@@ -219,7 +259,7 @@ async function runConnect({
   payload,
   userId,
 }: {
-  provider: Provider;
+  provider: CustomerFacingProvider;
   organizationId: string;
   payload: Record<string, unknown>;
   userId: string;
@@ -262,17 +302,6 @@ async function runConnect({
         ? { ok: true, credentialHint: result.data.credentialHint }
         : { ok: false, error: result.error };
     }
-    case "n8n": {
-      const result = await n8n.connect({
-        organizationId,
-        instanceUrl: text("instanceUrl"),
-        apiKey: text("apiKey"),
-        connectedBy: userId,
-      });
-      return result.ok
-        ? { ok: true, credentialHint: result.data.credentialHint }
-        : { ok: false, error: result.error };
-    }
     case "whatsapp": {
       const result = await whatsapp.connect({
         organizationId,
@@ -303,7 +332,7 @@ async function runConnect({
 }
 
 async function runDisconnect(
-  provider: Provider,
+  provider: CustomerFacingProvider,
   organizationId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   switch (provider) {
@@ -321,10 +350,6 @@ async function runDisconnect(
     }
     case "llm": {
       const result = await llm.disconnect(organizationId);
-      return result.ok ? { ok: true } : { ok: false, error: result.error };
-    }
-    case "n8n": {
-      const result = await n8n.disconnect(organizationId);
       return result.ok ? { ok: true } : { ok: false, error: result.error };
     }
     case "whatsapp": {

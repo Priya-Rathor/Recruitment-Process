@@ -23,8 +23,6 @@ export default async function OnboardingSettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/onboarding"
       title="Onboarding documents"
       description="The checklist every new hire is asked for, once an application reaches Hired."
     >

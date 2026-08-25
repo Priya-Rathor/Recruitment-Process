@@ -26,8 +26,6 @@ async function FormsContent() {
   if (!hasRole(membership.role, ["owner", "admin", "recruiter"])) {
     return (
       <SettingsShell
-        role={membership.role}
-        current="/settings/forms"
         title="Forms"
         description="Application forms and questionnaires."
       >
@@ -40,8 +38,6 @@ async function FormsContent() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/forms"
       title="Forms"
       description="Application forms candidates fill in themselves, and questionnaires you send during the process."
     >

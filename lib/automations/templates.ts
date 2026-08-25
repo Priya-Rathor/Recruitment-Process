@@ -211,24 +211,6 @@ export const RULE_TEMPLATES: RuleTemplate[] = [
     needs: ["email"],
   },
 
-  {
-    id: "handoff_hires_to_n8n",
-    name: "Hand new hires to n8n",
-    summary: "When an application reaches Hired, call an n8n workflow.",
-    note:
-      "For the work that lives outside this product — payroll, IT provisioning, a Slack " +
-      "announcement. The payload is ids and the stage only: no name, email or phone leaves here, " +
-      "because posting candidate details into a workflow engine is a decision an admin should make " +
-      "deliberately, not inherit from a template.",
-    trigger: "application_stage_changed",
-    conditions: [
-      { match: "all", conditions: [{ field: "stage", operator: "eq", value: "hired" }] },
-    ],
-    actions: [{ type: "call_n8n_webhook", config: { path: "recruitment/hired" } }],
-    requiresApproval: false,
-    dailyRunCap: null,
-    needs: ["n8n"],
-  },
 ];
 
 export function getTemplate(id: string): RuleTemplate | null {

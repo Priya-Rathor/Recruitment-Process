@@ -363,7 +363,20 @@ const HEALTH_CHECKS: Record<
     why: "this rule can't create calendar invites",
   },
   llm: { read: getLlmStatus, label: "the AI provider", why: "this rule can't run AI actions" },
-  n8n: { read: getN8nStatus, label: "n8n", why: "this rule can't reach the workflow engine" },
+  /*
+    KEPT AS A GATE, RENAMED IN THE WARNING.
+
+    The check still runs — a legacy rule with a hand-off action must not activate
+    against an unreachable workflow engine. What changed is the LABEL: it named a
+    product a customer can no longer see or connect anywhere, so the warning sent
+    them looking for an integration card that does not exist. "The workflow
+    engine" is what it is from their side.
+  */
+  n8n: {
+    read: getN8nStatus,
+    label: "the workflow engine",
+    why: "this rule can't reach the workflow engine",
+  },
   // MODULE 15's channel. Only ever REQUIRED by a "Send templated message" action
   // whose template is WhatsApp-only — a `both` template requires neither channel,
   // because either one delivering is enough. See requiredIntegrationsFor().

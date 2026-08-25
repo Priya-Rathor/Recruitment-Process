@@ -19,8 +19,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, MessageCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, Mail, MessageCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { FormError } from "@/components/states";
+import { formatDateTimeInZone } from "@/lib/time";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { Toggle } from "@/components/ui/Toggle";
 import {
@@ -31,22 +32,65 @@ import { CHANNEL_LABELS, type MessageTemplate } from "@/lib/communications/templ
 import type { TemplateGroup } from "@/lib/communications/queries";
 import { TemplateEditor } from "./TemplateEditor";
 
+/** The channel filter. "all" is a filter value, not a channel. */
+type ChannelFilter = "all" | "email" | "whatsapp";
+
 export function TemplateLibrary({
   groups,
   emailConnected,
   whatsappConnected,
+  timeZone,
+  canManage,
 }: {
   groups: TemplateGroup[];
   emailConnected: boolean;
   whatsappConnected: boolean;
+  timeZone: string;
+  /**
+   * Owner/Admin. False for a Recruiter or Viewer, who read the library without
+   * being able to change organization-wide messaging.
+   *
+   * One prop rather than the role: the page owns the rule, this component asks a
+   * question. The routes and RLS enforce it independently — nothing here is a
+   * boundary.
+   */
+  canManage: boolean;
 }) {
   const router = useRouter();
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
 
   const [editing, setEditing] = useState<MessageTemplate | null>(null);
   const [creatingFor, setCreatingFor] = useState<CommunicationEventKey | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+
+  /*
+    ONE LIST, FILTERED — not two pages.
+
+    A `both` template matches BOTH filters, because it genuinely sends on both.
+    Hiding it under "Email" would tell an admin filtering for email problems that
+    a template which emails candidates does not exist.
+
+    Groups whose templates all filter out are kept, not dropped: an empty event
+    group is the useful one — it is how somebody sees that "Offer extended" would
+    send nothing. Dropping it would make a gap invisible, which is the reason the
+    unfiltered list shows empty groups in the first place.
+  */
+  const visibleGroups = groups.map((group) => ({
+    ...group,
+    templates: group.templates.filter(
+      (template) =>
+        channelFilter === "all" ||
+        template.channel === channelFilter ||
+        template.channel === "both"
+    ),
+  }));
+
+  const filteredCount = visibleGroups.reduce(
+    (total, group) => total + group.templates.length,
+    0
+  );
 
   const activeCount = groups.reduce(
     (total, group) => total + group.templates.filter((template) => template.active).length,
@@ -105,6 +149,7 @@ export function TemplateLibrary({
   if (editing || creatingFor) {
     return (
       <TemplateEditor
+          readOnly={!canManage}
         template={editing}
         eventKey={editing?.event_key ?? (creatingFor as CommunicationEventKey)}
         whatsappConnected={whatsappConnected}
@@ -177,7 +222,51 @@ export function TemplateLibrary({
 
       <FormError message={error} />
 
-      {groups.map((group) => {
+      {/*
+        All / Email / WhatsApp. Tabs rather than a dropdown: three options that
+        change what the list shows are worth one click, not two.
+      */}
+      <div className="tpl-filter" role="tablist" aria-label="Filter templates by channel">
+        {(
+          [
+            { key: "all", label: "All", icon: null },
+            { key: "email", label: "Email", icon: Mail },
+            { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+          ] as { key: ChannelFilter; label: string; icon: typeof Mail | null }[]
+        ).map((option) => {
+          const Icon = option.icon;
+          const selected = channelFilter === option.key;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              className={`tpl-filter__tab${selected ? " is-active" : ""}`}
+              onClick={() => setChannelFilter(option.key)}
+            >
+              {Icon && <Icon size={14} aria-hidden="true" />}
+              {option.label}
+            </button>
+          );
+        })}
+
+        <span className="tpl-filter__count" role="status" aria-live="polite">
+          {filteredCount} {filteredCount === 1 ? "template" : "templates"}
+          {channelFilter !== "all" && " on this channel"}
+        </span>
+      </div>
+
+      {filteredCount === 0 && channelFilter !== "all" && (
+        <div className="card mb-4">
+          <p style={{ fontSize: 14, margin: 0 }}>
+            No {channelFilter === "email" ? "email" : "WhatsApp"} templates yet. Templates that send
+            on both channels appear under both filters.
+          </p>
+        </div>
+      )}
+
+      {visibleGroups.map((group) => {
         const definition = COMMUNICATION_EVENT_DEFINITIONS[group.eventKey];
 
         return (
@@ -206,14 +295,16 @@ export function TemplateLibrary({
                 </p>
               </div>
 
-              <button
-                type="button"
-                className="button is-small"
-                onClick={() => setCreatingFor(group.eventKey)}
-              >
-                <Plus size={14} aria-hidden="true" />
-                New template
-              </button>
+              {canManage && (
+                <button
+                  type="button"
+                  className="button is-small"
+                  onClick={() => setCreatingFor(group.eventKey)}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  New template
+                </button>
+              )}
             </div>
 
             {group.templates.length === 0 ? (
@@ -238,7 +329,19 @@ export function TemplateLibrary({
                           className="is-flex mt-1"
                           style={{ gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}
                         >
-                          <span className="intake-chip is-info">
+                          {/*
+                            Icon AND word. The brief asks for an envelope or a
+                            chat bubble; the label stays because an icon alone is
+                            a guess, and a `both` template shows both marks so the
+                            row does not have to be read twice.
+                          */}
+                          <span className="tpl-channel">
+                            {(template.channel === "email" || template.channel === "both") && (
+                              <Mail size={13} aria-hidden="true" />
+                            )}
+                            {(template.channel === "whatsapp" || template.channel === "both") && (
+                              <MessageCircle size={13} aria-hidden="true" />
+                            )}
                             {CHANNEL_LABELS[template.channel]}
                           </span>
                           {template.active ? (
@@ -246,6 +349,11 @@ export function TemplateLibrary({
                           ) : (
                             <StatusChip tone="neutral" label="Off" />
                           )}
+                          {/* Organization timezone, so this reads the same for
+                              everyone on the team — see lib/time.ts. */}
+                          <span className="tpl-edited">
+                            Edited {formatDateTimeInZone(template.updated_at, timeZone)}
+                          </span>
                         </div>
                       </div>
 
@@ -253,29 +361,52 @@ export function TemplateLibrary({
                         className="is-flex is-align-items-center"
                         style={{ gap: "0.75rem" }}
                       >
-                        <Toggle
-                          checked={template.active}
-                          disabled={busyId === template.id}
-                          label={template.active ? "On" : "Off"}
-                          onChange={(next) => toggle(template, next)}
-                        />
-                        <button
-                          type="button"
-                          className="button is-small"
-                          onClick={() => setEditing(template)}
-                        >
-                          <Pencil size={14} aria-hidden="true" />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="button is-small"
-                          onClick={() => setConfirmingDelete(template.id)}
-                          disabled={busyId === template.id}
-                        >
-                          <Trash2 size={14} aria-hidden="true" />
-                          Delete
-                        </button>
+                        {/*
+                          A Recruiter or Viewer gets "View" and nothing else.
+
+                          The write controls are ABSENT rather than disabled — the
+                          settings area's rule throughout is to hide what a role
+                          cannot do rather than present a wall of dead switches.
+                          The status chip beside the name already says whether the
+                          template is sending, so nothing is lost by removing the
+                          toggle.
+                        */}
+                        {canManage ? (
+                          <>
+                            <Toggle
+                              checked={template.active}
+                              disabled={busyId === template.id}
+                              label={template.active ? "On" : "Off"}
+                              onChange={(next) => toggle(template, next)}
+                            />
+                            <button
+                              type="button"
+                              className="button is-small"
+                              onClick={() => setEditing(template)}
+                            >
+                              <Pencil size={14} aria-hidden="true" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="button is-small"
+                              onClick={() => setConfirmingDelete(template.id)}
+                              disabled={busyId === template.id}
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                              Delete
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="button is-small"
+                            onClick={() => setEditing(template)}
+                          >
+                            <Eye size={14} aria-hidden="true" />
+                            View
+                          </button>
+                        )}
                       </div>
                     </div>
 

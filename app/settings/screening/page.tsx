@@ -13,8 +13,6 @@ export default async function ScreeningSettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/screening"
       title="Screening"
       description="How the AI screening call behaves."
     >

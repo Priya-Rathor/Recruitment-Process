@@ -79,8 +79,9 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `lib/intake/` | Bulk resume intake — deterministic candidate matching, per-file processing (see `docs/modules/18-bulk-resume-intake.md`) |
 | `lib/onboarding/` | Module 19's document checklist, completion gate, and overdue sweep (see `docs/modules/19-onboarding-documents.md`). Records are created by a trigger on `applications`, never by a route |
 | `lib/forms/` | Module 23's form engine — the public application link's signed token, both validators, answers-to-candidate mapping, and the submission pipeline (see `docs/modules/23-forms-public-applications.md`). The public page is `app/apply/[token]/`; submissions reuse Modules 4/5/6 rather than reimplementing them |
-| `lib/voice/` | Module 24's neutral `AgentSettings` shape and **the Default Call Data precedence rule** (see `docs/modules/24-voice-agent-console.md`). Provider-neutral by construction — the mapping to a provider's own schema lives in `lib/integrations/bolna/agentMapping.ts` |
+| `lib/voice/` | Module 24's neutral `AgentSettings` shape and **the Default Call Data precedence rule** (see `docs/modules/24-voice-agent-console.md`). Provider-neutral by construction — the mapping to a provider's own schema lives in `lib/integrations/bolna/agentMapping.ts`. Split client-safe from server: `settings/callData/catalog/costModel` touch nothing, `queries/cost` read the database |
 | `lib/integrations/` | Provider adapters (connect/test/getStatus/disconnect) |
+| `app/settings/catalog.ts` | The ONE settings catalogue — categories, links and role gating for both the landing grid and every page's own check (see `docs/modules/17-settings-notes.md`) |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
 | `proxy.ts` | Session refresh + auth enforcement at the edge |

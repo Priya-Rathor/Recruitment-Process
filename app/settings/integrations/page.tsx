@@ -3,9 +3,10 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { SkeletonRows } from "@/components/states";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { getAllIntegrationHealth, type IntegrationHealth } from "@/lib/settings/integrations";
-import type { Provider } from "@/lib/integrations/store";
+import type { CustomerFacingProvider } from "@/lib/settings/integrations";
 import { RestrictedPanel, SettingsShell } from "../SettingsShell";
 import { IntegrationCard } from "./IntegrationCard";
+import { CredentialDisclosure } from "./CredentialDisclosure";
 
 export const metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";
@@ -21,10 +22,31 @@ export const dynamic = "force-dynamic";
  * Declared as data rather than as markup so a new provider is a one-line
  * addition, and so the completeness check below can prove nothing was dropped.
  */
-const CATEGORIES: { label: string; providers: Provider[] }[] = [
+/**
+ * The anchor id for one integration's card.
+ *
+ * The ONE place these are minted. The Settings landing grid deep-links to
+ * `#integration-<provider>`, the card renders the matching id, and
+ * app/settings/catalog.test.ts asserts every anchor in the grid names a provider
+ * that still has a descriptor — so a renamed provider breaks the test rather than
+ * the link.
+ */
+export function integrationAnchor(provider: string): string {
+  return `integration-${provider}`;
+}
+
+const CATEGORIES: { label: string; providers: CustomerFacingProvider[] }[] = [
   { label: "Calling & scheduling", providers: ["bolna", "calendar"] },
   { label: "Communication", providers: ["email", "whatsapp"] },
-  { label: "AI & automation", providers: ["llm", "n8n"] },
+  /*
+    ONE provider here, not two.
+
+    n8n used to sit beside the AI provider. It has no descriptor now — it is
+    platform-managed infrastructure a customer cannot configure — so there is
+    nothing to render, and the group is honest at one card rather than padded to
+    two.
+  */
+  { label: "AI & automation", providers: ["llm"] },
 ];
 
 export default async function IntegrationsSettingsPage({
@@ -39,8 +61,6 @@ export default async function IntegrationsSettingsPage({
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/integrations"
       title="Integrations"
       description="Connect the services this product talks to, and check they still work."
     >
@@ -168,11 +188,15 @@ async function IntegrationList({
         </section>
       )}
 
-      <p className="has-text-secondary" style={{ fontSize: 12 }}>
-        Credentials are encrypted before storage and can never be read back — not by this page, not
-        by the API, and not by anyone&apos;s browser session. Only the last four characters are kept
-        for display.
-      </p>
+      {/*
+        The trust disclosure, as a persistent footer note.
+
+        A flat bordered note rather than a card, deliberately: it is not one of the
+        integrations, and giving it the same white card treatment would make it
+        read as a sixth item in the list. The same words appear inside every
+        credential-entry panel — see CredentialDisclosure.
+      */}
+      <CredentialDisclosure placement="footer" />
     </>
   );
 }

@@ -24,6 +24,8 @@ export function ConsoleSection({
   description,
   children,
   defaultOpen = true,
+  open: controlledOpen,
+  onToggle,
   /** Rendered in the header, right-aligned — a count, a chip, a warning. */
   aside,
 }: {
@@ -32,9 +34,35 @@ export function ConsoleSection({
   description?: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  /**
+   * OPTIONALLY CONTROLLED.
+   *
+   * Every section manages its own open state — that is what makes them
+   * independently expandable rather than an accordion, and it stays the default.
+   *
+   * The Test Agent section is the one exception: the page header's "Get call from
+   * agent" button arms a confirmation that lives inside it, and a confirmation
+   * behind a collapsed heading is a dialog nobody can see. So the console owns
+   * that one section's state and passes it here.
+   *
+   * A controlled pair rather than a `forceOpen` flag: a flag has to be applied in
+   * an effect, which is a render late and a setState-in-an-effect. This way the
+   * parent's click handler opens the section in the same tick it arms the
+   * confirmation, and the reader can still close it, because onToggle flips the
+   * parent's state rather than fighting it.
+   */
+  open?: boolean;
+  onToggle?: (next: boolean) => void;
   aside?: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+
+  const open = controlledOpen ?? uncontrolledOpen;
+  const toggle = () => {
+    const next = !open;
+    if (onToggle) onToggle(next);
+    else setUncontrolledOpen(next);
+  };
 
   return (
     <section id={id} className="card vac-section">
@@ -45,7 +73,7 @@ export function ConsoleSection({
             className="vac-section__toggle"
             aria-expanded={open}
             aria-controls={`${id}-body`}
-            onClick={() => setOpen((previous) => !previous)}
+            onClick={toggle}
           >
             <ChevronDown
               size={16}

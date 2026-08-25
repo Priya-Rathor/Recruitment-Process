@@ -12,8 +12,6 @@ export default async function OrganizationSettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/organization"
       title="Organization"
       description="Who you are, and the timezone every date in the product is measured in."
     >

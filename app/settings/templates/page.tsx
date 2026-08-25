@@ -3,7 +3,7 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { SkeletonRows } from "@/components/states";
 import { listMessageTemplates, groupByEvent } from "@/lib/communications/queries";
 import { getAllIntegrationHealth } from "@/lib/settings/integrations";
-import { RestrictedPanel, SettingsShell } from "../SettingsShell";
+import { SettingsShell } from "../SettingsShell";
 import { TemplateLibrary } from "./TemplateLibrary";
 
 export const metadata = { title: "Message templates" };
@@ -14,29 +14,50 @@ export default async function MessageTemplatesSettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/templates"
       title="Message templates"
       description="What this product says to candidates, and which pipeline events say it."
     >
-      {!hasRole(membership.role, ["owner", "admin"]) ? (
-        <RestrictedPanel what="message templates" />
-      ) : (
-        <Suspense
-          fallback={
-            <div className="card">
-              <SkeletonRows rows={6} />
-            </div>
-          }
-        >
-          <Library organizationId={membership.organization.id} />
-        </Suspense>
-      )}
+      {/*
+        EVERY ROLE READS; OWNER/ADMIN WRITE.
+
+        This used to show RestrictedPanel to a Recruiter, which was the wrong
+        refusal: a recruiter about to move somebody to Rejected should be able to
+        see exactly what that candidate is about to receive. Not being able to see
+        it is how a recruiter gets surprised by a message they did not know the
+        product sent.
+
+        `canManage` is passed down rather than the role, so the library asks one
+        question instead of re-deriving the rule. The API routes and the RLS
+        policies in migration 0035 enforce the same split independently — this only
+        decides what to draw.
+      */}
+      <Suspense
+        fallback={
+          <div className="card">
+            <SkeletonRows rows={6} />
+          </div>
+        }
+      >
+        <Library
+          organizationId={membership.organization.id}
+          timeZone={membership.organization.timezone}
+          canManage={hasRole(membership.role, ["owner", "admin"])}
+        />
+      </Suspense>
     </SettingsShell>
   );
 }
 
-async function Library({ organizationId }: { organizationId: string }) {
+async function Library({
+  organizationId,
+  timeZone,
+  canManage,
+}: {
+  organizationId: string;
+  /** The ORGANIZATION's timezone, so dates read the same on server and client. */
+  timeZone: string;
+  canManage: boolean;
+}) {
   const [{ templates, failed }, integrations] = await Promise.all([
     listMessageTemplates(organizationId),
     // Read so the page can say which channels will actually deliver TODAY.
@@ -70,6 +91,8 @@ async function Library({ organizationId }: { organizationId: string }) {
       groups={groupByEvent(templates)}
       emailConnected={emailConnected}
       whatsappConnected={whatsappConnected}
+      timeZone={timeZone}
+      canManage={canManage}
     />
   );
 }

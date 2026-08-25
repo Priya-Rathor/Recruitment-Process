@@ -48,8 +48,6 @@ export default async function UsersSettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/users"
       title="Team & permissions"
       description="What each role can do. Every rule below is enforced by the API and by the database, not just by hiding buttons."
     >

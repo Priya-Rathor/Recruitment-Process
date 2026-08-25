@@ -108,7 +108,6 @@ Rules for good output:
 - time_elapsed_in_stage REQUIRES a days_in_stage condition using gte or gt. Without one the rule would match every open application at once.
 - move_to_stage requires config: {"stage": "<one of the stages above>"}.
 - assign_recruiter requires config: {"strategy": "job_owner"}.
-- call_n8n_webhook takes config: {"path": "<a path inside the n8n instance>"} — never a full URL.
 - If the request asks to send a message from the organization's own template library, say so in "unsupported" and explain that the person should add the "Send templated message" action themselves and pick the template. You cannot know which templates exist.
 - Never propose rejecting or withdrawing an application. Ending somebody's application is a decision a person makes.
 - Never propose more than 3 actions.

@@ -70,6 +70,22 @@ and a consent disclosure that cannot be disabled. Recording someone without
 telling them is unlawful in many jurisdictions — treat that as a build
 constraint, not a later compliance task.
 
+**Client/server import boundary.** A module a `"use client"` component imports
+may not reach `lib/supabase/server.ts`, `lib/supabase/admin.ts` or `next/headers`.
+Breaking it pulls the service-side client into the browser bundle and the App
+Router rejects the build — but the failure is nastier than that sounds: the import
+looks harmless (nobody imports a formatter expecting to drag a database client
+along), and it can pass `npm run build` while failing `next dev`, so it surfaces
+when somebody else pulls the branch.
+
+The fix is always the same shape — split the module, not the file. Types and pure
+functions in one file that touches nothing, the read in another. See
+`lib/voice/costModel.ts` (client-safe) against `lib/voice/cost.ts` (server), and
+`lib/voice/catalog.ts` against `lib/integrations/bolna/agentMapping.ts`. Note that
+`import type` is erased and always safe; a value import from the same module is
+not, and that distinction is usually the whole bug.
+`app/settings/clientBoundary.test.ts` enforces this across the codebase.
+
 **Time.** Every "today"/"this week" calculation uses `lib/time.ts` with the
 ORGANIZATION's configured timezone — never the server's or the browser's. Ranges
 are half-open `[start, end)`.

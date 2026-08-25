@@ -233,6 +233,31 @@ export const ACTIONS = [
 
 export type ActionType = (typeof ACTIONS)[number];
 
+/**
+ * Actions that still RUN but are no longer OFFERED.
+ *
+ * `call_n8n_webhook` is retired from the builder because the integration it
+ * depends on is no longer customer-facing: an admin could pick the action and
+ * then find no card anywhere to connect it, which is a worse outcome than not
+ * offering it.
+ *
+ * IT STAYS IN `ACTIONS` DELIBERATELY. `isActionType()` gates parseActions(), so
+ * dropping it would make every stored rule containing it fail to save with
+ * "Unknown action" — silently breaking live automations to tidy a picker. The
+ * engine's handler stays too, so a rule that already exists keeps working
+ * exactly as it did.
+ */
+export const RETIRED_ACTIONS: ActionType[] = ["call_n8n_webhook"];
+
+export function isRetiredAction(action: ActionType): boolean {
+  return RETIRED_ACTIONS.includes(action);
+}
+
+/** What the builder offers for a NEW action. Everything not retired. */
+export const OFFERED_ACTIONS: ActionType[] = ACTIONS.filter(
+  (action) => !RETIRED_ACTIONS.includes(action)
+);
+
 export const ACTION_LABELS: Record<ActionType, string> = {
   start_screening_call: "Start an AI screening call",
   generate_screening_report: "Generate the screening report",
@@ -242,7 +267,10 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   add_note: "Add a note to the application",
   send_candidate_email: "Email the candidate a stage update",
   assign_recruiter: "Assign a recruiter",
-  call_n8n_webhook: "Hand off to an n8n workflow",
+  // RETIRED — see RETIRED_ACTIONS. Kept so an existing rule still renders with a
+  // readable label instead of a raw slug, and unbranded because the integration
+  // it named is no longer something a customer can see or connect.
+  call_n8n_webhook: "Hand off to an external workflow",
   send_templated_message: "Send templated message",
 };
 
@@ -680,7 +708,7 @@ export function validateRule(value: unknown): ValidationResult {
     if (entry.type === "call_n8n_webhook") {
       const path = config.path;
       if (path !== undefined && path !== null && typeof path !== "string") {
-        return { ok: false, error: "The n8n workflow path must be text." };
+        return { ok: false, error: "The workflow path must be text." };
       }
       // Relative only. A rule that could name any host would be an outbound
       // request to anywhere, authored by whoever can edit a rule — the n8n
@@ -688,7 +716,7 @@ export function validateRule(value: unknown): ValidationResult {
       if (typeof path === "string" && /^[a-z]+:\/\//i.test(path)) {
         return {
           ok: false,
-          error: "Give a path inside your n8n instance, not a full URL.",
+          error: "Give a path inside your workflow engine, not a full URL.",
         };
       }
       config.path = typeof path === "string" ? path.replace(/^\/+/, "").slice(0, 200) : "";

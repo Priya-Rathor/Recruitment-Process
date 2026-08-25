@@ -167,3 +167,134 @@ settings pages link to it rather than duplicating it.
   last-write-wins with no acknowledgment.
 - ☐ **Branding is stored but not applied** — `logo_url` and `brand_color` are
   saved and validated; the app shell still renders the default tokens.
+
+---
+
+# What changed after Module 17 shipped
+
+Four passes over this module, in order. Each was a visual/consistency change
+except the last, which removed a provider.
+
+## 1. The sidebar became a landing grid
+
+Settings was a permanent left nav beside a detail panel — twelve rows of
+similar-length text, always on screen, competing with whatever page you opened.
+
+`/settings` is now a **categorised grid** and the navigation *is* the landing
+page. Each individual settings page keeps its content exactly as built and gains
+an explicit `← Settings` back link; a page nested one level deeper (the Voice
+Agent Console) points one level up instead, so it does not skip the integration
+that owns it.
+
+`SettingsShell` lost both `role` and `current`. With no sidebar neither had any
+output — every page already does its own role check and renders
+`RestrictedPanel` itself. The old `.settings-nav__*` CSS was deleted with them.
+
+### One catalogue, not two
+
+`app/settings/catalog.ts` is the single source: `visibleCategories()` feeds the
+grid, `visibleLinks()` (re-exported from `SettingsShell` as `visibleSections` for
+compatibility) feeds everything else. A grid built *beside* the old section list
+would have been a second list to keep in step, and the drift is not cosmetic — a
+link whose route was renamed becomes a 404.
+
+`catalog.test.ts` walks the real `app/` route tree and asserts every `href`
+resolves to a page file, including the `#integration-…` anchors, which are checked
+against `PROVIDER_DESCRIPTORS` rather than against a hardcoded list. It also
+proves the checker works by asserting a route that does not exist is rejected —
+without that, a `routeExists()` returning `true` for everything would pass
+silently forever.
+
+### Search
+
+Subsequence matching, not substring: `msgtmp` finds Message templates and a
+typo still lands. A category whose *name* matches keeps all its links, because
+searching by category is half of what people type.
+
+## 2. The grid was rebalanced
+
+Cards hold 2–3 items each and heights are content-driven — `align-items: start`,
+no masonry, no forced height matching. That only reads as deliberate while the
+content is balanced, so the **Integrations card was split in two** (Calling &
+scheduling / Communication & AI) when it reached six items against neighbours of
+two.
+
+Column counts are explicit (1 / 2 / 3 / 4 at 560, 860, 1120px). `auto-fill`
+re-flowed the same seven cards through 4+3, 3+3+1 and 2+2+2+1 at breakpoints
+nobody chose. Tracks are `minmax(0, 1fr)` — a track's implicit minimum is `auto`,
+so one long unbroken word could push a column wider than its share.
+
+`catalog.test.ts` asserts every card stays within 2–3 items. The layout depends
+on that property, so it is a test rather than a hope.
+
+## 3. The integrations detail page
+
+**Three button states, one rule, no exceptions:** connectable → solid primary
+`Connect`; connected → outline `Replace credentials` plus quiet `Test connection`
+and soft-danger `Disconnect`, with *no* solid button anywhere; blocked →
+`is-unavailable`, grey and inert.
+
+That third state is the fix for a real bug. Google Calendar's button was already
+`disabled` (no OAuth app on the deployment), but the only disabled treatment in
+the stylesheet was a global opacity knock-down — so a disabled *primary* rendered
+as the same blue at 55% and read as a second kind of button rather than as a dead
+one. `is-unavailable` is opt-in rather than a change to
+`.button.is-primary:disabled`, which would repaint every disabled primary in the
+product.
+
+The AI provider's chip reads **"Using platform default"** when
+`activeSource === "server_environment"`. Its status genuinely is `disconnected` —
+no organization key is stored — but resume parsing and matching *are* working on
+the server's key, and a grey "Disconnected" on a working feature is false. Only
+the chip changes; `status` is untouched, so the connect flow and every dependency
+check behave as before.
+
+The **trust disclosure** is one component in two placements: a flat bordered
+footer note, and inside every credential-entry panel. The inline copy used to be
+a shorter paraphrase — it said less than the footer did, in the one place where
+somebody has a secret in the field above it.
+
+## 4. n8n removed from every customer surface
+
+It stays in the `Provider` union — the table has a CHECK constraint listing it and
+Module 13's engine can still hand off to a workflow — but it has no descriptor, so
+no card, no connect form, no dependency warning and no API route (the handler
+404s it). Ten surfaces were closed, including the automations builder, the
+template library, the rule-drafting AI prompt, and a **public marketing page**
+that claimed the automation engine was "orchestrated through n8n" — which was
+also factually wrong, since Module 13 runs in-process.
+
+The exclusion is a TYPE, `CustomerFacingProvider = Exclude<Provider, "n8n">`, not
+a filter applied at the end. Applying it made the compiler find every remaining
+surface; a filter can be forgotten by the next person adding one.
+
+`call_n8n_webhook` is **retired, not deleted**. `isActionType()` gates
+`parseActions()`, so removing it from `ACTIONS` would make every stored rule
+containing it fail to save with "Unknown action" — silently breaking live
+automations to tidy a picker. It is gone from `OFFERED_ACTIONS`, the templates and
+the AI prompt; it still parses and still runs.
+
+## Retrofit checklist — additions
+
+- ☐ **Module 15's migration is a 4-byte truncated file.**
+  `0030_module15_candidate_messaging.sql` contains the text `writ`.
+  `message_templates`, `message_log` and `candidate_communication_preferences`
+  are queried from eleven files and created by nothing, and
+  `lib/communications/` has no `isMissingRelation` guard — so
+  `/settings/templates` errors rather than degrading. **Blocking.**
+- ☐ **`organization_settings.communication_settings` has no column.**
+  `RecruitmentForm` sends it in the same payload as currency, default recruiter,
+  default stage and interview duration, so `/settings/recruitment` cannot save
+  *anything*. **Blocking.**
+- ☐ **`SettingsPayload` is stale** — omits `onboarding_settings` and
+  `communication_settings`, both of which `parseSettingsPayload()` accepts.
+  Cosmetic; the parser is the real contract.
+- ☐ **`var(--color-secondary-text)` does not exist.** The real token is
+  `--color-text-secondary`. Fixed in the settings nav; still wrong in
+  `TemplateEditor`, `SendMessagePanel`, `ReminderButton`, `NotificationList`,
+  `charts.tsx` and `CommunicationLog`, where the text silently inherits
+  near-black instead of grey.
+- ☐ **Automation rules have no Settings entry.** The org-wide kill switch
+  (`organizations.automations_enabled`) and the rules themselves live only on
+  `/automations`. The audit recommends linking them from the grid (marked ↗)
+  rather than moving the page.

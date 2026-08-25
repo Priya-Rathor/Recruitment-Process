@@ -1,6 +1,4 @@
 import { Suspense } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { hasRole, requireMembershipOrRedirect } from "@/lib/tenant";
 import { ErrorState, SkeletonRows } from "@/components/ui/states";
 import { getStatus, listAgentCatalog } from "@/lib/integrations/bolna";
@@ -9,6 +7,7 @@ import {
   listPreviewJobs,
   listVoiceAgents,
 } from "@/lib/voice/queries";
+import { getAgentCostEstimate } from "@/lib/voice/cost";
 import { RestrictedPanel, SettingsShell } from "../../SettingsShell";
 import { VoiceAgentConsole } from "./VoiceAgentConsole";
 
@@ -33,18 +32,12 @@ export default async function VoiceAgentConsolePage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      // Keeps Integrations highlighted in the left nav: this is a page WITHIN
-      // that section, not a tenth section of its own.
-      current="/settings/integrations"
       title="Voice Agent Console"
       description="What the automated screening call says, how it sounds, and how it behaves."
+      // One level up, not all the way to the grid: this page lives inside the
+      // integration that owns it, and the shell's default would skip it.
+      back={{ href: "/settings/integrations", label: "Integrations" }}
     >
-      <Link className="text-link mb-4 is-block" href="/settings/integrations">
-        <ArrowLeft size={14} aria-hidden="true" />
-        All integrations
-      </Link>
-
       {!hasRole(membership.role, ["owner", "admin"]) ? (
         <RestrictedPanel what="the voice agent" />
       ) : (
@@ -74,11 +67,17 @@ async function ConsoleBody({
 }) {
   // In parallel: nothing here depends on anything else here, and the catalogue
   // involves a provider round trip that must not delay the rest of the page.
-  const [{ agents, notBuilt, failed }, catalog, status, jobs] = await Promise.all([
+  const [{ agents, notBuilt, failed }, catalog, status, jobs, costEstimate] = await Promise.all([
     listVoiceAgents({ organizationId, companyName: organizationName }),
     listAgentCatalog(organizationId),
     getStatus(organizationId),
     listPreviewJobs({ organizationId }),
+    /*
+      From OUR usage ledger. Returns an explicit `not_tracked` state today,
+      because the Cost & Budget Guardrails feature is specified but unbuilt — the
+      header says so in words rather than inventing a figure. See lib/voice/cost.
+    */
+    getAgentCostEstimate({ organizationId }),
   ]);
 
   if (failed) return <ErrorState message="Couldn't load the voice agent settings." />;
@@ -118,6 +117,7 @@ async function ConsoleBody({
       }}
       jobs={jobs}
       initialTestCall={initialTestCall}
+      costEstimate={costEstimate}
       organizationName={organizationName}
     />
   );

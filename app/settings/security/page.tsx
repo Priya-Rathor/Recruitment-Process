@@ -14,8 +14,6 @@ export default async function SecuritySettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/security"
       title="Security & data"
       description="How long data is kept, and what the product does to protect it."
     >

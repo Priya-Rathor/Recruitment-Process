@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ACTIONS,
   ACTION_MODES,
+  OFFERED_ACTIONS,
+  isActionType,
+  isRetiredAction,
   TRIGGERS,
   TRIGGER_MODES,
   TRIGGER_SOURCES,
@@ -593,6 +596,40 @@ describe("guardrails", () => {
         { type: "calculate_match" },
       ])
     ).toBe(2);
+  });
+
+  /*
+    THE RETIREMENT, ASSERTED.
+
+    n8n is no longer customer-facing, so the hand-off action is not offered — but
+    it must keep parsing and keep declaring its requirement, because rules saved
+    before the retirement are still live. These two facts are easy to break in
+    opposite directions, so both are pinned.
+  */
+  it("no longer OFFERS the workflow hand-off action", () => {
+    expect(OFFERED_ACTIONS).not.toContain("call_n8n_webhook");
+    expect(isRetiredAction("call_n8n_webhook")).toBe(true);
+  });
+
+  it("still ACCEPTS a stored rule that uses it, so nothing live breaks", () => {
+    // The failure this guards against: removing it from ACTIONS makes
+    // isActionType() reject it and every existing rule fails to save with
+    // "Unknown action".
+    expect(isActionType("call_n8n_webhook")).toBe(true);
+
+    const result = validateRule({
+      trigger: "application_stage_changed",
+      actions: [{ type: "call_n8n_webhook", config: { path: "recruitment/hired" } }],
+    });
+    expect(result.ok, result.ok ? "" : result.error).toBe(true);
+  });
+
+  it("offers no template that needs a retired action", () => {
+    for (const template of RULE_TEMPLATES) {
+      for (const action of template.actions) {
+        expect(isRetiredAction(action.type), `${template.id} offers ${action.type}`).toBe(false);
+      }
+    }
   });
 
   it("requires email for a candidate email and n8n for a hand-off", () => {

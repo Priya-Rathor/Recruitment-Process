@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormError } from "@/components/states";
 import {
-  ACTIONS,
+  OFFERED_ACTIONS,
   ACTION_INTEGRATIONS,
   ACTION_LABELS,
   ACTION_MODES,
@@ -666,7 +666,10 @@ export function AutomationForm({
                       });
                     }}
                   >
-                    {ACTIONS.map((type) => (
+                    {/* OFFERED_ACTIONS, not ACTIONS: a retired action still
+                        renders on a rule that has one, but is never offered as a
+                        new choice. */}
+                    {OFFERED_ACTIONS.map((type) => (
                       <option key={type} value={type}>
                         {ACTION_LABELS[type]}
                       </option>
@@ -846,8 +849,11 @@ export function AutomationForm({
 
               {action.type === "call_n8n_webhook" && (
                 <p className="has-text-secondary mt-1" style={{ fontSize: 12 }}>
-                  Posts ids and the stage to a workflow in your own n8n instance. No candidate
-                  name, email or phone is sent.
+                  {/* Only reachable on a rule saved before this action was
+                      retired. Kept visible so an admin can see what a live rule
+                      does — hiding it would be worse than naming it. */}
+                  Retired: posts ids and the stage to an external workflow. Still runs on rules
+                  that already use it, but can&apos;t be added to new ones.
                 </p>
               )}
             </div>

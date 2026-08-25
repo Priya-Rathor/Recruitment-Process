@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { SlidersHorizontal } from "lucide-react";
+import { Cloud, SlidersHorizontal } from "lucide-react";
 import { FormError } from "@/components/states";
 import type { IntegrationHealth } from "@/lib/settings/integrations";
 import { formatDateTimeInZone } from "@/lib/time";
 import { StatusChip, type ChipTone } from "@/components/ui/StatusChip";
+import { CredentialDisclosure } from "./CredentialDisclosure";
 
 /**
  * Integration status, rendered with the shared chip.
@@ -17,7 +18,33 @@ import { StatusChip, type ChipTone } from "@/components/ui/StatusChip";
  * a tone gives the specified appearance AND one consistent chip geometry across
  * every module — rather than a fourth bespoke chip with its own padding.
  */
-function StatusChipFor({ status }: { status: string }) {
+function StatusChipFor({
+  status,
+  platformDefault = false,
+}: {
+  status: string;
+  /** True when the feature works on the platform's key, not one stored here. */
+  platformDefault?: boolean;
+}) {
+  /*
+    "USING PLATFORM DEFAULT" IS A PRESENTATION OF `disconnected`, NOT A NEW STATUS.
+
+    The AI provider stores no organization key, so its status genuinely is
+    `disconnected` — but resume parsing, matching and drafting are all working, on
+    the server's own key. A grey "Disconnected" chip on a working feature is
+    simply false, and it sends admins hunting for a fault that is not there.
+
+    Only this chip changes. The status value, the connect flow and every other
+    reader are untouched, so an organization can still add its own key and the
+    dependency warnings still say what they said.
+
+    Cloud icon rather than a tick: a tick would claim THIS organization connected
+    something, which is the one thing that has not happened.
+  */
+  if (platformDefault) {
+    return <StatusChip tone="info" label="Using platform default" icon={Cloud} />;
+  }
+
   const map: Record<string, { tone: ChipTone; label: string }> = {
     connected: { tone: "success", label: "Connected" },
     needs_attention: { tone: "warning", label: "Needs attention" },
@@ -172,13 +199,22 @@ export function IntegrationCard({
     setFields((previous) => ({ ...previous, [key]: value }));
 
   return (
-    <div className="card integration-card">
+    /*
+      The id is the anchor the Settings landing grid deep-links to. Minted from
+      the provider key in one place — see INTEGRATION_ANCHOR on the page — so a
+      link and its target cannot disagree, and a test asserts every anchor in the
+      grid names a provider that still has a card.
+    */
+    <div className="card integration-card" id={`integration-${provider}`}>
       <div className="integration-card__head">
         <div style={{ minWidth: 0 }}>
           <h3 className="integration-card__title">{integration.label}</h3>
           <p className="integration-card__description">{integration.description}</p>
         </div>
-        <StatusChipFor status={integration.status} />
+        <StatusChipFor
+          status={integration.status}
+          platformDefault={integration.platformDefault}
+        />
       </div>
 
       {/*
@@ -353,23 +389,6 @@ export function IntegrationCard({
             </>
           )}
 
-          {provider === "n8n" && (
-            <>
-              <input
-                className="input mb-2"
-                placeholder="https://your-n8n-instance.example.com"
-                value={field("instanceUrl")}
-                onChange={(event) => setField("instanceUrl", event.target.value)}
-              />
-              <input
-                className="input mb-2"
-                type="password"
-                placeholder="n8n API key"
-                value={field("apiKey")}
-                onChange={(event) => setField("apiKey", event.target.value)}
-              />
-            </>
-          )}
 
           {provider === "whatsapp" && (
             <>
@@ -422,10 +441,17 @@ export function IntegrationCard({
             </>
           )}
 
-          <p className="integration-card__footnote mb-3">
-            The key is encrypted before it&apos;s stored and is never shown again — only the last
-            four characters.
-          </p>
+          {/*
+            THE FULL DISCLOSURE, AT THE POINT OF ENTRY.
+
+            This was a shortened paraphrase ("the key is encrypted before it's
+            stored…"). It said less than the footer note did, in the one place
+            where the promise actually matters — with somebody's secret in the
+            field above it. Now it is the same component and the same words.
+          */}
+          <div className="mb-3">
+            <CredentialDisclosure placement="inline" />
+          </div>
 
           <div className="buttons">
             <button

@@ -36,9 +36,21 @@ stay on that card, because the console must never display or accept an API key.
           │                       silence, duration, hangup, voicemail        ─┘
           ├─ 7 Default Call Data  org fallbacks + precedence preview  (default_call_data jsonb)
           ├─ 8 Handoff            transfer toggle + number
-          └─ 9 Test Agent         "Call me" → voice_agent_test_calls
+          └─ 9 Test Agent         Call  → voice_agent_test_calls
                                        └─ /api/webhooks/bolna advances it
+                                  Chat  → LLM only. No call, no row, no telephony
 ```
+
+The header above section 0 carries the agent name, the Default chip, a cost
+breakdown (see below) and **Get call from agent** — a shortcut that opens section
+9, arms the confirmation and scrolls there. It does not dial: this product's rule
+for telephoning a person is a confirmation that names the number, and that lives
+in the section. One `useTestCall()` hook serves both controls.
+
+Section 3 also carries **AI Edit**: describe a change in words, get a proposed
+revision, Accept or Discard. The route has no write — only the page's own Save can
+persist it. A revision that drops a guardrail is *rejected*, not flagged, because a
+reviewer skims a fluent rewrite.
 
 ## Files
 
@@ -51,8 +63,29 @@ stay on that card, because the console must never display or accept an API key.
 | `lib/voice/queries.ts` | Reads/writes, precedence inputs, test-call rows |
 | `lib/integrations/bolna/agentMapping.ts` | Neutral → provider payload. Server only; names the provider |
 | `lib/integrations/bolna/index.ts` | `listAgentCatalog`, `updateAgentConfig`, `placeTestCall` |
-| `app/api/settings/voice-agents/` | List/create, save/delete, test-call, precedence preview |
-| `app/settings/integrations/bolna/` | The page and its five client components |
+| `lib/voice/costModel.ts` | Cost types + arithmetic. **Client-safe** — see the split below |
+| `lib/voice/cost.ts` | The usage-ledger read. **Server only** |
+| `lib/ai/refineAgentPrompt.ts` | AI Edit. Proposes a revised prompt; cannot save one |
+| `lib/ai/chatAsAgent.ts` | The text rehearsal. No database handle at all |
+| `app/api/settings/voice-agents/` | List/create, save/delete, test-call, precedence preview, `prompt-edit`, `chat` |
+| `app/settings/integrations/bolna/` | The page and its client components |
+| ↳ `AgentCostHeader.tsx` | Cost line, segmented bar, legend, and the three honest empty states |
+| ↳ `PromptAiEdit.tsx` | Ask → propose → Accept/Discard |
+| ↳ `TestAgentSection.tsx` | Call and Chat tabs |
+| ↳ `useTestCall.ts` | The one test-call flow, shared with the header button |
+
+### Why the cost module is two files
+
+`AgentCostHeader` is a client component and needs the labels, the formatter and
+the component order. Those first lived beside `getAgentCostEstimate()`, which
+imports `lib/supabase/server.ts` — so importing one value pulled `next/headers`
+into the browser bundle and broke the dev build. It would have been wrong even had
+it built: nothing in a browser bundle should reference the service-side client.
+
+`costModel.ts` holds the types and arithmetic and touches nothing; `cost.ts` holds
+the read. The rule is now enforced by `app/settings/clientBoundary.test.ts`, which
+walks every `"use client"` file and follows runtime imports (skipping `import
+type`, which is erased) to any depth.
 
 ## The precedence rule
 
@@ -179,8 +212,40 @@ is never cleared.
 | A saved voice no longer in the catalogue | Rendered as "Saved selection (no longer listed)", value intact. A plain `<select>` would silently show — and then save — the first option |
 | No jobs yet | The precedence table says there is nothing to compare against |
 
+## Cost display — a deferral, recorded
+
+The header's cost line reads from `call_usage_events`. **That table does not
+exist.** The Cost & Budget Guardrails feature (`docs/modules/00-cost-tracking.md`)
+is specified but unbuilt, so `getAgentCostEstimate()` returns `not_tracked` and the
+header says so in words.
+
+This is the architecture rule for building against unbuilt modules, applied: never
+a fake zero, never a fabricated figure, and `not_tracked` is kept distinct from
+`failed` so a real read error cannot hide behind a build state.
+
+**Retrofit checklist** — when the cost ledger lands, `call_usage_events` needs:
+
+| Column | Why |
+| --- | --- |
+| `organization_id` | The tenant filter; RLS |
+| `component` | `telephony` \| `stt` \| `llm` \| `tts`. NULL is allowed and means "whole-call charge" — the console then draws a single-colour bar rather than inventing a split |
+| `cost_cents` | Integer cents |
+| `billable_seconds` | The denominator. Per-minute cost is `cost / (seconds / 60)` |
+| `created_at` | The 30-day window |
+
+Nothing else in the console changes: `lib/voice/cost.ts` and `AgentCostHeader` are
+finished and tested against that shape.
+
 ## Known gaps
 
+- **Chat mode costs LLM tokens.** It creates no call record and no telephony
+  charge — `lib/ai/chatAsAgent.ts` has no database handle, so that is structural —
+  but it is not free, and once the cost ledger exists its tokens should be metered
+  like any other AI call.
+- **No "Share" button.** The brief made it optional "only if there's a real use
+  case". There is none: an agent config is organization-scoped with no public read
+  path, so a shared link would either 404 or need a whole token-signing flow built
+  for it. Skipped rather than added with no destination.
 - **`rejectUnknownCallers` is stored, not applied.** This product places outbound
   calls only; there is no inbound path for it to gate. The toggle's help text says
   exactly that rather than pretending.

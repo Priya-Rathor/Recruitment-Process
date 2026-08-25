@@ -18,8 +18,6 @@ export default async function PrivacySettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/privacy"
       title="Privacy & consent"
       description="How candidate voice-call and interview data is handled."
     >

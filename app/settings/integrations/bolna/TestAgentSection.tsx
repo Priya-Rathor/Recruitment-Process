@@ -1,143 +1,78 @@
 "use client";
 
 // =============================================================================
-// Section 9 — Test Agent.
+// Section 9 — Test Agent. Two modes: Call, and Chat.
 //
-// THIS BUTTON TELEPHONES A REAL PERSON, so it is built like every other outbound
-// control in this product rather than like a "run" button:
+// CALL tests the thing that actually happens to a candidate — voice, pacing,
+// interruption handling, the recogniser coping with an accent. It telephones a
+// real person, so it keeps every safety property it had: two-step confirm naming
+// the number, disabled with a stated reason when the integration isn't connected
+// or the agent was never synced, a hard hourly cap server-side, and a disclosure
+// that cannot be switched off.
 //
-//   - two-step confirm, naming the number that will be dialled
-//   - disabled outright when the integration is not connected or the agent has
-//     never been synced, with the reason said out loud
-//   - the disclosure is not mentioned as a possibility but as a fact, because
-//     lib/screening/script.ts emits it and it cannot be switched off
+// CHAT tests the prompt. It is a text rehearsal against the SAME persona,
+// instructions and guardrails, with no call, no call record and no telephony
+// charge — see lib/ai/chatAsAgent.ts, which has no database handle at all.
 //
-// STATUS DISPLAY IS REUSED, NOT REBUILT. The badge is Module 8's CallStatusBadge
-// and the underlying row is advanced by the SAME provider webhook that advances a
-// screening call, so a test call and a candidate call cannot end up with two
-// different ideas of what "no answer" looks like. Module 8 had no polling loop to
-// reuse — it refreshes the server component — so the poll is new; it reads our own
-// row through our own route and never talks to the provider.
+// The two are labelled with what each can and cannot tell you, because the
+// tempting mistake is to rehearse in chat and ship. Chat cannot hear pacing.
+//
+// The call flow lives in useTestCall() — shared with the header's "Get call from
+// agent" button, so there is one code path and one confirmation, not two.
 // =============================================================================
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { PhoneCall } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MessageSquare, PhoneCall, Send } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/states";
 import { CallStatusBadge } from "@/app/screening-calls/CallStatusBadge";
+import type { AgentSettings } from "@/lib/voice/settings";
 import type { TestCall } from "@/lib/voice/queries";
+import { isTerminalCallStatus, type TestCallController } from "./useTestCall";
 
-/** Statuses that will not change again, so polling can stop. */
-const TERMINAL = new Set([
-  "completed",
-  "failed",
-  "no_answer",
-  "busy",
-  "cancelled",
-  "callback_requested",
-]);
-
-/** Every 4s, and never for more than 5 minutes — a call that long is over. */
-const POLL_INTERVAL_MS = 4_000;
-const POLL_LIMIT = 75;
+export type Mode = "call" | "chat";
 
 export function TestAgentSection({
   agentId,
-  initialCall,
+  controller,
+  settings,
+  mode,
+  onModeChange,
   connected,
   synced,
   hasUnsavedChanges,
 }: {
   agentId: string;
-  /** The most recent test call for this agent, so the readout survives a reload. */
-  initialCall: TestCall | null;
+  /** Shared with the header button. See useTestCall. */
+  controller: TestCallController;
+  /** The DRAFT settings, so Chat rehearses what is on screen. */
+  settings: AgentSettings;
+  /*
+    Mode is owned by the console, not by this section.
+
+    Because the header's "Get call from agent" button has to switch it: arming the
+    confirmation while the Chat tab is showing would hide the confirmation behind
+    a tab. Lifting the state lets that button say what it means in one handler —
+    set the mode, arm, scroll — instead of this component watching `confirming`
+    and reacting, which is a setState-in-an-effect and a render behind.
+  */
+  mode: Mode;
+  onModeChange: (mode: Mode) => void;
   connected: boolean;
   synced: boolean;
   hasUnsavedChanges: boolean;
 }) {
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [call, setCall] = useState<TestCall | null>(initialCall);
+  const numberRef = useRef<HTMLInputElement>(null);
 
-  // A ref, not state: the poll count must not re-render the component 75 times.
-  const pollCount = useRef(0);
+  /*
+    Focus the number field when a confirmation is armed with nothing to dial —
+    which is what happens when the header button is pressed first.
 
-  const poll = useCallback(
-    async (callId: string): Promise<TestCall | null> => {
-      const response = await fetch(
-        `/api/settings/voice-agents/${agentId}/test-call?callId=${encodeURIComponent(callId)}`
-      );
-      if (!response.ok) return null;
-      const payload = await response.json();
-      return payload.data as TestCall;
-    },
-    [agentId]
-  );
-
+    A DOM side effect, not state: this is exactly what an effect is for.
+  */
   useEffect(() => {
-    if (!call || TERMINAL.has(call.status)) return;
-    if (pollCount.current >= POLL_LIMIT) return;
-
-    const timer = setTimeout(async () => {
-      pollCount.current += 1;
-      const next = await poll(call.id);
-      // A failed poll leaves the last known state alone. Blanking the readout
-      // because one request 500'd would look like the call vanished.
-      if (next) setCall(next);
-    }, POLL_INTERVAL_MS);
-
-    return () => clearTimeout(timer);
-  }, [call, poll]);
-
-  async function placeCall() {
-    setBusy(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/settings/voice-agents/${agentId}/test-call`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber, confirmed: true }),
-      });
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        setError(payload?.error ?? "Couldn't place the test call.");
-        // A provider refusal still recorded a row — show it, so the failure is
-        // in the call history rather than only in a toast that disappears.
-        if (payload?.data?.callId) {
-          const recorded = await poll(payload.data.callId as string);
-          if (recorded) setCall(recorded);
-        }
-        return;
-      }
-
-      pollCount.current = 0;
-      const started = await poll(payload.data.callId as string);
-      setCall(
-        started ?? {
-          id: payload.data.callId as string,
-          status: "dialing",
-          phoneNumber,
-          startedAt: null,
-          endedAt: null,
-          durationSeconds: null,
-          transcript: null,
-          failureReason: null,
-          createdAt: new Date().toISOString(),
-        }
-      );
-    } catch {
-      setError("Couldn't reach the server.");
-    } finally {
-      setBusy(false);
-      setConfirming(false);
-    }
-  }
-
-  const dialable = phoneNumber.replace(/\D/g, "").length >= 8;
+    if (controller.confirming && !controller.dialable) numberRef.current?.focus();
+  }, [controller.confirming, controller.dialable]);
 
   const blocked = !connected
     ? "The voice integration isn't connected, so no call can be placed."
@@ -145,6 +80,71 @@ export function TestAgentSection({
       ? "Save this agent first — the provider doesn't have this configuration yet."
       : null;
 
+  return (
+    <>
+      {/* Two modes, one section. Tabs rather than a toggle, because these are two
+          different activities rather than one setting being switched. */}
+      <div className="vac-tabs" role="tablist" aria-label="How to test this agent">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "call"}
+          className={`vac-tabs__tab${mode === "call" ? " is-active" : ""}`}
+          onClick={() => onModeChange("call")}
+        >
+          <PhoneCall size={14} aria-hidden="true" />
+          Call
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "chat"}
+          className={`vac-tabs__tab${mode === "chat" ? " is-active" : ""}`}
+          onClick={() => onModeChange("chat")}
+        >
+          <MessageSquare size={14} aria-hidden="true" />
+          Chat
+        </button>
+      </div>
+
+      {/*
+        The honest framing, on both tabs. Written so neither mode oversells: chat
+        is fastest for the prompt, and cannot tell you how the agent SOUNDS.
+      */}
+      <p className="vac-tabs__note">
+        Chat is the fastest way to test your prompt and persona — for testing voice, pacing, and
+        interruption handling, use Call instead.
+      </p>
+
+      {mode === "call" ? (
+        <CallMode
+          controller={controller}
+          numberRef={numberRef}
+          blocked={blocked}
+          hasUnsavedChanges={hasUnsavedChanges}
+        />
+      ) : (
+        <ChatMode agentId={agentId} settings={settings} />
+      )}
+    </>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Call
+// -----------------------------------------------------------------------------
+
+function CallMode({
+  controller,
+  numberRef,
+  blocked,
+  hasUnsavedChanges,
+}: {
+  controller: TestCallController;
+  numberRef: React.RefObject<HTMLInputElement | null>;
+  blocked: string | null;
+  hasUnsavedChanges: boolean;
+}) {
   return (
     <>
       <div className="vac-test">
@@ -158,14 +158,12 @@ export function TestAgentSection({
           </p>
           <input
             id="vac-test-number"
+            ref={numberRef}
             className="input"
             type="tel"
             placeholder="+91 98765 43210"
-            value={phoneNumber}
-            onChange={(event) => {
-              setPhoneNumber(event.target.value);
-              setConfirming(false);
-            }}
+            value={controller.phoneNumber}
+            onChange={(event) => controller.setPhoneNumber(event.target.value)}
           />
         </div>
 
@@ -173,12 +171,9 @@ export function TestAgentSection({
           <p className="stage-warning">{blocked}</p>
         ) : (
           <>
-            {/*
-              Said before the click, not after. The person answering may not be
-              the person who pressed the button, and the disclosure is a legal
-              obligation rather than a setting — so it is described as what
-              happens, not as an option.
-            */}
+            {/* Said before the click, not after. The person answering may not be
+                the person who pressed the button, and the disclosure is a legal
+                obligation rather than a setting. */}
             <p className="stage-field__help">
               The call opens by stating that it is automated and may be recorded, exactly as a
               candidate call does.
@@ -186,30 +181,30 @@ export function TestAgentSection({
 
             {hasUnsavedChanges && (
               <p className="stage-note">
-                You have unsaved changes. The test call uses the <strong>last saved</strong>{" "}
-                settings — save first to hear your edits.
+                You have unsaved changes. The call uses the <strong>last saved</strong> settings —
+                save first to hear your edits. (Chat rehearses the unsaved ones.)
               </p>
             )}
 
-            {!confirming ? (
+            {!controller.confirming ? (
               <Button
                 variant="primary"
                 icon={PhoneCall}
-                disabled={!dialable}
-                onClick={() => setConfirming(true)}
+                disabled={!controller.dialable}
+                onClick={controller.arm}
               >
                 Call me
               </Button>
             ) : (
               <div className="vac-test__confirm">
                 <p>
-                  Call <strong>{phoneNumber}</strong> now? This places a real phone call.
+                  Call <strong>{controller.phoneNumber}</strong> now? This places a real phone call.
                 </p>
                 <div className="buttons">
-                  <Button variant="primary" loading={busy} onClick={placeCall}>
+                  <Button variant="primary" loading={controller.busy} onClick={controller.place}>
                     Yes, call now
                   </Button>
-                  <Button onClick={() => setConfirming(false)} disabled={busy}>
+                  <Button onClick={controller.cancel} disabled={controller.busy}>
                     Cancel
                   </Button>
                 </div>
@@ -218,10 +213,10 @@ export function TestAgentSection({
           </>
         )}
 
-        <FormError message={error} />
+        <FormError message={controller.error} />
       </div>
 
-      {call && <TestCallReadout call={call} />}
+      {controller.call && <TestCallReadout call={controller.call} />}
     </>
   );
 }
@@ -229,12 +224,11 @@ export function TestAgentSection({
 /**
  * The result.
  *
- * A transcript is shown only when one exists — an empty <pre> reads as "the call
- * said nothing", which is a different fact from "the provider has not sent the
- * transcript yet".
+ * A transcript is shown only when one exists — an empty block reads as "the call
+ * said nothing", which is a different fact from "the transcript hasn't arrived".
  */
 function TestCallReadout({ call }: { call: TestCall }) {
-  const settled = TERMINAL.has(call.status);
+  const settled = isTerminalCallStatus(call.status);
 
   return (
     <div className="vac-result">
@@ -269,6 +263,144 @@ function TestCallReadout({ call }: { call: TestCall }) {
             No transcript came back with this call. The call itself completed.
           </p>
         )
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Chat
+// -----------------------------------------------------------------------------
+
+type Bubble = { role: "operator" | "agent"; text: string };
+
+/**
+ * The text rehearsal.
+ *
+ * Conversation state lives HERE and nowhere else — no table, no row. A prompt
+ * sandbox does not need a transcript store, and storing rehearsal text that looks
+ * like a candidate conversation is how a fake transcript later gets mistaken for
+ * evidence.
+ *
+ * Bubble styling is new: this product had no chat UI to reuse (the communication
+ * log is a list of sent messages, not a conversation), so `.vac-chat__*` is the
+ * first of its kind rather than a divergent second copy of something.
+ */
+function ChatMode({ agentId, settings }: { agentId: string; settings: AgentSettings }) {
+  const [turns, setTurns] = useState<Bubble[]>([]);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Only scrolls the thread, not the page — `block: "nearest"` keeps the long
+    // console still while a reply lands.
+    endRef.current?.scrollIntoView({ block: "nearest" });
+  }, [turns]);
+
+  async function send() {
+    const message = draft.trim();
+    if (message.length === 0) return;
+
+    const history = turns;
+    setTurns([...history, { role: "operator", text: message }]);
+    setDraft("");
+    setBusy(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/settings/voice-agents/${agentId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // The DRAFT settings, so the rehearsal reflects unsaved edits — the whole
+        // point of testing before committing.
+        body: JSON.stringify({ message, history, settings }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setError(payload?.error ?? "The agent couldn't reply.");
+        return;
+      }
+
+      setTurns((current) => [...current, { role: "agent", text: payload.data.reply as string }]);
+    } catch {
+      setError("Couldn't reach the server.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="vac-chat">
+      <p className="vac-chat__meta">
+        No phone call and no call charge — this runs on text only, against the settings currently on
+        screen, including unsaved ones.
+      </p>
+
+      <div className="vac-chat__thread" role="log" aria-live="polite" aria-label="Rehearsal">
+        {turns.length === 0 && (
+          <p className="vac-chat__empty">
+            Say something the way a candidate would — &ldquo;Hello?&rdquo;, or an answer to your
+            first question — and see how the agent replies.
+          </p>
+        )}
+
+        {turns.map((turn, index) => (
+          <div
+            key={index}
+            className={`vac-chat__bubble vac-chat__bubble--${turn.role === "agent" ? "agent" : "operator"}`}
+          >
+            <span className="vac-chat__who">{turn.role === "agent" ? "Agent" : "You"}</span>
+            {turn.text}
+          </div>
+        ))}
+
+        {busy && (
+          <div className="vac-chat__bubble vac-chat__bubble--agent vac-chat__bubble--waiting">
+            <span className="vac-chat__who">Agent</span>
+            Thinking…
+          </div>
+        )}
+
+        <div ref={endRef} />
+      </div>
+
+      <FormError message={error} />
+
+      <div className="vac-chat__compose">
+        <input
+          className="input"
+          type="text"
+          placeholder="Type as the candidate…"
+          aria-label="Your message"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            // Enter sends. Without preventDefault this would submit the
+            // surrounding form and save a half-finished configuration.
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void send();
+            }
+          }}
+        />
+        <Button
+          variant="primary"
+          icon={Send}
+          loading={busy}
+          disabled={draft.trim().length === 0}
+          onClick={send}
+        >
+          Send
+        </Button>
+      </div>
+
+      {turns.length > 0 && (
+        <button type="button" className="text-link mt-2" onClick={() => setTurns([])}>
+          Clear rehearsal
+        </button>
       )}
     </div>
   );

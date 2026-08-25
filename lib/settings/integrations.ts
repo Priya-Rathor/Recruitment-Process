@@ -1,23 +1,47 @@
 // =============================================================================
 // Integration health, and what depends on what.
 //
-// One place that knows about all six providers, so the settings page never
-// imports six adapters and the dependency warning never hardcodes a list.
+// One place that knows about every CUSTOMER-FACING provider, so the settings page
+// never imports five adapters and the dependency warning never hardcodes a list.
+//
+// N8N IS NOT ONE OF THEM.
+//
+// It stays in the Provider union — the table has a CHECK constraint listing it,
+// rows may exist, and Module 13's engine can still hand off to a workflow — but it
+// has no descriptor, no health entry and therefore no card. Module 17's spec calls
+// it platform-managed infrastructure; a customer has nothing to configure and
+// nothing to fix, so offering them a card was inviting them to connect something
+// that changes nothing about how their automations run.
+//
+// The exclusion is expressed in the TYPE (`CustomerFacingProvider`), not by
+// filtering a list at the end. A filter can be forgotten by the next reader
+// adding a surface; a missing key is a compile error.
 // =============================================================================
 import { createClient } from "@/lib/supabase/server";
 import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
 import { getStatus as getEmailStatus } from "@/lib/integrations/email";
 import { getStatus as getCalendarStatus } from "@/lib/integrations/calendar";
 import { getStatus as getLlmStatus } from "@/lib/integrations/llm";
-import { getStatus as getN8nStatus } from "@/lib/integrations/n8n";
 import { getStatus as getWhatsAppStatus } from "@/lib/integrations/whatsapp";
 import { isGoogleOAuthConfigured } from "@/lib/integrations/calendar/oauth";
 import type { IntegrationStatus, Provider } from "@/lib/integrations/store";
 import { ACTION_INTEGRATIONS, ACTION_LABELS, type ActionType } from "@/lib/automations/catalog";
 import { formatDbError } from "@/lib/supabase/errors";
 
+/**
+ * The providers a customer can see and configure.
+ *
+ * Exclude rather than a fresh literal union, so adding a provider to PROVIDERS
+ * without deciding whether it is customer-facing fails to compile here.
+ */
+export type CustomerFacingProvider = Exclude<Provider, "n8n">;
+
+export function isCustomerFacingProvider(value: Provider): value is CustomerFacingProvider {
+  return value !== "n8n";
+}
+
 export type ProviderDescriptor = {
-  provider: Provider;
+  provider: CustomerFacingProvider;
   label: string;
   description: string;
   /** How credentials are supplied — an OAuth flow, or a form. */
@@ -26,7 +50,7 @@ export type ProviderDescriptor = {
   featureImpact: string[];
 };
 
-export const PROVIDER_DESCRIPTORS: Record<Provider, ProviderDescriptor> = {
+export const PROVIDER_DESCRIPTORS: Record<CustomerFacingProvider, ProviderDescriptor> = {
   bolna: {
     provider: "bolna",
     label: "Bolna AI",
@@ -67,13 +91,6 @@ export const PROVIDER_DESCRIPTORS: Record<Provider, ProviderDescriptor> = {
       "Every manual workflow keeps working without it",
     ],
   },
-  n8n: {
-    provider: "n8n",
-    label: "n8n",
-    description: "Workflow engine. Monitored here; automations run in-process.",
-    connectStyle: "api_key",
-    featureImpact: ["Nothing — automations do not run through n8n in this version"],
-  },
   whatsapp: {
     provider: "whatsapp",
     label: "WhatsApp Business",
@@ -90,7 +107,7 @@ export const PROVIDER_DESCRIPTORS: Record<Provider, ProviderDescriptor> = {
 };
 
 export type IntegrationHealth = {
-  provider: Provider;
+  provider: CustomerFacingProvider;
   label: string;
   description: string;
   connectStyle: "oauth" | "api_key";
@@ -103,6 +120,11 @@ export type IntegrationHealth = {
   encryptionUnavailable: boolean;
   /** Provider-specific extras the card renders (From address, model, URL). */
   detail: string | null;
+  /**
+   * True when the feature works on the platform's own credential rather than one
+   * this organization stored. Presentation only — see the AI provider entry.
+   */
+  platformDefault?: boolean;
   /** True when the SERVER lacks what this provider needs, whatever the org did. */
   serverUnavailable: boolean;
   serverUnavailableReason: string | null;
@@ -118,16 +140,15 @@ export type IntegrationHealth = {
 export async function getAllIntegrationHealth(
   organizationId: string
 ): Promise<IntegrationHealth[]> {
-  const [bolna, calendar, email, llm, n8n, whatsapp] = await Promise.all([
+  const [bolna, calendar, email, llm, whatsapp] = await Promise.all([
     getBolnaStatus(organizationId).catch(() => null),
     getCalendarStatus(organizationId).catch(() => null),
     getEmailStatus(organizationId).catch(() => null),
     getLlmStatus(organizationId).catch(() => null),
-    getN8nStatus(organizationId).catch(() => null),
     getWhatsAppStatus(organizationId).catch(() => null),
   ]);
 
-  const base = (provider: Provider): IntegrationHealth => ({
+  const base = (provider: CustomerFacingProvider): IntegrationHealth => ({
     ...PROVIDER_DESCRIPTORS[provider],
     status: "disconnected",
     credentialHint: null,
@@ -190,6 +211,18 @@ export async function getAllIntegrationHealth(
       errorCode: llm?.errorCode ?? null,
       errorMessage: llm?.errorMessage ?? null,
       encryptionUnavailable: llm?.encryptionUnavailable ?? false,
+      /*
+        "Using platform default", not "Disconnected".
+
+        The status underneath is genuinely `disconnected` — this organization has
+        stored no key — but AI features ARE working, on the server's own key. A
+        grey "Disconnected" chip on a working feature is simply false, and it sent
+        admins looking for a fault that does not exist.
+
+        Only the PRESENTATION changes. `status` is untouched, so the connect flow,
+        the dependency check and every other reader behave exactly as before.
+      */
+      platformDefault: llm?.activeSource === "server_environment",
       // Honest about which key is actually in use — see lib/integrations/llm.
       detail:
         llm?.activeSource === "server_environment"
@@ -197,19 +230,6 @@ export async function getAllIntegrationHealth(
           : llm?.activeSource === "organization_key"
             ? `Using this organization's key${llm.model ? ` · ${llm.model}` : ""}`
             : "No AI key available — AI features are unavailable",
-    },
-    {
-      ...base("n8n"),
-      status: n8n?.status ?? "disconnected",
-      credentialHint: n8n?.credentialHint ?? null,
-      lastTestedAt: n8n?.lastTestedAt ?? null,
-      lastSuccessAt: n8n?.lastSuccessAt ?? null,
-      errorCode: n8n?.errorCode ?? null,
-      errorMessage: n8n?.errorMessage ?? null,
-      encryptionUnavailable: n8n?.encryptionUnavailable ?? false,
-      detail: n8n?.instanceUrl
-        ? `${n8n.instanceUrl} · monitored only, automations run in-process`
-        : "Monitored only — automations run in-process in this version",
     },
     {
       ...base("whatsapp"),
@@ -257,7 +277,7 @@ export async function findDependencies({
   provider,
 }: {
   organizationId: string;
-  provider: Provider;
+  provider: CustomerFacingProvider;
 }): Promise<{ dependencies: Dependency[]; failed: boolean }> {
   const descriptor = PROVIDER_DESCRIPTORS[provider];
 

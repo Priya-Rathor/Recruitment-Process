@@ -20,8 +20,6 @@ export default async function RecruitmentSettingsPage() {
 
   return (
     <SettingsShell
-      role={membership.role}
-      current="/settings/recruitment"
       title="Recruitment defaults"
       description="Applied when nobody chooses otherwise. Changing them never alters existing records."
     >
