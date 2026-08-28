@@ -48,8 +48,9 @@ async function countActiveOwners(organizationId: string) {
 /**
  * PATCH /api/members/:id — change a member's role. Owner/Admin only.
  *
- * Escalation guards: only an Owner may grant or revoke Owner. An organization
- * can never be left with zero active Owners.
+ * Escalation guards: only an Owner may grant or revoke Owner, nobody may change
+ * their own role, and an organization can never be left with zero active
+ * Owners.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -68,6 +69,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const target = await loadTarget(id, membership.organization.id);
     if (!target || target.status !== "active") return jsonError("Team member not found.", 404);
+
+    // Nobody edits their own role, Owner included. Without this an Admin could
+    // demote themselves and then lack the permission needed to undo it. The
+    // prevent_self_role_change trigger enforces the same rule at the database,
+    // because this route is not the only way to write the row.
+    if (target.user_id === membership.user_id) {
+      return jsonError(
+        "You cannot change your own role. Ask another Owner or Admin to do it.",
+        403
+      );
+    }
 
     if (target.role === nextRole) {
       return NextResponse.json({ data: target, changed: false });
@@ -122,7 +134,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 /**
  * DELETE /api/members/:id — remove a member (soft: status -> 'removed', so the
  * audit trail and any records that reference this member survive).
- * Owner/Admin only.
+ * Owner/Admin only, never yourself.
  */
 export async function DELETE(
   _request: NextRequest,
@@ -134,6 +146,18 @@ export async function DELETE(
 
     const target = await loadTarget(id, membership.organization.id);
     if (!target || target.status !== "active") return jsonError("Team member not found.", 404);
+
+    // Same rule as the role change above: your own membership is not yours to
+    // edit. The UI has always hidden this button on your own row; the route
+    // did not enforce it, so an Admin could remove themselves via the API and
+    // lose the workspace outright. There is no "leave organization" flow yet —
+    // if one is added it should be its own deliberate endpoint, not this one.
+    if (target.user_id === membership.user_id) {
+      return jsonError(
+        "You cannot remove your own membership. Ask another Owner or Admin to do it.",
+        403
+      );
+    }
 
     if (membership.role !== "owner" && target.role === "owner") {
       return jsonError("Only an Owner can remove another Owner.", 403);

@@ -118,6 +118,17 @@ remain open, roughly in priority order.
   Related and *not* fixable via error codes: a wrong RLS SELECT policy returns
   0 rows with no error, so a tile would confidently print "0". Verify that at
   retrofit with a service-role cross-check instead.
+- ☑ **FIXED — the overdue TILE counted `hired` applications.**
+  `buildOverdueClause()` mapped over all of `PIPELINE_STAGES`, which includes
+  `hired`. `targetDaysFor()` correctly returns null for it (terminal), but the
+  `?? OVERDUE_DAYS` fallback turned that "not tracked" into a 3-day target — so
+  every hired application untouched for 3 days was counted as overdue.
+  `buildAttentionItems()` excluded terminal stages properly, so the tile and the
+  queue disagreed: a number with nothing behind it. `rejected` and `withdrawn`
+  escaped only because they are not in `PIPELINE_STAGES` at all.
+  `buildOverdueClause()` now filters on `isTerminalStage()`. Found while writing
+  `02-testing-guide.md`; the function had no test coverage, and now has five,
+  including one asserting the tile and the queue agree on every stage.
 - ☐ **`failedCalls` uses `created_at` while `screeningsCompleted` uses
   `ended_at`** — same table, two definitions of "today". Use `ended_at` for
   both, and record the timestamp column in the tile table above.

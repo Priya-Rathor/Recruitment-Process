@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   availableMetrics,
   buildAttentionItems,
+  buildOverdueClause,
   canViewOrganizationWide,
   isMissingRelation,
   OVERDUE_DAYS,
@@ -10,6 +11,7 @@ import {
   type MetricKey,
   type MetricResult,
 } from "./metrics";
+import { APPLICATION_STAGES, isTerminalStage, PIPELINE_STAGES } from "@/lib/applications/stages";
 
 const NOW = new Date("2026-08-13T12:00:00Z");
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000).toISOString();
@@ -73,6 +75,63 @@ describe("scopeForRole — spec section 9", () => {
     }
     expect(canViewOrganizationWide("recruiter")).toBe(false);
     expect(scopeForRole("recruiter")).toBe("own");
+  });
+});
+
+describe("buildOverdueClause — which stages the overdue TILE counts", () => {
+  const NOW = new Date("2026-08-27T00:00:00.000Z");
+
+  function stagesIn(clause: string) {
+    return [...clause.matchAll(/stage\.eq\.([a-z_]+)/g)].map((m) => m[1]);
+  }
+
+  it("never counts a terminal stage as overdue", () => {
+    const stages = stagesIn(buildOverdueClause({}, NOW));
+    for (const stage of APPLICATION_STAGES) {
+      if (isTerminalStage(stage)) expect(stages).not.toContain(stage);
+    }
+  });
+
+  it("excludes 'hired' specifically", () => {
+    // Regression: `hired` is in PIPELINE_STAGES but terminal, so
+    // targetDaysFor() returns null and the `?? OVERDUE_DAYS` fallback silently
+    // gave it a 3-day target. The tile counted hired applications the
+    // attention queue correctly ignored.
+    expect(stagesIn(buildOverdueClause({}, NOW))).not.toContain("hired");
+  });
+
+  it("agrees with buildAttentionItems about what is overdue", () => {
+    // The tile and the queue must describe the same set of stages, or the
+    // dashboard contradicts itself: a number on a tile with nothing behind it.
+    // AttentionItem carries no stage, so the row id encodes it.
+    const counted = new Set(stagesIn(buildOverdueClause({}, NOW)));
+    const longAgo = new Date(NOW.getTime() - 400 * 24 * 3600 * 1000).toISOString();
+
+    const queued = new Set(
+      buildAttentionItems(
+        APPLICATION_STAGES.map((stage) => ({ id: stage, stage, updated_at: longAgo })),
+        NOW,
+        {}
+      ).map((item) => item.id)
+    );
+
+    expect(queued.size).toBeGreaterThan(0);
+    for (const stage of APPLICATION_STAGES) {
+      expect(counted.has(stage)).toBe(queued.has(stage));
+    }
+  });
+
+  it("still covers every non-terminal stage", () => {
+    const stages = stagesIn(buildOverdueClause({}, NOW));
+    for (const stage of PIPELINE_STAGES) {
+      if (!isTerminalStage(stage)) expect(stages).toContain(stage);
+    }
+  });
+
+  it("honours a configured target over the default", () => {
+    const clause = buildOverdueClause({ applied: 10 }, NOW);
+    const cutoff = new Date(NOW.getTime() - 10 * 24 * 3600 * 1000).toISOString();
+    expect(clause).toContain(`and(stage.eq.applied,updated_at.lt.${cutoff})`);
   });
 });
 

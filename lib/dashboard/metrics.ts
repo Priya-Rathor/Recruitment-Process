@@ -17,6 +17,7 @@ import { dayRangeInZone, daysSince } from "@/lib/time";
 import { assessSla, targetDaysFor, type SlaConfig } from "@/lib/pipeline/sla";
 import {
   APPLICATION_STAGES,
+  isTerminalStage,
   PIPELINE_STAGES,
   STAGE_LABELS,
   type ApplicationStage,
@@ -209,11 +210,25 @@ async function getSlaConfigSafely(
  * omitted entirely — a hired or rejected application is finished, not overdue.
  */
 export function buildOverdueClause(config: SlaConfig, now: Date): string {
-  return PIPELINE_STAGES.map((stage) => {
-    const target = targetDaysFor(stage, config) ?? OVERDUE_DAYS;
-    const cutoff = new Date(now.getTime() - target * 24 * 60 * 60 * 1000).toISOString();
-    return `and(stage.eq.${stage},updated_at.lt.${cutoff})`;
-  }).join(",");
+  return (
+    PIPELINE_STAGES
+      // `hired` lives in PIPELINE_STAGES but is terminal, so targetDaysFor()
+      // returns null for it — and the `?? OVERDUE_DAYS` below would turn that
+      // "not tracked" into a 3-day target, counting every hired application
+      // untouched for 3 days as overdue. buildAttentionItems() excludes
+      // terminal stages properly, so the tile and the queue disagreed.
+      // `rejected` and `withdrawn` were safe only because they are not in
+      // PIPELINE_STAGES at all.
+      .filter((stage) => !isTerminalStage(stage))
+      .map((stage) => {
+        // The fallback remains for a stage with no configured or default
+        // target — unrecognised, not deliberately untracked.
+        const target = targetDaysFor(stage, config) ?? OVERDUE_DAYS;
+        const cutoff = new Date(now.getTime() - target * 24 * 60 * 60 * 1000).toISOString();
+        return `and(stage.eq.${stage},updated_at.lt.${cutoff})`;
+      })
+      .join(",")
+  );
 }
 
 /**

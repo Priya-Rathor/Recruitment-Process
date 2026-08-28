@@ -260,9 +260,13 @@ export function TeamManager({
               <tbody>
                 {members.map((member) => {
                   const isSelf = member.user?.id === currentUserId;
-                  // An Admin cannot touch an Owner's row — same rule the API enforces.
+                  // Two rules, both mirrored in the API and at the database:
+                  // an Admin cannot touch an Owner's row, and nobody edits
+                  // their own row — role or removal.
                   const canEditRow =
-                    canManage && (callerRole === "owner" || member.role !== "owner");
+                    canManage &&
+                    !isSelf &&
+                    (callerRole === "owner" || member.role !== "owner");
 
                   return (
                     <tr key={member.id}>
@@ -297,7 +301,7 @@ export function TeamManager({
                       </td>
                       {canManage && (
                         <td className="has-text-right">
-                          {canEditRow && !isSelf && (
+                          {canEditRow && (
                             <button
                               type="button"
                               className={`button is-small ${
@@ -320,7 +324,12 @@ export function TeamManager({
           </div>
         )}
 
-        {!canManage && (
+        {canManage ? (
+          <p className="has-text-secondary mt-3" style={{ fontSize: 13 }}>
+            You can&rsquo;t change or remove your own membership. Ask another Owner
+            or Admin to do it.
+          </p>
+        ) : (
           <p className="has-text-secondary mt-3" style={{ fontSize: 13 }}>
             Only an Owner or Admin can invite teammates or change roles.
           </p>
