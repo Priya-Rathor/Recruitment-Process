@@ -168,6 +168,34 @@ export type SendOnChannelInput = {
   origin?: string | null;
   /** Pre-read state, so a `both` send checks once rather than twice. */
   optOut?: OptOutState;
+  /**
+   * MODULE 25 — send this to a COLLEAGUE instead of the candidate.
+   *
+   * Set, three things change and nothing else does:
+   *
+   *   1. The address is this person's, not the candidate's.
+   *   2. The candidate opt-out is not consulted. It is a statement about contact
+   *      directed at the CANDIDATE; letting it gate a recruiter's own alerts
+   *      would mean an applicant could silently switch off their recruiter's
+   *      notifications by unsubscribing.
+   *   3. No unsubscribe footer. On internal mail it is meaningless, and a
+   *      colleague who clicked it would opt the candidate out of everything.
+   *
+   * What deliberately does NOT change is the RENDERED BODY. An internal message
+   * is about a candidate and resolves candidate placeholders exactly as a
+   * candidate-facing one does — "{{candidate.name}} just passed with
+   * {{application.match_score}}" is the whole point of the feature.
+   *
+   * The row still records `target.candidateId`, so the message appears on that
+   * candidate's communication history where it belongs — it IS part of the story
+   * of this application — labelled by `internal_recipient_*`.
+   */
+  internalRecipient?: {
+    email: string;
+    name: string | null;
+    /** users.id, for the log. Null would mean "we could not say who". */
+    userId: string | null;
+  } | null;
 };
 
 export type SendOutcome = {
@@ -190,15 +218,48 @@ export type SendOutcome = {
 export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutcome> {
   const { client, target, channel, templateId, eventKey, sentBy } = input;
   const automatic = sentBy === null;
+  const internal = input.internalRecipient ?? null;
+
+  /**
+   * WhatsApp to a colleague is refused rather than attempted.
+   *
+   * `users` has no phone column, so there is no number to send to. Falling back
+   * to the CANDIDATE's number — the only one in scope — would deliver an
+   * internal message about a candidate to that candidate. Skipping loudly is the
+   * only safe direction here.
+   */
+  if (internal && channel === "whatsapp") {
+    const reason =
+      "Not sent — internal notifications go by email only; we hold no phone number for colleagues.";
+    const logId = await recordMessage({
+      client,
+      target,
+      channel,
+      templateId,
+      eventKey,
+      subject: input.subject,
+      bodySent: input.body,
+      status: "skipped",
+      errorMessage: reason,
+      recipientHint: null,
+      providerMessageId: null,
+      sentBy,
+      internalRecipientUserId: internal.userId,
+    });
+    return { channel, status: "skipped", detail: reason, logId, delivered: false };
+  }
 
   try {
+    // Not consulted at all for an internal send — see `internalRecipient`.
     const optOut =
-      input.optOut ??
-      (await loadOptOut({
-        client,
-        organizationId: target.organizationId,
-        candidateId: target.candidateId,
-      }));
+      internal !== null
+        ? NO_OPT_OUT
+        : (input.optOut ??
+          (await loadOptOut({
+            client,
+            organizationId: target.organizationId,
+            candidateId: target.candidateId,
+          })));
 
     // --- The opt-out gate ---------------------------------------------------
     //
@@ -241,18 +302,23 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
         recipientHint: null,
         providerMessageId: null,
         sentBy,
+        internalRecipientUserId: internal?.userId ?? null,
       });
 
       return { channel, status: "skipped", detail: reason, logId, delivered: false };
     }
 
     // --- The recipient ------------------------------------------------------
-    const recipient =
-      channel === "email" ? target.candidateEmail?.trim() : target.candidatePhone?.trim();
+    const recipient = internal
+      ? internal.email.trim()
+      : channel === "email"
+        ? target.candidateEmail?.trim()
+        : target.candidatePhone?.trim();
 
     if (!recipient) {
-      const reason =
-        channel === "email"
+      const reason = internal
+        ? "Not sent — that colleague has no email address on file."
+        : channel === "email"
           ? "Not sent — this candidate has no email address on file."
           : "Not sent — this candidate has no phone number on file.";
 
@@ -269,6 +335,7 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
         recipientHint: null,
         providerMessageId: null,
         sentBy,
+        internalRecipientUserId: internal?.userId ?? null,
       });
 
       return { channel, status: "skipped", detail: reason, logId, delivered: false };
@@ -276,8 +343,10 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
 
     // --- The footer ---------------------------------------------------------
     // Automatic only, and appended AFTER rendering, so no template can drop it.
+    // NEVER on an internal send: the unsubscribe link belongs to the candidate,
+    // and a colleague clicking it would opt that candidate out of everything.
     let body = input.body;
-    if (automatic) {
+    if (automatic && !internal) {
       const unsubscribeUrl = await buildUnsubscribeUrl({
         candidateId: target.candidateId,
         channel,
@@ -319,6 +388,7 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
       recipientHint: maskRecipient(recipient, channel),
       providerMessageId: result.ok ? result.providerMessageId : null,
       sentBy,
+      internalRecipientUserId: internal?.userId ?? null,
     });
 
     return {
@@ -364,6 +434,7 @@ async function recordMessage({
   recipientHint,
   providerMessageId,
   sentBy,
+  internalRecipientUserId,
 }: {
   client: CommsClient;
   target: SendTarget;
@@ -377,6 +448,17 @@ async function recordMessage({
   recipientHint: string | null;
   providerMessageId: string | null;
   sentBy: string | null;
+  /**
+   * MODULE 25 — set when this row is a message to a COLLEAGUE about the
+   * candidate, rather than to the candidate.
+   *
+   * The row still carries candidate_id, because the message is part of that
+   * application's story and the communication history is where somebody looks to
+   * find out what happened. This column is what stops it being READ as a message
+   * the candidate received — without it, "we told them on the 4th" would be a
+   * false statement generated by a true row.
+   */
+  internalRecipientUserId?: string | null;
 }): Promise<string | null> {
   const { data, error } = await client
     .from("message_log")
@@ -393,6 +475,7 @@ async function recordMessage({
       provider_message_id: providerMessageId,
       error_message: errorMessage,
       recipient_hint: recipientHint,
+      internal_recipient_user_id: internalRecipientUserId ?? null,
       sent_by: sentBy,
       sent_at: status === "sent" ? new Date().toISOString() : null,
     })

@@ -50,7 +50,27 @@ import { buildMessageValues, renderMessage } from "@/lib/communications/tokens";
 import { isCommunicationEvent, type CommunicationEventKey } from "@/lib/communications/events";
 import { resolveTimeZone } from "@/lib/time";
 import { formatDbError } from "@/lib/supabase/errors";
+import { resolveRecipients, type ResolvedRecipient } from "@/lib/workflow/resolveRecipients";
+import type { Recipient } from "@/lib/workflow/recipients";
 import type { WorkMode } from "@/lib/types";
+
+/**
+ * The recipient every caller written before Module 25 means.
+ *
+ * A constant rather than an `if` at each use: "no recipients configured" and
+ * "recipients: [candidate]" have to behave identically, and the surest way to
+ * guarantee that is for the first to become the second before anything reads it.
+ * The address fields are null because sendOnChannel() reads the candidate's
+ * address from `target` in that case — this row only says WHICH branch to take.
+ */
+const CANDIDATE_ONLY: ResolvedRecipient = {
+  kind: "candidate",
+  userId: null,
+  name: null,
+  email: null,
+  phone: null,
+  internal: false,
+};
 
 const TEMPLATE_COLUMNS =
   "id, organization_id, name, event_key, channel, subject, body, whatsapp_body, active, " +
@@ -290,6 +310,29 @@ export type SendForEventInput = {
    * second reminder, an interview two months out does not need sixty.
    */
   dedupeSinceIso?: string;
+  /**
+   * MODULE 25 — who this goes to. Absent means the candidate, which is what
+   * every caller written before the Stage Workflow Builder means.
+   *
+   * The list is resolved against the application HERE rather than by the caller,
+   * so "assigned recruiter" means whoever it is at send time. See
+   * lib/workflow/resolveRecipients.ts.
+   */
+  recipients?: Recipient[] | null;
+  /**
+   * MODULE 25 — extra placeholder values merged over the resolved context.
+   *
+   * The only current user is `request_form`, which needs `{{form.link}}` and
+   * `{{form.name}}` — values that exist for one action rather than for every
+   * message, and that cannot be read from the application because the form is
+   * named by the RULE.
+   *
+   * Merged OVER the context deliberately: a caller supplying a value for a token
+   * the context also resolves is stating something more specific than the
+   * general lookup, and silently preferring the general one would make the
+   * override look broken.
+   */
+  extraValues?: Record<string, string> | null;
 };
 
 /** Sends the active template for an event, if there is one. Never throws. */
@@ -406,29 +449,75 @@ export async function sendForEvent(input: SendForEventInput): Promise<EventSendR
 
     const outcomes: SendOutcome[] = [];
 
+    /**
+     * MODULE 25 — resolve the recipient list, once, before any channel loop.
+     *
+     * THE RENDER CONTEXT DOES NOT VARY BY RECIPIENT. An internal notification is
+     * about a candidate and resolves candidate placeholders exactly as a
+     * candidate-facing message does; that is the entire feature. Only the
+     * ADDRESS changes, which is why the values are computed above the loop and
+     * only `internalRecipient` moves inside it.
+     */
+    const resolution = input.recipients?.length
+      ? await resolveRecipients({
+          client,
+          organizationId: input.organizationId,
+          applicationId: input.applicationId,
+          recipients: input.recipients,
+        })
+      : { resolved: [CANDIDATE_ONLY], unresolved: [] };
+
+    if (resolution.resolved.length === 0) {
+      return {
+        ...base,
+        templateId: template.id,
+        templateName: template.name,
+        status: "failed",
+        outcomes: [],
+        // Named, not generic. "No recipient could be resolved" sends whoever
+        // reads the run log hunting; "this application has no assigned
+        // recruiter" tells them what to fix.
+        detail:
+          resolution.unresolved.map((entry) => entry.reason).join(" ") ||
+          "Nobody could be resolved to send this to.",
+      };
+    }
+
+    const values = { ...context.values, ...(input.extraValues ?? {}) };
+
     // Sequential, and email first. A `both` template's two channels are
     // independent (a WhatsApp failure must not cost the email), and firing them
     // concurrently is how a provider rate-limit lands on whichever one lost the
-    // race rather than on a predictable one.
-    for (const channel of channelsFor(template.channel)) {
-      outcomes.push(
-        await sendOnChannel({
-          client,
-          target,
-          channel,
-          subject: subjectFor(template, channel)
-            ? renderMessage(subjectFor(template, channel) as string, context.values)
-            : null,
-          body: renderMessage(bodyFor(template, channel), context.values),
-          templateId: template.id,
-          eventKey: input.eventKey,
-          // NULL — this is an automatic send. The log shows "Automatic", the
-          // opt-out is binding, and the footer is attached.
-          sentBy: null,
-          origin: input.origin,
-          optOut,
-        })
-      );
+    // race rather than on a predictable one. The recipient loop is outside for
+    // the same reason: one slow mailbox must not reorder the rest.
+    for (const recipient of resolution.resolved) {
+      for (const channel of channelsFor(template.channel)) {
+        outcomes.push(
+          await sendOnChannel({
+            client,
+            target,
+            channel,
+            subject: subjectFor(template, channel)
+              ? renderMessage(subjectFor(template, channel) as string, values)
+              : null,
+            body: renderMessage(bodyFor(template, channel), values),
+            templateId: template.id,
+            eventKey: input.eventKey,
+            // NULL — this is an automatic send. The log shows "Automatic", the
+            // opt-out is binding, and the footer is attached.
+            sentBy: null,
+            origin: input.origin,
+            optOut,
+            internalRecipient: recipient.internal
+              ? {
+                  email: recipient.email ?? "",
+                  name: recipient.name,
+                  userId: recipient.userId,
+                }
+              : null,
+          })
+        );
+      }
     }
 
     const anyDelivered = outcomes.some((outcome) => outcome.delivered);
@@ -488,6 +577,8 @@ export async function sendTemplatedMessage({
   templateId,
   eventKey,
   origin,
+  recipients,
+  extraValues,
 }: {
   client: CommsClient;
   organizationId: string;
@@ -495,6 +586,10 @@ export async function sendTemplatedMessage({
   templateId: string;
   eventKey: CommunicationEventKey | null;
   origin?: string | null;
+  /** Module 25. Absent means the candidate. */
+  recipients?: Recipient[] | null;
+  /** Module 25. Extra tokens for one action — see SendForEventInput. */
+  extraValues?: Record<string, string> | null;
 }): Promise<EventSendResult> {
   let resolvedEvent = eventKey;
 
@@ -528,5 +623,7 @@ export async function sendTemplatedMessage({
     templateId,
     client,
     origin,
+    recipients,
+    extraValues,
   });
 }

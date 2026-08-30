@@ -129,6 +129,27 @@ explicit Save, never silent auto-save.
 - Prefer loading data in server components and refreshing after mutations over
   client-side fetch effects.
 
+## Session memory (`docs/Memory.md`)
+
+`docs/Memory.md` is a running, dated log of build sessions. It exists to make
+context reconstruction cheap — not to be a polished changelog.
+
+**Start of every session:** read the most recent `docs/Memory.md` entries FIRST,
+before re-reading the codebase. Fall back to source files only for what
+Memory.md doesn't cover or looks stale on.
+
+**End of every session** (or before context runs low): append a new dated entry
+(`## YYYY-MM-DD`, newest at the bottom) with:
+
+- which phase/module/task was worked on
+- what was actually completed — files changed, migrations written/applied
+- what's left unfinished, if the task didn't land
+- decisions not already captured here or in `docs/modules/` — "chose X over Y
+  because Z"
+
+Terse bullets, not paragraphs. Don't restate what git history or the module spec
+already says.
+
 ## Where things are
 
 See the project layout table in `README.md`.

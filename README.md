@@ -84,6 +84,7 @@ retrofits (privacy/compliance, AI & calling cost tracking).
 | `app/settings/catalog.ts` | The ONE settings catalogue — categories, links and role gating for both the landing grid and every page's own check (see `docs/modules/17-settings-notes.md`) |
 | `supabase/migrations/` | SQL schema, RLS policies, indexes, RPCs |
 | `docs/` | The product specification, split per module |
+| `docs/Memory.md` | Running dated session log — read its latest entries first when picking work back up (protocol in `AGENTS.md`) |
 | `proxy.ts` | Session refresh + auth enforcement at the edge |
 
 ## Non-negotiable conventions

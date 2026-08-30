@@ -36,6 +36,21 @@
 //    actions the engine performs itself.
 // =============================================================================
 
+/**
+ * The ONLY import in this file, and it is a pure one.
+ *
+ * This file was import-free by design: a closed vocabulary that depends on
+ * nothing cannot be dragged into a client bundle by accident. lib/workflow/
+ * recipients.ts preserves that — it has no imports of its own, touches no
+ * database and reads no headers, and the builder UI already imports it directly.
+ *
+ * The alternative was to re-implement recipient validation here, which would
+ * have put the rules that decide who receives a message in two files. The first
+ * time somebody added a recipient kind to one of them, a rule would validate in
+ * the editor and be rejected on save, or worse, the other way round.
+ */
+import { validateRecipients } from "@/lib/workflow/recipients";
+
 export const TRIGGERS = [
   "application_stage_changed",
   "application_created",
@@ -229,6 +244,22 @@ export const ACTIONS = [
   // ACTION_INTEGRATIONS for why this one's required integrations are computed
   // from its config rather than fixed.
   "send_templated_message",
+  /**
+   * ADDED BY MODULE 25 (Stage Workflow Builder).
+   *
+   * All four are ordinary members of this closed vocabulary — the builder does
+   * not get a private action list, because a rule it writes has to be
+   * executable, explainable and visible on the Module 13 Automations page like
+   * every other rule. Adding them here rather than beside the builder is what
+   * makes that true.
+   *
+   * ai_resume_shortlist is the only genuinely new capability. The other three
+   * are entry points into engines that already exist (Module 18's forms,
+   * Module 11's scheduling, Module 24's agents), reached from a stage.
+   */
+  "ai_resume_shortlist",
+  "request_form",
+  "schedule_interview",
 ] as const;
 
 export type ActionType = (typeof ACTIONS)[number];
@@ -272,6 +303,9 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   // it named is no longer something a customer can see or connect.
   call_n8n_webhook: "Hand off to an external workflow",
   send_templated_message: "Send templated message",
+  ai_resume_shortlist: "Screen the resume against the passing mark",
+  request_form: "Send the candidate a form to complete",
+  schedule_interview: "Schedule an interview",
 };
 
 /**
@@ -300,6 +334,21 @@ export const ACTION_MODES: Record<ActionType, ExecutionMode[]> = {
   // The engine renders and sends this itself, with whichever client it holds, so
   // a scheduled sweep and the Bolna webhook can both run it.
   send_templated_message: ["session", "service"],
+  /**
+   * SESSION-ONLY, and for the same reason the three Module 7-9 actions above
+   * are: it calls calculateAndStoreMatch(), which builds its own session-bound
+   * client internally and would be denied by RLS under the service role.
+   *
+   * This is not a limitation in practice. Every path that creates an application
+   * — the API route, bulk intake, a public form submission — dispatches
+   * `application_created`, which is a session trigger. A resume cannot arrive
+   * without somebody or something signed in having put it there.
+   */
+  ai_resume_shortlist: ["session"],
+  request_form: ["session", "service"],
+  // Manual-trigger only (see MANUAL_ONLY_ACTIONS), so the mode list is
+  // permissive: whichever client the recruiter's click arrives with will do.
+  schedule_interview: ["session", "service"],
 };
 
 export function actionRunsIn(action: ActionType, mode: ExecutionMode): boolean {
@@ -330,6 +379,18 @@ export const ACTION_INTEGRATIONS: Partial<Record<ActionType, string>> = {
    * a rule that never touches email.
    *
    * requiredIntegrationsFor() reads the action's config instead — see below.
+   *
+   * MODULE 25's `request_form` is absent for exactly the same reason: it also
+   * names a template, and its channels also come from that template's row.
+   *
+   * `ai_resume_shortlist` is absent because `calculate_match` is — the matching
+   * engine is a first-party capability, not a connected integration, and neither
+   * action can be blocked by a disconnected card.
+   *
+   * `schedule_interview` is absent because it is manual-only: it opens a
+   * scheduling screen. Requiring a calendar connection to put a BUTTON on an
+   * application would refuse the action to every team that schedules by hand,
+   * which is most of them.
    */
 };
 
@@ -365,7 +426,49 @@ export const CONSEQUENTIAL_ACTIONS: ActionType[] = [
   "calculate_match",
   "send_candidate_email",
   "send_templated_message",
+  // Runs the matching engine — the same LLM spend `calculate_match` incurs.
+  "ai_resume_shortlist",
+  // Sends the candidate a link and asks them for their time.
+  "request_form",
 ];
+
+/**
+ * Actions that never fire automatically, whatever the rule says.
+ *
+ * `schedule_interview` is here because scheduling needs a slot, and a slot is a
+ * negotiation with two diaries. The engine could invent a time, and it would be
+ * wrong often enough that every recruiter would learn to check — at which point
+ * the automation has cost more attention than it saved. So this action's only
+ * mode is the manual trigger: it puts a button on the application that opens
+ * Module 11's existing scheduling flow, pre-filled, and a person picks the time.
+ *
+ * The brief asks for exactly this ("reuse the existing manual-trigger pattern
+ * already used for AI Screening Call"), and validateRule() refuses to store the
+ * action any other way rather than storing a rule that silently never runs.
+ */
+export const MANUAL_ONLY_ACTIONS: ActionType[] = ["schedule_interview"];
+
+export function isManualOnly(action: ActionType): boolean {
+  return MANUAL_ONLY_ACTIONS.includes(action);
+}
+
+/**
+ * Actions valid only on a specific pipeline stage.
+ *
+ * AI Resume Shortlisting screens a resume the moment the application exists, so
+ * it belongs to Applied and nowhere else. Offered on Video Interview it would
+ * re-score a candidate three rounds after anybody cared about their resume, and
+ * — because it moves the application on a pass and flags it on a fail — it would
+ * do so destructively.
+ *
+ * Keyed by ApplicationStage from lib/applications/stages.ts, as plain strings:
+ * importing the stage list here would make the vocabulary depend on the pipeline
+ * definition, and the check that these strings are real stages belongs in the
+ * builder's tests rather than in a type.
+ */
+export const ACTION_STAGE_RESTRICTIONS: Partial<Record<ActionType, string[]>> = {
+  ai_resume_shortlist: ["applied"],
+};
 
 /**
  * Actions that reach a candidate directly, with no colleague in between.
@@ -379,10 +482,40 @@ export const CANDIDATE_CONTACT_ACTIONS: ActionType[] = [
   "start_screening_call",
   "send_candidate_email",
   "send_templated_message",
+  "request_form",
 ];
 
+/**
+ * True when a `send_templated_message` reaches the CANDIDATE specifically.
+ *
+ * Module 25 made the recipient configurable, and that breaks a flat action-type
+ * list: "email the assigned recruiter that a candidate passed" is in
+ * CANDIDATE_CONTACT_ACTIONS by type and contacts no candidate at all. Forcing
+ * approval on it would put a human review step in front of an internal
+ * notification — the exact friction that makes people switch automation off.
+ *
+ * So the type list stays the coarse filter and this is the precise one. A rule
+ * with no recipients configured is treated as candidate-facing: every row
+ * written before recipients existed meant the candidate, and defaulting the
+ * unknown case toward MORE review is the safe direction to be wrong in.
+ */
+export function actionReachesCandidate(action: Action): boolean {
+  if (!CANDIDATE_CONTACT_ACTIONS.includes(action.type)) return false;
+  if (action.type !== "send_templated_message") return true;
+
+  const recipients = action.config?.recipients;
+  if (!Array.isArray(recipients) || recipients.length === 0) return true;
+
+  return recipients.some(
+    (recipient) =>
+      typeof recipient === "object" &&
+      recipient !== null &&
+      (recipient as { kind?: unknown }).kind === "candidate"
+  );
+}
+
 export function contactsCandidate(actions: Action[]): boolean {
-  return actions.some((action) => CANDIDATE_CONTACT_ACTIONS.includes(action.type));
+  return actions.some((action) => actionReachesCandidate(action));
 }
 
 /** True when a rule's actions mean approval cannot be switched off. */
@@ -411,7 +544,14 @@ export function approvalIsMandatory(actions: Action[]): boolean {
 export const APPROVAL_RECOMMENDED_ACTIONS: ActionType[] = ["send_templated_message"];
 
 export function approvalIsRecommended(actions: Action[]): boolean {
-  return actions.some((action) => APPROVAL_RECOMMENDED_ACTIONS.includes(action.type));
+  return actions.some((action) => {
+    if (!APPROVAL_RECOMMENDED_ACTIONS.includes(action.type)) return false;
+    // Same carve-out as contactsCandidate(): a templated message addressed only
+    // to colleagues is internal mail, and recommending review for it would train
+    // people to click through the review screen without reading it.
+    if (action.type === "send_templated_message") return actionReachesCandidate(action);
+    return true;
+  });
 }
 
 export type Condition = {
@@ -463,7 +603,7 @@ export function requiredIntegrationsFor(actions: Action[]): string[] {
     const integration = ACTION_INTEGRATIONS[action.type];
     if (integration) required.add(integration);
 
-    if (action.type === "send_templated_message") {
+    if (action.type === "send_templated_message" || action.type === "request_form") {
       const channels = messageChannelsFor(action);
       /**
        * A `both` template requires NEITHER channel, not both of them.
@@ -542,7 +682,19 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 const MAX_GROUPS = 5;
 const MAX_CONDITIONS_PER_GROUP = 6;
-const MAX_ACTIONS = 5;
+/**
+ * RAISED FROM 5 TO 10 BY MODULE 25.
+ *
+ * Five was right for a hand-written When/If/Then rule, where a sixth action is
+ * usually a sign the rule is doing two things. A stage workflow is a different
+ * shape: one stage plausibly acknowledges the candidate, notifies the recruiter,
+ * notifies the job owner, requests a form and schedules a call — five before
+ * anybody has done anything unusual.
+ *
+ * Raising a maximum is backward-compatible in a way that lowering one is not:
+ * every rule that validated at five still validates at ten.
+ */
+const MAX_ACTIONS = 10;
 
 function validateCondition(entry: Record<string, unknown>): ValidationResult | Condition {
   const field = entry.field as ConditionField;
@@ -705,6 +857,72 @@ export function validateRule(value: unknown): ValidationResult {
       if (typeof config.event_key !== "string") delete config.event_key;
     }
 
+    /**
+     * MODULE 25 — AI Resume Shortlisting.
+     *
+     * `passing_score` is OPTIONAL and null means "use this job's Resume Score
+     * passing mark" (job_hiring_stages.config.passingScore). That indirection is
+     * deliberate: the passing mark is already configured per job on the Resume
+     * Score row, and copying it into the rule would create a second number that
+     * silently stops agreeing with the first the day somebody edits one of them.
+     *
+     * An explicit number here overrides it, for the case where a stage workflow
+     * genuinely wants a different bar from the one the scoring row displays.
+     */
+    if (entry.type === "ai_resume_shortlist") {
+      const passing = config.passing_score;
+      if (passing !== undefined && passing !== null) {
+        const score = Number(passing);
+        if (!Number.isFinite(score) || score < 0 || score > 100) {
+          return { ok: false, error: "The passing mark must be between 0 and 100." };
+        }
+        config.passing_score = Math.round(score);
+      } else {
+        config.passing_score = null;
+      }
+
+      // What happens on a pass. Advancing is the point of the step, but a team
+      // that wants the screen to only FLAG and never move anybody can switch it
+      // off — the score and the branch still fire.
+      config.advance_on_pass = config.advance_on_pass !== false;
+    }
+
+    /**
+     * MODULE 25 — Request Form.
+     *
+     * Two ids, both verified server-side for tenancy by the API (a pure
+     * validator cannot prove either belongs to the caller's organization — the
+     * same split send_templated_message already uses).
+     */
+    if (entry.type === "request_form") {
+      const formId = config.form_id;
+      if (typeof formId !== "string" || !UUID_PATTERN.test(formId)) {
+        return { ok: false, error: "Choose which form to send." };
+      }
+      const templateId = config.template_id;
+      if (typeof templateId !== "string" || !UUID_PATTERN.test(templateId)) {
+        return { ok: false, error: "Choose the message that carries the form link." };
+      }
+      const channels = Array.isArray(config.channels)
+        ? config.channels.filter((channel) => channel === "email" || channel === "whatsapp")
+        : [];
+      config.channels = channels;
+      if (typeof config.event_key !== "string") delete config.event_key;
+    }
+
+    /**
+     * MODULE 25 — Schedule Interview.
+     *
+     * Manual-only, enforced below rather than here so the message can name the
+     * setting the user has to change.
+     */
+    if (entry.type === "schedule_interview") {
+      const mode = config.mode;
+      if (mode !== undefined && mode !== null && typeof mode !== "string") {
+        return { ok: false, error: "The interview mode must be text." };
+      }
+    }
+
     if (entry.type === "call_n8n_webhook") {
       const path = config.path;
       if (path !== undefined && path !== null && typeof path !== "string") {
@@ -721,6 +939,68 @@ export function validateRule(value: unknown): ValidationResult {
       }
       config.path = typeof path === "string" ? path.replace(/^\/+/, "").slice(0, 200) : "";
     }
+
+    /**
+     * MODULE 25 — the AI agent an outbound call uses.
+     *
+     * EXTENDS `start_screening_call` rather than adding a "place_ai_call"
+     * action. The brief asks for per-stage agent choice, and the difference
+     * between "the screening call" and "a call with the Technical Screening
+     * Agent" is which agent row Bolna is handed — not a different action, a
+     * different execution path or a different cost line. A second action type
+     * would have needed its own handler, its own integration check and its own
+     * consent disclosure, and the day one of those three was edited the other
+     * copy would have quietly diverged on the thing that telephones people.
+     *
+     * Absent means the organization's default agent, which is what every rule
+     * written before Module 25 does today.
+     */
+    if (entry.type === "start_screening_call") {
+      const agentId = config.agent_id;
+      if (agentId === undefined || agentId === null || agentId === "") {
+        config.agent_id = null;
+      } else if (typeof agentId !== "string" || !UUID_PATTERN.test(agentId)) {
+        return { ok: false, error: "Choose a valid voice agent for this call." };
+      }
+    }
+
+    /**
+     * MODULE 25 — recipients.
+     *
+     * Only `send_templated_message` and `request_form` carry them: those are the
+     * two actions that render a template and send it somewhere. `notify_recruiter`
+     * already has a fixed audience by definition, and giving it a recipient list
+     * would make its name a lie.
+     *
+     * Validated here by shape; a named organization_member is proved to be a
+     * member of the CALLER'S organization by the API, for the same reason
+     * template ids are. A pure function cannot check tenancy, and a user id
+     * accepted from a request body without that check would be a cross-tenant
+     * read wearing a configuration value's clothes.
+     */
+    if (entry.type === "send_templated_message" || entry.type === "request_form") {
+      const recipients = validateRecipients(config.recipients);
+      if (!recipients.ok) return { ok: false, error: recipients.error };
+      config.recipients = recipients.recipients;
+    }
+
+    /**
+     * MODULE 25 — automatic vs manual trigger.
+     *
+     * `manual: true` means the action does not fire on entry into the stage; it
+     * renders as a button on the application and waits for a recruiter. Stored
+     * on the action rather than the rule because one stage's list mixes the two
+     * freely — the acknowledgement email should send itself, the interview
+     * invitation should not.
+     */
+    const manualRequested = config.manual === true;
+    if (isManualOnly(entry.type) && !manualRequested) {
+      return {
+        ok: false,
+        error: `"${ACTION_LABELS[entry.type]}" has to be set to Manual trigger — it needs a person to choose the time.`,
+      };
+    }
+    config.manual = manualRequested;
 
     actions.push({ type: entry.type, config });
 

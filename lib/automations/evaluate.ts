@@ -26,6 +26,20 @@ import { FIELD_LABELS, FIELD_VALUE_OPTIONS, OPERATOR_LABELS, normalizeConditions
  * calls it should not.
  */
 export type EvaluationContext = {
+  /**
+   * MODULE 25. NOT a condition field — deliberately absent from FIELD_ACCESSORS
+   * below, so no rule can be written against it.
+   *
+   * A stage workflow is scoped to its job by the `job_id` COLUMN, which is
+   * indexed, enforced by a database constraint and visible in the Automations
+   * list. Offering "job is X" as a condition as well would give the same fact
+   * two homes, and a rule could then be scoped to one job by its column and a
+   * different one by its conditions.
+   *
+   * It rides in the context because dispatch() needs it to apply the column
+   * filter and buildContext() already reads it.
+   */
+  jobId: string | null;
   stage: string | null;
   matchScore: number | null;
   candidateHasPhone: boolean | null;

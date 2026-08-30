@@ -99,6 +99,11 @@ export type StoredAutomation = {
   required_integrations: string[];
   requires_approval: boolean;
   daily_run_cap: number | null;
+  /** Module 25. Null on every rule written before the Stage Workflow Builder. */
+  job_id: string | null;
+  stage_key: string | null;
+  branch: WorkflowBranch;
+  source: "manual" | "stage_workflow";
 };
 
 export type ActionResult = {
@@ -117,7 +122,10 @@ export type RunOutcome = {
 
 const AUTOMATION_COLUMNS =
   "id, organization_id, name, trigger, conditions, actions, status, required_integrations, " +
-  "requires_approval, daily_run_cap";
+  // Module 25's provenance. Read on every dispatch because branch and job_id are
+  // both FILTERS, not display fields — a rule that fetched them lazily would
+  // have to decide whether to run before it knew whether it applied.
+  "requires_approval, daily_run_cap, job_id, stage_key, branch, source";
 
 /**
  * Resolves the client for a mode.
@@ -300,6 +308,7 @@ export async function buildContext({
   return {
     stageEnteredAt,
     context: {
+      jobId: application.job_id ?? null,
       stage: application.stage ?? null,
       matchScore: application.match_score,
       candidateHasPhone: application.candidate
@@ -485,6 +494,26 @@ async function executeAction(input: ExecuteActionInput): Promise<ActionResult> {
   } = input;
 
   const useAdminClient = mode === "service";
+
+  /**
+   * MODULE 25 — a manual-trigger action is never executed by the engine.
+   *
+   * It is configuration for a BUTTON on the application, not work to do now.
+   * Checked once, above the switch, rather than in each handler: a new action
+   * type added later gets this behaviour without its author having to know the
+   * rule exists.
+   *
+   * Reported as `skipped` with a reason, not silently dropped. A run whose only
+   * action was manual would otherwise show as an empty success, and the next
+   * person would reasonably read that as "the automation ran and did nothing".
+   */
+  if (action.config?.manual === true) {
+    return {
+      action: action.type,
+      status: "skipped",
+      detail: "Set to manual trigger — waiting for a recruiter to run it.",
+    };
+  }
 
   try {
     switch (action.type) {
@@ -1113,6 +1142,21 @@ export type DispatchInput = {
   timeZone?: string;
   /** Set by the sweep so the run records that nobody was there. */
   scheduled?: boolean;
+  /**
+   * MODULE 25 — which outcome branch this dispatch represents.
+   *
+   * Defaults to 'always', which is what every caller written before the Stage
+   * Workflow Builder means and what every rule written before it stores.
+   *
+   * THE BRANCH IS DISPATCHED, NOT DERIVED. The alternative was a condition field
+   * — "latest outcome is pass" — evaluated per rule, and it would have been
+   * wrong in a way that is hard to see: by the time a pass has moved the
+   * application to Shortlisted and that move has dispatched its own
+   * `application_stage_changed`, "the latest outcome" is a question about a
+   * different moment than the one that caused this run. Passing the verdict down
+   * from the thing that produced it removes the re-derivation entirely.
+   */
+  branch?: WorkflowBranch;
 };
 
 /**
@@ -1167,8 +1211,23 @@ export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
       return [];
     }
 
-    const automations = (data ?? []) as unknown as StoredAutomation[];
-    if (automations.length === 0) return [];
+    const allRules = (data ?? []) as unknown as StoredAutomation[];
+    if (allRules.length === 0) return [];
+
+    /**
+     * MODULE 25 — branch and job scoping, applied in code rather than in the
+     * query.
+     *
+     * The job filter needs the application's job_id, which `buildContext()`
+     * below is what reads. Fetching it a second time to build a narrower
+     * `.or()` clause would be one extra round trip on every dispatch, on every
+     * trigger, to save filtering a list that is almost always under ten rows.
+     *
+     * Both filters are written so a rule with NULL provenance passes: those are
+     * the organization-wide Module 13 rules, and every one of them must keep
+     * behaving exactly as it did before this module existed.
+     */
+    const dispatchBranch: WorkflowBranch = input.branch ?? "always";
 
     const built = await buildContext({
       client,
@@ -1176,6 +1235,31 @@ export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
       applicationId: input.applicationId,
     });
     if (!built) return [];
+
+    const automations = allRules.filter((automation) => {
+      // A branch rule fires only for its own outcome. An 'always' rule fires on
+      // every dispatch, INCLUDING a pass or fail one — entering the stage
+      // happened regardless of what the verdict turned out to be.
+      if (automation.branch !== "always" && automation.branch !== dispatchBranch) return false;
+
+      // A job-scoped rule fires only for its job. An unscoped rule fires for all.
+      if (automation.job_id && automation.job_id !== built.context.jobId) return false;
+
+      /**
+       * A stage workflow fires only on entry into ITS stage.
+       *
+       * Redundant with the rule's own `stage` condition in the normal case —
+       * the builder writes one — but not redundant when a workflow was created
+       * with no conditions at all, which is the state a brand-new stage row is
+       * in before anybody adds one. Without this, an empty Video Interview
+       * workflow would fire on entry into every stage.
+       */
+      if (automation.stage_key && automation.stage_key !== built.context.stage) return false;
+
+      return true;
+    });
+
+    if (automations.length === 0) return [];
 
     const outcomes: RunOutcome[] = [];
 
