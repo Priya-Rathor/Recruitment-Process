@@ -27,8 +27,11 @@
 // internal mail is nonsense at best — at worst a colleague clicks it and opts
 // the CANDIDATE out.
 //
-// So internal sends carry `suppressOptOut` and `suppressFooter`, and the send
-// log records them as internal. See lib/communications/send.ts.
+// So a resolved recipient carries `internal`, sendOnChannel() takes it as
+// `internalRecipient`, and setting it does exactly three things: swaps the
+// address, skips the opt-out read, and omits the footer. The message_log row
+// records `internal_recipient_user_id` so the send is never later mistaken for
+// one the candidate received. See lib/communications/send.ts.
 // =============================================================================
 import { formatDbError } from "@/lib/supabase/errors";
 import { isInternal, type Recipient, type RecipientKind } from "@/lib/workflow/recipients";
@@ -110,18 +113,24 @@ export async function resolveRecipients({
     /**
      * ONE QUERY, both staff rows embedded.
      *
-     * The two foreign keys are disambiguated by constraint name because
-     * `applications` and `jobs` both point at `users`, and PostgREST cannot
-     * guess which relationship an unqualified embed means.
+     * The two foreign keys are disambiguated BY CONSTRAINT NAME, because
+     * `applications` and `jobs` each point at `users` and PostgREST cannot guess
+     * which relationship an unqualified `users` embed means — it errors rather
+     * than choosing, which is the right behaviour and the reason for the
+     * verbosity.
+     *
+     * The job owner is nested INSIDE the job embed rather than pulled up as a
+     * second aliased `jobs` embed. Two embeds of the same table work, but they
+     * are two joins to the same row and the shape they return is harder to read
+     * than the nesting it saves.
      */
     const { data, error } = await client
       .from("applications")
       .select(
         "assigned_recruiter_id, " +
           "candidate:candidates(name, email, phone), " +
-          "job:jobs(owner_recruiter_id), " +
-          "recruiter:users!applications_assigned_recruiter_id_fkey(id, name, email), " +
-          "owner:jobs(owner:users!jobs_owner_recruiter_id_fkey(id, name, email))"
+          "job:jobs(owner_recruiter_id, owner:users!jobs_owner_recruiter_id_fkey(id, name, email)), " +
+          "recruiter:users!applications_assigned_recruiter_id_fkey(id, name, email)"
       )
       .eq("id", applicationId)
       .eq("organization_id", organizationId)
@@ -139,8 +148,11 @@ export async function resolveRecipients({
     }
 
     const raw = data as unknown as
-      | (Omit<Row, "owner"> & {
-          owner: { owner: { id: string; name: string | null; email: string } | null } | null;
+      | (Omit<Row, "owner" | "job"> & {
+          job: {
+            owner_recruiter_id: string | null;
+            owner: { id: string; name: string | null; email: string } | null;
+          } | null;
         })
       | null;
 
@@ -150,7 +162,7 @@ export async function resolveRecipients({
           candidate: raw.candidate,
           job: raw.job,
           recruiter: raw.recruiter,
-          owner: raw.owner?.owner ?? null,
+          owner: raw.job?.owner ?? null,
         }
       : null;
 
@@ -184,7 +196,10 @@ export async function resolveRecipients({
      */
     const { data, error } = await client
       .from("organization_members")
-      .select("user_id, user:users(id, name, email)")
+      // The constraint is named for the same reason it is on the applications
+      // embed above: organization_members points at `users` twice (`user_id` and
+      // `invited_by`), so an unqualified embed is ambiguous and is refused.
+      .select("user_id, user:users!organization_members_user_id_fkey(id, name, email)")
       .eq("organization_id", organizationId)
       .in("user_id", memberIds);
 

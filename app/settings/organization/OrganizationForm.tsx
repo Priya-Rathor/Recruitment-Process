@@ -37,7 +37,12 @@ export function OrganizationForm({
     timezone: string;
     agencyMode: boolean;
   };
-  branding: { logo_url: string | null; brand_color: string | null };
+  branding: {
+    logo_url: string | null;
+    brand_color: string | null;
+    /** Module 26 — {{organization.office_address}} in candidate messages. */
+    office_address: string | null;
+  };
 }) {
   const router = useRouter();
   const [values, setValues] = useState({ ...organization, ...branding });
@@ -74,6 +79,7 @@ export function OrganizationForm({
           body: JSON.stringify({
             logo_url: values.logo_url || null,
             brand_color: values.brand_color || null,
+            office_address: values.office_address || null,
           }),
         }),
       ]);
@@ -198,6 +204,24 @@ export function OrganizationForm({
           />
         </Field>
       </div>
+
+      {/*
+        Module 26. Outside the two-column branding row because it is not
+        branding — it is an operational detail candidates are sent, and it is
+        long enough that a half-width box would truncate it on screen.
+      */}
+      <Field
+        label="Office address"
+        hint="Shown to candidates invited to attend in person, as {{organization.office_address}}. Left empty, that placeholder renders as a dash."
+      >
+        <textarea
+          className="textarea"
+          rows={2}
+          placeholder="4th Floor, Prestige Tower, MG Road, Bengaluru 560001"
+          value={values.office_address ?? ""}
+          onChange={(event) => set("office_address", event.target.value || null)}
+        />
+      </Field>
 
       <FormError message={error} />
 

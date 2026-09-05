@@ -22,8 +22,11 @@
 // A branch needs a verdict, and a verdict needs a score and a threshold to
 // compare it against. Three stages have both:
 //
-//   applied            — the resume score, against the job's Resume Score
+//   shortlisted        — the resume score, against the job's Resume Score
 //                        passing mark (job_hiring_stages.config.passingScore).
+//                        Scored by the AI Resume Shortlisting action, which sits
+//                        on Applied — see BRANCHING_STAGES for why the branches
+//                        are filed one stage further along than the action.
 //   ai_screening_call  — the screening round's score, same shape.
 //   written_assessment — the assessment score, same shape.
 //
@@ -59,15 +62,44 @@ export const BRANCH_LABELS: Record<WorkflowBranch, string> = {
 /**
  * Stages whose action list splits into On Pass / On Fail.
  *
- * `applied` is here because of the new AI Resume Shortlisting step: the moment a
- * resume is scored against the job's passing mark, entry into Applied has an
- * outcome it did not have before.
+ * `shortlisted` IS HERE AND `applied` IS NOT, which looks backwards until you
+ * read what the branches are FOR.
+ *
+ * The brief is explicit, twice: on a pass the application "advances to
+ * Shortlisted, and triggers whatever actions are configured under Shortlisted's
+ * 'On Pass' branch", and on a fail it "triggers whatever actions are configured
+ * under Shortlisted's 'On Fail' branch". So the branch lists belong to the stage
+ * the decision is ABOUT, not the stage the scoring action sits on.
+ *
+ * That reads oddly for one line and then reads correctly forever: "Shortlisted —
+ * On Fail" is where you configure the polite auto-rejection, and a recruiter
+ * looking for "what happens when somebody is not shortlisted" looks under
+ * Shortlisted. Under Applied it would be filed by mechanism rather than by
+ * meaning.
+ *
+ * The consequence for the engine is that a FAILED screen dispatches Shortlisted's
+ * branch while the application is still sitting in Applied — which is why
+ * dispatch() takes an explicit `branchStage` rather than reading the
+ * application's current stage. See DispatchInput.branchStage.
+ *
+ * AI Screening Call and Written Assessment carry their own branches, because
+ * their score is about that round rather than about entry into the next one.
  */
 export const BRANCHING_STAGES: ApplicationStage[] = [
-  "applied",
+  "shortlisted",
   "ai_screening_call",
   "written_assessment",
 ];
+
+/**
+ * The stage whose branch lists a given scored stage's verdict fires.
+ *
+ * Only the resume screen redirects: its action lives on Applied and its branches
+ * live on Shortlisted. Everything else decides about itself.
+ */
+export const BRANCH_TARGET_STAGE: Partial<Record<ApplicationStage, ApplicationStage>> = {
+  applied: "shortlisted",
+};
 
 export function stageBranches(stage: ApplicationStage): boolean {
   return BRANCHING_STAGES.includes(stage);
@@ -109,7 +141,7 @@ export const NO_BRANCH_NOTE =
  * it compare against?".
  */
 export const BRANCH_SCORE_SOURCE: Partial<Record<ApplicationStage, string>> = {
-  applied: "the resume match score, against this job's Resume Score passing mark",
+  shortlisted: "the resume match score, against this job's Resume Score passing mark",
   ai_screening_call: "the screening round's score, against this job's AI Screening Call passing mark",
   written_assessment:
     "the assessment score, against this job's Written Assessment passing mark",
@@ -119,9 +151,9 @@ export const BRANCH_SCORE_SOURCE: Partial<Record<ApplicationStage, string>> = {
  * The job_hiring_stages key holding a stage's passing mark, where there is one.
  *
  * `applied` maps to `resume_score` — the two names differ because they name
- * different things: `applied` is where the application SITS, `resume_score` is
- * the configuration that judges it. The mapping is here so nothing else has to
- * know that.
+ * different things: `applied` is where the application SITS when the AI Resume
+ * Shortlisting action runs, `resume_score` is the configuration that judges it.
+ * The mapping is here so nothing else has to know that.
  */
 export const THRESHOLD_STAGE_KEY: Partial<Record<ApplicationStage, string>> = {
   applied: "resume_score",

@@ -34,6 +34,8 @@ import { STAGE_LABELS } from "@/lib/applications/stages";
 import { getLatestParsedResume } from "@/lib/resumes/queries";
 import { resumeKeyPoints } from "@/lib/resumes/keyPoints";
 import { ApplicationStageSection } from "./ApplicationStageSection";
+import { SurfacedAnswers } from "./SurfacedAnswers";
+import { loadSurfacedAnswers } from "@/lib/workflow/formAnswers";
 import { ApplicationHeaderActions } from "./ApplicationHeaderActions";
 import { SendMessagePanel } from "./SendMessagePanel";
 import { CommunicationLog } from "@/components/CommunicationLog";
@@ -73,6 +75,7 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     parsedResume,
     matchHighlights,
     resumeThreshold,
+    surfacedAnswers,
   ] = await Promise.all([
     listInterviews({
       organizationId: membership.organization.id,
@@ -93,6 +96,19 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     }),
     getJobResumeThreshold({
       organizationId: membership.organization.id,
+      jobId: application.job_id,
+    }),
+    /**
+     * MODULE 26 — answers this job's stage workflow asked to surface.
+     *
+     * Loaded here rather than fetched by a client component, so the values are
+     * on the page at first paint. Reads form_responses BY REFERENCE — nothing is
+     * copied onto the application, which is why there is no write path anywhere
+     * for these and no risk of them going stale.
+     */
+    loadSurfacedAnswers({
+      organizationId: membership.organization.id,
+      applicationId: application.id,
       jobId: application.job_id,
     }),
   ]);
@@ -303,6 +319,11 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
         directly under the heading, because "where is this and how far has it
         come" is the first question this page is opened to answer.
       */}
+      {/* What the candidate told us, above the stepper: a recruiter opening
+          this page to book a call needs the preferred time before anything
+          else on it. */}
+      <SurfacedAnswers answers={surfacedAnswers} timeZone={membership.organization.timezone} />
+
       <ApplicationStageSection
         segments={stepper}
         applicationId={application.id}

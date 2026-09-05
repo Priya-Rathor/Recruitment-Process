@@ -23,6 +23,7 @@ import { RULE_TEMPLATES } from "@/lib/automations/templates";
 import { buildDedupeKey, evaluateConditions, type EvaluationContext } from "@/lib/automations/evaluate";
 
 const FULL_CONTEXT: EvaluationContext = {
+  jobId: "11111111-1111-4111-8111-111111111111",
   stage: "screening",
   matchScore: 82,
   candidateHasPhone: true,

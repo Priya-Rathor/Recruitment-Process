@@ -45,6 +45,7 @@ import {
 } from "@/lib/automations/catalog";
 import { dispatch, type EngineClient, type RunOutcome } from "@/lib/automations/engine";
 import { expireStaleApprovals } from "@/lib/automations/approvals";
+import { drainDueActions, type DrainSummary } from "@/lib/workflow/delayQueue";
 import { TERMINAL_STAGES } from "@/lib/applications/stages";
 import { formatDbError } from "@/lib/supabase/errors";
 
@@ -74,6 +75,15 @@ export type SweepResult = {
   truncated: boolean;
   applicationsRemaining: number;
   error: string | null;
+  /**
+   * MODULE 26 — what the "Wait, then…" queue did this pass.
+   *
+   * Reported separately from `runsCreated` because the two answer different
+   * questions. A sweep that created no runs but fired eight delayed actions was
+   * busy; collapsing them would make it look idle, and an admin checking whether
+   * the scheduler works would conclude it does not.
+   */
+  delayed: DrainSummary;
 };
 
 type ScheduledRule = {
@@ -114,6 +124,7 @@ export async function sweepOrganization({
     truncated: false,
     applicationsRemaining: 0,
     error: null,
+    delayed: { considered: 0, fired: 0, cancelled: 0, failed: 0, truncated: false },
   };
 
   // The sweep record is opened FIRST, so a crash halfway leaves evidence that a
@@ -159,6 +170,38 @@ export async function sweepOrganization({
     if (expiry.failed) {
       console.error(`[automation] could not expire stale approvals for ${organizationId}`);
     }
+
+    /**
+     * MODULE 26 — drain the "Wait, then…" queue.
+     *
+     * THIS IS THE WHOLE DELAY MECHANISM. There is no second cron, no worker and
+     * no timer anywhere in the product: a wait is a row with a `run_at`, and this
+     * line is what turns it into actions. Placed inside the sweep, before the
+     * stale-stage scan, for two reasons:
+     *
+     *   - a due wait is older than anything the scan is about to find, and
+     *     draining first keeps the ordering "oldest promise first";
+     *   - a delayed action that moves an application should do so before the
+     *     scan reads stages, rather than leaving the scan acting on a stage that
+     *     is about to change within the same sweep.
+     *
+     * Failures here do NOT abort the sweep. The stale-stage rules are unrelated
+     * work, and losing them because one queued email failed would compound the
+     * problem.
+     */
+    result.delayed = await drainDueActions({
+      client,
+      organizationId,
+      organizationName,
+      /*
+        Empty, exactly as the dispatch below passes it. The sweep has no request
+        to take an origin from — it is a cron. buildApplyUrl() falls back to
+        APP_URL, and refuses to mint a link rather than sending a relative one
+        nobody can open, which is the honest failure for a deployment that has
+        not set it.
+      */
+      webhookUrl: "",
+    });
 
     const { data: ruleData, error: ruleError } = await client
       .from("automations")

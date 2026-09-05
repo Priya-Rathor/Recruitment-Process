@@ -139,12 +139,23 @@ export async function startScreeningCall({
   organizationName,
   triggeredBy,
   webhookUrl,
+  voiceAgentId,
 }: {
   organizationId: string;
   applicationId: string;
   organizationName: string;
   triggeredBy: string;
   webhookUrl: string;
+  /**
+   * MODULE 25. The voice agent this stage's workflow chose, if any.
+   *
+   * Threaded through rather than resolved here: the adapter already owns "which
+   * provider agent dials", including the default-agent fallback and the
+   * credential fallback behind it. Resolving it here would be a second answer to
+   * that question, and the two would disagree the first time somebody changed
+   * the default.
+   */
+  voiceAgentId?: string | null;
 }): Promise<StartCallResult> {
   const supabase = await createClient();
 
@@ -345,6 +356,7 @@ export async function startScreeningCall({
     script,
     webhookUrl,
     callContext,
+    voiceAgentId: voiceAgentId ?? null,
   });
 
   if (!result.ok) {

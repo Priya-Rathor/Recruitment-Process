@@ -181,6 +181,38 @@ export const EVENT_CATALOGUE = {
     describe: () => "Archived the application",
   },
   // ---------------------------------------------------------------------------
+  // Module 25 — the Stage Workflow Builder's automatic resume screen.
+  //
+  // Two events, because an automatic screen-out and a human reversing it are
+  // different acts by different actors, and a timeline that showed only the
+  // first would make the flag look permanent.
+  // ---------------------------------------------------------------------------
+  "application.resume_screened": {
+    entity: "application",
+    label: "Resume screened",
+    describe: (m) => {
+      const score = text(m.score, "?");
+      const threshold = text(m.threshold, "?");
+
+      // needs_review is spelled out rather than shown as a verdict, because it
+      // is the absence of one. "Scored ? against ?" would read as a failure.
+      if (m.verdict === "needs_review") {
+        return "Resume screening reached no decision — no score, or no passing mark set";
+      }
+      if (m.verdict === "pass") {
+        return m.advanced === true
+          ? `Passed the resume screen (${score} vs ${threshold}) and moved to Shortlisted`
+          : `Passed the resume screen (${score} vs ${threshold})`;
+      }
+      return `Did not reach the resume passing mark (${score} vs ${threshold}) — flagged Not Shortlisted`;
+    },
+  },
+  "application.not_shortlisted_cleared": {
+    entity: "application",
+    label: "Not Shortlisted reversed",
+    describe: () => "Cleared the automatic Not Shortlisted flag",
+  },
+  // ---------------------------------------------------------------------------
   // Module 19 — onboarding documents.
   //
   // Filed under the APPLICATION rather than a new entity type, so a hire's

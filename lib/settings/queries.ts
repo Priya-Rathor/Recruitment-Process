@@ -78,6 +78,14 @@ export type OrganizationSettings = {
   communication_settings: CommunicationSettings;
   logo_url: string | null;
   brand_color: string | null;
+  /**
+   * MODULE 26. Where candidates are asked to attend in person, for
+   * {{organization.office_address}} in the Director Round invitation.
+   *
+   * Distinct from a job's `location`, which is where the ROLE is — a remote job
+   * with an onsite final round has two different answers to "where?".
+   */
+  office_address: string | null;
   updated_at: string | null;
 };
 
@@ -135,6 +143,7 @@ export const DEFAULT_SETTINGS: Omit<OrganizationSettings, "organization_id" | "u
   communication_settings: DEFAULT_COMMUNICATION_SETTINGS,
   logo_url: null,
   brand_color: null,
+  office_address: null,
 };
 
 /**
@@ -189,6 +198,7 @@ export async function getOrganizationSettings(
       communication_settings: normalizeCommunicationSettings(row.communication_settings),
       logo_url: (row.logo_url as string | null) ?? null,
       brand_color: (row.brand_color as string | null) ?? null,
+      office_address: (row.office_address as string | null) ?? null,
       updated_at: (row.updated_at as string | null) ?? null,
     },
     failed: false,
@@ -350,6 +360,22 @@ export function parseSettingsPayload(value: unknown): ParseResult {
 
   const raw = value as Record<string, unknown>;
   const updates: Record<string, unknown> = {};
+
+  if ("office_address" in raw) {
+    const address = raw.office_address;
+    if (address === null || address === "") {
+      // Cleared, not rejected. An organisation that stops using an office should
+      // be able to empty the field; the token then renders as an em dash, which
+      // is visible in the template preview.
+      updates.office_address = null;
+    } else if (typeof address !== "string") {
+      return { ok: false, error: "The office address must be text." };
+    } else if (address.trim().length > 500) {
+      return { ok: false, error: "That office address is too long (500 characters max)." };
+    } else {
+      updates.office_address = address.trim();
+    }
+  }
 
   if ("currency" in raw) {
     const currency = typeof raw.currency === "string" ? raw.currency.trim().toUpperCase() : "";

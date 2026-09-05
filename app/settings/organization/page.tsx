@@ -54,7 +54,11 @@ async function OrganizationBody({
         timezone: organization.timezone,
         agencyMode: organization.agencyMode,
       }}
-      branding={{ logo_url: settings.logo_url, brand_color: settings.brand_color }}
+      branding={{
+        logo_url: settings.logo_url,
+        brand_color: settings.brand_color,
+        office_address: settings.office_address,
+      }}
     />
   );
 }

@@ -23,6 +23,10 @@ import { requestOrigin } from "@/lib/forms/origin";
 import { ScreeningSummary } from "./ScreeningSummary";
 import { JobHiringStages, type PipelineStageRow } from "./JobHiringStages";
 import { ResumeScoringCard } from "./ResumeScoringCard";
+import { StageWorkflowBuilder } from "./StageWorkflowBuilder";
+import { ApplyFlowTemplate } from "./ApplyFlowTemplate";
+import { loadJobWorkflow } from "@/lib/workflow/queries";
+import { loadWorkflowOptions } from "@/lib/workflow/options";
 import { HealthBadge, HealthReasons, StatusBadge } from "../JobBadges";
 import { ArchiveJobButton } from "./JobActions";
 import { IntakeModal } from "./IntakeModal";
@@ -112,6 +116,15 @@ async function JobDetailContent({
   if (!job) notFound();
 
   const canEdit = hasRole(membership.role, ["owner", "admin", "recruiter"]);
+  /**
+   * The workflow builder is Owner/Admin, NOT the page's general `canEdit`.
+   *
+   * It writes `automations` rows, and Module 13's spec puts rule authoring out of
+   * a Recruiter's reach ("Create/edit automations — Recruiter: No"). Reusing
+   * `canEdit` here would have offered a Recruiter controls whose save the RLS
+   * policy then refuses — a permission error where a hidden control belonged.
+   */
+  const canEditWorkflow = hasRole(membership.role, ["owner", "admin"]);
   const canArchive = hasRole(membership.role, ["owner", "admin"]);
   /**
    * Regenerating the public application link is the same bar as archiving: it
@@ -128,6 +141,8 @@ async function JobDetailContent({
     orgSettings,
     applicationForm,
     orgCallData,
+    workflow,
+    workflowOptions,
   ] = await Promise.all([
     listApplications({
       organizationId: membership.organization.id,
@@ -144,6 +159,11 @@ async function JobDetailContent({
       organizationId: membership.organization.id,
       companyName: membership.organization.name,
     }),
+    // MODULE 25. Both loaded here, in the same round, rather than fetched by the
+    // client component — AGENTS.md prefers server loads, and it keeps the
+    // builder's pickers populated on first paint rather than a beat later.
+    loadJobWorkflow({ organizationId: membership.organization.id, jobId }),
+    loadWorkflowOptions(membership.organization.id),
   ]);
 
   /*
@@ -285,6 +305,28 @@ async function JobDetailContent({
 
       {/* ---- Hiring stages: all four, on or off -------------------------- */}
       <JobHiringStages jobId={job.id} stages={pipelineStages} canEdit={canEdit} />
+
+      {/* ---- Stage workflow: what fires on entry into each stage ---------
+          Placed after the stage toggles and before Resume Scoring, because it
+          reads as the consequence of the toggles above it: these are the stages
+          this job runs, and this is what happens at each one. ---------------- */}
+      {/* MODULE 26 — the one-click starting point, above the builder it fills
+          in. Owner/Admin only, same bar as saving a single stage list. */}
+      {canEditWorkflow && (
+        <ApplyFlowTemplate
+          jobId={job.id}
+          hasExistingWorkflow={workflow.stages.some((stage) =>
+            stage.lists.some((list) => list.actions.length > 0)
+          )}
+        />
+      )}
+
+      <StageWorkflowBuilder
+        jobId={job.id}
+        stages={workflow.stages}
+        options={workflowOptions}
+        canEdit={canEditWorkflow}
+      />
 
       {/* ---- Resume scoring: always on, so never a stage row ------------- */}
       <ResumeScoringCard

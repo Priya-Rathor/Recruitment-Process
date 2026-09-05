@@ -50,6 +50,8 @@
  * the editor and be rejected on save, or worse, the other way round.
  */
 import { validateRecipients } from "@/lib/workflow/recipients";
+// Module 26. Also pure, also import-free — same reasoning as above.
+import { validateDelay } from "@/lib/workflow/delay";
 
 export const TRIGGERS = [
   "application_stage_changed",
@@ -260,6 +262,20 @@ export const ACTIONS = [
   "ai_resume_shortlist",
   "request_form",
   "schedule_interview",
+  /**
+   * ADDED BY MODULE 26 (Default Recruitment Flow).
+   *
+   * The only action that CONTAINS other actions. Everything else in this
+   * vocabulary is a leaf; this one holds a nested list and a delay, and the
+   * engine queues the list rather than running it.
+   *
+   * Nesting rather than a `delay_minutes` field on every action, because a wait
+   * usually covers a GROUP — "30 minutes later, email them and notify the
+   * recruiter" is one wait and two actions. Per-action delays would express that
+   * as two independent waits that could drift apart, and a reader could not tell
+   * whether they were meant to be simultaneous.
+   */
+  "wait_then",
 ] as const;
 
 export type ActionType = (typeof ACTIONS)[number];
@@ -303,6 +319,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   // it named is no longer something a customer can see or connect.
   call_n8n_webhook: "Hand off to an external workflow",
   send_templated_message: "Send templated message",
+  wait_then: "Wait, then…",
   ai_resume_shortlist: "Screen the resume against the passing mark",
   request_form: "Send the candidate a form to complete",
   schedule_interview: "Schedule an interview",
@@ -345,6 +362,13 @@ export const ACTION_MODES: Record<ActionType, ExecutionMode[]> = {
    * without somebody or something signed in having put it there.
    */
   ai_resume_shortlist: ["session"],
+  /**
+   * Both modes: scheduling a wait is a database insert and nothing else. The
+   * nested actions' own modes are checked when the SWEEP fires them, under the
+   * service-role client — which is why validateRule() refuses to nest a
+   * session-only action inside a wait. See the nesting rules below.
+   */
+  wait_then: ["session", "service"],
   request_form: ["session", "service"],
   // Manual-trigger only (see MANUAL_ONLY_ACTIONS), so the mode list is
   // permissive: whichever client the recruiter's click arrives with will do.
@@ -430,6 +454,13 @@ export const CONSEQUENTIAL_ACTIONS: ActionType[] = [
   "ai_resume_shortlist",
   // Sends the candidate a link and asks them for their time.
   "request_form",
+  /**
+   * `wait_then` is DELIBERATELY ABSENT.
+   *
+   * Scheduling a wait spends nothing and contacts nobody. Its nested actions are
+   * counted when the sweep fires them, against the run row that fires them — so
+   * counting the wait too would bill the same email twice in the cost ledger.
+   */
 ];
 
 /**
@@ -696,6 +727,16 @@ const MAX_CONDITIONS_PER_GROUP = 6;
  */
 const MAX_ACTIONS = 10;
 
+/**
+ * How many actions may sit inside one "Wait, then…".
+ *
+ * Lower than MAX_ACTIONS because a nested list is not a stage's whole
+ * programme — it is what happens at one moment after a delay. Five is more than
+ * any case in the default flow needs, and a nested list longer than the outer
+ * one would mean the wait had become the rule.
+ */
+const MAX_NESTED_ACTIONS = 5;
+
 function validateCondition(entry: Record<string, unknown>): ValidationResult | Condition {
   const field = entry.field as ConditionField;
   if (!isConditionField(field)) {
@@ -908,6 +949,35 @@ export function validateRule(value: unknown): ValidationResult {
         : [];
       config.channels = channels;
       if (typeof config.event_key !== "string") delete config.event_key;
+
+      /**
+       * MODULE 26 — "Show an answer from this form on the application."
+       *
+       * Two strings: which question, and what to call it on the application.
+       * NEITHER IS THE ANSWER. Nothing about the candidate's reply is stored
+       * here — this is a pointer, and the value is read from
+       * form_responses.raw_answers at display time. See
+       * lib/workflow/formAnswers.ts for why that matters.
+       *
+       * `field_key` is validated against the same pattern the form_fields column
+       * check uses, so a key that could never exist is refused at configuration
+       * time rather than surfacing as a permanently blank field.
+       */
+      if (config.surface_field_key === "" || config.surface_field_key === null) {
+        delete config.surface_field_key;
+        delete config.surface_label;
+      } else if (config.surface_field_key !== undefined) {
+        const key = config.surface_field_key;
+        if (typeof key !== "string" || !/^[a-z][a-z0-9_]{0,58}[a-z0-9]$/.test(key)) {
+          return { ok: false, error: "Choose which answer to show on the application." };
+        }
+        const label = config.surface_label;
+        if (typeof label !== "string" || label.trim().length === 0) {
+          return { ok: false, error: "Give the surfaced answer a label to show on the application." };
+        }
+        config.surface_field_key = key;
+        config.surface_label = label.trim().slice(0, 60);
+      }
     }
 
     /**
@@ -921,6 +991,74 @@ export function validateRule(value: unknown): ValidationResult {
       if (mode !== undefined && mode !== null && typeof mode !== "string") {
         return { ok: false, error: "The interview mode must be text." };
       }
+    }
+
+    /**
+     * MODULE 26 — "Wait, then…".
+     *
+     * THREE RULES, each closing a way this could fail silently.
+     *
+     * 1. NO NESTING A WAIT INSIDE A WAIT. Two levels would need the queue to
+     *    schedule from the queue, and a chain of them could keep an application
+     *    "in progress" indefinitely with nothing on any screen saying so. One
+     *    level covers every case the brief describes.
+     *
+     * 2. THE NESTED LIST CANNOT BE EMPTY. A wait with nothing after it is a rule
+     *    that consumes an occasion, occupies a queue row, and does nothing —
+     *    indistinguishable, in the run history, from one that failed.
+     *
+     * 3. EVERY NESTED ACTION MUST RUN IN SERVICE MODE. The sweep drains this
+     *    queue with the service-role client, so a session-only action (the
+     *    Module 7-9 three, and ai_resume_shortlist) queued inside a wait would be
+     *    denied by RLS half an hour later, with nobody watching. Refused here,
+     *    naming the action, rather than discovered in a log.
+     */
+    if (entry.type === "wait_then") {
+      const delay = validateDelay(config);
+      if (!delay.ok) return { ok: false, error: delay.error };
+
+      config.delay_minutes = delay.delay.minutes;
+      config.delay_basis = delay.delay.basis;
+
+      const nested = Array.isArray(config.actions) ? config.actions : [];
+      if (nested.length === 0) {
+        return { ok: false, error: "Add at least one action to run after the wait." };
+      }
+      if (nested.length > MAX_NESTED_ACTIONS) {
+        return {
+          ok: false,
+          error: `A wait can be followed by at most ${MAX_NESTED_ACTIONS} actions.`,
+        };
+      }
+
+      const nestedRule = validateRule({
+        trigger: raw.trigger,
+        conditions: [],
+        actions: nested,
+      });
+      if (!nestedRule.ok) return nestedRule;
+
+      for (const nestedAction of nestedRule.rule.actions) {
+        if (nestedAction.type === "wait_then") {
+          return { ok: false, error: "A wait can't contain another wait." };
+        }
+        if (!actionRunsIn(nestedAction.type, "service")) {
+          return {
+            ok: false,
+            error: `"${ACTION_LABELS[nestedAction.type]}" can't run after a wait — it needs a signed-in user, and the scheduler has none.`,
+          };
+        }
+        if (nestedAction.config?.manual === true) {
+          // A manual action after a wait is two contradictory instructions:
+          // "do this in 30 minutes" and "do this when somebody clicks".
+          return {
+            ok: false,
+            error: `"${ACTION_LABELS[nestedAction.type]}" is set to manual, so it can't be scheduled after a wait.`,
+          };
+        }
+      }
+
+      config.actions = nestedRule.rule.actions;
     }
 
     if (entry.type === "call_n8n_webhook") {

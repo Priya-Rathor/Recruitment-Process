@@ -61,6 +61,23 @@ export const MESSAGE_ONLY_FIELDS: PlaceholderField[] = [
     sample: "Webbee Global",
   },
   {
+    /*
+      MODULE 26. Where candidates are asked to attend in person.
+
+      Distinct from job.location, which is where the ROLE is — a remote job with
+      an onsite final round has two different answers to "where?", and one token
+      covering both would be wrong for one of them.
+
+      Populated from organization_settings.office_address. Unset, renderMessage()
+      resolves it to an em dash, which is visible in the preview before anybody
+      sends a Director Round invitation with a blank address in it.
+    */
+    token: "organization.office_address",
+    label: "Office Address",
+    group: "organization",
+    sample: "4th Floor, Prestige Tower, MG Road, Bengaluru 560001",
+  },
+  {
     token: "recruiter.name",
     label: "Assigned Recruiter",
     group: "organization",
@@ -222,6 +239,7 @@ export function buildMessageValues({
   application,
   interview,
   organizationName,
+  officeAddress,
   recruiterName,
   timeZone,
 }: {
@@ -230,12 +248,15 @@ export function buildMessageValues({
   application?: ApplicationValueSource | null;
   interview?: InterviewValueSource | null;
   organizationName?: string | null;
+  /** Module 26. organization_settings.office_address. */
+  officeAddress?: string | null;
   recruiterName?: string | null;
   timeZone: string;
 }): PlaceholderValues {
   const values: PlaceholderValues = buildPlaceholderValues({ job, candidate, application });
 
   values["organization.name"] = organizationName ?? null;
+  values["organization.office_address"] = officeAddress ?? null;
   values["recruiter.name"] = recruiterName ?? null;
 
   if (interview) {

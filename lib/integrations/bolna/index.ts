@@ -298,6 +298,16 @@ export type PlaceCallInput = {
    * existing caller still holds.
    */
   callContext?: Record<string, string>;
+  /**
+   * MODULE 25. The voice_agents row this call should use, chosen on the stage
+   * workflow — a "CV Shortlisting Agent" persona on one stage, a "Technical
+   * Screening Agent" on another.
+   *
+   * OPTIONAL, and its absence is the pre-Module-25 behaviour exactly: fall back
+   * to the console's default agent, then to the id captured when the integration
+   * was connected. See resolveDialingAgentId().
+   */
+  voiceAgentId?: string | null;
 };
 
 /**
@@ -370,7 +380,11 @@ export async function placeCall(
     organization that has never opened the console resolves to exactly the id it
     used before.
   */
-  const dialingAgentId = await resolveDialingAgentId(input.organizationId, agentId);
+  const dialingAgentId = await resolveDialingAgentId(
+    input.organizationId,
+    agentId,
+    input.voiceAgentId ?? null
+  );
 
   try {
     const response = await fetch(`${BOLNA_BASE_URL}/call`, {
@@ -719,10 +733,35 @@ export async function updateAgentConfig(
  */
 async function resolveDialingAgentId(
   organizationId: string,
-  credentialAgentId: string
+  credentialAgentId: string,
+  /**
+   * MODULE 25. A specific agent named by a stage workflow. Takes priority over
+   * the organization default, because it is the more specific statement: "this
+   * stage uses the Technical Screening persona" is a decision about this call,
+   * and the default is a decision about calls in general.
+   *
+   * An id that does not resolve falls back to the default rather than failing
+   * the call. A deleted agent must not silently stop a pipeline from dialling —
+   * and the run log records which agent was used either way.
+   */
+  requestedAgentId: string | null = null
 ): Promise<string> {
   const admin = createAdminClient();
   if (!admin) return credentialAgentId;
+
+  // organization_id is filtered explicitly on both reads: this is the admin
+  // client, so RLS is off and an agent id from a rule is not proof of tenancy.
+  if (requestedAgentId) {
+    const { data: requested } = await admin
+      .from("voice_agents")
+      .select("provider_agent_id")
+      .eq("organization_id", organizationId)
+      .eq("id", requestedAgentId)
+      .maybeSingle();
+
+    const provider = (requested as { provider_agent_id: string | null } | null)?.provider_agent_id;
+    if (provider?.trim()) return provider;
+  }
 
   const { data, error } = await admin
     .from("voice_agents")

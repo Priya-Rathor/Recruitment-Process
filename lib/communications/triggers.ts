@@ -200,6 +200,30 @@ export async function loadMessageContext({
 
   const timeZone = resolveTimeZone(row.organization?.timezone ?? null);
   const organizationName = row.organization?.name ?? "our team";
+
+  /**
+   * MODULE 26 — the office address, for {{organization.office_address}}.
+   *
+   * A SEPARATE QUERY, not an embed on the organizations join above.
+   *
+   * organization_settings holds Module 8's screening credentials context and
+   * Module 21's privacy configuration alongside this column, and widening the
+   * existing embed would pull that row into every message render. One narrow
+   * select of one column is cheaper than the alternative and cannot accidentally
+   * start carrying something sensitive when a later module adds a column.
+   *
+   * A failed read leaves the token null, which renders as an em dash. Blocking
+   * a rejection email because an address could not be read would be a far worse
+   * trade than a dash in a sentence that does not mention the office.
+   */
+  const { data: settingsRow } = await client
+    .from("organization_settings")
+    .select("office_address")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  const officeAddress =
+    (settingsRow as { office_address: string | null } | null)?.office_address ?? null;
   const recruiterName = row.recruiter ? row.recruiter.name ?? row.recruiter.email : null;
 
   return {
@@ -221,6 +245,7 @@ export async function loadMessageContext({
       application: { stage: row.stage, match_score: row.match_score },
       interview: interview ?? null,
       organizationName,
+      officeAddress,
       recruiterName,
       timeZone,
     }),

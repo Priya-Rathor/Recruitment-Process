@@ -21,11 +21,14 @@ function Card({
   card,
   canMove,
   onMove,
+  onReverseScreen,
   busy,
 }: {
   card: BoardCard;
   canMove: boolean;
   onMove: (id: string, stage: ApplicationStage) => void;
+  /** MODULE 25. Clears the automatic Not Shortlisted flag. */
+  onReverseScreen: (id: string) => void;
   busy: boolean;
 }) {
   const accent = slaColor(card.sla.status);
@@ -74,6 +77,47 @@ function Card({
         </Link>
       )}
 
+      {/*
+        MODULE 25 — the automatic screen-out, shown ON the card.
+
+        Deliberately NOT styled as an error. A failed resume screen is a first
+        pass by a threshold, not a verdict, and painting it red would train
+        recruiters to treat it as one. It carries the two numbers so the decision
+        is checkable at a glance, and a reversal is one click away — which is the
+        brief's "visible and reversible" requirement made concrete.
+      */}
+      {card.notShortlisted && (
+        <div
+          className="mt-2"
+          style={{
+            background: "var(--status-attention-bg)",
+            borderRadius: 8,
+            padding: "8px 10px",
+          }}
+        >
+          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--status-attention-text)" }}>
+            Not shortlisted by the resume screen
+          </p>
+          {card.notShortlisted.score !== null && card.notShortlisted.threshold !== null && (
+            <p className="has-text-secondary" style={{ fontSize: 11 }}>
+              Scored {Math.round(card.notShortlisted.score)} against a mark of{" "}
+              {Math.round(card.notShortlisted.threshold)}.
+            </p>
+          )}
+          {canMove && (
+            <button
+              type="button"
+              className="button is-small is-ghost mt-1"
+              style={{ padding: 0, height: "auto", fontSize: 11, textDecoration: "underline" }}
+              disabled={busy}
+              onClick={() => onReverseScreen(card.id)}
+            >
+              Reverse this
+            </button>
+          )}
+        </div>
+      )}
+
       {canMove && (
         <div className="select is-small is-fullwidth mt-2">
           <select
@@ -107,6 +151,31 @@ export function PipelineBoard({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * MODULE 25 — undo an automatic screen-out.
+   *
+   * A DELETE on the flag rather than a stage move, because the failed screen
+   * never moved the application: it is sitting in Applied with a marker on it.
+   * That is what makes the reversal a single call with nothing to unwind.
+   */
+  async function reverseScreen(applicationId: string) {
+    setBusyId(applicationId);
+    setError(null);
+
+    const response = await fetch(`/api/applications/${applicationId}/shortlist`, {
+      method: "DELETE",
+    });
+
+    setBusyId(null);
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error ?? "Could not reverse that screening decision.");
+      return;
+    }
+    router.refresh();
+  }
 
   async function move(applicationId: string, stage: ApplicationStage) {
     setBusyId(applicationId);
@@ -178,6 +247,7 @@ export function PipelineBoard({
                     card={card}
                     canMove={canMove}
                     onMove={move}
+                    onReverseScreen={reverseScreen}
                     busy={busyId === card.id}
                   />
                 ))

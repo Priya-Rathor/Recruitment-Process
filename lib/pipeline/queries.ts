@@ -20,6 +20,21 @@ export type BoardCard = {
   daysInStage: number;
   sla: SlaAssessment;
   awaitingScreeningReview: boolean;
+  /**
+   * MODULE 25. Set when the automatic resume screen said no.
+   *
+   * THE CARD IS STILL HERE, in its column, which is the point. The brief forbids
+   * an automatic screen-out that "silently disappears an application", so the
+   * flag changes how a card LOOKS and adds a way to reverse it — it never filters
+   * the card out. An over-aggressive threshold shows up as a column full of
+   * markers, which is a visible problem; a filtered board would just look quiet.
+   */
+  notShortlisted: {
+    at: string;
+    score: number | null;
+    threshold: number | null;
+    reason: string | null;
+  } | null;
 };
 
 export type Board = {
@@ -74,6 +89,8 @@ export async function getBoard({
     .from("applications")
     .select(
       "id, stage, match_score, updated_at, candidate_id, job_id, " +
+        "not_shortlisted_at, not_shortlisted_score, not_shortlisted_threshold, " +
+        "not_shortlisted_reason, " +
         "candidate:candidates(id, name), job:jobs(id, title), " +
         "recruiter:users!applications_assigned_recruiter_id_fkey(name, email)"
     )
@@ -102,6 +119,10 @@ export async function getBoard({
     updated_at: string;
     candidate_id: string;
     job_id: string;
+    not_shortlisted_at: string | null;
+    not_shortlisted_score: number | null;
+    not_shortlisted_threshold: number | null;
+    not_shortlisted_reason: string | null;
     candidate: { id: string; name: string } | null;
     job: { id: string; title: string } | null;
     recruiter: { name: string | null; email: string } | null;
@@ -144,6 +165,14 @@ export async function getBoard({
       daysInStage,
       sla: assessSla({ stage: row.stage, daysInStage, config: slaConfig }),
       awaitingScreeningReview: pendingReview.has(row.id),
+      notShortlisted: row.not_shortlisted_at
+        ? {
+            at: row.not_shortlisted_at,
+            score: row.not_shortlisted_score,
+            threshold: row.not_shortlisted_threshold,
+            reason: row.not_shortlisted_reason,
+          }
+        : null,
     };
   });
 

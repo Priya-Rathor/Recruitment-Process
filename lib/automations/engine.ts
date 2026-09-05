@@ -78,6 +78,33 @@ import { isCommunicationEvent } from "@/lib/communications/events";
 import { findOwnersAndAdmins } from "@/lib/notifications/queries";
 import { startOfDayInZone, resolveTimeZone } from "@/lib/time";
 import { formatDbError } from "@/lib/supabase/errors";
+import { runResumeShortlist } from "@/lib/workflow/shortlist";
+import { buildApplyUrl } from "@/lib/forms/token";
+import { describeRecipients, recipientsFrom } from "@/lib/workflow/recipients";
+import { BRANCH_TARGET_STAGE, type WorkflowBranch } from "@/lib/workflow/stages";
+import { describeDelay, isDelayBasis } from "@/lib/workflow/delay";
+import { resolveAnchor, scheduleDelayedAction } from "@/lib/workflow/delayQueue";
+
+/**
+ * The site origin, recovered from the Bolna webhook URL the caller passed.
+ *
+ * Every dispatch already carries `webhookUrl` — an absolute URL built from the
+ * request's own origin — because Module 8 needs it. A form link needs the same
+ * origin, and taking it from here rather than adding a second parameter means
+ * one absolute-URL source rather than two that can disagree about which host
+ * this deployment is on.
+ *
+ * Null when it cannot be parsed, at which point buildApplyUrl() falls back to
+ * APP_URL and, failing that, refuses to mint a link rather than sending a
+ * relative one nobody can open.
+ */
+function originFromWebhookUrl(webhookUrl: string): string | null {
+  try {
+    return new URL(webhookUrl).origin;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Either Supabase client. The union, not `any` — every call in this file is
@@ -110,6 +137,16 @@ export type ActionResult = {
   action: ActionType;
   status: "success" | "failed" | "skipped";
   detail: string;
+  /**
+   * MODULE 25 — the outcome this action produced, when it produced one.
+   *
+   * Only `ai_resume_shortlist` sets it today. runOne() collects it and
+   * re-dispatches so the On Pass / On Fail lists fire, which is why the verdict
+   * travels back up rather than being re-derived from the row afterwards: by
+   * then a pass has already moved the application, and reading its state would
+   * answer a question about a later moment.
+   */
+  branch?: WorkflowBranch;
 };
 
 export type RunOutcome = {
@@ -477,6 +514,23 @@ export type ExecuteActionInput = {
   triggeredBy: string | null;
   webhookUrl: string;
   automationName: string;
+  /**
+   * MODULE 26 — everything `wait_then` needs to queue a row, and nothing else
+   * reads.
+   *
+   * Threaded through rather than re-fetched inside the handler: the rule's id,
+   * stage and branch are already in hand at the call site, and the application's
+   * live stage was read into the evaluation context one step earlier. A handler
+   * that re-queried for them would be three extra round trips per wait, and the
+   * `currentStage` one would additionally be racing the value the rest of the run
+   * was evaluated against.
+   */
+  automationId?: string | null;
+  stageKey?: string | null;
+  branch?: WorkflowBranch | null;
+  currentStage?: string | null;
+  /** Position in the rule's action list. Part of the wait's dedupe key. */
+  actionIndex?: number;
 };
 
 /** Executes one action. Never throws — a thrown action would lose the run record. */
@@ -491,6 +545,11 @@ async function executeAction(input: ExecuteActionInput): Promise<ActionResult> {
     triggeredBy,
     webhookUrl,
     automationName,
+    automationId,
+    stageKey,
+    branch,
+    currentStage,
+    actionIndex = 0,
   } = input;
 
   const useAdminClient = mode === "service";
@@ -542,6 +601,10 @@ async function executeAction(input: ExecuteActionInput): Promise<ActionResult> {
           organizationName,
           triggeredBy,
           webhookUrl,
+          // MODULE 25. Null on every rule written before it, which resolves to
+          // the organization's default agent exactly as it always did.
+          voiceAgentId:
+            typeof action.config?.agent_id === "string" ? action.config.agent_id : null,
         });
         // Module 14. The route logs this for a manual call; the automation path
         // does not go through the route, so it is logged here too. actorId is
@@ -922,6 +985,10 @@ async function executeAction(input: ExecuteActionInput): Promise<ActionResult> {
           applicationId,
           templateId,
           eventKey,
+          // MODULE 25. Absent on every rule written before it, and
+          // recipientsFrom() reads that absence as "the candidate" — which is
+          // exactly what those rules have always done.
+          recipients: recipientsFrom(action.config),
         });
 
         if (result.status === "sent") {
@@ -948,6 +1015,244 @@ async function executeAction(input: ExecuteActionInput): Promise<ActionResult> {
           action: action.type,
           status: "skipped",
           detail: result.detail ?? "Nothing was sent.",
+        };
+      }
+
+      /**
+       * MODULE 25 — AI Resume Shortlisting.
+       *
+       * The handler is thin on purpose: every decision lives in
+       * lib/workflow/shortlist.ts as a pure verdict plus one effectful runner,
+       * so the branching rule can be tested without a database and without the
+       * engine. What the engine adds is the audit entry and the `branch` it
+       * hands back to runOne(), which is what causes the On Pass / On Fail lists
+       * to fire.
+       */
+      case "ai_resume_shortlist": {
+        if (mode === "service") {
+          return {
+            action: action.type,
+            status: "failed",
+            detail: "Resume shortlisting can't run without a signed-in user.",
+          };
+        }
+
+        const override = action.config?.passing_score;
+        const outcome = await runResumeShortlist({
+          client,
+          organizationId,
+          applicationId,
+          passingScoreOverride: typeof override === "number" ? override : null,
+          advanceOnPass: action.config?.advance_on_pass !== false,
+        });
+
+        await logActivity({
+          organizationId,
+          entityType: "application",
+          entityId: applicationId,
+          eventType: "application.resume_screened",
+          actorId: triggeredBy,
+          actorLabel: `Automation: ${automationName}`,
+          metadata: {
+            verdict: outcome.verdict,
+            score: outcome.score,
+            threshold: outcome.threshold,
+            advanced: outcome.advanced,
+            flagged: outcome.flagged,
+          },
+        });
+
+        return {
+          action: action.type,
+          /**
+           * A needs_review verdict is a SKIP, not a failure.
+           *
+           * Nothing went wrong — the job has no passing mark, or the resume
+           * could not be scored. Reporting it as failed would put a red row in
+           * the run history for a configuration gap, and a run history where
+           * red does not mean broken is one nobody reads.
+           */
+          status: outcome.verdict === "needs_review" ? "skipped" : "success",
+          detail: outcome.detail,
+          branch: outcome.verdict === "needs_review" ? undefined : outcome.verdict,
+        };
+      }
+
+      /**
+       * MODULE 25 — Request Form.
+       *
+       * Sends a Module 18 form's link through the Module 15 template machinery.
+       * The link is minted per send rather than stored on the rule: a form's
+       * token_version is its revocation mechanism, so a URL frozen into a rule
+       * would keep working after somebody revoked every link, or stop working
+       * for no visible reason after they did.
+       */
+      case "request_form": {
+        const formId = action.config?.form_id;
+        const templateId = action.config?.template_id;
+
+        if (typeof formId !== "string" || typeof templateId !== "string") {
+          return {
+            action: action.type,
+            status: "failed",
+            detail: "This action is missing its form or its message template.",
+          };
+        }
+
+        const { data: formRow, error: formError } = await client
+          .from("forms")
+          .select("id, name, status, token_version")
+          .eq("organization_id", organizationId)
+          .eq("id", formId)
+          .maybeSingle();
+
+        if (formError || !formRow) {
+          return {
+            action: action.type,
+            status: "failed",
+            detail: "That form no longer exists, so nothing was sent.",
+          };
+        }
+
+        const form = formRow as {
+          id: string;
+          name: string;
+          status: string;
+          token_version: number;
+        };
+
+        // A paused form would hand the candidate a link to a page that refuses
+        // them. Skipped rather than failed: somebody switched it off on purpose.
+        if (form.status !== "published") {
+          return {
+            action: action.type,
+            status: "skipped",
+            detail: `"${form.name}" isn't published, so no link was sent.`,
+          };
+        }
+
+        const link = await buildApplyUrl({
+          formId: form.id,
+          tokenVersion: form.token_version,
+          origin: originFromWebhookUrl(webhookUrl),
+        });
+
+        if (!link) {
+          return {
+            action: action.type,
+            status: "failed",
+            detail:
+              "The form link could not be built — form link signing isn't configured on this deployment.",
+          };
+        }
+
+        const formResult = await sendTemplatedMessage({
+          client,
+          organizationId,
+          applicationId,
+          templateId,
+          eventKey: isCommunicationEvent(action.config?.event_key)
+            ? action.config.event_key
+            : null,
+          recipients: recipientsFrom(action.config),
+          // The two tokens this action exists to supply. Merged over the
+          // resolved context by sendForEvent().
+          extraValues: { "form.link": link, "form.name": form.name },
+        });
+
+        if (formResult.status === "sent") {
+          return {
+            action: action.type,
+            status: "success",
+            detail: `"${form.name}" sent to ${describeRecipients(recipientsFrom(action.config))}.`,
+          };
+        }
+
+        return {
+          action: action.type,
+          status: formResult.status === "failed" ? "failed" : "skipped",
+          detail: formResult.detail ?? "The form link was not sent.",
+        };
+      }
+
+      /**
+       * MODULE 25 — Schedule Interview.
+       *
+       * Unreachable in normal operation: validateRule() refuses to store this
+       * action unless it is marked manual, and the manual check above the switch
+       * returns before any handler runs. It exists so that a rule stored before
+       * that validation — or edited directly through PostgREST — reports a
+       * reason instead of falling through to the default and reading as
+       * "unknown action".
+       */
+      case "schedule_interview": {
+        return {
+          action: action.type,
+          status: "skipped",
+          detail:
+            "Interview scheduling needs a person to choose the time — run it from the application.",
+        };
+      }
+
+      /**
+       * MODULE 26 — "Wait, then…".
+       *
+       * This handler SCHEDULES; it never executes the nested list. That single
+       * fact is what keeps the delay primitive on the product's one clock: the
+       * row goes into automation_delayed_actions, and the existing sweep at
+       * /api/automations/sweep drains it. There is no timer here, no setTimeout,
+       * and nothing that depends on this process still being alive later.
+       */
+      case "wait_then": {
+        if (!automationId) {
+          // Only reachable from the dry-run/test path, which has no rule row to
+          // hang a queued wait off. Reported rather than silently skipped.
+          return {
+            action: action.type,
+            status: "skipped",
+            detail: "A wait can only be scheduled by a saved rule.",
+          };
+        }
+
+        const basis = isDelayBasis(action.config?.delay_basis)
+          ? action.config.delay_basis
+          : "after";
+
+        const anchor = await resolveAnchor({
+          client,
+          organizationId,
+          applicationId,
+          basis,
+        });
+
+        const scheduled = await scheduleDelayedAction({
+          client,
+          organizationId,
+          automationId,
+          applicationId,
+          stageKey: stageKey ?? "",
+          branch: branch ?? "always",
+          // The cancellation baseline: the stage the application is in at this
+          // instant, which for a fail branch is NOT the rule's stage_key.
+          currentStage: currentStage ?? "",
+          actionIndex,
+          config: action.config,
+          anchor,
+        });
+
+        if (!scheduled.ok) {
+          return { action: action.type, status: "skipped", detail: scheduled.reason };
+        }
+
+        const nested = Array.isArray(action.config?.actions) ? action.config.actions.length : 0;
+        const minutes = Number(action.config?.delay_minutes ?? 0);
+
+        return {
+          action: action.type,
+          status: "success",
+          detail: scheduled.duplicate
+            ? "Already waiting — nothing queued twice."
+            : `Queued ${nested} action${nested === 1 ? "" : "s"} for ${describeDelay(minutes)}' time.`,
         };
       }
 
@@ -1157,6 +1462,24 @@ export type DispatchInput = {
    * from the thing that produced it removes the re-derivation entirely.
    */
   branch?: WorkflowBranch;
+  /**
+   * MODULE 25 — which stage's branch lists to consult, when that is not the
+   * stage the application is currently sitting in.
+   *
+   * THE FAILED RESUME SCREEN IS THE WHOLE REASON THIS EXISTS.
+   *
+   * A failed screen leaves the application in Applied — deliberately; it is a
+   * flag, not a move. But its "On Fail" actions are filed under Shortlisted,
+   * because that is where a recruiter looks for "what happens when somebody is
+   * not shortlisted" (see BRANCHING_STAGES). Without this override the stage
+   * filter would compare Shortlisted's rules against an application in Applied,
+   * find no match, and the On Fail branch would never fire — silently, which is
+   * the exact failure mode the brief warns about.
+   *
+   * Absent, dispatch falls back to the application's real stage, which is right
+   * for every other caller.
+   */
+  branchStage?: string;
 };
 
 /**
@@ -1254,7 +1577,8 @@ export async function dispatch(input: DispatchInput): Promise<RunOutcome[]> {
        * in before anybody adds one. Without this, an empty Video Interview
        * workflow would fire on entry into every stage.
        */
-      if (automation.stage_key && automation.stage_key !== built.context.stage) return false;
+      const effectiveStage = input.branchStage ?? built.context.stage;
+      if (automation.stage_key && automation.stage_key !== effectiveStage) return false;
 
       return true;
     });
@@ -1335,6 +1659,9 @@ async function runOne({
       reason: "Running…",
       trigger: input.trigger,
       scheduled: input.scheduled === true,
+      // MODULE 25. Which outcome branch this run was dispatched for, so the run
+      // history answers "why did this fire?" without opening the rule.
+      branch: input.branch ?? "always",
       triggered_by: input.triggeredBy,
     })
     .select("id")
@@ -1585,7 +1912,7 @@ async function runOne({
   }
 
   const actionResults: ActionResult[] = [];
-  for (const action of automation.actions ?? []) {
+  for (const [actionIndex, action] of (automation.actions ?? []).entries()) {
     actionResults.push(
       await executeAction({
         action,
@@ -1597,13 +1924,19 @@ async function runOne({
         triggeredBy: input.triggeredBy,
         webhookUrl: input.webhookUrl,
         automationName: automation.name,
+        // MODULE 26 — only `wait_then` reads these.
+        automationId: automation.id,
+        stageKey: automation.stage_key,
+        branch: automation.branch,
+        currentStage: context.stage,
+        actionIndex,
       })
     );
   }
 
   const failed = actionResults.filter((result) => result.status === "failed");
 
-  return finish(
+  const outcome = finish(
     failed.length > 0 ? "failed" : "success",
     failed.length > 0
       ? `${failed.length} of ${actionResults.length} actions failed.`
@@ -1611,6 +1944,64 @@ async function runOne({
     actionResults,
     failed.length > 0 ? failed.map((result) => result.detail).join(" ") : null
   );
+
+  /**
+   * MODULE 25 — THE BRANCH DISPATCH.
+   *
+   * An action that produced a verdict re-enters dispatch() with that verdict, so
+   * the stage's On Pass / On Fail lists fire. This is the mechanism the brief's
+   * central test exercises: "an action configured under Shortlisted's On Pass
+   * branch fires only when the AI Resume Shortlisting step actually passes".
+   *
+   * FOUR THINGS ABOUT THE SHAPE OF THIS, EACH PREVENTING A SPECIFIC FAILURE:
+   *
+   *   1. AWAITED, AFTER `finish()`. The parent run row is written first, so the
+   *      run history reads in causal order and a branch run can never appear
+   *      before the run that caused it.
+   *
+   *   2. IT RE-DISPATCHES `application_stage_changed`, not the trigger that got
+   *      us here. A pass has MOVED the application to Shortlisted, and the
+   *      branch lists hang off the stage the application is now in — which is
+   *      what makes "Shortlisted's On Pass branch" mean what it says.
+   *
+   *   3. ONE LEVEL ONLY, enforced by `branch` being set on the child dispatch:
+   *      the branch rules that fire cannot themselves carry an
+   *      `ai_resume_shortlist` action, because the catalogue restricts that
+   *      action to the Applied stage and the stage filter in dispatch() drops
+   *      anything attached elsewhere. Without that pairing this would be a loop.
+   *
+   *   4. WRAPPED. A failing branch rule must not retroactively fail the run that
+   *      produced the verdict — the resume WAS screened and the application WAS
+   *      moved, and reporting that as failed would be false.
+   */
+  const verdict = actionResults.find((result) => result.branch)?.branch;
+  if (verdict && !input.dryRun) {
+    try {
+      await dispatch({
+        ...input,
+        trigger: "application_stage_changed",
+        branch: verdict,
+        /**
+         * Pinned to the stage that OWNS these branches, not to wherever the
+         * application ended up. On a pass those are the same thing (it moved to
+         * Shortlisted); on a fail they are not (it stayed in Applied), and
+         * reading the live stage would silently drop the On Fail branch.
+         */
+        branchStage:
+          BRANCH_TARGET_STAGE[automation.stage_key as ApplicationStage] ??
+          automation.stage_key ??
+          undefined,
+        // Not reused: the parent's client is correct, but `onlyAutomationId`
+        // would pin the child dispatch to the rule that just ran.
+        onlyAutomationId: undefined,
+        client,
+      });
+    } catch (error) {
+      console.error(`[automation] branch dispatch failed: ${formatDbError(error)}`);
+    }
+  }
+
+  return outcome;
 }
 
 /**
@@ -1720,4 +2111,143 @@ export function summarizeActionResults(results: ActionResult[]): string {
   return results
     .map((result) => `${ACTION_LABELS[result.action] ?? result.action}: ${result.detail}`)
     .join(" ");
+}
+
+/**
+ * MODULE 26 — fires the actions a "Wait, then…" queued, now that it is due.
+ *
+ * Called only by lib/workflow/delayQueue.ts, from inside the existing sweep.
+ *
+ * -----------------------------------------------------------------------------
+ * WHY THIS WRITES A REAL automation_runs ROW.
+ *
+ * Because the alternative is a message a candidate received with nothing in the
+ * product accounting for it. A recruiter looking at the run history half an hour
+ * after a screening call has to be able to see "the thank-you went out" —
+ * otherwise the delayed half of a rule is invisible and the history lies by
+ * omission about what the automation did.
+ *
+ * The row carries the SAME automation_id as the run that queued it, so the two
+ * appear together on the rule's history: one row for "queued 2 actions for 30
+ * minutes' time", a later one for what those actions then did.
+ *
+ * -----------------------------------------------------------------------------
+ * NO CONDITION RE-EVALUATION, DELIBERATELY.
+ *
+ * The conditions were true when the wait started; that is what the wait is a
+ * promise about. Re-checking them here would mean a candidate whose match score
+ * was recalculated during the wait silently stops receiving a message they were
+ * already owed — and the recruiter would have no way to find out why.
+ *
+ * The one thing that DOES invalidate the promise is the application moving on,
+ * and that is checked (twice: the trigger in migration 0038, and again in
+ * drainDueActions before this is called).
+ */
+export async function executeQueuedActions({
+  client,
+  organizationId,
+  organizationName,
+  applicationId,
+  automationId,
+  actions,
+  branch,
+  webhookUrl,
+}: {
+  client: EngineClient;
+  organizationId: string;
+  organizationName: string;
+  applicationId: string;
+  automationId: string;
+  actions: Action[];
+  branch: WorkflowBranch;
+  webhookUrl: string;
+}): Promise<{ status: "success" | "failed"; reason: string | null; actionResults: ActionResult[] }> {
+  const actionResults: ActionResult[] = [];
+
+  // The rule's name, for the run row and for the "Automation: X" actor label on
+  // every activity entry these actions write. A deleted rule cannot happen here
+  // — the queue row cascades with it — so a missing name is a real anomaly and
+  // is named as one rather than rendered as "undefined".
+  const { data: ruleRow } = await client
+    .from("automations")
+    .select("name")
+    .eq("id", automationId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  const automationName = (ruleRow as { name: string } | null)?.name ?? "a deleted rule";
+
+  for (const [actionIndex, action] of actions.entries()) {
+    actionResults.push(
+      await executeAction({
+        action,
+        client,
+        /**
+         * SERVICE MODE, ALWAYS.
+         *
+         * The sweep holds the service-role client and nobody is signed in. The
+         * catalogue refuses to nest a session-only action inside a wait for
+         * exactly this reason, so anything reaching here can run — but the mode
+         * is stated rather than inferred, because a handler that guessed wrong
+         * would be denied by RLS with nobody watching.
+         */
+        mode: "service",
+        organizationId,
+        organizationName,
+        applicationId,
+        // Nobody triggered this. The run row records it as scheduled, and every
+        // activity entry it writes shows the automation as the actor.
+        triggeredBy: null,
+        webhookUrl,
+        automationName,
+        automationId,
+        actionIndex,
+      })
+    );
+  }
+
+  const failed = actionResults.filter((result) => result.status === "failed");
+  const status = failed.length > 0 ? ("failed" as const) : ("success" as const);
+  const reason =
+    failed.length > 0
+      ? `${failed.length} of ${actionResults.length} actions failed after the wait.`
+      : `${actionResults.length} action${actionResults.length === 1 ? "" : "s"} ran after the wait.`;
+
+  const chargeable = actionResults.filter(
+    (result) => result.status === "success" && CONSEQUENTIAL_ACTIONS.includes(result.action)
+  ).length;
+
+  const { error } = await client.from("automation_runs").insert({
+    organization_id: organizationId,
+    automation_id: automationId,
+    application_id: applicationId,
+    status,
+    reason,
+    action_results: actionResults,
+    chargeable_actions: chargeable,
+    trigger: "time_elapsed_in_stage",
+    scheduled: true,
+    triggered_by: null,
+    branch,
+    /**
+     * A dedupe key unique to this firing.
+     *
+     * The queue row's own partial unique index already guarantees one firing per
+     * wait, and the claim in drainDueActions() guarantees one winner among
+     * concurrent sweeps. This key only has to avoid colliding with the run rows
+     * the same rule wrote earlier — including the one that QUEUED this wait,
+     * which shares automation_id and application_id and would otherwise be a
+     * unique-index conflict that discarded the record of what actually happened.
+     */
+    dedupe_key: `wait_fired:${branch}:${new Date().toISOString()}`,
+  });
+
+  if (error) {
+    // Reported, not swallowed. The actions already ran; losing the record of a
+    // message that reached a real person is the worse outcome, and the sweep's
+    // summary is where somebody would notice.
+    console.error(`[automation] recording a delayed run failed: ${formatDbError(error)}`);
+  }
+
+  return { status, reason, actionResults };
 }
