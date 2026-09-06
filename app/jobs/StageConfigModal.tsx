@@ -21,6 +21,7 @@
 import { useState } from "react";
 import { RotateCcw, X } from "lucide-react";
 import { PlaceholderEditor } from "@/components/PlaceholderEditor";
+import { PLACEHOLDER_FIELDS, type PlaceholderField } from "@/lib/hiring-stages/placeholders";
 import {
   MAX_CALL_ATTEMPTS,
   MAX_DURATION_MINUTES,
@@ -56,6 +57,7 @@ export function StageConfigModal({
   stageKey,
   draft,
   readOnly,
+  customFields = [],
   onSave,
   onCancel,
 }: {
@@ -63,6 +65,16 @@ export function StageConfigModal({
   draft: StageDraft;
   /** Viewer: the whole screen renders, nothing accepts input. */
   readOnly: boolean;
+  /**
+   * MODULE 27 — the organization's custom fields, appended to the stage-script
+   * vocabulary.
+   *
+   * PLACEHOLDER_FIELDS is a deliberately CLOSED list (see its comment: an open
+   * one could expose a column nobody meant to publish). Custom fields do not
+   * reopen it — they are an explicit, per-organization catalogue passed in by
+   * the caller, exactly the way the interview and organization groups are.
+   */
+  customFields?: PlaceholderField[];
   onSave: (next: StageDraft) => void;
   onCancel: () => void;
 }) {
@@ -135,6 +147,7 @@ export function StageConfigModal({
             help="Write what should happen during this stage. Insert live job or candidate details using the field picker — they'll be replaced with real values when this runs."
             value={prompt}
             onChange={setPrompt}
+            fields={[...PLACEHOLDER_FIELDS, ...customFields]}
             readOnly={readOnly}
             placeholder="e.g. Confirm {{candidate.name}} is still interested in {{job.title}}…"
           />

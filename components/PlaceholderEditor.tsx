@@ -33,7 +33,18 @@ import {
   type PlaceholderGroup,
 } from "@/lib/hiring-stages/placeholders";
 
-const GROUP_ORDER: PlaceholderGroup[] = ["job", "candidate", "interview", "organization"];
+/*
+  Custom fields come LAST. They are the organization's own additions, and a
+  picker that opened with them would bury the built-in tokens most templates are
+  actually written from.
+*/
+const GROUP_ORDER: PlaceholderGroup[] = [
+  "job",
+  "candidate",
+  "interview",
+  "organization",
+  "custom",
+];
 
 export function PlaceholderEditor({
   id,

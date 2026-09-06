@@ -42,6 +42,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDbError } from "@/lib/supabase/errors";
+import { splitAnswers } from "@/lib/customFields/publicForm";
+import { savePublicCustomAnswers } from "@/lib/customFields/publicFormQueries";
 import { extractResumeText } from "@/lib/resumes/extract";
 import { parseResume, type ParsedResume } from "@/lib/ai/parseResume";
 import { buildFieldComparisons } from "@/lib/resumes/review";
@@ -262,6 +264,28 @@ export async function submitApplication(input: SubmitInput): Promise<SubmitResul
     resumeId: outcome.resumeId,
     error: outcome.error,
   });
+
+  /*
+    MODULE 27 — the job's custom questions, filed against THIS application.
+
+    Runs only once there is an application to attach them to: the definition
+    belongs to the job, but the answer belongs to the applicant, and without an
+    application id there is nothing to answer for. A submission that failed to
+    produce an application still has its answers in raw_answers above.
+
+    Not awaited for its result beyond a log. See savePublicCustomAnswers().
+  */
+  if (outcome.applicationId) {
+    const { customAnswers } = splitAnswers(answers);
+    if (Object.keys(customAnswers).length > 0) {
+      await savePublicCustomAnswers({
+        admin,
+        organizationId,
+        applicationId: outcome.applicationId,
+        answers: customAnswers,
+      });
+    }
+  }
 
   // THE APPLICANT IS TOLD IT WORKED EITHER WAY, and that is deliberate: their
   // answers are in the database and a recruiter can see the row. A failure to

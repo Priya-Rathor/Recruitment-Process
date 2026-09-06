@@ -1,3 +1,4 @@
+import { activeDefinitions } from "@/lib/customFields/queries";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
@@ -28,6 +29,9 @@ export default async function NewCandidatePage() {
     );
   }
 
+  // MODULE 27. No values yet — the candidate does not exist until saved.
+  const customFields = await activeDefinitions(membership.organization.id, "candidate");
+
   return (
     <AppShell>
       <div className="mb-5">
@@ -41,7 +45,7 @@ export default async function NewCandidatePage() {
         </p>
       </div>
 
-      <CandidateForm mode="create" />
+      <CandidateForm mode="create" customFields={customFields} />
     </AppShell>
   );
 }

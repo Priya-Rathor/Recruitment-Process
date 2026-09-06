@@ -1,3 +1,4 @@
+import { activeDefinitions, valuesForEntity } from "@/lib/customFields/queries";
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -70,6 +71,8 @@ async function CandidateDetailContent({
     // the record of what we told them with it.
     { messages, failed: messagesFailed },
     communicationPreferences,
+    customFields,
+    customValues,
   ] = await Promise.all([
     getCandidateDuplicates({ organizationId: membership.organization.id, candidateId }),
     listApplications({
@@ -98,6 +101,9 @@ async function CandidateDetailContent({
     getLatestParsedResume({ organizationId: membership.organization.id, candidateId }),
     listCandidateMessages({ organizationId: membership.organization.id, candidateId }),
     getCommunicationPreferences({ organizationId: membership.organization.id, candidateId }),
+    // MODULE 27.
+    activeDefinitions(membership.organization.id, "candidate"),
+    valuesForEntity(membership.organization.id, "candidate", candidateId),
   ]);
 
   const pendingSummary = pendingReviewSummary(pendingReviews);
@@ -115,7 +121,17 @@ async function CandidateDetailContent({
           </p>
           <h1 className="title is-4">Edit candidate</h1>
         </div>
-        <CandidateForm mode="edit" candidate={candidate} />
+        <CandidateForm
+          mode="edit"
+          candidate={candidate}
+          customFields={customFields}
+          initialCustomValues={Object.fromEntries(
+            customFields.map((definition) => [
+              definition.field_key,
+              customValues.get(definition.id) ?? null,
+            ])
+          )}
+        />
       </>
     );
   }

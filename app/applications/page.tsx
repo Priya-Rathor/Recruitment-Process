@@ -5,9 +5,9 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/states";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { applicationFiltersFromParams, listApplications } from "@/lib/applications/queries";
 import { APPLICATION_STAGES, STAGE_LABELS } from "@/lib/applications/stages";
-import { daysSince } from "@/lib/time";
-import { MatchScore, StageBadge } from "./StageBadge";
 import { ApplicationFilters } from "./ApplicationFilters";
+import { ApplicationTable } from "./ApplicationTable";
+import { activeDefinitions } from "@/lib/customFields/queries";
 import { listJobsWithHealth } from "@/lib/jobs/queries";
 import { SCHEMA_OUT_OF_DATE_MESSAGE } from "@/lib/supabase/errors";
 
@@ -18,7 +18,8 @@ async function ApplicationsTable({ searchParams }: { searchParams: Record<string
   const membership = await requireMembershipOrRedirect();
   const params = new URLSearchParams(searchParams);
 
-  const [{ applications, total, failed, schemaOutOfDate }, { jobs }] = await Promise.all([
+  const [{ applications, total, failed, schemaOutOfDate }, { jobs }, customFields] =
+    await Promise.all([
     listApplications({
       organizationId: membership.organization.id,
       filters: applicationFiltersFromParams(params),
@@ -31,7 +32,10 @@ async function ApplicationsTable({ searchParams }: { searchParams: Record<string
       organizationId: membership.organization.id,
       filters: { includeArchived: true },
       limit: 200,
-    }),
+    }),,
+    // MODULE 27. Definitions only — the table fetches the values for the rows it
+    // is showing, which keeps one code path for filtered and unfiltered views.
+    activeDefinitions(membership.organization.id, "application"),
   ]);
 
   if (failed) {
@@ -71,70 +75,12 @@ async function ApplicationsTable({ searchParams }: { searchParams: Record<string
           />
         ) : (
           <>
-            <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>
-              {applications.length === total
-                ? `${total} ${total === 1 ? "application" : "applications"}`
-                : `Showing ${applications.length} of ${total} applications`}
-              {membership.role === "recruiter" && " · yours and unassigned"}
-            </p>
-
-            <div className="table-container">
-              <table className="table is-fullwidth is-hoverable">
-                <thead>
-                  <tr>
-                    <th>Candidate</th>
-                    <th>Job</th>
-                    <th>Stage</th>
-                    <th>Match</th>
-                    <th>Recruiter</th>
-                    <th>Last update</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {applications.map((application) => {
-                    const idleDays = daysSince(application.updated_at);
-                    return (
-                      <tr key={application.id}>
-                        <td>
-                          <Link
-                            href={`/applications/${application.id}`}
-                            style={{ fontWeight: 600 }}
-                          >
-                            {application.candidate_name}
-                          </Link>
-                          {application.archived_at && (
-                            <span className="tag is-light ml-2" style={{ fontSize: 11 }}>
-                              Archived
-                            </span>
-                          )}
-                        </td>
-                        <td className="has-text-secondary" style={{ fontSize: 13 }}>
-                          {application.job_title}
-                        </td>
-                        <td>
-                          <StageBadge stage={application.stage} />
-                        </td>
-                        <td>
-                          <MatchScore score={application.match_score} />
-                        </td>
-                        <td className="has-text-secondary" style={{ fontSize: 13 }}>
-                          {application.recruiter_name ?? "Unassigned"}
-                        </td>
-                        <td
-                          className="has-text-secondary"
-                          style={{
-                            fontSize: 13,
-                            color: idleDays >= 3 ? "var(--color-warning)" : undefined,
-                          }}
-                        >
-                          {idleDays === 0 ? "Today" : `${idleDays}d ago`}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ApplicationTable
+              applications={applications}
+              total={total}
+              countSuffix={membership.role === "recruiter" ? " · yours and unassigned" : ""}
+              customFields={customFields}
+            />
           </>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { activeDefinitions } from "@/lib/customFields/queries";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { requireMembershipOrRedirect, requireCurrentUser, hasRole } from "@/lib/tenant";
@@ -36,11 +37,14 @@ export default async function NewJobPage() {
 
   const agencyMode = isAgencyMode(membership.organization);
 
-  const [members, { clients }] = await Promise.all([
+  const [members, { clients }, customFields] = await Promise.all([
     listTeamMembers(membership.organization.id),
     agencyMode
       ? listClients({ organizationId: membership.organization.id })
       : Promise.resolve({ clients: [], failed: false }),
+    // MODULE 27. No values to load — the job does not exist yet, so the form
+    // holds the draft and writes it once the job has an id.
+    activeDefinitions(membership.organization.id, "job"),
   ]);
 
   return (
@@ -56,6 +60,7 @@ export default async function NewJobPage() {
       </div>
 
       <JobForm
+        customFields={customFields}
         mode="create"
         members={members}
         clients={clients}

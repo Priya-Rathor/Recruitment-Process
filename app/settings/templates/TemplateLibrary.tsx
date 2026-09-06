@@ -16,6 +16,7 @@
 // boolean behind its own confirmation, and an unsaved-switch state would be a
 // switch that lies about what the product is doing.
 // =============================================================================
+import type { PlaceholderField } from "@/lib/hiring-stages/placeholders";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -41,6 +42,7 @@ export function TemplateLibrary({
   whatsappConnected,
   timeZone,
   canManage,
+  customFields = [],
 }: {
   groups: TemplateGroup[];
   emailConnected: boolean;
@@ -55,6 +57,8 @@ export function TemplateLibrary({
    * boundary.
    */
   canManage: boolean;
+  /** MODULE 27 — forwarded to the editor's placeholder picker. */
+  customFields?: PlaceholderField[];
 }) {
   const router = useRouter();
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
@@ -149,6 +153,7 @@ export function TemplateLibrary({
   if (editing || creatingFor) {
     return (
       <TemplateEditor
+        customFields={customFields}
           readOnly={!canManage}
           emailConnected={emailConnected}
         template={editing}

@@ -1,3 +1,6 @@
+import { listDefinitions, valuesForEntity } from "@/lib/customFields/queries";
+import { customPlaceholderFields } from "@/lib/customFields/placeholders";
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -143,6 +146,8 @@ async function JobDetailContent({
     orgCallData,
     workflow,
     workflowOptions,
+    customDefinitions,
+    customValues,
   ] = await Promise.all([
     listApplications({
       organizationId: membership.organization.id,
@@ -164,7 +169,28 @@ async function JobDetailContent({
     // builder's pickers populated on first paint rather than a beat later.
     loadJobWorkflow({ organizationId: membership.organization.id, jobId }),
     loadWorkflowOptions(membership.organization.id),
+    /*
+      MODULE 27. ALL entities' definitions, because two different consumers on
+      this page want different subsets: the read-only Custom fields card below
+      wants only the job ones, while the workflow builder's placeholder picker
+      wants every token that could resolve in a message about this job's
+      applications — which includes candidate and application fields.
+    */
+    listDefinitions(membership.organization.id),
+    valuesForEntity(membership.organization.id, "job", jobId),
   ]);
+
+  const jobCustomFields = customDefinitions.filter(
+    (definition) => definition.entity_type === "job" && definition.active
+  );
+
+  /* Keyed by field_key, which is what CustomFieldsSection reads. */
+  const jobCustomValues = Object.fromEntries(
+    jobCustomFields.map((definition) => [
+      definition.field_key,
+      customValues.get(definition.id) ?? null,
+    ])
+  );
 
   /*
     THE PUBLIC LINK IS BUILT ON THE SERVER, never in the browser.
@@ -322,6 +348,7 @@ async function JobDetailContent({
       )}
 
       <StageWorkflowBuilder
+        customFields={customPlaceholderFields(customDefinitions)}
         jobId={job.id}
         stages={workflow.stages}
         options={workflowOptions}
@@ -405,6 +432,18 @@ async function JobDetailContent({
         <SkillTags label="Required skills" skills={job.required_skills} />
         <SkillTags label="Preferred skills" skills={job.preferred_skills} />
       </section>
+
+      {/* ---- MODULE 27: the organization's own job fields, read-only ------
+          Under Details because that is what they are — more details, added by
+          this organization. Editing happens on the job form, where the fixed
+          fields are edited, so there is one place a job is changed rather than
+          two. Renders nothing at all when no job fields are configured. */}
+      <CustomFieldsSection
+        entityType="job"
+        definitions={jobCustomFields}
+        values={jobCustomValues}
+        canEdit={false}
+      />
 
       {/* ---- Description: the narrative, and nothing that is already above -- */}
       {job.description && (

@@ -37,6 +37,7 @@
 // spec's test is "correctly saves and becomes selectable without a page
 // reload", and a refresh round trip is a reload from the user's point of view.
 // =============================================================================
+import type { PlaceholderField } from "@/lib/hiring-stages/placeholders";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -149,6 +150,7 @@ export function WorkflowActionEditor({
   onChange,
   onOptionsChanged,
   onRemove,
+  customFields = [],
 }: {
   action: Action;
   stage: ApplicationStage;
@@ -165,6 +167,8 @@ export function WorkflowActionEditor({
   /** Adds a newly created template/form/agent to the live option list. */
   onOptionsChanged: (patch: Partial<WorkflowOptions>) => void;
   onRemove: () => void;
+  /** MODULE 27 — forwarded to the message editor's placeholder picker. */
+  customFields?: PlaceholderField[];
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState<"template" | "form" | "agent" | null>(null);
@@ -501,6 +505,7 @@ export function WorkflowActionEditor({
           */}
           <TemplateEditor
             template={null}
+            customFields={customFields}
             eventKey={
               typeof config.event_key === "string"
                 ? (config.event_key as TemplateOption["eventKey"])

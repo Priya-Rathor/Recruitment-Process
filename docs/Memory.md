@@ -169,3 +169,70 @@ New findings worth acting on (full detail in `docs/PRODUCTION_AUDIT.md` §8):
   is a permanent 503 and no time-based automation ever fires.
 
 Still true from previous sessions: migrations **0032, 0037, 0038 unapplied**.
+
+## 2026-09-06 (Module 27 — Custom Fields)
+
+Built the whole module. `npm test` 1707/1707 green · typecheck clean · lint clean
+· `next build` compiles.
+
+**Numbering:** the brief said "Module 19", which is Onboarding & Documents
+(migration 0026). Took 27, the next free. The brief's "Module 18's form_fields"
+is actually Module 23 (0033) — right taxonomy, wrong number, no code impact.
+
+Created:
+- `supabase/migrations/0039_module27_custom_fields.sql` — **unapplied** (see below)
+- `lib/customFields/{definitions,values,queries,publicForm,publicFormQueries,placeholders}.ts`
+  + 4 test files (62 new tests)
+- `app/api/custom-fields/definitions/route.ts`, `definitions/[id]/route.ts`,
+  `values/route.ts` (PUT + GET)
+- `app/settings/custom-fields/{page,CustomFieldsManager,FieldEditor}.tsx`
+- `components/{CustomFieldsSection,CustomColumns,FieldInput}.tsx`
+- `docs/modules/27-custom-fields.md`
+
+Changed: settings catalog (+ its pinned counts), job page/form/new/edit,
+candidate form/new/detail, applications page (table extracted to
+`ApplicationTable.tsx`), candidates page/list, templates page/library/editor,
+HiringStages + StageConfigModal, StageWorkflowBuilder + WorkflowActionEditor,
+`lib/forms/{public,submit}.ts`, `lib/hiring-stages/placeholders.ts`.
+
+Decisions worth keeping:
+- **`field_type` is `public.form_field_type`**, Module 23's existing enum — not a
+  new one. `CUSTOM_FIELD_TYPES` is `FORM_FIELD_TYPES.filter(...)`, derived so a
+  new forms type cannot be silently missed. email/phone/file_upload excluded.
+- **Reserved keys live in BOTH the migration and TS**, and
+  `definitions.test.ts` parses the SQL to assert they match. The DB copy is the
+  real boundary (PostgREST); the TS copy is so the editor can say "reserved"
+  while somebody is still typing.
+- **`custom_field_values.organization_id` added** (not in the brief's schema):
+  RLS + rule 8 need it. A trigger checks it against the definition.
+- **One permitted entity_type mismatch**: a `show_on_public_form` job definition
+  carries `application` values. Encoded in the integrity trigger, nowhere else.
+  This is the brief's "confirm this distinction is handled correctly".
+- **`TOKEN_PATTERN` widened** to 2-or-3 segments + digits. Backward-compatible;
+  unknown tokens still render verbatim. `{{custom.<entity>.<key>}}`.
+- **A public-form job token prefers the APPLICATION's answer**, job value as
+  fallback — the message is written to the candidate.
+- **`FieldInput` extracted** from `app/apply/[token]/ApplyForm.tsx` to
+  `components/FieldInput.tsx` and reused. Moved, not copied: a job field on the
+  public form is rendered by both paths, and two renderers would drift.
+- **Custom columns**: definitions server-loaded, VALUES fetched client-side via
+  `GET /api/custom-fields/values`. Because the candidates table swaps rows on
+  client-side search, a preloaded map would render "—" for every search result —
+  a lie about the data rather than a gap in it.
+- **Column choice is per-viewer localStorage**, read via `useSyncExternalStore`
+  (React 19 lint forbids setState-in-effect; the loading flag is derived from an
+  answered-key, not stored).
+- **Settings card went under "Data & activity", not "Recruitment defaults"** —
+  that category was at the 3-item cap `catalog.test.ts` enforces.
+- **DELETE soft-deletes**; permanent erase refused server-side if any value
+  exists. Brief's "re-add with the same key" reworded to "turn it back on",
+  which is what soft delete actually does.
+
+Unfinished / carried:
+- **Migration 0039 is UNAPPLIED**, along with 0032, 0037, 0038. The Supabase
+  project (`jjcwwotdkoojqdifwdwx`) is NXDOMAIN — paused or deleted — so nothing
+  could be applied or exercised against a real database this session. All
+  verification was typecheck/lint/vitest/build only.
+- `supabase/RESET_DATA.sql` written earlier this session (wipe data, keep
+  schema); also unrun for the same reason.
+- `supabase/ALL_MIGRATIONS.sql` is stale — stops at 0031, missing 0032-0039.

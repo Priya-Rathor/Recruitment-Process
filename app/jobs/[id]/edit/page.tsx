@@ -1,3 +1,4 @@
+import { activeDefinitions, valuesForEntity } from "@/lib/customFields/queries";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
@@ -38,13 +39,16 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
 
   const agencyMode = isAgencyMode(membership.organization);
 
-  const [job, members, { clients }, stages] = await Promise.all([
+  const [job, members, { clients }, stages, customFields, customValues] = await Promise.all([
     getJobDetail({ organizationId: membership.organization.id, jobId: id }),
     listTeamMembers(membership.organization.id),
     agencyMode
       ? listClients({ organizationId: membership.organization.id })
       : Promise.resolve({ clients: [], failed: false }),
     listJobStages({ organizationId: membership.organization.id, jobId: id }),
+    // MODULE 27.
+    activeDefinitions(membership.organization.id, "job"),
+    valuesForEntity(membership.organization.id, "job", id),
   ]);
 
   if (!job) notFound();
@@ -80,6 +84,13 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
         currentUserId={user.id}
         canClose={canClose}
         initialStages={stagesToFormState(stages)}
+        customFields={customFields}
+        initialCustomValues={Object.fromEntries(
+          customFields.map((definition) => [
+            definition.field_key,
+            customValues.get(definition.id) ?? null,
+          ])
+        )}
       />
     </AppShell>
   );

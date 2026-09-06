@@ -28,6 +28,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDbError } from "@/lib/supabase/errors";
 import { verifyFormToken } from "@/lib/forms/token";
+import { loadPublicCustomFields } from "@/lib/customFields/publicFormQueries";
 import { normalizePrivacySettings } from "@/lib/privacy/settings";
 import type { FormFieldType } from "@/lib/forms/fields";
 import type { FormPurpose, FormStatus } from "@/lib/forms/types";
@@ -217,8 +218,32 @@ export async function loadPublicForm(token: string): Promise<PublicFormResult> {
 
   // A published form with no questions would render a page with nothing but a
   // submit button. Closed rather than broken.
+  //
+  // Checked BEFORE the custom fields are appended, deliberately: a form whose
+  // own field list is empty is a broken form, and custom fields must not paper
+  // over that by making it look answerable.
   if (fields.length === 0) {
     return { ok: false, code: "closed", message: CLOSED_MESSAGE };
+  }
+
+  /*
+    MODULE 27 — the organization's job-level custom fields, appended AFTER the
+    standard fields exactly as the brief specifies.
+
+    Only for a job application: a standalone questionnaire has no job and
+    therefore no job-level questions to ask. A read failure here appends nothing
+    and lets the form render — a custom question is additive, and losing the
+    whole application form because an extra question could not be loaded would be
+    a far worse trade than one missing field.
+  */
+  if (row.job) {
+    fields.push(
+      ...(await loadPublicCustomFields(
+        admin,
+        row.organization_id,
+        fields.map((field) => field.fieldKey)
+      ))
+    );
   }
 
   return {

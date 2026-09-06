@@ -8,6 +8,8 @@
 //  2. "System checks for duplicates before creating a new candidate record" —
 //     the API returns 409 with the suspected matches, and the recruiter must
 //     explicitly acknowledge before the record is created.
+import { CustomFieldsSection, toDraft, type DraftValues } from "@/components/CustomFieldsSection";
+import type { CustomFieldDefinition } from "@/lib/customFields/definitions";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -93,14 +95,31 @@ function numberOrNull(raw: string): number | null {
 export function CandidateForm({
   mode,
   candidate,
+  customFields = [],
+  initialCustomValues = {},
 }: {
   mode: "create" | "edit";
   candidate?: Candidate;
+  /**
+   * MODULE 27 — active candidate-level custom fields.
+   *
+   * ADDITIVE ONLY. These render after the fixed fields and write to
+   * custom_field_values through their own endpoint. They do not touch name,
+   * email or phone, and cannot: the reserved-key constraint in migration 0039
+   * refuses those keys outright, so no custom field can become a second,
+   * differently-permissioned way to edit a candidate's identity. The rule that
+   * those three are editable only here is untouched by this section.
+   */
+  customFields?: CustomFieldDefinition[];
+  initialCustomValues?: Record<string, unknown>;
 }) {
   const router = useRouter();
 
   const [form, setForm] = useState<FormState>(() =>
     candidate ? formFromCandidate(candidate) : emptyForm()
+  );
+  const [customDraft, setCustomDraft] = useState<DraftValues>(() =>
+    toDraft(customFields, initialCustomValues)
   );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -228,8 +247,26 @@ export function CandidateForm({
       return;
     }
 
-    setDirty(false);
     const id = mode === "create" ? (result.data as Candidate).id : candidate!.id;
+
+    /*
+      MODULE 27 — custom values, written after the candidate exists. On create
+      there is no candidate id until the request above returns, exactly as with
+      a job's custom fields. A failure here does not discard the candidate.
+    */
+    if (customFields.length > 0) {
+      await fetch("/api/custom-fields/values", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity_type: "candidate",
+          entity_id: id,
+          values: customDraft,
+        }),
+      });
+    }
+
+    setDirty(false);
     router.push(`/candidates/${id}`);
     router.refresh();
   }
@@ -547,6 +584,20 @@ export function CandidateForm({
           </p>
         </div>
       </div>
+
+      {/* ---- MODULE 27: this organization's own candidate fields ----------
+          After every fixed field, before the save bar, so one Save commits the
+          whole page. Renders nothing when none are configured. */}
+      <CustomFieldsSection
+        entityType="candidate"
+        definitions={customFields}
+        values={initialCustomValues}
+        onChange={(next) => {
+          setCustomDraft(next);
+          setDirty(true);
+        }}
+        canEdit
+      />
 
       {/* ---- Explicit save + unsaved indicator ---------------------------- */}
       <div className="card">

@@ -279,6 +279,28 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     label: "Data & activity",
     links: [
       {
+        /*
+          MODULE 27, AND NOT UNDER "Recruitment defaults" WHERE THE BRIEF
+          SUGGESTED IT.
+
+          That category is already at three, and the 2-3 balance rule below is
+          enforced by catalog.test.ts, not merely preferred — a fourth card there
+          fails the suite. The brief allowed for this ("or a new small entry
+          there"), and a one-item category of its own would fail the same rule
+          from the other side.
+
+          This is the better home anyway: custom fields decide WHAT this
+          organization records, which is the same subject as the log of changes to
+          it and the export of it. Every member may open the page — Viewers are
+          read-only inside it (brief §6) rather than shut out, because somebody
+          looking at a job with a "Visa sponsorship" field should be able to find
+          out what that field is.
+        */
+        href: "/settings/custom-fields",
+        label: "Custom fields",
+        description: "Extra fields on jobs, candidates and applications",
+      },
+      {
         href: "/audit-log",
         label: "Audit log",
         description: "Every sensitive action, append-only",

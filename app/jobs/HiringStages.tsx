@@ -17,6 +17,7 @@
 //      Re-enabling restores what was there rather than starting blank.
 // =============================================================================
 
+import type { PlaceholderField } from "@/lib/hiring-stages/placeholders";
 import { useState } from "react";
 import { Settings2 } from "lucide-react";
 import { Toggle } from "@/components/ui/Toggle";
@@ -55,6 +56,7 @@ export function HiringStages({
   screeningQuestions,
   onScreeningQuestionsChange,
   readOnly = false,
+  customFields = [],
 }: {
   stages: StagesState;
   onChange: (next: StagesState) => void;
@@ -68,6 +70,8 @@ export function HiringStages({
   screeningQuestions: string[];
   onScreeningQuestionsChange: (questions: string[]) => void;
   readOnly?: boolean;
+  /** MODULE 27 — forwarded to the stage script's placeholder picker. */
+  customFields?: PlaceholderField[];
 }) {
   // Which stage's modal is open, and whether opening it was a first-time
   // enable — the only thing that decides what Cancel means.
@@ -198,6 +202,7 @@ export function HiringStages({
         <StageConfigModal
           stageKey={editing.key}
           readOnly={readOnly}
+          customFields={customFields}
           draft={{
             promptTemplate: stages[editing.key].promptTemplate,
             config: stages[editing.key].config,

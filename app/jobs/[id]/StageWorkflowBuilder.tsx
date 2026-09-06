@@ -33,6 +33,7 @@
 // which three.
 // =============================================================================
 
+import type { PlaceholderField } from "@/lib/hiring-stages/placeholders";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -67,12 +68,15 @@ export function StageWorkflowBuilder({
   stages,
   options: initialOptions,
   canEdit,
+  customFields = [],
 }: {
   jobId: string;
   stages: BuilderStage[];
   options: WorkflowOptions;
   /** Owner/Admin. A Recruiter or Viewer reads the same rows, with no controls. */
   canEdit: boolean;
+  /** MODULE 27 — forwarded to each action's message editor. */
+  customFields?: PlaceholderField[];
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [options, setOptions] = useState(initialOptions);
@@ -174,6 +178,7 @@ export function StageWorkflowBuilder({
                     dirty={drafts[`${list.stage}:${list.branch}`] !== undefined}
                     options={options}
                     canEdit={canEdit}
+                    customFields={customFields}
                     showBranchHeading={stage.branches.length > 1}
                     onChange={(actions) => setList(list, actions)}
                     onSaved={() => clearDraft(list)}
@@ -198,6 +203,7 @@ function BranchList({
   dirty,
   options,
   canEdit,
+  customFields,
   showBranchHeading,
   onChange,
   onSaved,
@@ -209,6 +215,7 @@ function BranchList({
   dirty: boolean;
   options: WorkflowOptions;
   canEdit: boolean;
+  customFields: PlaceholderField[];
   showBranchHeading: boolean;
   onChange: (actions: Action[]) => void;
   onSaved: () => void;
@@ -278,6 +285,7 @@ function BranchList({
           editing === index ? (
             <WorkflowActionEditor
               key={index}
+              customFields={customFields}
               action={action}
               stage={list.stage}
               options={options}

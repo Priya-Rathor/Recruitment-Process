@@ -5,6 +5,7 @@ import { ErrorState, SkeletonRows } from "@/components/states";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { listCandidates } from "@/lib/candidates/queries";
 import { filtersFromSearchParams, isEmptyFilters } from "@/lib/candidates/filters";
+import { activeDefinitions } from "@/lib/customFields/queries";
 import { CandidateList } from "./CandidateList";
 
 export const metadata = { title: "Candidates" };
@@ -16,10 +17,13 @@ async function CandidatesContent({ searchParams }: { searchParams: Record<string
   // Filters are parsed and validated server-side; the URL is never trusted.
   const filters = filtersFromSearchParams(new URLSearchParams(searchParams));
 
-  const { candidates, total, failed } = await listCandidates({
-    organizationId: membership.organization.id,
-    filters,
-  });
+  const [{ candidates, total, failed }, customFields] = await Promise.all([
+    listCandidates({ organizationId: membership.organization.id, filters }),
+    // MODULE 27. The DEFINITIONS are server-loaded so the picker is populated on
+    // first paint; the VALUES are fetched by the list, because searching
+    // replaces the rows. See components/CustomColumns.tsx.
+    activeDefinitions(membership.organization.id, "candidate"),
+  ]);
 
   if (failed) return <ErrorState message="Couldn't load candidates." />;
 
@@ -29,6 +33,7 @@ async function CandidatesContent({ searchParams }: { searchParams: Record<string
       total={total}
       canCreate={hasRole(membership.role, ["owner", "admin", "recruiter"])}
       hasFilters={!isEmptyFilters(filters)}
+      customFields={customFields}
     />
   );
 }

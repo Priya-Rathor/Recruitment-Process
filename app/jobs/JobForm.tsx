@@ -10,7 +10,10 @@
 // The critical rule: AI fills only BLANK fields. Where the recruiter has already
 // typed something different, their value is kept and the difference is shown as a
 // conflict for them to resolve. AI never silently overwrites.
-import { useState } from "react";
+import { CustomFieldsSection, toDraft, type DraftValues } from "@/components/CustomFieldsSection";
+import { customPlaceholderFields } from "@/lib/customFields/placeholders";
+import type { CustomFieldDefinition } from "@/lib/customFields/definitions";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormError } from "@/components/states";
 import { HiringStages, emptyStages, type StagesState } from "./HiringStages";
@@ -101,6 +104,8 @@ export function JobForm({
   canClose,
   initialStages,
   canEditStages = true,
+  customFields = [],
+  initialCustomValues = {},
 }: {
   mode: "create" | "edit";
   job?: Job;
@@ -109,6 +114,10 @@ export function JobForm({
   initialStages?: StagesState;
   /** False for a Viewer, who may see the configuration but not change it. */
   canEditStages?: boolean;
+  /** MODULE 27 — active job-level custom field definitions, in display order. */
+  customFields?: CustomFieldDefinition[];
+  /** Their current values, keyed by field_key. Empty when creating. */
+  initialCustomValues?: Record<string, unknown>;
   members: { id: string; name: string; role: string }[];
   clients: { id: string; name: string }[];
   /**
@@ -136,6 +145,21 @@ export function JobForm({
   // save to their own endpoint, because on create the job has no id until the
   // first request returns.
   const [stages, setStages] = useState<StagesState>(() => initialStages ?? emptyStages());
+
+  /*
+    MODULE 27. The custom field draft, held here because the section is rendered
+    in its controlled mode — on create there is no job id to save against until
+    the job exists, so this form owns the values and writes them in handleSubmit.
+  */
+  const [customDraft, setCustomDraft] = useState<DraftValues>(() =>
+    toDraft(customFields, initialCustomValues)
+  );
+
+  /* The stage script picker offers this job's custom fields too. */
+  const jobPlaceholderFields = useMemo(
+    () => customPlaceholderFields(customFields),
+    [customFields]
+  );
 
   // AI state
   const [pasted, setPasted] = useState("");
@@ -303,6 +327,23 @@ export function JobForm({
         })),
       }),
     });
+
+    /*
+      MODULE 27 — custom field values, saved THIRD and for the same reason the
+      stages are saved second: on create there is no job id to attach them to
+      until the job exists.
+
+      A failure here does not discard the job either. The values can be set
+      again from the job form, and the section reports its own errors when it
+      owns the save (edit mode); here the job is the important half.
+    */
+    if (customFields.length > 0) {
+      await fetch("/api/custom-fields/values", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entity_type: "job", entity_id: id, values: customDraft }),
+      });
+    }
 
     setDirty(false);
 
@@ -626,7 +667,27 @@ export function JobForm({
           still owned here and still saved on every submit, so a job whose
           stage is switched off keeps its questions untouched — they are hidden,
           never dropped. -------------------------------------------------- */}
+      {/* ---- MODULE 27: this organization's own job fields ----------------
+          After the fixed Details fields and before the stage configuration,
+          which is where the brief puts them and where they read as "more about
+          this job" rather than as part of the hiring process.
+
+          CONTROLLED, with no entityId: on create there is no job to attach a
+          value to yet, so the draft is held here and written by handleSubmit
+          once the job has an id. Renders nothing when none are configured. */}
+      <CustomFieldsSection
+        entityType="job"
+        definitions={customFields}
+        values={initialCustomValues}
+        onChange={(next) => {
+          setCustomDraft(next);
+          setDirty(true);
+        }}
+        canEdit={canEditStages}
+      />
+
       <HiringStages
+        customFields={jobPlaceholderFields}
         stages={stages}
         onChange={(next) => {
           setStages(next);

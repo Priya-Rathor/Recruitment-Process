@@ -1,3 +1,5 @@
+import { listDefinitions } from "@/lib/customFields/queries";
+import { customPlaceholderFields } from "@/lib/customFields/placeholders";
 import { Suspense } from "react";
 import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { SkeletonRows } from "@/components/states";
@@ -58,13 +60,21 @@ async function Library({
   timeZone: string;
   canManage: boolean;
 }) {
-  const [{ templates, failed }, integrations] = await Promise.all([
+  const [{ templates, failed }, integrations, customDefinitions] = await Promise.all([
     listMessageTemplates(organizationId),
     // Read so the page can say which channels will actually deliver TODAY.
     // A library full of active WhatsApp templates on a disconnected integration
     // looks like it is working; saying so up front is the difference between a
     // configuration screen and a promise.
     getAllIntegrationHealth(organizationId),
+    /*
+      MODULE 27. Loaded here, on the server, and handed to the picker as data.
+
+      ALL entities, not just one: a message about an application legitimately
+      references the job's custom fields and the candidate's, so narrowing this
+      would hide tokens that do resolve.
+    */
+    listDefinitions(organizationId),
   ]);
 
   if (failed) {
@@ -88,6 +98,7 @@ async function Library({
 
   return (
     <TemplateLibrary
+      customFields={customPlaceholderFields(customDefinitions)}
       groups={groupByEvent(templates)}
       emailConnected={emailConnected}
       whatsappConnected={whatsappConnected}

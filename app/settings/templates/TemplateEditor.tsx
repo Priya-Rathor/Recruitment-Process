@@ -14,7 +14,7 @@
 // badly on one of the two channels. Two rows would mean two things to switch on
 // and two chances to forget.
 // =============================================================================
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FormError } from "@/components/states";
 import { PlaceholderEditor } from "@/components/PlaceholderEditor";
 /*
@@ -30,6 +30,7 @@ import { PlaceholderEditor } from "@/components/PlaceholderEditor";
   so this narrows an argument rather than forking a component.
 */
 import { messageFieldsForEvent } from "@/lib/communications/tokens";
+import type { PlaceholderField } from "@/lib/hiring-stages/placeholders";
 import {
   CHANNEL_LABELS,
   MAX_WHATSAPP_BODY_LENGTH,
@@ -49,6 +50,7 @@ export function TemplateEditor({
   emailConnected,
   whatsappConnected,
   readOnly = false,
+  customFields = [],
   onDone,
   onCancel,
 }: {
@@ -67,6 +69,17 @@ export function TemplateEditor({
    * A second display-only component would be a second thing to keep in step.
    */
   readOnly?: boolean;
+  /**
+   * MODULE 27 — this organization's custom fields, already in PlaceholderField
+   * shape.
+   *
+   * A PROP, not a fetch. The picker's vocabulary is "what is true where this
+   * renders" (see the note on lib/hiring-stages/placeholders.ts's lookupFor),
+   * and the caller is a server component that already has the definitions. An
+   * effect fetching them here would make an empty picker the first thing every
+   * editor shows.
+   */
+  customFields?: PlaceholderField[];
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -76,6 +89,20 @@ export function TemplateEditor({
   const [subject, setSubject] = useState(template?.subject ?? "");
   const [body, setBody] = useState(template?.body ?? "");
   const [whatsappBody, setWhatsappBody] = useState(template?.whatsapp_body ?? "");
+
+  /*
+    The event's own vocabulary PLUS the organization's custom fields.
+
+    Concatenated rather than merged by key: the two namespaces cannot collide —
+    every custom token starts "custom." and no built-in one does — so there is
+    nothing to reconcile, and a merge would only invite a precedence rule that
+    never fires.
+  */
+  const pickerFields = useMemo(
+    () => [...messageFieldsForEvent(event), ...customFields],
+    [event, customFields]
+  );
+
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -263,7 +290,7 @@ export function TemplateEditor({
         value={body}
         onChange={setBody}
         rows={channel === "both" ? 10 : 8}
-        fields={messageFieldsForEvent(event)}
+        fields={pickerFields}
           readOnly={readOnly}
         placeholder="Hi {{candidate.name}}, …"
         footer={
@@ -281,7 +308,7 @@ export function TemplateEditor({
           value={whatsappBody}
           onChange={setWhatsappBody}
           rows={5}
-          fields={messageFieldsForEvent(event)}
+          fields={pickerFields}
           readOnly={readOnly}
           placeholder="Hi {{candidate.name}}, …"
           footer={<CharacterCount value={whatsappBody} limit={MAX_WHATSAPP_BODY_LENGTH} />}

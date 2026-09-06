@@ -1,3 +1,5 @@
+import { activeDefinitions, valuesForEntity } from "@/lib/customFields/queries";
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -133,6 +135,8 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     // Module 23. Null for anybody who did not arrive through a public form,
     // which is most applications — the card simply does not render.
     formResponse,
+    customFields,
+    customValues,
   ] = await Promise.all([
     listApplicationMessages({
       organizationId: membership.organization.id,
@@ -153,6 +157,18 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
       organizationId: membership.organization.id,
       applicationId: application.id,
     }),
+    /*
+      MODULE 27.
+
+      APPLICATION-level definitions only, but the VALUES read includes answers
+      collected by the public form against job-level definitions — those are
+      stored with entity_type 'application', so valuesForEntity picks them up in
+      the same query. The section below renders the application definitions; the
+      public-form answers already appear on the form-response card, which is
+      where somebody looks for what an applicant typed.
+    */
+    activeDefinitions(membership.organization.id, "application"),
+    valuesForEntity(membership.organization.id, "application", application.id),
   ]);
 
   /**
@@ -282,6 +298,24 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
           </Link>
         </div>
       </div>
+
+      {/* ---- MODULE 27: this organization's own application fields --------
+          Editable by exactly the roles that may already edit this application's
+          other fields — canEdit is Owner/Admin/Recruiter, computed above and
+          reused rather than recomputed, so the two can never disagree. A Viewer
+          sees the values as text. Renders nothing when none are configured. */}
+      <CustomFieldsSection
+        entityType="application"
+        entityId={application.id}
+        definitions={customFields}
+        values={Object.fromEntries(
+          customFields.map((definition) => [
+            definition.field_key,
+            customValues.get(definition.id) ?? null,
+          ])
+        )}
+        canEdit={canEdit}
+      />
 
       {canEdit && (
         <ApplicationHeaderActions

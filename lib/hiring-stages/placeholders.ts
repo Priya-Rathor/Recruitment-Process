@@ -24,7 +24,18 @@
  * caller passes in, not by PLACEHOLDER_FIELDS below — so a stage script cannot
  * accidentally offer a token that has no value at call time.
  */
-export type PlaceholderGroup = "job" | "candidate" | "interview" | "organization";
+export type PlaceholderGroup =
+  | "job"
+  | "candidate"
+  | "interview"
+  | "organization"
+  /*
+    MODULE 27. Per-organization custom fields, supplied by the CALLER exactly the
+    way "interview" and "organization" are — they are never in PLACEHOLDER_FIELDS
+    below, because that list is a compile-time constant and an organization's
+    custom fields are rows in a table. See lib/customFields/placeholders.ts.
+  */
+  | "custom";
 
 export type PlaceholderField = {
   /** The token written in a script, without braces: "job.title". */
@@ -117,6 +128,7 @@ export const GROUP_LABELS: Record<PlaceholderGroup, string> = {
   candidate: "Candidate / application fields",
   interview: "Interview fields",
   organization: "Your organization",
+  custom: "Custom fields",
 };
 
 const BY_TOKEN = new Map(PLACEHOLDER_FIELDS.map((field) => [field.token, field]));
@@ -159,7 +171,22 @@ export function toToken(token: string): string {
  * they write one by hand instead of using the picker, and refusing it would
  * turn a reasonable guess into a token read aloud verbatim on a phone call.
  */
-export const TOKEN_PATTERN = /\{\{\s*([a-z_]+\.[a-z_]+)\s*\}\}/gi;
+/*
+  WIDENED BY MODULE 27, IN TWO WAYS, AND BOTH ARE BACKWARD-COMPATIBLE.
+
+  Was /\{\{\s*([a-z_]+\.[a-z_]+)\s*\}\}/gi — exactly two segments, letters and
+  underscores only. Custom fields need a third segment ({{custom.job.visa}},
+  because a "region" field may exist on jobs AND on candidates and the token has
+  to say which) and they need DIGITS (uniqueFieldKey appends _2 when two labels
+  slugify the same).
+
+  Nothing that resolved before stops resolving: a two-segment token still
+  matches, and renderTemplate() returns the token untouched when the catalogue
+  does not know it. The only visible change is that a stray {{a.b.c}} now shows
+  up in the editor as an unrecognised token rather than being silently ignored,
+  which is the more useful of the two behaviours.
+*/
+export const TOKEN_PATTERN = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z0-9_]+){1,2})\s*\}\}/gi;
 
 /**
  * Every token used in a script, in first-appearance order, deduplicated.

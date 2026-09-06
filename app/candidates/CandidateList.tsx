@@ -3,6 +3,12 @@
 // Client wrapper so natural-language results can replace the server-rendered
 // list in place. The server list is the default; a search overlays it and
 // "Clear" restores it without a round trip.
+import {
+  CustomColumnCell,
+  CustomColumnsPicker,
+  useCustomColumns,
+} from "@/components/CustomColumns";
+import type { CustomFieldDefinition } from "@/lib/customFields/definitions";
 import { useState } from "react";
 import Link from "next/link";
 import { SearchX, UserRoundPlus } from "lucide-react";
@@ -26,15 +32,30 @@ export function CandidateList({
   total,
   canCreate,
   hasFilters,
+  customFields = [],
 }: {
   candidates: Candidate[];
   total: number;
   canCreate: boolean;
   hasFilters: boolean;
+  /** MODULE 27 — active candidate custom fields, offered as optional columns. */
+  customFields?: CustomFieldDefinition[];
 }) {
   const [search, setSearch] = useState<SearchResult | null>(null);
 
   const rows = search ? search.candidates : candidates;
+
+  /*
+    Keyed on the CURRENT rows, which change when somebody searches. That is why
+    the values are fetched rather than passed down from the server: a preloaded
+    map would be missing every search result, and those cells would render "—"
+    as though the fields were empty.
+  */
+  const columns = useCustomColumns(
+    "candidate",
+    customFields,
+    rows.map((candidate) => candidate.id)
+  );
   const shownTotal = search ? search.total : total;
 
   // "Nobody has been added" vs "nothing matched" — same zero rows, different
@@ -109,11 +130,21 @@ export function CandidateList({
           )
         ) : (
           <>
-            <p className="has-text-secondary mb-3" style={{ fontSize: 13 }}>
-              {rows.length === shownTotal
+            <div
+              className="mb-3"
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+            >
+              <p className="has-text-secondary" style={{ fontSize: 13 }}>
+                {rows.length === shownTotal
                 ? `${shownTotal} ${shownTotal === 1 ? "candidate" : "candidates"}`
-                : `Showing ${rows.length} of ${shownTotal} candidates`}
-            </p>
+                  : `Showing ${rows.length} of ${shownTotal} candidates`}
+              </p>
+              <CustomColumnsPicker
+                definitions={customFields}
+                chosenIds={columns.chosenIds}
+                onToggle={columns.toggle}
+              />
+            </div>
 
             <div className="table-container">
               <table className="table is-fullwidth is-hoverable">
@@ -125,6 +156,9 @@ export function CandidateList({
                     <th>Location</th>
                     <th>Notice</th>
                     <th>Source</th>
+                    {columns.columns.map((definition) => (
+                      <th key={definition.id}>{definition.label}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -164,6 +198,14 @@ export function CandidateList({
                       <td className="has-text-secondary" style={{ fontSize: 13 }}>
                         {CANDIDATE_SOURCE_LABELS[candidate.source]}
                       </td>
+                      {columns.columns.map((definition) => (
+                        <CustomColumnCell
+                          key={definition.id}
+                          definition={definition}
+                          values={columns.values.get(candidate.id)}
+                          loaded={!columns.loading}
+                        />
+                      ))}
                     </tr>
                   ))}
                 </tbody>

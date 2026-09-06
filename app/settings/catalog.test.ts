@@ -90,11 +90,13 @@ describe("the settings catalogue", () => {
 
       History: 19 in 6 → 19 in 7 (the Integrations card split, which moved links
       without adding any) → 20 in 8 (Communication & AI split into Communications
-      and AI & automation, plus Automations added — the one genuinely new link).
+      and AI & automation, plus Automations added — the one genuinely new link)
+      → 21 in 8 (Module 27's Custom fields, added to Data & activity because
+      Recruitment defaults was already at the three-item cap below).
       The grid's counter is computed from these, so this test and the visible
-      "20 settings in 8 categories" cannot disagree.
+      "21 settings in 8 categories" cannot disagree.
     */
-    expect(SETTINGS_LINKS).toHaveLength(20);
+    expect(SETTINGS_LINKS).toHaveLength(21);
     expect(SETTINGS_CATEGORIES).toHaveLength(8);
   });
 
@@ -221,6 +223,12 @@ describe("role filtering", () => {
     expect(visibleLinks("recruiter").map((link) => link.href).sort()).toEqual([
       "/analytics",
       "/automations",
+      /*
+        Module 27. A Recruiter fills custom field VALUES in on jobs and
+        applications, so the vocabulary is genuinely theirs to read; the page
+        itself gates defining and editing to Owner/Admin.
+      */
+      "/settings/custom-fields",
       "/settings/forms",
       "/settings/notifications",
       "/settings/users",
