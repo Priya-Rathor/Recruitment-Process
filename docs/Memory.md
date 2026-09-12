@@ -236,3 +236,145 @@ Unfinished / carried:
 - `supabase/RESET_DATA.sql` written earlier this session (wipe data, keep
   schema); also unrun for the same reason.
 - `supabase/ALL_MIGRATIONS.sql` is stale — stops at 0031, missing 0032-0039.
+
+## 2026-09-12 (pre-deploy verification + security headers)
+
+Goal was a Vercel deploy. Verified first, fixed two real gaps, found one blocker.
+
+**Green, all re-run from clean:** `lint` clean · `typecheck` clean · `npm test`
+1785/1785 across 72 files · `next build` compiles, 60+ routes.
+
+Also smoke-tested the PRODUCTION build (`npm start`), not just the build:
+- all five new security headers present on `/login`
+- `/dashboard` signed out → 307 `/login?next=%2Fdashboard`
+- `GET /api/jobs` signed out → **401 JSON**, not a redirect (TC-AUTH-028 holds)
+
+**THE BLOCKER — the Supabase project in `.env.local` no longer exists.**
+`jjcwwotdkoojqdifwdwx.supabase.co` returns **NXDOMAIN** from both the local
+resolver and 8.8.8.8, while `supabase.com` resolves and outbound HTTPS works
+(github.com → 200). So it is a dead project, not a network problem. Nothing
+database-backed can run until a new project is created and **all 39 migrations**
+are applied in filename order. This also makes the old "0032/0037/0038/0039 not
+applied" note moot — a fresh project needs every file.
+
+**Fixed:**
+- `next.config.ts` was empty → now sends `X-Frame-Options: DENY`, `nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, HSTS (2y, subdomains, **no
+  preload** — preload is the domain owner's call and is irreversible), and
+  `Permissions-Policy` denying camera/mic/geo/payment/USB. Verified by curl.
+  **No CSP**, deliberately: inline styles throughout the design system, next/font
+  and CodeMirror mean a policy worth having needs `unsafe-inline` for styles, a
+  nonce pipeline and an origin audit. A wrong CSP breaks production silently.
+  KNOWN_ISSUES entry downgraded P1 → P2 and rewritten to say exactly that.
+- `.env.local.example` gained the six undocumented variables — `CRON_SECRET`
+  (with the "nothing time-based ever fires" consequence written into the file),
+  `AI_BASE_URL`, `AI_MODEL`, `BOLNA_CATALOG_PATHS`, and the current-generation
+  Supabase key names beside the legacy pair.
+
+**Noticed, not fixed (no scope to):**
+- `docs/DEPLOYMENT.md` §7 claims the sweep's bearer secret is "compared in
+  constant time". It is a plain `!==` in `app/api/automations/sweep/route.ts:46`.
+  Either the doc or the code should move; `crypto.timingSafeEqual` is ~3 lines.
+- S-01 (invite tokens not identity-bound, P0) is still open. Deploying a
+  multi-tenant product with a known privilege-escalation path is a decision, not
+  an accident — flagged to the user rather than silently shipped.
+
+**Unrelated, still unfinished:** the documentation centre (Module 25). `lib/docs/*`
+and `docs/QA-SUPPLEMENT-MODULES.md` are committed and tested (78 new tests), but
+**no `app/docs/` UI exists yet**, so none of it is reachable and nothing imports
+it. It is inert — safe to deploy, but it is half a module.
+
+## 2026-09-12 (S-01 fixed — invite tokens bound to identity)
+
+`supabase/migrations/0040_bind_invite_to_identity.sql`. **Written, NOT applied**
+— the Supabase project is gone (see the entry above), so nothing has executed
+this. It is reviewed, not proven.
+
+**The fix, two parts:**
+1. `accept_invite()` compares the invite's email to the caller's, raising a
+   custom `INV01` before writing anything — a refusal leaves the invite
+   `pending` so a forwarded link cannot become a denial of service against the
+   real recipient.
+2. `on conflict … do update set role = excluded.role` is gone. Three explicit
+   branches: new member inserts; **already-active member keeps their role**
+   (this was the escalation half); removed member rejoins at the invite's role.
+
+**THE DECIDING DETAIL — read auth.users, never public.users.** `users_update_self`
+(0001) has no column restriction and the browser holds a PostgREST client, so
+any user can `update public.users set email = '<the invited address>'` on their
+own row. A check against the profile table would have looked right and done
+nothing. `VERIFY_0040.sql` check 3 is that exact attack.
+
+**Had to touch 0036's trigger.** `prevent_self_role_change` fires `before update
+of role`, and the rejoin branch changes the accepting user's own role — a Viewer
+re-invited as Admin would have been refused on a legitimate link. Exempted
+`old.status='removed' → new.status='active'` only. Not a hole:
+`org_members_update_owner_admin` needs `has_org_role()`, which needs an ACTIVE
+row, and there is at most one row per (org, user) — so a member whose own row is
+removed cannot reach that transition through PostgREST at all.
+
+**Error mapping is a pure function** (`lib/invites/acceptErrors.ts`, 4 tests),
+matched on SQLSTATE rather than message text. The mismatch case is told plainly
+— the reader already holds a valid token, so genericising teaches them nothing
+and costs them the one fact they need — but it never names the invited address.
+Everything else stays one indistinguishable sentence.
+
+**Backward-compatible on purpose:** the old function never raises `INV01`, so the
+route is correct against both. Migration and deploy can happen in either order,
+though the hole stays open until 0040 runs.
+
+**Also regenerated `supabase/ALL_MIGRATIONS.sql`** — it had stopped at 0031 while
+nine more landed. Anyone building a workspace from that bundle got a database
+with no privacy settings, forms, voice agents, workflows or custom fields, and
+every symptom would have looked like an application bug.
+
+`lint` clean · `typecheck` clean · **1789/1789** · `build` compiles.
+
+**Still to do:** run `supabase/VERIFY_0040.sql` against a real database. Six
+checks, self-cleaning, rolls back. Until it has run, S-01 is fixed-by-reading.
+
+## 2026-09-12 (S-01 VERIFIED on a real database — and a migration that never worked)
+
+Started Rancher Desktop, ran Postgres 16 in Docker, wrote a minimal Supabase shim
+(auth.users, auth.uid(), storage.buckets/objects/foldername, the three roles) and
+replayed the migration set. S-01 is no longer fixed-by-reading.
+
+**FOUND: `0030_module15_candidate_messaging.sql` was never valid SQL.** A 4-byte
+truncated file containing the word `writ`. `0035` was written later as the real
+Module 15 schema and its header even documents the truncation — but 0030 was left
+in place, so **any replay from empty died there and took 0031-0040 with it**:
+live coding, privacy, forms, voice agents, workflows, custom fields, and the S-01
+fix. A new Supabase project built from this repo was broken and nothing said so.
+This would have hit the Vercel deploy squarely. Replaced its body with a comment
+pointing at 0035; number kept, because filename order is apply order and a gap
+invites "was something lost?".
+
+**All 40 migrations now replay cleanly from empty. First time that has ever been
+true here.**
+
+**S-01, measured rather than argued** — and the audit was half wrong:
+
+| | Pre-0040 | Post-0040 |
+| --- | --- | --- |
+| Stranger with a forwarded token joins as admin | **WORKED** | refused (INV01) |
+| Existing member re-grades self via the invite | already blocked | still blocked, deliberately |
+
+The second half had been closed since **0036** (`prevent_self_role_change`),
+which was written for an unrelated reason — an Admin demoting themselves on the
+Team page. So the escalation was never live after 0036; the identity hole was,
+and it was the serious one. Proved by restoring 0001's function *and* 0036's
+trigger and running both probes. SECURITY.md §S-01 corrected to say this.
+
+Still worth removing from accept_invite: the block was incidental, the error was
+wrong ("You cannot change your own role" when nobody was trying to), and anyone
+relaxing 0036 later would have silently re-opened it.
+
+**Negative control done** — VERIFY_0040.sql fails with exactly the right message
+against the original function, so the test is not vacuous.
+
+**Added `supabase/tests/replay.sh` + `supabase_shim.sql`** — closes the "no CI
+check that migrations replay cleanly" gap DEPLOYMENT.md had carried for months.
+Runs every migration one file at a time (a failure names the file) then every
+`supabase/VERIFY_*.sql`. ~1 minute, self-cleaning. Not wired to CI; there is no CI.
+
+`lint` clean · `typecheck` clean · 1789/1789 · containers removed.

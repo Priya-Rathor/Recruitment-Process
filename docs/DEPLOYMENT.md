@@ -86,13 +86,16 @@ variable nobody sets.
 `GOOGLE_CLIENT_SECRET`, `EMAIL_API_URL`, `WHATSAPP_API_URL`, `APP_URL`,
 `N8N_WEBHOOK_URL`.
 
-### `MISSING` (P2) — undocumented
-Read by the code but **absent from `.env.local.example`**: `CRON_SECRET`,
-`AI_MODEL`, `AI_BASE_URL`, `BOLNA_CATALOG_PATHS`, and the current-generation
-names `SUPABASE_SECRET_KEY` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+### `FIXED` 2026-09-12 — all six are now documented
+`CRON_SECRET`, `AI_MODEL`, `AI_BASE_URL`, `BOLNA_CATALOG_PATHS` and the
+current-generation names `SUPABASE_SECRET_KEY` /
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are all in `.env.local.example`.
 
-`CRON_SECRET` is the dangerous one: a deployment looks entirely healthy while
-every delayed action is dead. Nothing surfaces it except that one endpoint.
+`CRON_SECRET` remains the dangerous one to skip: a deployment looks entirely
+healthy while every delayed action is dead. Nothing surfaces it except that one
+endpoint, so check it explicitly after a deploy —
+`curl -i https://<domain>/api/automations/sweep` should return **401**, not 503.
+A 503 means the variable never reached the deployment.
 
 ---
 
@@ -101,9 +104,28 @@ every delayed action is dead. Nothing surfaces it except that one endpoint.
 Plain SQL in `supabase/migrations/`, applied **in filename order** through the
 Supabase SQL Editor or `supabase db push`. Written to be re-runnable.
 
-### `RISK` (P0) — three migrations are written but not applied
+### `RISK` (P0) — the bundle went stale, and three migrations were never applied
 
-`docs/Memory.md` records that **`0032`, `0037` and `0038` have not been run**
+**`supabase/ALL_MIGRATIONS.sql` stopped at `0031`** while nine more had landed.
+A workspace built from that bundle is missing privacy settings, forms and public
+applications, voice agents, stage workflows, custom fields and the S-01 invite
+fix — and every symptom looks like an application bug rather than a missing
+table. **Regenerated 2026-09-12; it now carries all 40.** Regenerate it whenever
+you add a migration:
+
+```bash
+python3 - <<'EOF'
+import glob, os
+files = sorted(glob.glob("supabase/migrations/*.sql"))
+out = ["-- ALL MIGRATIONS, concatenated in order.\n\n"]
+for path in files:
+    out.append("\n-- " + "#" * 76 + "\n-- ## " + os.path.basename(path) + "\n-- " + "#" * 76 + "\n\n")
+    out.append(open(path).read().rstrip("\n") + "\n")
+open("supabase/ALL_MIGRATIONS.sql", "w").write("".join(out))
+EOF
+```
+
+`docs/Memory.md` also records that **`0032`, `0037` and `0038` had not been run**
 against the working database. Code that reads
 `organization_settings.privacy_settings`, the stage-workflow columns on
 `automations`, or `automation_delayed_actions` will fail until they are.
@@ -118,7 +140,12 @@ degradation — it is not a substitute for applying them.
 - No down-migrations, no rollback SQL.
 - No applied-migrations ledger for any environment. `docs/Memory.md` is the only
   record, and it is prose.
-- No CI check that migrations replay cleanly from empty.
+- ~~No CI check that migrations replay cleanly from empty.~~ **Added
+  2026-09-12: `./supabase/tests/replay.sh`** spins up a throwaway Postgres,
+  applies a minimal Supabase shim, replays every migration one file at a time
+  (so a failure names the file), then runs every `supabase/VERIFY_*.sql`. It is
+  not yet wired into CI — there is no CI — but it runs in about a minute
+  locally. The first run found `0030` had never been valid SQL.
 
 **Fix:** adopt the Supabase CLI's own migration tracking (`supabase migration
 list` / `db push`) rather than manual SQL-Editor paste, and add a CI job that

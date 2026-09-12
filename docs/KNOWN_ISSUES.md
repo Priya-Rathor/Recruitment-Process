@@ -40,12 +40,16 @@ alerting, no health check. A production failure is invisible.
 
 ## Security
 
-### S-01 · Invite tokens are not identity-bound — `RISK` (P0)
-`supabase/migrations/0001_*.sql`, `public.accept_invite`.
+### S-01 · Invite tokens are not identity-bound — `FIXED` 2026-09-12
+Fixed by `supabase/migrations/0040_bind_invite_to_identity.sql`.
+`accept_invite()` now proves the caller is the invited address (read from
+`auth.users`, **not** the user-writable `public.users`) and no longer re-grades
+an existing member. Full analysis in `docs/SECURITY.md` §S-01; proof in
+`supabase/VERIFY_0040.sql`.
 
-No email comparison, and `on conflict … do update set role = excluded.role`
-lets an existing member escalate by presenting an admin invite token intended
-for someone else. Full analysis in `docs/SECURITY.md` §S-01.
+**Not closed until the migration is applied.** The code ships correct against
+both the old and new function, so deploying before applying it is safe — but the
+hole stays open until 0040 runs.
 
 ### S-07 · Rate limiting exists on exactly one endpoint — `MISSING` (P1)
 `lib/forms/rateLimit.ts` is used only by `lib/forms/submit.ts`. Uncapped:
@@ -62,9 +66,20 @@ no human in the loop.
 16 modules bypass RLS. Correct where inspected; no test or lint rule asserts the
 `organization_id` filter.
 
-### No security headers — `MISSING` (P1)
-`next.config.ts` is empty. No CSP, HSTS, `nosniff`, `Referrer-Policy`, or
-`frame-ancestors`. The app is framable.
+### No Content-Security-Policy — `MISSING` (P2, was P1)
+**Partly fixed 2026-09-12, before the first deploy.** `next.config.ts` now sends
+`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+strict-origin-when-cross-origin`, `Strict-Transport-Security` (2 years,
+subdomains, no preload) and a `Permissions-Policy` denying camera, microphone,
+geolocation, payment and USB. Verified against `npm start`, not assumed.
+
+**A CSP is still missing**, deliberately rather than by oversight. This product
+inlines `style` objects throughout the design system, loads fonts through
+`next/font`, and runs CodeMirror; a policy worth having needs `unsafe-inline`
+for styles, a nonce pipeline for scripts and a pass over every external origin.
+A wrong CSP breaks production silently rather than failing a build, so it needs
+its own test plan. `frame-ancestors` is covered in the meantime by
+`X-Frame-Options`.
 
 ### S-06 · One encryption key, five purposes — `RISK` (P2)
 `INTEGRATION_ENCRYPTION_KEY` signs form tokens, unsubscribe tokens, coding
@@ -78,12 +93,17 @@ Rotating it invalidates every live candidate link, so it will never be rotated.
 `lib/integrations/calendar/oauth.ts:135`, `lib/integrations/email/index.ts:361`,
 `lib/ai/provider.ts:110`. Can carry candidate PII into logs.
 
-### `CRON_SECRET` undocumented — `MISSING` (P2)
-Read by `app/api/automations/sweep/route.ts`; absent from `.env.local.example`.
-Unset, the cron endpoint is a permanent 503 and **no time-based automation ever
-fires**, with nothing in the product saying so. Also undocumented: `AI_MODEL`,
-`AI_BASE_URL`, `BOLNA_CATALOG_PATHS`, `SUPABASE_SECRET_KEY`,
-`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+### `CRON_SECRET` undocumented — `FIXED` 2026-09-12
+All six are now in `.env.local.example`: `CRON_SECRET` (with the consequence of
+leaving it unset stated in the file), `AI_MODEL`, `AI_BASE_URL`,
+`BOLNA_CATALOG_PATHS`, and the current-generation Supabase names
+`SUPABASE_SECRET_KEY` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` alongside the
+legacy pair.
+
+Still true and worth keeping in mind: unset, the cron endpoint is a permanent
+503 and **no time-based automation ever fires**, with nothing in the product
+saying so except that endpoint. Documenting it does not make it self-evident on
+a deployment where somebody skipped it.
 
 ### No upload content sniffing — `RISK` (P2)
 Extension and MIME are checked; bytes are not. Impact limited — files are never

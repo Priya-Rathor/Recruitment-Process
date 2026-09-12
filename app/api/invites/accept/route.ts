@@ -4,15 +4,22 @@ import { handleRouteError, jsonError } from "@/lib/api";
 import { ACTIVE_ORG_COOKIE, requireCurrentUser } from "@/lib/tenant";
 import { logActivity } from "@/lib/activity/log";
 import { formatDbError } from "@/lib/supabase/errors";
+import { acceptInviteFailure } from "@/lib/invites/acceptErrors";
 
 /**
  * POST /api/invites/accept
  *
- * Accepts an invite by token. All validation (token exists, still pending, not
- * expired) happens inside the accept_invite RPC, which is the only path that
- * can write an organization_members row — organization_members has no
- * client-facing INSERT policy. A bad or expired token is rejected there, so
- * this handler cannot be tricked into joining an org by guessing ids.
+ * Accepts an invite by token. All validation happens inside the accept_invite
+ * RPC, which is the only path that can write an organization_members row —
+ * organization_members has no client-facing INSERT policy. A bad or expired
+ * token is rejected there, so this handler cannot be tricked into joining an
+ * org by guessing ids.
+ *
+ * SINCE MIGRATION 0040 the RPC also proves the caller IS the invited address,
+ * reading it from auth.users rather than from the user-writable profile table.
+ * Until that migration is applied the older function still answers and simply
+ * never raises the mismatch code, so this handler is correct against both —
+ * which is what lets the migration and the deploy happen in either order.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -36,10 +43,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (error || !organizationId) {
-      // Deliberately generic: do not reveal whether the token exists, is
-      // expired, or was already used.
+      // The mapping — and how much each failure may reveal — lives in
+      // lib/invites/acceptErrors.ts, where it is unit tested. Everything except
+      // an identity mismatch stays generic, so the endpoint cannot be used to
+      // find out which tokens are real.
+      const failure = acceptInviteFailure(error?.code);
+
       console.error(`[api] accept_invite failed: ${formatDbError(error)}`);
-      return jsonError("This invite link is no longer valid. Ask for a new invite.", 400);
+      return jsonError(failure.message, failure.status);
     }
 
     // Module 14. Logged AFTER the RPC succeeds, so the row only exists if the

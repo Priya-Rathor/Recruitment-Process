@@ -1,7 +1,22 @@
 -- =============================================================================
 -- ALL MIGRATIONS, concatenated in order.
 -- Generated from supabase/migrations/. Paste into the Supabase SQL Editor.
+--
+-- REGENERATE THIS FILE WHENEVER YOU ADD A MIGRATION. It went stale once — it
+-- stopped at 0031 while nine more had landed, so a workspace built from it was
+-- missing privacy settings, forms, voice agents, stage workflows, custom fields
+-- and the S-01 invite fix, and every symptom looked like an application bug.
+--
+--   python3 - <<'EOF'
+--   import glob
+--   files = sorted(glob.glob("supabase/migrations/*.sql"))
+--   ...  (the generator lives in docs/DEPLOYMENT.md section 5)
+--   EOF
+--
+-- Order is filename order and is load-bearing: later files reference tables,
+-- enums and functions the earlier ones create.
 -- =============================================================================
+
 
 
 -- ############################################################################
@@ -458,7 +473,6 @@ create policy invites_update_owner_admin on public.invites
     and (role <> 'owner' or public.has_org_role(organization_id, array['owner']::public.org_role[]))
   );
 
-
 -- ############################################################################
 -- ## 0002_module3_jobs_management.sql
 -- ############################################################################
@@ -709,7 +723,6 @@ create policy job_interview_questions_write_staff on public.job_interview_questi
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
 
-
 -- ############################################################################
 -- ## 0003_module4_candidates_management.sql
 -- ############################################################################
@@ -959,7 +972,6 @@ create policy candidate_duplicates_write_staff on public.candidate_duplicates
   with check (
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
-
 
 -- ############################################################################
 -- ## 0004_module5_applications_management.sql
@@ -1272,7 +1284,6 @@ drop policy if exists application_notes_delete_author on public.application_note
 create policy application_notes_delete_author on public.application_notes
   for delete using (author_id = public.current_app_user_id());
 
-
 -- ############################################################################
 -- ## 0005_module6_resume_ai.sql
 -- ############################################################################
@@ -1522,7 +1533,6 @@ create policy resumes_storage_delete on storage.objects
     )
   );
 
-
 -- ############################################################################
 -- ## 0006_module7_ai_matching.sql
 -- ############################################################################
@@ -1754,7 +1764,6 @@ create policy application_matches_write_staff on public.application_matches
   with check (
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
-
 
 -- ############################################################################
 -- ## 0007_module8_bolna_screening.sql
@@ -2032,7 +2041,6 @@ create policy screening_calls_update_staff on public.screening_calls
 -- and of the consent given. Erasure belongs to the Privacy retrofit's audited
 -- flow, not to a stray delete.
 
-
 -- ############################################################################
 -- ## 0008_module9_screening_reports.sql
 -- ############################################################################
@@ -2249,7 +2257,6 @@ create policy screening_reports_delete_owner_admin on public.screening_reports
     public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
   );
 
-
 -- ############################################################################
 -- ## 0009_module10_pipeline.sql
 -- ############################################################################
@@ -2333,7 +2340,6 @@ create index if not exists idx_applications_open_board
   on public.applications (organization_id, stage, updated_at)
   where archived_at is null
     and stage not in ('hired', 'rejected', 'withdrawn');
-
 
 -- ############################################################################
 -- ## 0010_module11_interviews.sql
@@ -2622,7 +2628,6 @@ create policy interview_feedback_update_author on public.interview_feedback
   using (submitted_by = public.current_app_user_id())
   with check (submitted_by = public.current_app_user_id());
 
-
 -- ############################################################################
 -- ## 0011_module12_clients.sql
 -- ############################################################################
@@ -2900,7 +2905,6 @@ create trigger trg_jobs_client_tenant_integrity
   before insert or update of client_id, organization_id on public.jobs
   for each row execute function public.enforce_job_client_tenant_integrity();
 
-
 -- ############################################################################
 -- ## 0012_module13_automations.sql
 -- ############################################################################
@@ -3165,7 +3169,6 @@ drop policy if exists automation_runs_insert_member on public.automation_runs;
 create policy automation_runs_insert_member on public.automation_runs
   for insert with check (public.is_org_member(organization_id));
 
-
 -- ############################################################################
 -- ## 0013_module14_activity_audit.sql
 -- ############################################################################
@@ -3387,7 +3390,6 @@ create policy activity_events_insert_member on public.activity_events
   );
 
 -- No UPDATE policy. No DELETE policy. See the header.
-
 
 -- ############################################################################
 -- ## 0014_module15_notifications.sql
@@ -3745,7 +3747,6 @@ create policy notification_preferences_write on public.notification_preferences
     )
   );
 
-
 -- ############################################################################
 -- ## 0015_module16_analytics.sql
 -- ############################################################################
@@ -4054,7 +4055,6 @@ grant select on public.analytics_job_performance     to authenticated;
 grant select on public.analytics_client_performance  to authenticated;
 grant select on public.analytics_screening_metrics   to authenticated;
 
-
 -- ############################################################################
 -- ## 0016_module17_settings.sql
 -- ############################################################################
@@ -4349,7 +4349,6 @@ create trigger trg_user_preferences_tenant_integrity
 revoke select (encrypted_credentials) on public.organization_integrations from authenticated;
 revoke select (encrypted_credentials) on public.organization_integrations from anon;
 
-
 -- ############################################################################
 -- ## 0017_fix_missing_user_profile.sql
 -- ############################################################################
@@ -4466,7 +4465,6 @@ left join public.users u on u.auth_id = au.id
 where u.id is null
   and au.email is not null
 on conflict (auth_id) do nothing;
-
 
 -- ############################################################################
 -- ## 0018_bulk_resume_intake.sql
@@ -4667,7 +4665,6 @@ create policy resume_intake_delete_owner_admin on public.resume_intake_items
 -- _intake folder either.
 -- =============================================================================
 
-
 -- ############################################################################
 -- ## 0019_intake_manual_reconnect.sql
 -- ############################################################################
@@ -4787,7 +4784,6 @@ create policy candidates_delete_staff on public.candidates
 create index if not exists idx_resume_intake_items_candidate
   on public.resume_intake_items (organization_id, candidate_id)
   where candidate_id is not null;
-
 
 -- ############################################################################
 -- ## 0020_job_hiring_stages.sql
@@ -4917,7 +4913,6 @@ create policy job_hiring_stages_write_staff on public.job_hiring_stages
   with check (
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
-
 
 -- ############################################################################
 -- ## 0021_pipeline_stage_redefinition.sql
@@ -5327,7 +5322,6 @@ left join public.users u on u.id = a.assigned_recruiter_id
 where a.assigned_recruiter_id is not null
 group by a.organization_id, a.assigned_recruiter_id, u.name, u.email;
 
-
 -- ############################################################################
 -- ## 0022_application_evaluations.sql
 -- ############################################################################
@@ -5476,7 +5470,6 @@ create policy application_evaluations_write_staff on public.application_evaluati
     public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
   );
 
-
 -- ############################################################################
 -- ## 0023_application_edit_candidate_profile.sql
 -- ############################################################################
@@ -5556,7 +5549,6 @@ alter table public.candidates drop constraint if exists candidates_employment_is
 alter table public.candidates
   add constraint candidates_employment_is_array
   check (jsonb_typeof(employment_history) = 'array');
-
 
 -- ############################################################################
 -- ## 0024_structured_evaluation.sql
@@ -5640,7 +5632,6 @@ alter table public.jobs
 
 comment on column public.jobs.resume_passing_score is
   'Match percentage at or above which a resume passes this job''s first gate. Null = no gate configured; results read as Needs Review.';
-
 
 -- ############################################################################
 -- ## 0025_retire_standalone_interview_questions.sql
@@ -5799,7 +5790,6 @@ group by j.id, j.organization_id, j.title,
 
 comment on view public.report_interview_question_migration is
   'Post-migration audit for 0025. Rows with status MIGRATED BUT HIDDEN need a human to enable an interview stage or accept losing the old questions from view.';
-
 
 -- ############################################################################
 -- ## 0026_module19_onboarding_documents.sql
@@ -6535,7 +6525,6 @@ comment on table public.onboarding_records is
 comment on table public.onboarding_documents is
   'Module 19. Snapshotted from organization_document_templates at creation — never joined to them, so editing the checklist cannot disturb a hire already in progress.';
 
-
 -- ############################################################################
 -- ## 0027_resume_score_stage.sql
 -- ############################################################################
@@ -6661,7 +6650,6 @@ from public.jobs j
 where j.resume_passing_score is not null
 on conflict (job_id, stage_key) do nothing;
 
-
 -- ############################################################################
 -- ## 0028_agency_mode.sql
 -- ############################################################################
@@ -6703,7 +6691,6 @@ comment on column public.organizations.agency_mode is
   'True = recruits for client companies (Module 12 clients, submissions and '
   'feedback SLAs are shown). False = hires for itself; those surfaces are '
   'hidden. Visibility only — no data is deleted when this is turned off.';
-
 
 -- ############################################################################
 -- ## 0029_automation_upgrade.sql
@@ -7100,775 +7087,34 @@ create trigger trg_automations_bump_version
   before update on public.automations
   for each row execute function public.bump_automation_version();
 
-
 -- ############################################################################
 -- ## 0030_module15_candidate_messaging.sql
 -- ############################################################################
 
 -- =============================================================================
--- Module 15 extension — candidate communication.
+-- INTENTIONALLY EMPTY. Module 15's schema is 0035, not this file.
 --
--- Module 15 already ships an INTERNAL notification pipeline: notifications,
--- notification_deliveries, notification_preferences, and one approved external
--- template (`candidate_stage_update`) an automation may send. What it never had
--- is a library an organization can write, a channel besides email, and a record
--- of what was actually said to a candidate. That is what this migration adds.
+-- This file was a 4-byte truncated write containing the fragment `writ` and
+-- nothing else. It is not valid SQL, so ANY attempt to replay the migration set
+-- from empty died right here — `ERROR: syntax error at or near "writ"` — and
+-- took every migration after it with it. That is 0031 through 0040: live coding,
+-- privacy, forms, voice agents, workflows, custom fields and the S-01 invite fix.
 --
--- FOUR DECISIONS WORTH READING BEFORE THE SQL.
+-- The number is kept and the file left in place rather than deleted, because
+-- filename order IS the apply order and a gap invites the question of whether
+-- something was lost. Nothing was: the schema this file was meant to contain was
+-- written later, in full, as
 --
--- 1. THE LOG STORES THE RESOLVED TEXT, NOT A TEMPLATE REFERENCE.
---    `body_sent` holds the words that left the building, placeholders already
---    substituted. A log that only pointed at a template would start lying the
---    first time somebody edited that template — and "what did we tell this
---    candidate?" is exactly the question a log exists to answer. template_id is
---    kept alongside, nullable, and set null on delete: it is provenance, never
---    the content.
+--     0035_module15_candidate_messaging.sql
 --
--- 2. ONE ACTIVE TEMPLATE PER EVENT, ENFORCED BY AN INDEX.
---    Two active templates for `hired` would send a candidate two messages, and
---    which two would depend on row order. A partial unique index makes that
---    impossible rather than unlikely. The `both` channel exists precisely so one
---    template can cover email and WhatsApp, so nothing legitimate is lost.
+-- which carries its own explanation of how the application layer came to be
+-- built against tables no migration had created.
 --
--- 3. THE LOG IS APPEND-ONLY TO EVERY BROWSER.
---    Permissions: "Communication log: visible to all roles, read-only for
---    everyone (it's a record, not an editable thing)". The browser holds an
---    authenticated PostgREST client, so "read-only" cannot live in a route
---    handler: there is a SELECT policy and an INSERT policy and deliberately no
---    UPDATE or DELETE policy at all. Delivery-status callbacks (delivered,
---    opened, bounced) arrive without a session and are written with the
---    service-role client, which bypasses RLS — so the honest statement is that
---    nobody with a session can rewrite history.
---
--- 4. OPT-OUT IS PER CANDIDATE, PER CHANNEL, AND FORWARD-ONLY.
---    Opting out of email skips future AUTOMATIC email. It does not touch the
---    log, and it does not block a human who deliberately replies to a
---    candidate's own question — that is a warning in the UI, not a wall.
+-- Do not put anything here. A later module needing Module 15's tables should
+-- depend on 0035.
 -- =============================================================================
 
-do $$
-begin
-  -- Where a message went. Distinct from notification_channel ('in_app','email'):
-  -- that enum describes an internal notice, this one an outbound conversation.
-  if not exists (select 1 from pg_type where typname = 'message_channel') then
-    create type public.message_channel as enum ('email', 'whatsapp');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'message_status') then
-    create type public.message_status as enum (
-      -- Accepted by us, not yet handed to a provider.
-      'queued',
-      -- The provider accepted it.
-      'sent',
-      -- The provider confirmed delivery to the device/mailbox.
-      'delivered',
-      -- The recipient opened it.
-      'opened',
-      -- Something broke on our side or the provider's. Look at it.
-      'failed',
-      -- The address or number rejected it permanently. Different from failed:
-      -- retrying will not help, and the contact detail is probably wrong.
-      'bounced',
-      /**
-       * NOTHING WAS SENT, AND NOTHING IS BROKEN.
-       *
-       * The candidate has opted out of that channel, or has no address/number on
-       * file, or the channel isn't connected. Not in the spec's status list —
-       * added for the same reason migration 0014 added 'skipped' to
-       * notification_delivery_status: 'failed' means "something went wrong, look
-       * at it", and rendering a correct policy decision in error red teaches a
-       * team to ignore the colour. error_message says which of the three it was.
-       */
-      'skipped'
-    );
-  end if;
-end $$;
-
--- =============================================================================
--- message_templates — the library.
--- =============================================================================
-create table if not exists public.message_templates (
-  id uuid primary key default gen_random_uuid(),
-  organization_id uuid not null references public.organizations (id) on delete cascade,
-
-  name text not null check (length(btrim(name)) > 0 and length(name) <= 120),
-
-  /**
-   * Which pipeline event this template answers.
-   *
-   * Checked against a closed list here as well as in
-   * lib/communications/events.ts. A typo'd event_key would store fine and then
-   * never fire — the silent-failure class this codebase keeps designing out.
-   */
-  event_key text not null check (
-    event_key in (
-      'application_received',
-      'shortlisted',
-      'ai_screening_call_scheduled',
-      'phone_interview_scheduled',
-      'video_interview_scheduled',
-      'interview_reminder',
-      'assessment_assigned',
-      'director_round_scheduled',
-      'offer_extended',
-      'hired',
-      'rejected',
-      'unqualified'
-    )
-  ),
-
-  channel text not null default 'email' check (channel in ('email', 'whatsapp', 'both')),
-
-  /** Email only. WhatsApp has no subject line. */
-  subject text check (subject is null or length(subject) <= 300),
-
-  /**
-   * The email body — and, for a whatsapp-only template, the WhatsApp body.
-   * {{placeholder}} tokens, the same vocabulary the Job Hiring Stage prompt
-   * editors use (lib/hiring-stages/placeholders.ts).
-   */
-  body text not null check (length(btrim(body)) > 0),
-
-  /**
-   * The WhatsApp body, used only when channel = 'both'.
-   *
-   * A separate column rather than a second row, because "the email and the
-   * WhatsApp for this event" is one decision an admin makes once. WhatsApp
-   * messages are shorter and carry no subject, so sharing one body would make
-   * one of the two channels read badly. Null falls back to `body`.
-   */
-  whatsapp_body text,
-
-  /**
-   * FALSE BY DEFAULT, and the seeded set below ships inactive.
-   *
-   * An active template sends automatically the moment its event happens. Seeding
-   * twelve live templates would mean a product update started emailing an
-   * organization's candidates without anybody choosing to.
-   */
-  active boolean not null default false,
-
-  created_by uuid references public.users (id) on delete set null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-
-  -- A template with a subject on a WhatsApp-only channel is a subject nobody
-  -- will ever see. Refused rather than silently ignored, so the editor cannot
-  -- imply a field matters when it does not.
-  constraint message_templates_subject_channel check (
-    channel <> 'whatsapp' or subject is null
-  ),
-  -- 'both' needs email wording; the WhatsApp half may fall back to it.
-  constraint message_templates_whatsapp_body_scope check (
-    whatsapp_body is null or channel = 'both'
-  )
-);
-
-create index if not exists idx_message_templates_organization_id
-  on public.message_templates (organization_id);
-create index if not exists idx_message_templates_event_key
-  on public.message_templates (organization_id, event_key);
--- Two names the same within an org is a support call waiting to happen.
-create unique index if not exists idx_message_templates_unique_name
-  on public.message_templates (organization_id, lower(btrim(name)));
-
-/**
- * AT MOST ONE ACTIVE TEMPLATE PER EVENT. See decision 2 in the header.
- *
- * The API turns the resulting 23505 into "Deactivate <other template> first",
- * which is a sentence an admin can act on.
- */
-create unique index if not exists idx_message_templates_one_active_per_event
-  on public.message_templates (organization_id, event_key)
-  where active;
-
-drop trigger if exists trg_message_templates_touch on public.message_templates;
-create trigger trg_message_templates_touch
-  before update on public.message_templates
-  for each row execute function public.touch_updated_at();
-
--- =============================================================================
--- message_log — what was actually said, to whom, and what happened to it.
--- =============================================================================
-create table if not exists public.message_log (
-  id uuid primary key default gen_random_uuid(),
-  organization_id uuid not null references public.organizations (id) on delete cascade,
-
-  /**
-   * The application this message was about.
-   *
-   * Nullable, because a candidate can be messaged about nothing in particular
-   * once this product grows a general compose screen — but every send today
-   * names one. The Candidate page rolls the log up across applications, which is
-   * why candidate_id is stored separately rather than joined through here: an
-   * archived or deleted application must not take the record of the message with
-   * it.
-   */
-  application_id uuid references public.applications (id) on delete set null,
-  candidate_id uuid not null references public.candidates (id) on delete cascade,
-
-  channel public.message_channel not null,
-
-  /** Provenance only. Null for a one-off, and null once a template is deleted. */
-  template_id uuid references public.message_templates (id) on delete set null,
-
-  /**
-   * Which pipeline event caused an automatic send. Null for a manual one.
-   *
-   * Not in the original data model, added because "why did this go out?" is the
-   * second question anybody asks of a communication log, and the answer would
-   * otherwise have to be inferred from a timestamp.
-   */
-  event_key text,
-
-  subject text,
-
-  /** THE RESOLVED TEXT. Placeholders already substituted. See decision 1. */
-  body_sent text not null check (length(btrim(body_sent)) > 0),
-
-  status public.message_status not null default 'queued',
-
-  provider_message_id text,
-  /** Plain, safe to show. Provider payloads are never stored here. */
-  error_message text,
-
-  /** Masked at write time — never the full address or number. */
-  recipient_hint text,
-
-  /** NULL means an automation sent it. A user id means a person did. */
-  sent_by uuid references public.users (id) on delete set null,
-
-  sent_at timestamptz,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists idx_message_log_organization_id
-  on public.message_log (organization_id);
-create index if not exists idx_message_log_application_id
-  on public.message_log (application_id, created_at desc);
-create index if not exists idx_message_log_candidate_id
-  on public.message_log (candidate_id, created_at desc);
-create index if not exists idx_message_log_status on public.message_log (status);
-create index if not exists idx_message_log_provider_message_id
-  on public.message_log (provider_message_id);
-create index if not exists idx_message_log_org_created_at
-  on public.message_log (organization_id, created_at desc);
--- The auto-send dedupe read: "did this event already send for this application?"
-create index if not exists idx_message_log_application_event
-  on public.message_log (application_id, event_key, created_at desc);
-
--- =============================================================================
--- candidate_communication_preferences — opt-out state.
---
--- candidate_id is the primary key, as specified. organization_id is carried as
--- well, because every table in this product is governed by organization-scoped
--- RLS and a table without the column cannot be (AGENTS.md). Candidates never
--- move between organizations, so the two can never disagree; a trigger checks
--- it anyway.
--- =============================================================================
-create table if not exists public.candidate_communication_preferences (
-  candidate_id uuid primary key references public.candidates (id) on delete cascade,
-  organization_id uuid not null references public.organizations (id) on delete cascade,
-
-  email_opted_out boolean not null default false,
-  whatsapp_opted_out boolean not null default false,
-
-  opted_out_at timestamptz,
-  opted_out_reason text check (opted_out_reason is null or length(opted_out_reason) <= 500),
-
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index if not exists idx_candidate_comm_prefs_organization_id
-  on public.candidate_communication_preferences (organization_id);
-
-drop trigger if exists trg_candidate_comm_prefs_touch
-  on public.candidate_communication_preferences;
-create trigger trg_candidate_comm_prefs_touch
-  before update on public.candidate_communication_preferences
-  for each row execute function public.touch_updated_at();
-
--- =============================================================================
--- Cross-tenant integrity.
---
--- Foreign keys prove a row exists, not that it is OURS. Without these, a bug in
--- a call-site could file another organization's candidate under this one — and
--- the RLS policies, which trust organization_id, would then happily serve it.
--- =============================================================================
-create or replace function public.enforce_message_log_tenant_integrity()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_candidate_org uuid;
-  v_application_org uuid;
-  v_application_candidate uuid;
-  v_template_org uuid;
-begin
-  select organization_id into v_candidate_org
-  from public.candidates where id = new.candidate_id;
-
-  if v_candidate_org is null or v_candidate_org <> new.organization_id then
-    raise exception 'Candidate does not belong to this organization';
-  end if;
-
-  if new.application_id is not null then
-    select organization_id, candidate_id
-      into v_application_org, v_application_candidate
-    from public.applications where id = new.application_id;
-
-    if v_application_org is null or v_application_org <> new.organization_id then
-      raise exception 'Application does not belong to this organization';
-    end if;
-
-    -- The message is filed against both. If they disagree the log would show a
-    -- message on one candidate's page that was addressed to somebody else.
-    if v_application_candidate <> new.candidate_id then
-      raise exception 'Application belongs to a different candidate';
-    end if;
-  end if;
-
-  if new.template_id is not null then
-    select organization_id into v_template_org
-    from public.message_templates where id = new.template_id;
-
-    if v_template_org is null or v_template_org <> new.organization_id then
-      raise exception 'Template does not belong to this organization';
-    end if;
-  end if;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_message_log_tenant_integrity on public.message_log;
-create trigger trg_message_log_tenant_integrity
-  before insert on public.message_log
-  for each row execute function public.enforce_message_log_tenant_integrity();
-
-create or replace function public.enforce_comm_pref_tenant_integrity()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_org uuid;
-begin
-  select organization_id into v_org
-  from public.candidates where id = new.candidate_id;
-
-  if v_org is null or v_org <> new.organization_id then
-    raise exception 'Candidate does not belong to this organization';
-  end if;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_comm_prefs_tenant_integrity
-  on public.candidate_communication_preferences;
-create trigger trg_comm_prefs_tenant_integrity
-  before insert or update of candidate_id, organization_id
-  on public.candidate_communication_preferences
-  for each row execute function public.enforce_comm_pref_tenant_integrity();
-
-/**
- * opted_out_at is stamped by the database, not by the caller.
- *
- * A timestamp a client supplies is a timestamp a client can get wrong, and this
- * one is the evidence that a candidate asked not to be contacted. Cleared when
- * both flags go back to false, so "opted out on 4 March" never survives the
- * opt-out itself being lifted.
- */
-create or replace function public.stamp_comm_pref_optout()
-returns trigger
-language plpgsql
-set search_path = public
-as $$
-begin
-  if new.email_opted_out or new.whatsapp_opted_out then
-    if tg_op = 'INSERT'
-       or (not (old.email_opted_out or old.whatsapp_opted_out))
-       or new.opted_out_at is null then
-      new.opted_out_at := coalesce(new.opted_out_at, now());
-    end if;
-  else
-    new.opted_out_at := null;
-    new.opted_out_reason := null;
-  end if;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_comm_prefs_stamp on public.candidate_communication_preferences;
-create trigger trg_comm_prefs_stamp
-  before insert or update on public.candidate_communication_preferences
-  for each row execute function public.stamp_comm_pref_optout();
-
--- =============================================================================
--- Row-Level Security
--- =============================================================================
-alter table public.message_templates enable row level security;
-alter table public.message_log enable row level security;
-alter table public.candidate_communication_preferences enable row level security;
-
--- ---- message_templates ------------------------------------------------------
--- "Templates: Owner/Admin manage; Recruiter/Viewer read-only."
---
--- Every member reads: a Recruiter composing a manual message picks from this
--- library, so hiding it would break the send screen for the role that uses it
--- most.
-drop policy if exists message_templates_select_member on public.message_templates;
-create policy message_templates_select_member on public.message_templates
-  for select using (public.is_org_member(organization_id));
-
-/**
- * WRITES ARE OWNER/ADMIN, IN THE POLICY AND NOT ONLY IN THE ROUTE.
- *
- * A template's body becomes an automatic message to a candidate. If this rule
- * lived only in the API, any signed-in Recruiter could edit the words the
- * product sends in their organization's name by writing straight to PostgREST.
- *
- * The role check is repeated in WITH CHECK as well as USING because it
- * constrains what the row may BECOME — without it a permitted row could be
- * updated into one the caller was never allowed to create.
- */
-drop policy if exists message_templates_write_admin on public.message_templates;
-create policy message_templates_write_admin on public.message_templates
-  for all
-  using (public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[]))
-  with check (public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[]));
-
--- ---- message_log ------------------------------------------------------------
--- "Communication log: visible to all roles."
---
--- Deliberately NOT the strict per-recipient rule that governs `notifications`.
--- That table holds notices addressed to one colleague; this one holds what the
--- organization said to a candidate, which is team knowledge — a Viewer reading
--- the pipeline needs to know the candidate has already been told they were
--- rejected.
-drop policy if exists message_log_select_member on public.message_log;
-create policy message_log_select_member on public.message_log
-  for select using (public.is_org_member(organization_id));
-
-/**
- * INSERT is Owner/Admin/Recruiter — the roles that may send. A Viewer cannot
- * make this product message a candidate, and cannot forge a record that it did.
- *
- * There is NO UPDATE and NO DELETE POLICY. See decision 3 in the header: the log
- * is append-only to anybody holding a session, which is what "it's a record, not
- * an editable thing" has to mean when the browser can talk to the database.
- */
-drop policy if exists message_log_insert_sender on public.message_log;
-create policy message_log_insert_sender on public.message_log
-  for insert
-  with check (
-    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
-  );
-
--- ---- candidate_communication_preferences ------------------------------------
--- Every member reads: a recruiter must see "Email opted out" BEFORE composing.
-drop policy if exists candidate_comm_prefs_select_member
-  on public.candidate_communication_preferences;
-create policy candidate_comm_prefs_select_member on public.candidate_communication_preferences
-  for select using (public.is_org_member(organization_id));
-
-/**
- * Owner/Admin/Recruiter may record an opt-out — a candidate who says "please
- * stop emailing me" on a phone call is the common case, and the recruiter on
- * that call is who hears it.
- *
- * A Viewer cannot, in either direction: lifting somebody's opt-out is the more
- * dangerous half of this permission, and it is the same policy.
- */
-drop policy if exists candidate_comm_prefs_write on public.candidate_communication_preferences;
-create policy candidate_comm_prefs_write on public.candidate_communication_preferences
-  for all
-  using (
-    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
-  )
-  with check (
-    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
-  );
-
--- =============================================================================
--- Module 14 — a new audit entity.
---
--- `add value if not exists` rather than a type swap; migration 0021 is the
--- cautionary tale for swapping an enum out from under dependent views.
---
--- Message templates get their own entity rather than being filed under
--- 'organization', because "who changed the words we send candidates, and when?"
--- is a question with its own timeline. Messages themselves are logged against the
--- 'application' they were about, so they appear on the timeline a recruiter is
--- already reading.
--- =============================================================================
-alter type public.activity_entity_type add value if not exists 'message_template';
-
--- =============================================================================
--- organization_settings.communication_settings
---
--- Interview reminder timing and channel choice.
---
--- Module 11 never built a reminder timing config — its feedback queue is
--- computed on read and its notes say delivery arrived with Module 15. So rather
--- than stand up a second reminder system, the timing lives here, beside every
--- other operating default, and lib/notifications/reminders.ts (the one existing
--- dispatcher) reads it.
--- =============================================================================
-alter table public.organization_settings
-  add column if not exists communication_settings jsonb not null default '{}';
-
--- =============================================================================
--- THE DEFAULT TEMPLATE SET
---
--- One per event, neutral professional tone, INACTIVE. Seeded once per
--- organization and only when it has none at all — an org that deliberately
--- deleted every template is not re-seeded on the next call, for the same reason
--- Module 19's checklist is not.
---
--- The wording lives HERE and only here. It is deliberately not mirrored in
--- TypeScript: two copies of twelve message bodies is two things to keep in step,
--- and the drift would show up as a candidate receiving wording nobody approved.
--- The application reads these rows like any other template.
---
--- What the wording avoids, on purpose:
---   - promising a timeline ("we'll be in touch within a week") — nobody in the
---     loop agreed to that, and an automatic message cannot know;
---   - stating a reason for rejection — a templated reason applied to everybody
---     is both untrue and, in several jurisdictions, evidence;
---   - asking a question. These send automatically; a question implies somebody
---     is watching the reply, and until an inbound channel exists, nobody is.
--- =============================================================================
-create or replace function public.seed_default_message_templates(p_organization_id uuid)
-returns integer
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_count integer;
-begin
-  if exists (
-    select 1 from public.message_templates where organization_id = p_organization_id
-  ) then
-    return 0;
-  end if;
-
-  insert into public.message_templates
-    (organization_id, name, event_key, channel, subject, body, whatsapp_body, active)
-  values
-    (p_organization_id, 'Application received', 'application_received', 'both',
-     'We received your application for {{job.title}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'Thank you for applying for the {{job.title}} role. Your application has been received and '
-     || 'is with our recruitment team.' || chr(10) || chr(10) ||
-     'We will contact you if we need anything further.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     'Hi {{candidate.name}}, thank you for applying for the {{job.title}} role at '
-     || '{{organization.name}}. Your application has been received.',
-     false),
-
-    (p_organization_id, 'Shortlisted', 'shortlisted', 'both',
-     'Your application for {{job.title}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'Your application for the {{job.title}} role has been shortlisted and will move forward to '
-     || 'the next stage of our process.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     'Hi {{candidate.name}}, your application for the {{job.title}} role at '
-     || '{{organization.name}} has been shortlisted.',
-     false),
-
-    (p_organization_id, 'Screening call scheduled', 'ai_screening_call_scheduled', 'email',
-     'A short screening call for {{job.title}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'As the next step for the {{job.title}} role, you will receive a short automated screening '
-     || 'call on the number on your application. It covers a few basic questions about your '
-     || 'experience and availability.' || chr(10) || chr(10) ||
-     'If the call reaches you at an inconvenient time, you can ask to speak to a member of the '
-     || 'team instead.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     null,
-     false),
-
-    (p_organization_id, 'Phone interview scheduled', 'phone_interview_scheduled', 'both',
-     'Phone interview for {{job.title}} — {{interview.time}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'Your phone interview for the {{job.title}} role is scheduled for {{interview.time}}.'
-     || chr(10) || chr(10) ||
-     'Please let us know if you need a different time.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     'Hi {{candidate.name}}, your phone interview for the {{job.title}} role is scheduled for '
-     || '{{interview.time}}.',
-     false),
-
-    (p_organization_id, 'Video interview scheduled', 'video_interview_scheduled', 'both',
-     'Video interview for {{job.title}} — {{interview.time}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'Your video interview for the {{job.title}} role is scheduled for {{interview.time}}.'
-     || chr(10) || chr(10) ||
-     'Joining link: {{interview.link}}' || chr(10) || chr(10) ||
-     'Please let us know if you need a different time.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     'Hi {{candidate.name}}, your video interview for the {{job.title}} role is scheduled for '
-     || '{{interview.time}}. Joining link: {{interview.link}}',
-     false),
-
-    (p_organization_id, 'Interview reminder', 'interview_reminder', 'both',
-     'Reminder: your {{job.title}} interview at {{interview.time}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'This is a reminder that your interview for the {{job.title}} role is scheduled for '
-     || '{{interview.time}}.' || chr(10) || chr(10) ||
-     'Location / joining details: {{interview.location}}' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     'Reminder: your interview for the {{job.title}} role is at {{interview.time}}. '
-     || '{{interview.location}}',
-     false),
-
-    (p_organization_id, 'Assessment assigned', 'assessment_assigned', 'both',
-     'Written assessment for {{job.title}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'The next stage for the {{job.title}} role is a written assessment. A member of the team '
-     || 'will send you the assessment and its deadline separately.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     'Hi {{candidate.name}}, the next stage for the {{job.title}} role is a written assessment. '
-     || 'We will send you the details separately.',
-     false),
-
-    (p_organization_id, 'Final round scheduled', 'director_round_scheduled', 'both',
-     'Final interview for {{job.title}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'Your application for the {{job.title}} role has reached the final interview stage. A member '
-     || 'of the team will confirm the time with you.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     'Hi {{candidate.name}}, your application for the {{job.title}} role has reached the final '
-     || 'interview stage. We will confirm the time with you.',
-     false),
-
-    (p_organization_id, 'Offer extended', 'offer_extended', 'email',
-     'Your offer for {{job.title}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'We are pleased to offer you the {{job.title}} role at {{organization.name}}. The formal '
-     || 'offer, with the full terms, is being sent to you separately by the recruitment team.'
-     || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     null,
-     false),
-
-    (p_organization_id, 'Hired', 'hired', 'both',
-     'Welcome to {{organization.name}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'Your offer for the {{job.title}} role has been confirmed and we are glad to have you '
-     || 'joining us. Someone from the team will be in contact about your start date and the '
-     || 'paperwork we need.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     'Hi {{candidate.name}}, your offer for the {{job.title}} role at {{organization.name}} is '
-     || 'confirmed. Someone from the team will be in contact about next steps.',
-     false),
-
-    (p_organization_id, 'Not proceeding', 'rejected', 'email',
-     'Your application for {{job.title}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'Thank you for the time you gave to your application for the {{job.title}} role. On this '
-     || 'occasion we will not be taking it forward.' || chr(10) || chr(10) ||
-     'We appreciate your interest and wish you well with your search.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     null,
-     false),
-
-    (p_organization_id, 'Requirements not met', 'unqualified', 'email',
-     'Your application for {{job.title}}',
-     'Hi {{candidate.name}},' || chr(10) || chr(10) ||
-     'Thank you for applying for the {{job.title}} role. Having reviewed your application '
-     || 'against the requirements for this position, we will not be taking it forward.'
-     || chr(10) || chr(10) ||
-     'You are welcome to apply for other roles with us in future.' || chr(10) || chr(10) ||
-     'Regards,' || chr(10) || '{{organization.name}}',
-     null,
-     false)
-  on conflict do nothing;
-
-  select count(*)::integer into v_count
-  from public.message_templates where organization_id = p_organization_id;
-
-  return v_count;
-end;
-$$;
-
-revoke all on function public.seed_default_message_templates(uuid) from public, anon;
-grant execute on function public.seed_default_message_templates(uuid) to authenticated;
-
--- Every organization that already exists. Without this the library opens empty
--- for everybody currently using the product, and "ships with a default set"
--- would only be true for organizations created after today.
-do $$
-declare
-  v_org record;
-begin
-  for v_org in select id from public.organizations loop
-    perform public.seed_default_message_templates(v_org.id);
-  end loop;
-end $$;
-
--- New organizations. Re-created rather than wrapped, so there is still exactly
--- one place an organization is born (the same pattern migration 0026 used).
-create or replace function public.create_organization_and_owner(
-  p_name text,
-  p_industry text default null,
-  p_size text default null,
-  p_country text default null,
-  p_timezone text default 'Asia/Kolkata'
-)
-returns public.organizations
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_user_id uuid;
-  v_org public.organizations;
-begin
-  if auth.uid() is null then
-    raise exception 'Not authenticated';
-  end if;
-
-  insert into public.users (auth_id, name, email)
-  select auth.uid(), split_part(au.email, '@', 1), au.email
-  from auth.users au
-  where au.id = auth.uid()
-  on conflict (auth_id) do nothing;
-
-  select id into v_user_id from public.users where auth_id = auth.uid();
-
-  insert into public.organizations (name, industry, size, country, timezone)
-  values (btrim(p_name), p_industry, p_size, p_country, coalesce(p_timezone, 'Asia/Kolkata'))
-  returning * into v_org;
-
-  insert into public.organization_members (organization_id, user_id, role, status, joined_at)
-  values (v_org.id, v_user_id, 'owner', 'active', now());
-
-  -- Module 19. A new org gets a working onboarding checklist without having to
-  -- discover the Settings screen first.
-  perform public.seed_default_document_templates(v_org.id);
-
-  -- Module 15 candidate communication. Seeded INACTIVE: the library is there to
-  -- review, and nothing sends until somebody switches one on.
-  perform public.seed_default_message_templates(v_org.id);
-
-  return v_org;
-end;
-$$;
-
-revoke all on function public.create_organization_and_owner(text, text, text, text, text)
-  from public, anon;
-grant execute on function public.create_organization_and_owner(text, text, text, text, text)
-  to authenticated;
-
+-- No statements. Deliberately.
 
 -- ############################################################################
 -- ## 0031_live_coding_interview.sql
@@ -8251,3 +7497,2872 @@ create policy coding_submissions_select_member on public.coding_submissions
 -- =============================================================================
 grant select, insert, update on public.coding_sessions to authenticated;
 grant select on public.coding_submissions to authenticated;
+
+-- ############################################################################
+-- ## 0032_module21_privacy_consent.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Module 21 — Privacy, consent and data settings.
+--
+-- Four things, in dependency order:
+--   1. organization_settings.privacy_settings — the configuration (§1-§9)
+--   2. screening_call_status gains 'consent_declined' (§2)
+--   3. screening_calls gains consent provenance columns (§2, rule 3)
+--   4. A trigger that makes rule 5 structural rather than aspirational (§1)
+--
+-- Re-runnable, per the project convention: `if not exists`, `drop ... if exists`,
+-- and enum additions guarded by a catalogue lookup.
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 1. The configuration column.
+--
+-- JSONB on the existing settings row rather than a new table, matching
+-- screening_settings / retention_settings / communication_settings. It inherits
+-- organization_settings' RLS unchanged, which is what makes these settings
+-- organization-specific (rule 1) without a new policy to get wrong.
+--
+-- Default '{}' rather than a populated object: lib/privacy/settings.ts
+-- normalizes on read, so an empty object and a missing row both resolve to the
+-- documented defaults. Writing defaults into SQL as well would give two sources
+-- of truth that drift the first time one is edited.
+-- -----------------------------------------------------------------------------
+alter table public.organization_settings
+  add column if not exists privacy_settings jsonb not null default '{}'::jsonb;
+
+comment on column public.organization_settings.privacy_settings is
+  'Module 21 privacy, consent, retention and access configuration. Shape and '
+  'defaults are owned by lib/privacy/settings.ts, which normalises on read and '
+  'on write; treat values here as untrusted input, not as validated config.';
+
+-- -----------------------------------------------------------------------------
+-- 2. 'consent_declined' as a first-class call outcome.
+--
+-- The brief requires the interview be marked "Consent Declined". It is a real
+-- status and not a failure: 'failed' means the provider or network broke, and
+-- filing a refusal there would put a lawful, correctly handled refusal in the
+-- same bucket as an outage — which then feeds the retry policy, the dashboard
+-- counts and the analytics funnel as though it were a technical fault to be
+-- retried. It must also never be retried, which lib/screening/retry.ts enforces.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_enum e
+    join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'screening_call_status'
+      and e.enumlabel = 'consent_declined'
+  ) then
+    alter type public.screening_call_status add value 'consent_declined';
+  end if;
+end
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 3. Consent provenance on every call (rule 3: "Consent status must be stored
+--    with every interview").
+--
+-- consent_confirmed and consent_confirmed_at already exist from Module 8. What
+-- they cannot express is HOW consent was obtained, and rule 4 asks for exactly
+-- that distinction — an explicit spoken "yes" and a candidate who simply carried
+-- on are both consent, but they are not the same evidence. A privacy log that
+-- reported them identically would overstate the weaker one.
+--
+-- consent_declined_at is separate from consent_confirmed = false, because false
+-- is also the state of a call that has not reached the question yet. Silence and
+-- refusal are different facts and a subject access request has to tell them
+-- apart.
+-- -----------------------------------------------------------------------------
+alter table public.screening_calls
+  add column if not exists consent_mode text
+    check (consent_mode is null or consent_mode in ('explicit', 'continuation')),
+  add column if not exists consent_declined_at timestamptz,
+  -- What the configuration said at the moment of the call. Settings change; a
+  -- call has to be auditable against the policy that was live when it happened,
+  -- not whatever is configured on the day somebody asks.
+  add column if not exists recording_permitted boolean not null default false,
+  add column if not exists ai_disclosure_given boolean not null default false;
+
+comment on column public.screening_calls.consent_mode is
+  'How consent was obtained: explicit (the candidate said yes) or continuation '
+  '(the candidate was told and carried on). Null until the disclosure is answered.';
+
+comment on column public.screening_calls.recording_permitted is
+  'Whether recording was permitted for THIS call, evaluated at dial time against '
+  'the then-current privacy settings. Historical fact, not a live setting.';
+
+-- -----------------------------------------------------------------------------
+-- 4. The trigger that makes rule 5 structural.
+--
+--    "If recording is disabled, do not accidentally create or retain recordings."
+--
+-- WHY THIS IS A TRIGGER AND NOT A CHECK IN THE ROUTE HANDLER.
+--
+-- AGENTS.md states the rule this implements: the browser holds an authenticated
+-- PostgREST client, so any signed-in user can write to this table directly and
+-- skip the route entirely. A rule that only exists in a webhook handler is not
+-- enforced — and the writer here IS a webhook, i.e. a path driven by an external
+-- provider's payload rather than by our own UI.
+--
+-- So the invariant lives where it cannot be bypassed: a recording_url may only be
+-- set on a call where recording was permitted. Anything else is refused, loudly,
+-- rather than being silently nulled — a silent null would hide a bug in the
+-- dial-time evaluation and leave everyone believing recordings were being stored
+-- when they were not.
+-- -----------------------------------------------------------------------------
+create or replace function public.enforce_recording_permission()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.recording_url is not null and new.recording_permitted = false then
+    raise exception
+      'Cannot store a recording for call %: recording was not permitted for it. '
+      'Check the organization''s privacy settings and the candidate''s consent.',
+      new.id
+      using errcode = 'check_violation';
+  end if;
+
+  -- A declined call is a call that stopped. It cannot also be carrying consent.
+  if new.consent_declined_at is not null and new.consent_confirmed = true then
+    raise exception
+      'Call % cannot be both consented and declined.', new.id
+      using errcode = 'check_violation';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_recording_permission on public.screening_calls;
+
+create trigger trg_enforce_recording_permission
+  before insert or update on public.screening_calls
+  for each row
+  execute function public.enforce_recording_permission();
+
+-- -----------------------------------------------------------------------------
+-- 5. Index for the retention sweep.
+--
+-- The sweep asks "which completed calls have artifacts older than N days", per
+-- organization. Without this it is a full scan of screening_calls on every run,
+-- which grows with the table and runs on a schedule.
+--
+-- Partial: rows with no ended_at have no artifacts to expire, and
+-- planRetentionActions() skips them anyway, so there is no reason to index them.
+-- -----------------------------------------------------------------------------
+create index if not exists screening_calls_retention_idx
+  on public.screening_calls (organization_id, ended_at)
+  where ended_at is not null;
+
+-- -----------------------------------------------------------------------------
+-- 6. Index for the §10 privacy log.
+--
+-- The privacy view filters activity_events to the privacy.* event types for one
+-- organization, newest first. activity_events already has an organization index;
+-- this makes the event_type filter selective rather than a scan of every event
+-- the organization has ever recorded.
+-- -----------------------------------------------------------------------------
+create index if not exists activity_events_privacy_idx
+  on public.activity_events (organization_id, created_at desc)
+  where event_type like 'privacy.%';
+
+-- ############################################################################
+-- ## 0033_module23_forms_public_applications.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Module 23: Forms & Public Applications
+--
+-- ONE FORM ENGINE, NOT TWO. A job's public application form is a `forms` row
+-- with purpose='job_application' and a job_id; a pre-interview questionnaire is
+-- the same row with a different purpose and no job. There is deliberately no
+-- separate "job_application_forms" table: the second one would grow its own
+-- field editor, its own validation and its own drift.
+--
+-- THIS IS NOT job_screening_questions. That table (migration 0002) holds the
+-- questions the Module 8 AI voice screen asks. These are questions a candidate
+-- types answers to on a public web page. Two different asks, two different
+-- audiences, two tables.
+--
+-- THE CANDIDATE IS NOT A USER OF THIS PRODUCT.
+--
+-- They have no login, so the public page is authorised by a signed HMAC over
+-- (form id, token_version) — the same construction lib/coding/token.ts and
+-- lib/communications/optout.ts already use. NOTHING here stores a working link:
+-- a leaked database dump yields no URL anybody can open, and there is no token
+-- column for a mistaken SELECT to expose.
+--
+-- token_version is what makes "regenerate link" possible without a stored
+-- token. Bumping it invalidates every previously shared link and printed QR
+-- code in one UPDATE.
+--
+-- Because the applicant has no session, their reads and their submission go
+-- through route handlers using the service-role client, scoped by the form id
+-- that came out of a verified signature. RLS below therefore governs the
+-- RECRUITER's access only; the applicant never touches PostgREST.
+--
+-- WHY THERE IS NO submission_count COLUMN. The browser holds an authenticated
+-- PostgREST client, so a counter column is a number any signed-in user can set
+-- to anything. "24 applications received" has to be a count of rows that exist,
+-- so it is read as count(form_responses) and never stored.
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 1. A new candidate/application source.
+--
+-- applications.source and candidates.source are both public.candidate_source.
+-- 'career_page' is the closest existing value and it is not the same thing: a
+-- career page is a jobs board somebody browsed, this is a link a recruiter sent
+-- to one person. Analytics would silently merge the two.
+--
+-- SEPARATE do BLOCK, FIRST IN THE FILE, ON PURPOSE. A newly added enum label
+-- cannot be USED by the transaction that added it, so nothing below may
+-- reference 'application_form' as a default or an insert. Nothing does.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_enum e
+    join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'candidate_source'
+      and e.enumlabel = 'application_form'
+  ) then
+    alter type public.candidate_source add value 'application_form';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- 1b. activity_entity_type gains 'form' — AND the two values that were missing.
+--
+-- THIS FIXES A LATENT BUG, not just this module's need.
+--
+-- lib/activity/types.ts has declared 'message_template' (Module 15) and
+-- 'privacy' (Module 22) for some time, but neither was ever added to the
+-- database enum. logActivity() does not throw on a failed insert — it logs and
+-- returns false — so every audit row written against those two entity types has
+-- been silently dropped since. That includes the privacy log's "who viewed this
+-- transcript" rows, which is exactly the kind of gap an audit trail must not
+-- have.
+--
+-- Added here with `if not exists` so this migration stays re-runnable, and in
+-- the same first-in-the-file block as the candidate_source value above because
+-- a new enum label cannot be used by the transaction that added it.
+-- -----------------------------------------------------------------------------
+alter type public.activity_entity_type add value if not exists 'message_template';
+alter type public.activity_entity_type add value if not exists 'privacy';
+alter type public.activity_entity_type add value if not exists 'form';
+
+-- -----------------------------------------------------------------------------
+-- 2. Enums
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'form_purpose') then
+    /**
+     * What the form is FOR, which decides how it behaves rather than merely
+     * labelling it: only 'job_application' carries a job_id, is auto-created
+     * with default fields, and creates candidates and applications on submit.
+     */
+    create type public.form_purpose as enum (
+      'job_application',
+      'pre_interview',
+      'general'
+    );
+  end if;
+
+  if not exists (select 1 from pg_type where typname = 'form_status') then
+    /**
+     * THREE STATES, and 'disabled' is not the same as 'draft'.
+     *
+     * A draft has never been shared. A disabled form has a link in circulation
+     * — on WhatsApp, in an email, printed as a QR code on a poster — that must
+     * now say "no longer accepting applications" rather than 404. Collapsing
+     * them would mean closing a role either kept accepting submissions or
+     * started lying about whether the link ever existed.
+     */
+    create type public.form_status as enum ('draft', 'published', 'disabled');
+  end if;
+
+  if not exists (select 1 from pg_type where typname = 'form_field_type') then
+    create type public.form_field_type as enum (
+      'short_text',
+      'long_text',
+      'email',
+      'phone',
+      'number',
+      'dropdown',
+      'radio',
+      'checkbox',
+      'date',
+      'file_upload',
+      'url',
+      'yes_no'
+    );
+  end if;
+
+  if not exists (select 1 from pg_type where typname = 'form_response_status') then
+    /**
+     * A SUBMISSION THAT REACHED THIS DATABASE IS NEVER SILENTLY DROPPED.
+     *
+     * The applicant has already been told "thank you, we got it", so a failure
+     * in the steps after the insert (storage, parsing, candidate creation) must
+     * leave a row a recruiter can see and act on — not a lost application and a
+     * person waiting for a reply that will never come.
+     *
+     *   received       — stored, resolution not finished yet
+     *   linked         — candidate and application resolved
+     *   needs_review   — resolved, but a matched candidate's profile disagrees
+     *                    with what was typed, so fields are queued for review
+     *   needs_attention— something downstream failed; processing_error says what
+     */
+    create type public.form_response_status as enum (
+      'received',
+      'linked',
+      'needs_review',
+      'needs_attention'
+    );
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- 3. forms
+-- -----------------------------------------------------------------------------
+create table if not exists public.forms (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+
+  name text not null check (btrim(name) <> '' and length(name) <= 200),
+  description text check (description is null or length(description) <= 2000),
+
+  purpose public.form_purpose not null default 'general',
+
+  /**
+   * Set for a job application form, null for everything else. The CHECK is what
+   * makes that a rule rather than a convention — an application form with no
+   * job has no pipeline to put anybody into, and a general form with a job_id
+   * would silently start creating applications.
+   */
+  job_id uuid references public.jobs (id) on delete cascade,
+
+  status public.form_status not null default 'draft',
+
+  /**
+   * Bumped to revoke every link ever issued for this form. See the header:
+   * the token is an HMAC over (id, token_version), so this integer IS the
+   * revocation mechanism, and it is the only thing about the link that is
+   * stored anywhere.
+   */
+  token_version integer not null default 1 check (token_version >= 1),
+
+  created_by uuid references public.users (id) on delete set null,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint forms_job_matches_purpose check (
+    (purpose = 'job_application' and job_id is not null)
+    or (purpose <> 'job_application' and job_id is null)
+  )
+);
+
+create index if not exists idx_forms_organization on public.forms (organization_id);
+create index if not exists idx_forms_org_status on public.forms (organization_id, status);
+
+/**
+ * ONE application form per job.
+ *
+ * Two would mean two public links for the same role, both live, with
+ * submissions split between them and no way for the job page to say which one
+ * the QR code on the poster points at. Standalone forms are unconstrained —
+ * an organization may have as many questionnaires as it likes.
+ */
+create unique index if not exists uq_forms_job_application
+  on public.forms (job_id)
+  where purpose = 'job_application';
+
+-- -----------------------------------------------------------------------------
+-- 4. form_fields
+-- -----------------------------------------------------------------------------
+create table if not exists public.form_fields (
+  id uuid primary key default gen_random_uuid(),
+
+  /**
+   * Denormalised from forms.organization_id so RLS keys on this row alone
+   * rather than joining on every read — the same choice
+   * job_screening_questions made. A trigger below keeps it honest.
+   */
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+  form_id uuid not null references public.forms (id) on delete cascade,
+
+  /**
+   * The stable identifier answers are stored under.
+   *
+   * form_responses.raw_answers is keyed on THIS, not on the label, so a
+   * recruiter renaming "Current CTC" to "Current package" does not orphan
+   * every answer already collected.
+   */
+  field_key text not null check (
+    field_key ~ '^[a-z][a-z0-9_]{0,58}[a-z0-9]$'
+  ),
+
+  label text not null check (btrim(label) <> '' and length(label) <= 200),
+  help_text text check (help_text is null or length(help_text) <= 500),
+
+  field_type public.form_field_type not null,
+
+  /** Choices for dropdown/radio/checkbox. Validated in lib/forms/validation.ts. */
+  options jsonb not null default '[]'::jsonb,
+
+  required boolean not null default false,
+
+  /**
+   * True for the fields shipped with a job application form, false for a
+   * recruiter's own questions. Drives two things: which answers map onto
+   * candidate columns, and which appear in the "Application form responses"
+   * card (the custom ones, since the standard ones are already on the profile).
+   */
+  is_standard boolean not null default false,
+
+  -- display_order, not "order": ORDER is a reserved word and every other
+  -- ordered table in this schema already spells it this way.
+  display_order integer not null default 0,
+
+  created_at timestamptz not null default now(),
+
+  constraint form_fields_options_is_array check (jsonb_typeof(options) = 'array')
+);
+
+create unique index if not exists uq_form_fields_key on public.form_fields (form_id, field_key);
+create index if not exists idx_form_fields_form on public.form_fields (form_id, display_order);
+create index if not exists idx_form_fields_organization on public.form_fields (organization_id);
+
+-- -----------------------------------------------------------------------------
+-- 5. form_responses
+-- -----------------------------------------------------------------------------
+create table if not exists public.form_responses (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+  form_id uuid not null references public.forms (id) on delete cascade,
+
+  /**
+   * Both NULL at insert time, and that ordering is the whole design.
+   *
+   * The response is written BEFORE the candidate is matched and the application
+   * created, so a failure in either of those still leaves the applicant's
+   * answers in the database. Filled in by the same request a moment later.
+   */
+  application_id uuid references public.applications (id) on delete set null,
+  candidate_id uuid references public.candidates (id) on delete set null,
+  resume_id uuid references public.resumes (id) on delete set null,
+
+  /** field_key -> value, exactly as submitted. The record of what they typed. */
+  raw_answers jsonb not null default '{}'::jsonb,
+
+  status public.form_response_status not null default 'received',
+  processing_error text check (processing_error is null or length(processing_error) <= 1000),
+
+  /**
+   * A SALTED HASH, NOT AN IP ADDRESS.
+   *
+   * Rate limiting needs to know "same source as before?", which a hash answers
+   * completely. An IP address is personal data under GDPR and Module 22 exists
+   * precisely so this product does not collect things casually — so the raw
+   * value is never written, here or anywhere else.
+   */
+  submitter_ip_hash text check (submitter_ip_hash is null or length(submitter_ip_hash) <= 64),
+
+  submitted_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+
+  constraint form_responses_answers_is_object check (jsonb_typeof(raw_answers) = 'object')
+);
+
+create index if not exists idx_form_responses_form on public.form_responses (form_id, submitted_at desc);
+create index if not exists idx_form_responses_organization on public.form_responses (organization_id);
+create index if not exists idx_form_responses_application on public.form_responses (application_id);
+create index if not exists idx_form_responses_candidate on public.form_responses (candidate_id);
+
+-- -----------------------------------------------------------------------------
+-- 6. form_submission_attempts — the rate limiter's ledger
+--
+-- IN THE DATABASE, NOT IN MEMORY. This app runs serverless: an in-process Map
+-- is per-instance and resets on every cold start, so it is not a limit, it is a
+-- suggestion. A public unauthenticated endpoint that reaches an AI provider
+-- needs an actual one.
+-- -----------------------------------------------------------------------------
+create table if not exists public.form_submission_attempts (
+  id uuid primary key default gen_random_uuid(),
+  form_id uuid not null references public.forms (id) on delete cascade,
+  /** Same salted hash as form_responses.submitter_ip_hash. Never a raw IP. */
+  ip_hash text not null check (length(ip_hash) <= 64),
+  attempted_at timestamptz not null default now()
+);
+
+create index if not exists idx_form_attempts_window
+  on public.form_submission_attempts (form_id, ip_hash, attempted_at desc);
+
+-- =============================================================================
+-- 7. Triggers
+-- =============================================================================
+
+/**
+ * A field's denormalised organization_id must match its parent form's.
+ *
+ * In a trigger rather than only in the route because the browser holds an
+ * authenticated PostgREST client: a rule that lives in a handler is not
+ * enforced. Without this, a member of org A could insert a field carrying org
+ * A's id against org B's form and have it render on org B's public page.
+ */
+create or replace function public.enforce_form_field_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_form_org uuid;
+begin
+  select organization_id into v_form_org from public.forms where id = new.form_id;
+
+  if v_form_org is null then
+    raise exception 'Form % does not exist', new.form_id;
+  end if;
+
+  if v_form_org <> new.organization_id then
+    raise exception 'Form field organization does not match its form';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_form_fields_integrity on public.form_fields;
+create trigger trg_form_fields_integrity
+  before insert or update on public.form_fields
+  for each row execute function public.enforce_form_field_integrity();
+
+/** The same guard for a response. */
+create or replace function public.enforce_form_response_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_form_org uuid;
+begin
+  select organization_id into v_form_org from public.forms where id = new.form_id;
+
+  if v_form_org is null then
+    raise exception 'Form % does not exist', new.form_id;
+  end if;
+
+  if v_form_org <> new.organization_id then
+    raise exception 'Form response organization does not match its form';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_form_responses_integrity on public.form_responses;
+create trigger trg_form_responses_integrity
+  before insert or update on public.form_responses
+  for each row execute function public.enforce_form_response_integrity();
+
+/**
+ * EMAIL AND RESUME UPLOAD ARE LOAD-BEARING ON A JOB APPLICATION FORM.
+ *
+ * Email is what duplicate matching keys on (lib/candidates/dedupe.ts), and the
+ * resume is what the Module 6 parsing pipeline needs. A form without them still
+ * looks fine on the page and then quietly produces uncontactable, undedupable
+ * candidate records — one new person per submission, forever.
+ *
+ * So they may be RENAMED (an organization can call the upload whatever it
+ * likes) but not removed and not made optional. Enforced here because the field
+ * editor is not the only thing that can write this table.
+ *
+ * Standalone forms are unaffected: a pre-interview questionnaire has no
+ * candidate to create.
+ */
+create or replace function public.protect_required_application_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_purpose public.form_purpose;
+  v_key text;
+  v_form uuid;
+begin
+  -- OLD, not NEW. The trigger fires only on UPDATE and DELETE, so OLD
+  -- always exists — and it is the EXISTING field's key that
+  -- decides whether this row is protected. Reading NEW would let a rename to
+  -- some other key walk the field straight out of the protected set, which is
+  -- exactly what the last check below refuses.
+  v_key := old.field_key;
+  v_form := old.form_id;
+
+  if v_key not in ('email', 'resume') then
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
+  end if;
+
+  select purpose into v_purpose from public.forms where id = v_form;
+
+  if v_purpose is distinct from 'job_application' then
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    raise exception
+      'The % field cannot be removed from a job application form - candidate matching and resume parsing depend on it',
+      v_key;
+  end if;
+
+  if new.required = false then
+    raise exception
+      'The % field cannot be made optional on a job application form', v_key;
+  end if;
+
+  -- Renaming the KEY (not the label) would orphan every answer already
+  -- collected under it, and would take the field out of the protected set.
+  if new.field_key <> v_key then
+    raise exception 'The % field cannot be renamed to a different key', v_key;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_form_fields_protect on public.form_fields;
+create trigger trg_form_fields_protect
+  before update or delete on public.form_fields
+  for each row execute function public.protect_required_application_fields();
+
+drop trigger if exists trg_forms_touch on public.forms;
+create trigger trg_forms_touch
+  before update on public.forms
+  for each row execute function public.touch_updated_at();
+
+-- =============================================================================
+-- 8. Row-Level Security
+--
+-- Governs the RECRUITER's access. The applicant has no session and never
+-- reaches PostgREST — their page and their submission use the service-role
+-- client, scoped by a form id that came out of a verified signature.
+-- =============================================================================
+alter table public.forms enable row level security;
+alter table public.form_fields enable row level security;
+alter table public.form_responses enable row level security;
+alter table public.form_submission_attempts enable row level security;
+
+-- Every member may read a form's configuration and its submissions. Same floor
+-- as jobs and applications: a Viewer reads, and reading what a candidate
+-- submitted is how a hiring manager forms an opinion.
+drop policy if exists forms_select_member on public.forms;
+create policy forms_select_member on public.forms
+  for select using (public.is_org_member(organization_id));
+
+/**
+ * PUBLISHING A FORM MAKES A URL WORLD-REACHABLE, so it takes the same roles as
+ * scheduling an interview or starting a coding round — and the check is HERE,
+ * not only in the route. Without a policy, a Viewer with the browser's
+ * PostgREST client could flip status to 'published' from a console.
+ */
+drop policy if exists forms_insert_staff on public.forms;
+create policy forms_insert_staff on public.forms
+  for insert with check (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+drop policy if exists forms_update_staff on public.forms;
+create policy forms_update_staff on public.forms
+  for update using (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  ) with check (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+/**
+ * Deleting a form deletes its responses with it (ON DELETE CASCADE), which
+ * destroys applicants' submitted answers. Owner/Admin only, the same bar
+ * archiving a job takes.
+ */
+drop policy if exists forms_delete_admin on public.forms;
+create policy forms_delete_admin on public.forms
+  for delete using (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+drop policy if exists form_fields_select_member on public.form_fields;
+create policy form_fields_select_member on public.form_fields
+  for select using (public.is_org_member(organization_id));
+
+drop policy if exists form_fields_write_staff on public.form_fields;
+create policy form_fields_write_staff on public.form_fields
+  for insert with check (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+drop policy if exists form_fields_update_staff on public.form_fields;
+create policy form_fields_update_staff on public.form_fields
+  for update using (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  ) with check (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+drop policy if exists form_fields_delete_staff on public.form_fields;
+create policy form_fields_delete_staff on public.form_fields
+  for delete using (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+drop policy if exists form_responses_select_member on public.form_responses;
+create policy form_responses_select_member on public.form_responses
+  for select using (public.is_org_member(organization_id));
+
+/**
+ * NO INSERT, UPDATE OR DELETE POLICY ON form_responses, and that is the point.
+ *
+ * The only writer is the applicant, through the token-authorised route running
+ * under the service role. Giving staff a write path here would mean a recruiter
+ * could edit or delete what somebody submitted — the one thing this table
+ * exists to be able to show faithfully. The same call coding_submissions made.
+ */
+
+/**
+ * The rate-limit ledger is invisible to every client.
+ *
+ * It is written only by the service-role path, and there is nothing in it a
+ * recruiter needs: "how many times did this hashed source try?" is an
+ * operational detail, and exposing it would put a per-applicant activity trail
+ * on a screen nobody asked for. No policy at all = no rows for anybody.
+ */
+
+-- =============================================================================
+-- 9. Grants. Mirrors every other table: the API layer and RLS do the work.
+-- =============================================================================
+grant select, insert, update, delete on public.forms to authenticated;
+grant select, insert, update, delete on public.form_fields to authenticated;
+grant select on public.form_responses to authenticated;
+
+comment on table public.forms is
+  'Module 23. One form engine: job application forms (purpose=job_application, '
+  'job_id set, public link) and standalone questionnaires. The public link is a '
+  'signed HMAC over (id, token_version) — no token is stored.';
+comment on column public.forms.token_version is
+  'Bump to revoke every previously issued public link and QR code for this form.';
+comment on table public.form_submission_attempts is
+  'Module 23 rate-limit ledger. Salted IP hashes only, never raw addresses.';
+
+-- ############################################################################
+-- ## 0034_module24_voice_agent_console.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Module 24: Voice Agent Console
+--
+-- One page — /settings/integrations/bolna — that configures the voice agent
+-- which places AI screening calls, plus the ORGANIZATION-WIDE FALLBACKS a
+-- screening call uses when a job has not configured its own.
+--
+-- WHAT THIS MIGRATION DELIBERATELY DOES **NOT** CREATE
+-- ---------------------------------------------------
+--   * No second question list. The spec for this console says the Default Call
+--     Data section must "connect to, not duplicate, the per-job AI Screening
+--     Call configuration". A job's questions live in job_screening_questions
+--     (Module 3/8) and stay there; `default_call_data.fallbackQuestions` here is
+--     used ONLY when a job has AI screening enabled and its own list is empty.
+--     Precedence is resolved in lib/voice/callData.ts, with tests.
+--
+--   * No second credential store. The API key stays in
+--     organization_integrations.encrypted_credentials, unreadable by any browser
+--     session (column-level REVOKE, Module 8). Nothing in this migration holds a
+--     secret.
+--
+--   * No copy of language / max-attempts / retry policy. Those are Module 17's
+--     organization_settings.screening_settings and are read from there.
+--
+-- WHY A TABLE RATHER THAN organization_integrations.settings
+-- ---------------------------------------------------------
+-- The console's own spec requires MULTIPLE agents per organization (different
+-- agents per language or job category, chosen with a switcher). A jsonb blob on
+-- the single integration row cannot hold a list with per-row identity, a default
+-- flag, or a per-row provider sync state without becoming a hand-rolled table.
+-- =============================================================================
+
+-- =============================================================================
+-- voice_agents
+--
+-- One row per configured agent. `config` is the NEUTRAL AgentSettings object the
+-- browser sends — greeting, persona, guardrails, voice/STT selections (as opaque
+-- catalogue keys), conversation behaviour, handoff. It is normalised by
+-- lib/voice/settings.ts on every read AND every write, so a value edited straight
+-- into the column cannot make the agent stay on a call for an hour.
+-- =============================================================================
+create table if not exists public.voice_agents (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+
+  name text not null check (length(btrim(name)) between 1 and 120),
+
+  -- What this agent is FOR. Free-ish, but constrained so the switcher can group
+  -- and so a purpose cannot arrive as a paragraph.
+  purpose text not null default 'screening'
+    check (purpose in ('screening', 'confirmation', 'follow_up', 'other')),
+
+  -- Prefilled from organizations.name, but editable: the name a candidate should
+  -- hear is not always the legal entity name on the account.
+  company_name text,
+
+  -- The number candidates see. Not a credential; a display/dial-from choice.
+  caller_number text,
+
+  /**
+   * Exactly one default per organization, enforced by a PARTIAL UNIQUE INDEX
+   * below rather than by application code.
+   *
+   * It matters because this flag decides which agent actually dials: placeCall()
+   * resolves the default agent's provider id and falls back to the credential's
+   * agent id only when there is no synced default. Two defaults would make that
+   * resolution depend on row order.
+   */
+  is_default boolean not null default false,
+
+  /** The neutral AgentSettings blob. See lib/voice/settings.ts for the shape. */
+  config jsonb not null default '{}',
+
+  /**
+   * Organization-wide fallbacks for the AI screening call:
+   *   { fields: [{ key, value }], fallbackQuestions: [text, ...] }
+   *
+   * A JOB'S OWN CONFIGURATION ALWAYS WINS. This is the value used when the job
+   * did not specify one — never an override of it.
+   */
+  default_call_data jsonb not null default '{}',
+
+  -- ---------------------------------------------------------------------------
+  -- PROVIDER-SIDE STATE. Read only through lib/supabase/admin.ts.
+  --
+  -- SELECT on both columns is REVOKED from authenticated and anon below, for the
+  -- same reason encrypted_credentials is: the browser holds a PostgREST client,
+  -- so a column a policy exposes is a column a browser can read. The console's
+  -- spec requires that no provider-identifying value ever reaches the frontend,
+  -- and a REVOKE is the only way to mean that — a route handler that declines to
+  -- serialise a column is not a boundary.
+  -- ---------------------------------------------------------------------------
+  provider text not null default 'bolna' check (provider in ('bolna')),
+  provider_agent_id text,
+
+  -- Sync bookkeeping. A save that stored locally but failed at the provider must
+  -- be VISIBLE as such, not silently reported as saved.
+  last_synced_at timestamptz,
+  sync_error text,
+
+  created_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_voice_agents_organization
+  on public.voice_agents (organization_id);
+
+-- At most one default per organization. Partial, so the many non-default rows
+-- are unconstrained.
+create unique index if not exists uq_voice_agents_one_default
+  on public.voice_agents (organization_id)
+  where is_default;
+
+drop trigger if exists trg_voice_agents_touch on public.voice_agents;
+create trigger trg_voice_agents_touch
+  before update on public.voice_agents
+  for each row execute function public.touch_updated_at();
+
+-- =============================================================================
+-- voice_agent_test_calls
+--
+-- The Test Agent section's "Call me". A SEPARATE table from screening_calls, on
+-- purpose:
+--
+--   * screening_calls.application_id is NOT NULL, and a test call has no
+--     application. Making that column nullable would weaken a constraint every
+--     other reader relies on.
+--   * A test dial must never appear in a candidate's screening history, in the
+--     retry-cap arithmetic, or in Module 9's report inputs. Sharing the table
+--     would put it in all three.
+--
+-- The status enum IS shared, so one CallStatusBadge renders both.
+-- =============================================================================
+create table if not exists public.voice_agent_test_calls (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+  voice_agent_id uuid not null references public.voice_agents (id) on delete cascade,
+
+  -- The tester's own number. Stored so the readout can name who was called, and
+  -- so the hard per-hour cap below can be counted.
+  phone_number text not null,
+
+  status public.screening_call_status not null default 'queued',
+  provider_call_id text,
+
+  started_at timestamptz,
+  ended_at timestamptz,
+  duration_seconds integer check (duration_seconds is null or duration_seconds >= 0),
+  transcript text,
+  failure_reason text,
+
+  requested_by uuid references public.users (id) on delete set null,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint voice_agent_test_calls_end_after_start
+    check (ended_at is null or started_at is null or ended_at >= started_at)
+);
+
+create index if not exists idx_voice_agent_test_calls_org_created
+  on public.voice_agent_test_calls (organization_id, created_at desc);
+
+create index if not exists idx_voice_agent_test_calls_agent
+  on public.voice_agent_test_calls (voice_agent_id);
+
+drop trigger if exists trg_voice_agent_test_calls_touch on public.voice_agent_test_calls;
+create trigger trg_voice_agent_test_calls_touch
+  before update on public.voice_agent_test_calls
+  for each row execute function public.touch_updated_at();
+
+-- =============================================================================
+-- Row-Level Security
+-- =============================================================================
+alter table public.voice_agents enable row level security;
+alter table public.voice_agent_test_calls enable row level security;
+
+/**
+ * voice_agents SELECT: any member.
+ *
+ * Not Owner/Admin-only, and the reason is functional rather than a relaxation.
+ * startScreeningCall() runs under the SESSION of whoever pressed the button —
+ * usually a Recruiter — and it reads this row for the organization's fallback
+ * call data. An Owner-only SELECT would mean a Recruiter's call silently lost
+ * the org defaults, which is precisely the kind of "works for me" bug that RLS
+ * on a config table produces.
+ *
+ * Nothing readable here is a secret: the provider columns are REVOKED below, and
+ * a greeting message is not confidential to the team that reads it aloud.
+ * EDITING is still Owner/Admin, per this console's spec.
+ */
+drop policy if exists voice_agents_select_member on public.voice_agents;
+create policy voice_agents_select_member on public.voice_agents
+  for select using (public.is_org_member(organization_id));
+
+/**
+ * Writes: Owner/Admin only — "consistent with the rest of Module 17's
+ * integration configuration permissions".
+ *
+ * Stated as three policies rather than FOR ALL so that the INSERT check and the
+ * UPDATE's USING/WITH CHECK pair are each explicit. The rule constrains what a
+ * row may BECOME as well as who may touch it: without organization_id in WITH
+ * CHECK, an Admin could move their agent into another tenant.
+ */
+drop policy if exists voice_agents_insert_owner_admin on public.voice_agents;
+create policy voice_agents_insert_owner_admin on public.voice_agents
+  for insert with check (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+drop policy if exists voice_agents_update_owner_admin on public.voice_agents;
+create policy voice_agents_update_owner_admin on public.voice_agents
+  for update using (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  ) with check (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+drop policy if exists voice_agents_delete_owner_admin on public.voice_agents;
+create policy voice_agents_delete_owner_admin on public.voice_agents
+  for delete using (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+/**
+ * Test calls: Owner/Admin only, read as well as write.
+ *
+ * Unlike the agent config there is no reason for anyone else to see them, and a
+ * test transcript is a recording of a colleague.
+ */
+drop policy if exists voice_agent_test_calls_select_owner_admin on public.voice_agent_test_calls;
+create policy voice_agent_test_calls_select_owner_admin on public.voice_agent_test_calls
+  for select using (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+drop policy if exists voice_agent_test_calls_insert_owner_admin on public.voice_agent_test_calls;
+create policy voice_agent_test_calls_insert_owner_admin on public.voice_agent_test_calls
+  for insert with check (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+/**
+ * NO UPDATE POLICY, deliberately.
+ *
+ * A test call's outcome is written by the provider webhook through the
+ * service-role client, which bypasses RLS. Nobody's browser session has any
+ * business rewriting a transcript or a status — that would let an Admin edit the
+ * record of a call that was made, which is exactly what an audit trail must not
+ * allow. Deletion is likewise absent: rows age out with the organization.
+ */
+
+-- =============================================================================
+-- COLUMN-LEVEL REVOKE — the provider boundary.
+--
+-- Even an Owner's browser session must not be able to read which provider backs
+-- this product or what its internal agent id is. These two columns are therefore
+-- readable only through lib/supabase/admin.ts (service role), the same treatment
+-- organization_integrations.encrypted_credentials gets.
+--
+-- `revoke select (col)` on a table whose SELECT is granted at table level is the
+-- documented way to carve out a column: PostgREST's request then fails if the
+-- column is named, and `select *` from a browser returns the other columns.
+-- =============================================================================
+revoke select (provider, provider_agent_id) on public.voice_agents from authenticated;
+revoke select (provider, provider_agent_id) on public.voice_agents from anon;
+
+revoke select (provider_call_id) on public.voice_agent_test_calls from authenticated;
+revoke select (provider_call_id) on public.voice_agent_test_calls from anon;
+
+-- =============================================================================
+-- Cross-tenant integrity.
+--
+-- voice_agent_test_calls carries its own organization_id (the global rule) AND a
+-- foreign key to voice_agents. A foreign key proves the agent exists, not that it
+-- is OURS — without this trigger, an Admin could log a test call against another
+-- tenant's agent and read its config back through the join.
+-- =============================================================================
+create or replace function public.enforce_voice_test_call_tenant_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1
+    from public.voice_agents a
+    where a.id = new.voice_agent_id
+      and a.organization_id = new.organization_id
+  ) then
+    raise exception 'Voice agent does not belong to this organization';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_voice_test_call_tenant_integrity() from public, anon;
+
+drop trigger if exists trg_voice_agent_test_calls_tenant_integrity
+  on public.voice_agent_test_calls;
+create trigger trg_voice_agent_test_calls_tenant_integrity
+  before insert or update of voice_agent_id, organization_id
+  on public.voice_agent_test_calls
+  for each row execute function public.enforce_voice_test_call_tenant_integrity();
+
+-- =============================================================================
+-- "Always exactly one default" — the other half of the partial unique index.
+--
+-- The index stops TWO defaults. This trigger stops ZERO: the first agent an
+-- organization creates becomes the default, and promoting a new default demotes
+-- the old one in the same statement rather than relying on the client to send two
+-- writes (check-then-write across two statements is the TOCTOU race Module 1
+-- already hit).
+-- =============================================================================
+create or replace function public.enforce_single_default_voice_agent()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- First agent for this organization is the default whether asked for or not,
+  -- so "which agent dials?" always has an answer.
+  if not exists (
+    select 1 from public.voice_agents
+    where organization_id = new.organization_id
+      and id <> new.id
+  ) then
+    new.is_default := true;
+    return new;
+  end if;
+
+  if new.is_default then
+    -- Lock the sibling rows before demoting, so two concurrent promotions
+    -- serialise instead of both believing they won.
+    perform 1
+    from public.voice_agents
+    where organization_id = new.organization_id
+      and id <> new.id
+    for update;
+
+    update public.voice_agents
+    set is_default = false
+    where organization_id = new.organization_id
+      and id <> new.id
+      and is_default;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_single_default_voice_agent() from public, anon;
+
+drop trigger if exists trg_voice_agents_single_default on public.voice_agents;
+create trigger trg_voice_agents_single_default
+  before insert or update of is_default on public.voice_agents
+  for each row execute function public.enforce_single_default_voice_agent();
+
+-- =============================================================================
+-- Deleting the default promotes another, so an organization with agents always
+-- has one that dials.
+-- =============================================================================
+create or replace function public.promote_next_default_voice_agent()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not old.is_default then
+    return old;
+  end if;
+
+  update public.voice_agents
+  set is_default = true
+  where id = (
+    select id from public.voice_agents
+    where organization_id = old.organization_id
+    order by created_at
+    limit 1
+  );
+
+  return old;
+end;
+$$;
+
+revoke all on function public.promote_next_default_voice_agent() from public, anon;
+
+drop trigger if exists trg_voice_agents_promote_next on public.voice_agents;
+create trigger trg_voice_agents_promote_next
+  after delete on public.voice_agents
+  for each row execute function public.promote_next_default_voice_agent();
+
+-- =============================================================================
+-- Documentation the next reader sees before they see this file.
+-- =============================================================================
+comment on table public.voice_agents is
+  'Voice agent configuration for AI screening calls. config holds the neutral AgentSettings object (lib/voice/settings.ts); default_call_data holds ORG FALLBACKS that a job''s own AI Screening Call configuration always overrides. provider/provider_agent_id are service-role only.';
+
+comment on column public.voice_agents.default_call_data is
+  'Organization fallbacks: { fields: [{key,value}], fallbackQuestions: [] }. Used only where a job did not configure its own. Precedence resolved in lib/voice/callData.ts.';
+
+comment on column public.voice_agents.provider_agent_id is
+  'The provider''s own agent id. SELECT is revoked from authenticated/anon — read only through lib/supabase/admin.ts.';
+
+comment on table public.voice_agent_test_calls is
+  'Test dials from the Voice Agent Console. Separate from screening_calls so a test never enters a candidate''s history, the retry cap, or a screening report.';
+
+-- ############################################################################
+-- ## 0035_module15_candidate_messaging.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Module 15 (candidate communication) — the schema that was never written.
+--
+-- WHY THIS FILE EXISTS AT 0035 AND NOT AS A FIX TO 0030
+--
+-- `0030_module15_candidate_messaging.sql` is a 4-byte truncated file containing
+-- the text `writ`. Module 15's application layer — 3,098 lines across
+-- lib/communications/, the template library, the editor, the send pipeline, the
+-- opt-out flow and the communication log on two pages — was built against tables
+-- that no migration ever created. `/settings/templates` errors on load, and
+-- lib/communications/ has no isMissingRelation() guard to soften it.
+--
+-- 0030 is left in place rather than rewritten: migrations here are applied by
+-- hand, deployments may already have recorded it, and silently changing the
+-- contents of a migration somebody has run is how two environments stop matching.
+-- This is additive and re-runnable, so applying it to a database that somehow
+-- already has these tables is a no-op.
+--
+-- THE SCHEMA IS DERIVED FROM THE CODE, NOT INVENTED.
+--
+-- The column lists come from `TEMPLATE_COLUMNS` and `LOG_COLUMNS` in
+-- lib/communications/queries.ts, the enums from TEMPLATE_CHANNELS,
+-- COMMUNICATION_EVENTS and MessageStatus. Every name and every value below
+-- matches what the existing code already selects, inserts and filters on — this
+-- migration fits the application, not the other way round.
+--
+-- One detail worth naming: `message_log.sent_by` must produce a foreign key
+-- called `message_log_sent_by_fkey`, because queries.ts embeds the sender with
+-- `sender:users!message_log_sent_by_fkey(name, email)`. Postgres' default
+-- constraint naming gives exactly that, so it is not spelled out — but renaming
+-- the column later would break that join.
+-- =============================================================================
+
+-- =============================================================================
+-- Enums
+-- =============================================================================
+do $$
+begin
+  -- Channels a TEMPLATE may target. `both` is a template that carries an email
+  -- body and a WhatsApp body; it is not a channel anything sends on — see
+  -- deliveryChannelsFor() in lib/communications/templates.ts.
+  if not exists (select 1 from pg_type where typname = 'message_template_channel') then
+    create type public.message_template_channel as enum ('email', 'whatsapp', 'both');
+  end if;
+
+  -- Channels a MESSAGE actually went out on. Deliberately narrower than the
+  -- template enum: a log row records one delivery, so `both` is meaningless here
+  -- and a row can never claim it.
+  if not exists (select 1 from pg_type where typname = 'message_delivery_channel') then
+    create type public.message_delivery_channel as enum ('email', 'whatsapp');
+  end if;
+
+  /*
+    Delivery status.
+
+    `skipped` is the one that matters and the reason this is an enum rather than
+    a boolean: a message not sent because the candidate opted out, or because the
+    channel was disconnected, is NOT a failure — it is the product correctly
+    declining to send. Recording it as `failed` would make an opt-out look like a
+    bug, and recording nothing at all would make it look like the message went.
+  */
+  if not exists (select 1 from pg_type where typname = 'message_status') then
+    create type public.message_status as enum (
+      'queued',     -- accepted by us, not yet handed to a provider
+      'sent',       -- the provider accepted it
+      'delivered',  -- the provider confirmed delivery
+      'opened',     -- email only; WhatsApp gives us no read signal we trust
+      'bounced',    -- a hard delivery failure at the recipient
+      'failed',     -- we or the provider could not send
+      'skipped'     -- deliberately not sent. See above.
+    );
+  end if;
+
+  /*
+    The pipeline events a template can attach to.
+
+    Exactly COMMUNICATION_EVENTS from lib/communications/events.ts, in its order.
+    An enum rather than free text because a template pointing at an event the
+    product never raises is a template that silently never sends.
+  */
+  if not exists (select 1 from pg_type where typname = 'communication_event') then
+    create type public.communication_event as enum (
+      'application_received',
+      'shortlisted',
+      'ai_screening_call_scheduled',
+      'phone_interview_scheduled',
+      'video_interview_scheduled',
+      'interview_reminder',
+      'assessment_assigned',
+      'director_round_scheduled',
+      'offer_extended',
+      'hired',
+      'rejected',
+      'unqualified'
+    );
+  end if;
+end $$;
+
+-- =============================================================================
+-- message_templates
+--
+-- What a candidate is told, and when. One row per (event, channel) an
+-- organization chooses to automate.
+-- =============================================================================
+create table if not exists public.message_templates (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+
+  -- Internal label. Never shown to a candidate.
+  name text not null check (length(btrim(name)) between 1 and 120),
+
+  event_key public.communication_event not null,
+  channel public.message_template_channel not null,
+
+  /*
+    Email only, and NOT NULL-checked here.
+
+    parseTemplatePayload() refuses an email template with no subject, and this
+    constraint is the same rule at the boundary the browser can reach directly:
+    an email with no subject line is a deliverability problem, not a style
+    choice. A whatsapp-only template must leave it null rather than storing an
+    unused string that a future reader would try to display.
+  */
+  subject text,
+  constraint message_templates_subject_matches_channel check (
+    (channel in ('email', 'both') and subject is not null and length(btrim(subject)) > 0)
+    or (channel = 'whatsapp' and subject is null)
+  ),
+
+  -- The email body, or the only body for a whatsapp-only template.
+  body text not null check (length(btrim(body)) > 0),
+
+  /*
+    The WhatsApp body for a `both` template.
+
+    A separate column rather than one shared body, because the two channels are
+    not the same medium: an email can carry a paragraph and a signature, a
+    WhatsApp message is read on a phone and has a much shorter useful length.
+    One body would have to be wrong for one of them.
+  */
+  whatsapp_body text,
+  constraint message_templates_whatsapp_body_matches_channel check (
+    (channel = 'both' and whatsapp_body is not null and length(btrim(whatsapp_body)) > 0)
+    or (channel <> 'both')
+  ),
+
+  active boolean not null default false,
+
+  created_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_message_templates_organization
+  on public.message_templates (organization_id);
+
+-- The lookup the send pipeline does on every pipeline event: "is there an active
+-- template for this event in this org?"
+create index if not exists idx_message_templates_active_event
+  on public.message_templates (organization_id, event_key)
+  where active;
+
+drop trigger if exists trg_message_templates_touch on public.message_templates;
+create trigger trg_message_templates_touch
+  before update on public.message_templates
+  for each row execute function public.touch_updated_at();
+
+-- =============================================================================
+-- message_log
+--
+-- Every message this product sent a candidate, or deliberately did not send.
+--
+-- ONE LOG, TWO SURFACES. The Application page and the Candidate page both read
+-- this table — see components/CommunicationLog.tsx, rendered by both. There is no
+-- second history view and this migration does not create one.
+-- =============================================================================
+create table if not exists public.message_log (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+
+  /*
+    Both parents, and both nullable-by-context.
+
+    A message about an application has both; a message to a candidate with no
+    application in play has only the candidate. The check below refuses a row
+    that belongs to neither, which would be a log entry nothing can display.
+  */
+  application_id uuid references public.applications (id) on delete cascade,
+  candidate_id uuid references public.candidates (id) on delete cascade,
+  constraint message_log_has_a_subject check (
+    application_id is not null or candidate_id is not null
+  ),
+
+  channel public.message_delivery_channel not null,
+
+  /*
+    The template used, if any.
+
+    ON DELETE SET NULL, not CASCADE. Deleting a template must not erase the
+    record of messages already sent through it — that history is the evidence
+    that a candidate was told something, and it outlives the wording.
+  */
+  template_id uuid references public.message_templates (id) on delete set null,
+  event_key public.communication_event,
+
+  -- What was actually sent, AFTER placeholder substitution. Stored rather than
+  -- re-rendered on read: the template may have changed since, and the log has to
+  -- say what this person received, not what they would receive today.
+  subject text,
+  body_sent text not null,
+
+  status public.message_status not null default 'queued',
+  error_message text,
+
+  /*
+    A masked recipient — "r••••@example.com", "+91 •••• ••43 10".
+
+    The full address is on the candidate record; repeating it on every log row
+    would spread personal data across a table that exists to be read by anyone
+    who can see the application. The hint is enough to confirm which address was
+    used.
+  */
+  recipient_hint text,
+
+  provider_message_id text,
+
+  -- NULL for an automatic send: an automation is not a person, and naming the
+  -- recruiter who happened to trigger the stage change would be a false record.
+  sent_by uuid references public.users (id) on delete set null,
+
+  sent_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_message_log_application
+  on public.message_log (application_id, created_at desc);
+
+create index if not exists idx_message_log_candidate
+  on public.message_log (candidate_id, created_at desc);
+
+create index if not exists idx_message_log_organization
+  on public.message_log (organization_id, created_at desc);
+
+-- =============================================================================
+-- candidate_communication_preferences
+--
+-- Opt-out state, per candidate per channel.
+--
+-- Keyed by (organization_id, candidate_id) with no surrogate id: there can only
+-- ever be one row per candidate, and a surrogate key invites two — at which point
+-- "has this person opted out?" depends on which row you read.
+-- =============================================================================
+create table if not exists public.candidate_communication_preferences (
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+  candidate_id uuid not null references public.candidates (id) on delete cascade,
+
+  email_opted_out boolean not null default false,
+  whatsapp_opted_out boolean not null default false,
+
+  opted_out_at timestamptz,
+  -- Free text: "replied STOP", "asked on a call". Recorded because an opt-out a
+  -- recruiter entered by hand and one the candidate made through the unsubscribe
+  -- link are different facts if anyone ever disputes it.
+  opted_out_reason text,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  primary key (organization_id, candidate_id)
+);
+
+drop trigger if exists trg_candidate_comm_prefs_touch
+  on public.candidate_communication_preferences;
+create trigger trg_candidate_comm_prefs_touch
+  before update on public.candidate_communication_preferences
+  for each row execute function public.touch_updated_at();
+
+-- =============================================================================
+-- organization_settings.communication_settings
+--
+-- The other half of the same omission. lib/settings/queries.ts reads and writes
+-- this column and app/settings/recruitment/RecruitmentForm.tsx sends it in the
+-- SAME payload as currency, default recruiter, default stage and interview
+-- duration — so with the column absent, /settings/recruitment cannot save
+-- anything at all, not merely the reminder fields.
+--
+-- Shape: { interviewReminderHours: number, interviewReminderChannels: string[] }.
+-- Read through normalizeCommunicationSettings(), which clamps it.
+-- =============================================================================
+alter table public.organization_settings
+  add column if not exists communication_settings jsonb not null default '{}';
+
+-- =============================================================================
+-- Row-Level Security
+-- =============================================================================
+alter table public.message_templates enable row level security;
+alter table public.message_log enable row level security;
+alter table public.candidate_communication_preferences enable row level security;
+
+/**
+ * Templates: every member reads, Owner/Admin writes.
+ *
+ * The read is deliberately open to Recruiter and Viewer. A recruiter about to
+ * move somebody to Rejected should be able to see exactly what that candidate is
+ * about to receive, without being able to reword it for the whole organization.
+ * That is the permission split the module's spec asks for, and it only means
+ * anything if it is here as well as in the route.
+ */
+drop policy if exists message_templates_select_member on public.message_templates;
+create policy message_templates_select_member on public.message_templates
+  for select using (public.is_org_member(organization_id));
+
+drop policy if exists message_templates_insert_owner_admin on public.message_templates;
+create policy message_templates_insert_owner_admin on public.message_templates
+  for insert with check (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+/*
+  USING *and* WITH CHECK on update.
+
+  Without organization_id in WITH CHECK, an Admin could take their own template
+  and move it into another tenant — the rule constrains what the row may BECOME,
+  not just who may touch it. Same shape the rest of this schema uses.
+
+  It also matters for `active`: activating a template is what makes it send to
+  real people, and that transition must not be reachable by a Recruiter through
+  the browser's PostgREST client just because a route handler said no.
+*/
+drop policy if exists message_templates_update_owner_admin on public.message_templates;
+create policy message_templates_update_owner_admin on public.message_templates
+  for update using (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  ) with check (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+drop policy if exists message_templates_delete_owner_admin on public.message_templates;
+create policy message_templates_delete_owner_admin on public.message_templates
+  for delete using (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+/**
+ * message_log: every member reads. NOBODY writes through a session.
+ *
+ * There is no INSERT, UPDATE or DELETE policy, on purpose. Log rows are written
+ * by the send pipeline through lib/supabase/admin.ts, which bypasses RLS — and a
+ * message history that a user's browser could edit is not a history. An Owner
+ * must not be able to delete the record of what a candidate was told, and the
+ * append-only guarantee the audit log makes would be worthless here without the
+ * same treatment.
+ */
+drop policy if exists message_log_select_member on public.message_log;
+create policy message_log_select_member on public.message_log
+  for select using (public.is_org_member(organization_id));
+
+/**
+ * Opt-out state: every member reads; Owner/Admin/Recruiter write.
+ *
+ * Recruiters included because recording "she asked me on the call not to text
+ * again" is a thing that happens to a recruiter, and making them file a request
+ * to honour it is how an opt-out gets ignored. The unsubscribe route writes
+ * through the service role, since the candidate has no session.
+ */
+drop policy if exists candidate_comm_prefs_select_member
+  on public.candidate_communication_preferences;
+create policy candidate_comm_prefs_select_member
+  on public.candidate_communication_preferences
+  for select using (public.is_org_member(organization_id));
+
+drop policy if exists candidate_comm_prefs_write_staff
+  on public.candidate_communication_preferences;
+create policy candidate_comm_prefs_write_staff
+  on public.candidate_communication_preferences
+  for all using (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  ) with check (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+-- =============================================================================
+-- Cross-tenant integrity.
+--
+-- Every row here carries organization_id AND a foreign key to a parent. A foreign
+-- key proves the parent exists, not that it is OURS — without these triggers, a
+-- log row could point at another tenant's application and expose it through a
+-- join, which is precisely the class of bug organization_id-on-every-table is
+-- meant to prevent.
+-- =============================================================================
+create or replace function public.enforce_message_log_tenant_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.application_id is not null then
+    if not exists (
+      select 1 from public.applications a
+      where a.id = new.application_id and a.organization_id = new.organization_id
+    ) then
+      raise exception 'Application does not belong to this organization';
+    end if;
+  end if;
+
+  if new.candidate_id is not null then
+    if not exists (
+      select 1 from public.candidates c
+      where c.id = new.candidate_id and c.organization_id = new.organization_id
+    ) then
+      raise exception 'Candidate does not belong to this organization';
+    end if;
+  end if;
+
+  if new.template_id is not null then
+    if not exists (
+      select 1 from public.message_templates t
+      where t.id = new.template_id and t.organization_id = new.organization_id
+    ) then
+      raise exception 'Template does not belong to this organization';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_message_log_tenant_integrity() from public, anon;
+
+drop trigger if exists trg_message_log_tenant_integrity on public.message_log;
+create trigger trg_message_log_tenant_integrity
+  before insert or update of application_id, candidate_id, template_id, organization_id
+  on public.message_log
+  for each row execute function public.enforce_message_log_tenant_integrity();
+
+create or replace function public.enforce_comm_prefs_tenant_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.candidates c
+    where c.id = new.candidate_id and c.organization_id = new.organization_id
+  ) then
+    raise exception 'Candidate does not belong to this organization';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_comm_prefs_tenant_integrity() from public, anon;
+
+drop trigger if exists trg_comm_prefs_tenant_integrity
+  on public.candidate_communication_preferences;
+create trigger trg_comm_prefs_tenant_integrity
+  before insert or update of candidate_id, organization_id
+  on public.candidate_communication_preferences
+  for each row execute function public.enforce_comm_prefs_tenant_integrity();
+
+-- =============================================================================
+-- Documentation the next reader sees first.
+-- =============================================================================
+comment on table public.message_templates is
+  'What a candidate is told, and when. Owner/Admin write; every member reads, so a recruiter can see what a candidate will receive without being able to reword it org-wide.';
+
+comment on table public.message_log is
+  'Every message sent to a candidate, or deliberately skipped. APPEND-ONLY from a session''s point of view: there is no insert/update/delete policy, so only the send pipeline (service role) writes. Read by components/CommunicationLog.tsx on BOTH the application and candidate pages — there is no second history view.';
+
+comment on column public.message_log.status is
+  '''skipped'' is not a failure — it records the product declining to send, e.g. an opt-out or a disconnected channel. Logging that as ''failed'' would make an honoured opt-out look like a bug.';
+
+comment on column public.message_log.body_sent is
+  'The rendered message AS SENT, after placeholder substitution. Stored rather than re-rendered, because the template may have changed since and the log must say what this person actually received.';
+
+comment on table public.candidate_communication_preferences is
+  'Per-candidate opt-out, one row per (organization, candidate). Recruiters may write it: honouring "don''t text me again" should not need an Admin.';
+
+-- ############################################################################
+-- ## 0036_prevent_self_role_change.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Module 1 hardening: nobody changes their own role.
+--
+-- Before this, app/api/members/[id]/route.ts guarded escalation (only an Owner
+-- may grant or revoke Owner) and enforce_owner_remains() guarded the last
+-- Owner — but neither compared the actor to the target. An Admin could demote
+-- themselves to Viewer in one click and then lacked the very permission needed
+-- to undo it. app/team/invite/TeamManager.tsx hid the "Remove" button on your
+-- own row but left the role dropdown live next to it, which is what made the
+-- omission visible.
+--
+-- Role changes now always require a second person, Owner included. Stepping
+-- down as Owner is a two-sided flow: promote someone else to Owner, then they
+-- demote you. enforce_owner_remains() still guarantees the workspace is never
+-- left with zero Owners.
+--
+-- Why a trigger and not the RLS policy: the rule compares the row's OLD role
+-- to its NEW role, which a policy cannot express — USING sees only the old row
+-- and WITH CHECK only the new one. A policy predicate on user_id would block
+-- every self-update, including the soft-remove that writes status.
+-- =============================================================================
+
+create or replace function public.prevent_self_role_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- current_app_user_id() is null when there is no end-user session — the
+  -- service-role client (lib/supabase/admin.ts), the SQL Editor, migrations.
+  -- The comparison then yields null rather than true, so those contexts can
+  -- still repair a workspace that has locked itself out. That is deliberate:
+  -- an operator with the secret key is already past every other check here.
+  if new.role is distinct from old.role
+     and old.user_id = public.current_app_user_id()
+  then
+    raise exception
+      'You cannot change your own role. Ask another Owner or Admin to do it.'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists prevent_self_role_change on public.organization_members;
+
+-- `of role` narrows the trigger to statements that actually name the column,
+-- so the soft-remove path (status -> 'removed') and any future column write
+-- are untouched. `is distinct from` above then filters out a no-op rewrite.
+create trigger prevent_self_role_change
+  before update of role on public.organization_members
+  for each row
+  execute function public.prevent_self_role_change();
+
+-- ############################################################################
+-- ## 0037_stage_workflow_builder.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Module 25 — Stage Workflow Builder
+--
+-- This migration adds NO new engine, NO new pipeline, and NO new stage.
+--
+-- It does three things:
+--
+--   1. Gives `automations` enough provenance to say "this rule belongs to
+--      job X, stage Y, branch Z". A stage workflow IS an automations row. The
+--      Automations settings page keeps listing it, the run history keeps
+--      recording it, and the engine keeps executing it — the builder is a
+--      second, stage-centric editor for rows that already had a home.
+--
+--   2. Adds the Not Shortlisted flag to `applications`. NOT a stage, NOT a
+--      status enum value: three nullable columns. The 8-stage structure
+--      (lib/applications/stages.ts) is untouched, so Analytics funnels, SLA
+--      config and job_hiring_stages toggles all keep working unchanged.
+--
+--   3. Records which branch a run took, so "why did this email go out?" has an
+--      answer in the run history rather than only in the rule.
+--
+-- WHY PROVENANCE COLUMNS RATHER THAN A SEPARATE TABLE.
+--
+-- A `stage_workflows` table would have needed its own actions column, its own
+-- validation, its own executor and its own run log — four copies of Module 13
+-- that would drift from the original within one release. The brief is explicit
+-- that this "connects [the modules], it does not replace any of them", so the
+-- rows stay where the engine already looks for them and the new columns only
+-- answer "who is editing this, and from where".
+-- =============================================================================
+
+-- =============================================================================
+-- automations — provenance
+-- =============================================================================
+
+alter table public.automations
+  -- NULL means org-wide, which is what every rule written before this migration
+  -- is. A stage workflow always names its job: the same stage on two jobs is two
+  -- independent workflows, because the whole point is that a Senior Engineer
+  -- pipeline can email different words than a Support pipeline.
+  add column if not exists job_id uuid references public.jobs (id) on delete cascade,
+
+  -- Which pipeline stage this fires on. Deliberately plain text validated
+  -- against lib/applications/stages.ts, matching how `trigger` is stored: a new
+  -- stage would then be a catalogue change, not a migration. NULL for org-wide
+  -- rules that are not attached to a stage at all.
+  add column if not exists stage_key text,
+
+  -- 'always' for a stage with no pass/fail concept, 'pass'/'fail' for the two
+  -- branches of a scored stage. An 'always' rule fires on every entry into the
+  -- stage; a branch rule fires only when the engine dispatched that outcome.
+  add column if not exists branch text not null default 'always'
+    check (branch in ('always', 'pass', 'fail')),
+
+  -- How this rule is edited. 'stage_workflow' rows are owned by the builder and
+  -- round-tripped by it; 'manual' rows are the Module 13 builder's. Kept so the
+  -- Automations page can label where a rule came from instead of showing a list
+  -- where half the rows cannot be edited where they appear.
+  add column if not exists source text not null default 'manual'
+    check (source in ('manual', 'stage_workflow'));
+
+comment on column public.automations.job_id is
+  'Job this rule is scoped to. NULL = organization-wide (every rule before Module 25).';
+comment on column public.automations.stage_key is
+  'Pipeline stage this rule is attached to. Validated in lib/applications/stages.ts.';
+comment on column public.automations.branch is
+  'always | pass | fail. Branch rules fire only when the engine dispatched that outcome.';
+comment on column public.automations.source is
+  'manual = Module 13 builder. stage_workflow = the per-stage builder on the job page.';
+
+-- One workflow row per job + stage + branch. A second row for the same slot
+-- would make "the actions on this stage" depend on row order, which is the
+-- ambiguity the builder's ordered action list exists to remove.
+--
+-- Partial, so it constrains ONLY builder-owned rows: an admin may still write as
+-- many org-wide Module 13 rules against the same stage as they like.
+create unique index if not exists uq_automations_stage_workflow_slot
+  on public.automations (job_id, stage_key, branch)
+  where source = 'stage_workflow';
+
+-- The dispatch query gains a job filter: "active rules for this trigger, that
+-- are either org-wide or scoped to this application's job".
+create index if not exists idx_automations_job_stage
+  on public.automations (organization_id, job_id, stage_key)
+  where status = 'active';
+
+/**
+ * THE UNIQUE (organization_id, name) CONSTRAINT IS THE REASON FOR THIS BLOCK.
+ *
+ * Module 13 named rules uniquely per organization, which is right for
+ * hand-written rules a person has to find in a list. A stage workflow's name is
+ * generated ("Shortlisted — On Pass"), and the same stage on two different jobs
+ * would generate the same name and collide on save — the builder would refuse to
+ * create a workflow on the second job for a reason that has nothing to do with
+ * anything the user did.
+ *
+ * The constraint is replaced with one that treats a builder-owned row's name as
+ * unique within its JOB. Hand-written rules keep exactly the old guarantee,
+ * because their job_id is NULL and the two partial indexes below are disjoint.
+ */
+alter table public.automations
+  drop constraint if exists automations_organization_id_name_key;
+
+create unique index if not exists uq_automations_org_name_global
+  on public.automations (organization_id, name)
+  where job_id is null;
+
+create unique index if not exists uq_automations_org_job_name
+  on public.automations (organization_id, job_id, name)
+  where job_id is not null;
+
+/**
+ * A stage workflow must name its stage; an org-wide rule must not name a job it
+ * is not scoped to. Enforced in the database rather than only in the API for the
+ * standing reason in AGENTS.md: the browser holds an authenticated PostgREST
+ * client, so a rule inserted directly would otherwise skip every check the route
+ * makes.
+ */
+alter table public.automations
+  drop constraint if exists automations_stage_workflow_shape;
+
+alter table public.automations
+  add constraint automations_stage_workflow_shape check (
+    source <> 'stage_workflow'
+    or (job_id is not null and stage_key is not null)
+  );
+
+-- =============================================================================
+-- automation_runs — which branch ran
+-- =============================================================================
+
+alter table public.automation_runs
+  add column if not exists branch text not null default 'always'
+    check (branch in ('always', 'pass', 'fail'));
+
+comment on column public.automation_runs.branch is
+  'The outcome branch this run was dispatched for. Answers "why did this fire?".';
+
+-- =============================================================================
+-- message_log — who a message actually went to
+--
+-- Module 25 lets a stage workflow send a templated message to a COLLEAGUE about
+-- a candidate ("Rahul just passed the assessment with 82%"). The row keeps its
+-- candidate_id, because the message is part of that application's story and the
+-- communication history is where somebody goes to find out what happened.
+--
+-- Without this column that row would be indistinguishable from a message the
+-- CANDIDATE received. "We told them on the 4th" would then be a false statement
+-- generated from a true row — the worst kind, because nothing looks wrong.
+-- =============================================================================
+
+alter table public.message_log
+  add column if not exists internal_recipient_user_id uuid
+    references public.users (id) on delete set null;
+
+comment on column public.message_log.internal_recipient_user_id is
+  'Set when this message went to a colleague ABOUT the candidate, not to the '
+  'candidate. NULL = a candidate-facing message, which is every row before '
+  'Module 25.';
+
+create index if not exists idx_message_log_internal_recipient
+  on public.message_log (organization_id, internal_recipient_user_id)
+  where internal_recipient_user_id is not null;
+
+-- =============================================================================
+-- applications — the Not Shortlisted flag
+--
+-- THIS IS NOT A STAGE AND NOT A REJECTION.
+--
+-- The brief is explicit: an automatic screen-out is "distinct from Rejected,
+-- since this was an automatic screen-out rather than a human decision after
+-- review", and it "must remain visible and reversible by a human, never a hard
+-- rejection with no way back".
+--
+-- So the application STAYS in whatever stage it was in (Applied), keeps its row
+-- on the pipeline board, and carries a flag. Three consequences fall out of that
+-- choice, all of them wanted:
+--
+--   - public.application_stage is untouched, so the funnel in Module 16, the SLA
+--     config in Module 10 and the stage toggles in job_hiring_stages all keep
+--     working with no retrofit at all.
+--   - Clearing the flag is a single UPDATE to NULL. There is no stage to move
+--     back to and no history entry to unpick, which is what makes "reversible"
+--     true rather than aspirational.
+--   - The board can show the card with a marker instead of hiding it, so an
+--     over-aggressive threshold is visible as a column full of flags rather than
+--     as candidates who quietly stopped appearing.
+-- =============================================================================
+
+alter table public.applications
+  add column if not exists not_shortlisted_at timestamptz,
+
+  -- The score that failed, frozen at the moment of the decision. Read from
+  -- match_score at flag time rather than joined at read time, because match_score
+  -- is recalculated and a later recalculation would rewrite the history of a
+  -- decision that was made on the old number.
+  add column if not exists not_shortlisted_score numeric(5, 2)
+    check (not_shortlisted_score is null
+           or (not_shortlisted_score >= 0 and not_shortlisted_score <= 100)),
+
+  -- The threshold it was measured against, for the same reason. "62% did not
+  -- reach 70%" is a complete explanation; "62%" on its own is not.
+  add column if not exists not_shortlisted_threshold numeric(5, 2)
+    check (not_shortlisted_threshold is null
+           or (not_shortlisted_threshold >= 0 and not_shortlisted_threshold <= 100)),
+
+  add column if not exists not_shortlisted_reason text
+    check (not_shortlisted_reason is null or length(not_shortlisted_reason) <= 500);
+
+comment on column public.applications.not_shortlisted_at is
+  'Set by the AI Resume Shortlisting action on a fail. NOT a rejection: the '
+  'application keeps its stage and stays on the board. NULL = not flagged, and '
+  'setting it back to NULL is how a human reverses the automatic screen-out.';
+
+-- The board and the "show me what the screen rejected" filter both ask for
+-- flagged rows within an organization.
+create index if not exists idx_applications_not_shortlisted
+  on public.applications (organization_id, not_shortlisted_at)
+  where not_shortlisted_at is not null;
+
+/**
+ * The flag may never coexist with a terminal stage.
+ *
+ * "Not Shortlisted" means "the automatic screen said no, and a human has not
+ * looked yet". Once somebody rejects the application, the human decision is the
+ * one that stands and the flag becomes a second, contradictory answer to the
+ * same question. Clearing it on the way into a terminal stage is done by the
+ * trigger below rather than refused, because refusing would block a legitimate
+ * rejection behind an unrelated tidy-up.
+ */
+create or replace function public.clear_not_shortlisted_on_terminal()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.stage in ('rejected', 'withdrawn', 'hired')
+     and new.not_shortlisted_at is not null then
+    new.not_shortlisted_at := null;
+    new.not_shortlisted_score := null;
+    new.not_shortlisted_threshold := null;
+    new.not_shortlisted_reason := null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_applications_clear_not_shortlisted on public.applications;
+create trigger trg_applications_clear_not_shortlisted
+  before insert or update of stage, not_shortlisted_at on public.applications
+  for each row execute function public.clear_not_shortlisted_on_terminal();
+
+-- ############################################################################
+-- ## 0038_default_recruitment_flow.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Module 26 — Default Recruitment Flow, and the two primitives it needs.
+--
+-- Three things:
+--
+--   1. automation_delayed_actions — the "Wait, then…" queue. NOT a second
+--      scheduler: the existing hourly cron at /api/automations/sweep drains it,
+--      in the same pass, under the same service-role client, recording runs in
+--      the same automation_runs table. See the block comment on the table.
+--
+--   2. organization_settings.office_address — the one new organisation-level
+--      placeholder the Director Round invitation needs.
+--
+--   3. Nothing at all for the form-answer-to-field primitive, deliberately.
+--      Surfacing an answer reads form_responses.raw_answers BY REFERENCE. A
+--      column, a table or a copied value would be a second home for an answer
+--      the candidate already gave once, and the day somebody edited a response
+--      the two would disagree about what was submitted.
+-- =============================================================================
+
+-- =============================================================================
+-- automation_delayed_actions
+--
+-- WHY A QUEUE AND NOT A WINDOW QUERY.
+--
+-- Interview reminders — the existing scheduled feature — ask a WINDOW question:
+-- "which interviews start in the next N hours?" That works because an interview
+-- has a row with a time on it, so the question can be asked fresh every sweep
+-- and nothing needs remembering.
+--
+-- A delayed action has no such row. "Wait 30 minutes, then email" is a promise
+-- made at a moment that has otherwise left no trace: by the time the sweep runs,
+-- the screening call it followed looks exactly like one that finished 30 minutes
+-- earlier and was never followed by a wait. So the promise itself is stored.
+--
+-- This is still the SAME scheduling mechanism, not a second one. The cron
+-- endpoint is unchanged, the sweep function is unchanged in shape, and this adds
+-- one more pass to it — the way the sweep already has a pass for stale-stage
+-- rules and a pass for expiring approvals.
+--
+-- WHY IT CANCELS ON A STAGE CHANGE.
+--
+-- The brief is explicit: "If the application moves to a different stage before
+-- the delay elapses, the pending delayed action is automatically cancelled —
+-- never fire a stale action against an application that's moved on."
+--
+-- `stage_at_schedule` is the mechanism. The trigger below cancels on the stage
+-- change itself rather than leaving it to the sweep to notice, so the pending row
+-- is already cancelled the instant the recruiter clicks — not up to an hour
+-- later, and not in a race with a sweep that started before the click.
+-- =============================================================================
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'delayed_action_status') then
+    create type public.delayed_action_status as enum (
+      'pending',
+      'fired',
+      -- The application moved on. Not a failure — the correct outcome.
+      'cancelled',
+      'failed'
+    );
+  end if;
+end $$;
+
+create table if not exists public.automation_delayed_actions (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+
+  /**
+   * The rule that scheduled this. Cascade-deleted with it: a pending action
+   * belonging to a rule somebody deleted has nothing left to explain it, and
+   * firing it would send a message no rule accounts for.
+   */
+  automation_id uuid not null references public.automations (id) on delete cascade,
+  application_id uuid not null references public.applications (id) on delete cascade,
+
+  /** For the run record and for the cancellation comparison. */
+  stage_key text not null,
+  branch text not null default 'always' check (branch in ('always', 'pass', 'fail')),
+
+  /**
+   * THE STAGE THE APPLICATION WAS IN WHEN THE WAIT STARTED.
+   *
+   * Compared against the live stage by the trigger below. Stored rather than
+   * re-derived because `stage_key` is the stage the RULE is attached to, and for
+   * a fail branch those differ — a failed resume screen schedules a Shortlisted
+   * rule while the application sits in Applied.
+   */
+  stage_at_schedule text not null,
+
+  /** When this becomes due. The sweep drains everything at or before now(). */
+  run_at timestamptz not null,
+
+  /**
+   * The nested actions, frozen at schedule time.
+   *
+   * COPIED, not read from the rule when it fires. A wait is a promise about what
+   * was configured when it started; if an admin edits the rule during the wait,
+   * the candidate should get what the rule said when their application reached
+   * that point, not a message from a rule they never went through. It also means
+   * a rule edited mid-wait cannot turn a queued email into a phone call.
+   */
+  actions jsonb not null default '[]'::jsonb,
+
+  status public.delayed_action_status not null default 'pending',
+
+  /** Set when cancelled or failed. Always shown, never inferred. */
+  detail text check (detail is null or length(detail) <= 500),
+
+  scheduled_at timestamptz not null default now(),
+  resolved_at timestamptz,
+
+  /**
+   * IDEMPOTENCY. One pending wait per (rule, application, occasion).
+   *
+   * Without it a re-delivered webhook or two overlapping sweeps would queue the
+   * same wait twice, and the candidate would get the follow-up twice. Partial,
+   * so a completed wait does not block a legitimate second one later — a
+   * candidate who re-enters a stage genuinely earns a fresh wait.
+   */
+  dedupe_key text not null
+);
+
+create unique index if not exists uq_delayed_actions_pending
+  on public.automation_delayed_actions (automation_id, application_id, dedupe_key)
+  where status = 'pending';
+
+-- The sweep's only query: everything due, oldest first.
+create index if not exists idx_delayed_actions_due
+  on public.automation_delayed_actions (run_at)
+  where status = 'pending';
+
+create index if not exists idx_delayed_actions_application
+  on public.automation_delayed_actions (organization_id, application_id);
+
+comment on table public.automation_delayed_actions is
+  'The "Wait, then…" queue. Drained by the existing sweep at '
+  '/api/automations/sweep — this is not a second scheduler.';
+
+-- =============================================================================
+-- RLS
+--
+-- READ for any member, WRITE for nobody through the browser.
+--
+-- Rows here are created by the engine and resolved by the sweep, both of which
+-- hold either the acting user's session or the service-role client. A browser
+-- that could insert one could schedule an arbitrary action list against any
+-- application in its organization, which is a strictly larger power than the
+-- automations table's own insert policy grants — so there is no insert policy at
+-- all, matching how application_stage_history is handled.
+--
+-- Cancelling is the one thing a person legitimately does, and it happens through
+-- the trigger below rather than through a direct write.
+-- =============================================================================
+alter table public.automation_delayed_actions enable row level security;
+
+drop policy if exists delayed_actions_select_member on public.automation_delayed_actions;
+create policy delayed_actions_select_member on public.automation_delayed_actions
+  for select using (public.is_org_member(organization_id));
+
+-- =============================================================================
+-- Cancellation on a stage change
+-- =============================================================================
+create or replace function public.cancel_delayed_actions_on_stage_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.stage is distinct from old.stage then
+    update public.automation_delayed_actions
+       set status = 'cancelled',
+           resolved_at = now(),
+           detail = 'Cancelled — the application moved to ' || new.stage::text
+                    || ' before the wait finished.'
+     where application_id = new.id
+       and organization_id = new.organization_id
+       and status = 'pending'
+       /**
+        * Only waits that started in the stage being LEFT.
+        *
+        * A wait scheduled by a rule on the stage being ENTERED — the same
+        * dispatch that produced this stage change — must survive. Without this
+        * clause a pass branch that both moves the application and starts a wait
+        * would cancel its own wait microseconds after creating it, and the
+        * failure would look like "delays just don't work".
+        */
+       and stage_at_schedule = old.stage::text;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_applications_cancel_delayed on public.applications;
+create trigger trg_applications_cancel_delayed
+  after update of stage on public.applications
+  for each row execute function public.cancel_delayed_actions_on_stage_change();
+
+-- =============================================================================
+-- organization_settings.office_address
+--
+-- The Director Round invitation says "please visit our office at
+-- {{organization.office_address}}". Nothing in this product held an address
+-- before: organizations has a name, a timezone and a country, and a job has a
+-- location, which is where the ROLE is, not where the office is.
+--
+-- A column rather than a key inside an existing jsonb blob, because it is a
+-- single scalar an admin types into a settings field — the same shape as
+-- logo_url and brand_color, which sit beside it.
+-- =============================================================================
+alter table public.organization_settings
+  add column if not exists office_address text
+    check (office_address is null or length(office_address) <= 500);
+
+comment on column public.organization_settings.office_address is
+  'Where candidates are asked to attend in person. Renders as '
+  '{{organization.office_address}}. NULL renders as an em dash, never as a '
+  'blank in the middle of a sentence.';
+
+-- ############################################################################
+-- ## 0039_module27_custom_fields.sql
+-- ############################################################################
+
+-- =============================================================================
+-- Module 27 — Custom Fields for Jobs, Candidates and Applications.
+--
+-- NUMBERED 27, NOT 19. The brief calls this "Module 19", but Module 19 is
+-- Onboarding & Document Management — docs/modules/19-onboarding-documents.md,
+-- shipped in migration 0026_module19_onboarding_documents. Two modules with one
+-- number would make every later "see Module 19" ambiguous, so this takes the
+-- next free number. Nothing about the feature changed; only the label.
+--
+-- -----------------------------------------------------------------------------
+-- STRICTLY ADDITIVE. NOT ONE EXISTING COLUMN IS TOUCHED.
+--
+-- This migration creates two tables and nothing else. It does not alter, rename,
+-- drop or re-type any column on jobs, candidates or applications. The fixed
+-- fields stay fixed and keep their existing editability rules — in particular
+-- migration 0023's rule that a candidate's name, email and phone are editable
+-- only from the Candidate page. Custom fields sit BESIDE that rule; they are
+-- not a second door into it. See the reserved-key constraint below, which is
+-- what stops somebody re-creating "email" as a custom field and editing it
+-- somewhere the rule does not reach.
+--
+-- -----------------------------------------------------------------------------
+-- ONE FIELD-TYPE TAXONOMY, ENFORCED BY THE TYPE SYSTEM.
+--
+-- field_type is public.form_field_type — the ENUM migration 0033 created for
+-- Module 23's form_fields. Not a new enum, not a text column with its own CHECK
+-- list. Postgres itself now refuses a value the forms engine does not know,
+-- which is a stronger guarantee than two lists that agree today.
+--
+-- Three of that enum's twelve values are excluded here, and the exclusions are
+-- the interesting part:
+--
+--   email, phone  — identity. A custom "email" field on a candidate would be a
+--                   second place an email address lives, disagreeing with
+--                   candidates.email the first time somebody edited one. The
+--                   reserved-key constraint blocks the KEY; excluding the TYPE
+--                   blocks the same idea wearing a different label.
+--   file_upload   — there is no bucket for it. lib/forms/fields.ts already
+--                   excludes it from custom questions for exactly this reason:
+--                   offering the type would accept a file and silently drop it.
+--                   Adding it needs its own bucket, storage policies and a
+--                   Module 22 retention answer.
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Which entity a definition belongs to.
+--
+-- An enum rather than text: these three are the whole scope of this module, and
+-- a typo'd 'candidates' would otherwise create a definition that renders on
+-- nothing and is invisible to debug.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'custom_field_entity') then
+    create type public.custom_field_entity as enum ('job', 'candidate', 'application');
+  end if;
+end $$;
+
+-- =============================================================================
+-- custom_field_definitions — the org's field vocabulary
+-- =============================================================================
+create table if not exists public.custom_field_definitions (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+
+  entity_type public.custom_field_entity not null,
+
+  -- Stable, generated from the label once and NEVER regenerated on rename.
+  -- The key is what {{custom.*}} tokens and stored values point at; rewriting it
+  -- when somebody fixes a typo in the label would orphan every value and break
+  -- every message template that referenced it.
+  field_key text not null
+    check (field_key ~ '^[a-z][a-z0-9_]*$' and length(field_key) between 2 and 60),
+
+  label text not null check (btrim(label) <> '' and length(label) <= 120),
+
+  field_type public.form_field_type not null,
+
+  -- Choice options. Same shape as form_fields.options, so the renderer that
+  -- draws a dropdown on a public form draws this one too.
+  options jsonb not null default '[]'::jsonb,
+
+  required boolean not null default false,
+
+  -- Only meaningful for entity_type = 'job' — see the CHECK below.
+  show_on_public_form boolean not null default false,
+
+  -- `order` is a reserved word in SQL, and the repo already settled on
+  -- display_order (organization_document_templates). Same name, same meaning.
+  display_order integer not null default 0,
+
+  active boolean not null default true,
+
+  created_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  -- One key per entity per org. Scoped to entity_type on purpose: a job's
+  -- "region" and a candidate's "region" are different questions and must not
+  -- collide with each other.
+  constraint custom_field_definitions_unique_key
+    unique (organization_id, entity_type, field_key),
+
+  -- The excluded types, explained in the header.
+  constraint custom_field_definitions_type_allowed
+    check (field_type not in ('email', 'phone', 'file_upload')),
+
+  -- Choice types need options; everything else must not carry them. Without the
+  -- second half, changing a dropdown to a number leaves stale options behind
+  -- that reappear if it is ever changed back.
+  constraint custom_field_definitions_options_match_type check (
+    case
+      when field_type in ('dropdown', 'radio', 'checkbox')
+        then jsonb_typeof(options) = 'array' and jsonb_array_length(options) > 0
+      else options = '[]'::jsonb
+    end
+  ),
+
+  -- A candidate-level field cannot appear on a job's public form: the form
+  -- belongs to a job, and the value it collects lands on an application. Left
+  -- unconstrained, the settings UI would offer a toggle that silently does
+  -- nothing, which is how people learn a checkbox is broken.
+  constraint custom_field_definitions_public_form_is_job_only
+    check (show_on_public_form = false or entity_type = 'job'),
+
+  -- ---------------------------------------------------------------------------
+  -- THE COLLISION RULE, IN THE DATABASE.
+  --
+  -- AGENTS.md rule 6: a rule about the data belongs in a CHECK, not only in a
+  -- route handler. The browser holds an authenticated PostgREST client, so a
+  -- rule enforced only in the API is a rule any signed-in user can skip — and
+  -- skipping THIS one is how "email" becomes an editable custom field on the
+  -- Application page, in defiance of migration 0023.
+  --
+  -- The lists are every real column on each table as of migration 0038, plus
+  -- the UI-facing aliases somebody would naturally type (experience, salary,
+  -- skills, first_name, recruiter, status). Over-inclusive on purpose: refusing
+  -- a key costs somebody one rename, while allowing a colliding one costs a
+  -- silent disagreement between two fields that look identical.
+  -- ---------------------------------------------------------------------------
+  constraint custom_field_definitions_key_not_reserved check (
+    case entity_type
+      when 'job' then field_key <> all (array[
+        'id', 'organization_id', 'client_id', 'owner_recruiter_id',
+        'title', 'description', 'location', 'work_mode',
+        'experience_min', 'experience_max', 'experience',
+        'salary_min', 'salary_max', 'salary',
+        'required_skills', 'preferred_skills', 'skills',
+        'status', 'archived_at', 'created_at', 'updated_at',
+        'resume_passing_score', 'automations_enabled', 'client_name'
+      ])
+      when 'candidate' then field_key <> all (array[
+        'id', 'organization_id',
+        'name', 'first_name', 'last_name',
+        'email', 'email_normalized', 'phone', 'phone_normalized',
+        'location', 'current_company', 'current_role',
+        'total_experience_years', 'experience',
+        'expected_salary', 'salary', 'current_ctc',
+        'notice_period_days', 'notice_period',
+        'skills', 'source', 'resume_url',
+        'education', 'employment_history',
+        'archived_at', 'created_at', 'updated_at'
+      ])
+      when 'application' then field_key <> all (array[
+        'id', 'organization_id', 'job_id', 'candidate_id',
+        'assigned_recruiter_id', 'recruiter',
+        'stage', 'status', 'source', 'priority', 'match_score',
+        'not_shortlisted_at', 'not_shortlisted_reason',
+        'not_shortlisted_score', 'not_shortlisted_threshold',
+        'rejected_at_stage', 'archived_at', 'created_at', 'updated_at'
+      ])
+    end
+  )
+);
+
+create index if not exists idx_custom_field_defs_org_entity
+  on public.custom_field_definitions (organization_id, entity_type, display_order, created_at);
+
+-- The render path: "active fields for this entity type", the query every form
+-- runs. Partial, because inactive definitions are never rendered.
+create index if not exists idx_custom_field_defs_active
+  on public.custom_field_definitions (organization_id, entity_type, display_order)
+  where active;
+
+-- The public-form path, narrower still.
+create index if not exists idx_custom_field_defs_public_form
+  on public.custom_field_definitions (organization_id, display_order)
+  where active and show_on_public_form;
+
+-- =============================================================================
+-- custom_field_values — one answer per field per record
+-- =============================================================================
+create table if not exists public.custom_field_values (
+  id uuid primary key default gen_random_uuid(),
+
+  -- ---------------------------------------------------------------------------
+  -- organization_id IS NOT IN THE BRIEF'S SCHEMA, AND IT IS NOT OPTIONAL.
+  --
+  -- The brief lists only (definition_id, entity_type, entity_id, value). Every
+  -- RLS policy on this table would then have to JOIN to the definition to learn
+  -- the tenant, and AGENTS.md rule 8 requires that every query made with the
+  -- admin client filter organization_id EXPLICITLY — which is impossible on a
+  -- table that does not carry it. Denormalised here, and kept honest by the
+  -- trigger below rather than by hoping callers pass the right one.
+  -- ---------------------------------------------------------------------------
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+
+  custom_field_definition_id uuid not null
+    references public.custom_field_definitions (id) on delete cascade,
+
+  -- ---------------------------------------------------------------------------
+  -- POLYMORPHIC, SO THERE IS NO FOREIGN KEY. This is the one real cost of the
+  -- design and it is worth naming: entity_id points at a job, a candidate or an
+  -- application depending on entity_type, and Postgres cannot express "references
+  -- whichever table this other column names". The cleanup triggers at the bottom
+  -- of this file are what stands in for ON DELETE CASCADE. Without them, deleting
+  -- a job leaves its custom values behind for ever.
+  -- ---------------------------------------------------------------------------
+  entity_type public.custom_field_entity not null,
+  entity_id uuid not null,
+
+  -- jsonb because the shape genuinely varies: a string for text, a number for
+  -- number, a boolean for yes_no, an ARRAY for checkbox. A text column would
+  -- force every reader to re-parse, and the checkbox case would become CSV.
+  value jsonb,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  -- One value per field per record. This is what makes saving an upsert rather
+  -- than a delete-then-insert, so a failed save cannot lose the old answer.
+  constraint custom_field_values_unique_per_record
+    unique (custom_field_definition_id, entity_id)
+);
+
+create index if not exists idx_custom_field_values_entity
+  on public.custom_field_values (organization_id, entity_type, entity_id);
+create index if not exists idx_custom_field_values_definition
+  on public.custom_field_values (custom_field_definition_id);
+
+-- -----------------------------------------------------------------------------
+-- The value's tenant and entity_type must match its definition's.
+--
+-- A cross-row invariant, so a CHECK cannot express it. Without this, a caller
+-- could store a value under another org's definition id, or file a candidate
+-- answer against a job definition — and both would read back as legitimate
+-- data. SECURITY DEFINER so it can see the definition row regardless of the
+-- caller's own visibility.
+-- -----------------------------------------------------------------------------
+create or replace function public.enforce_custom_field_value_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_def record;
+begin
+  select organization_id, entity_type, active, show_on_public_form
+    into v_def
+    from public.custom_field_definitions
+   where id = new.custom_field_definition_id;
+
+  if not found then
+    raise exception 'custom field definition % does not exist',
+      new.custom_field_definition_id;
+  end if;
+
+  if v_def.organization_id <> new.organization_id then
+    raise exception 'custom field value organization does not match its definition';
+  end if;
+
+  -- ---------------------------------------------------------------------------
+  -- THE ONE PLACE A VALUE'S entity_type MAY DIFFER FROM ITS DEFINITION'S.
+  --
+  -- A job field marked show_on_public_form is asked of every APPLICANT, so the
+  -- DEFINITION belongs to the job while each VALUE it collects belongs to the
+  -- application that came through that job's form. The brief is explicit about
+  -- this ("saved ... against the resulting application (not the job)"), and it
+  -- is the right shape: one question, one definition, and an answer per
+  -- applicant rather than one answer overwritten by every candidate in turn.
+  --
+  -- Everything else must still match. Without the second half of this check a
+  -- candidate answer could be filed against a job definition by mistake and
+  -- would read back as legitimate data.
+  --
+  -- Note the unique constraint still holds: (definition_id, entity_id) differs
+  -- per application, so a job may ALSO carry its own value for the same
+  -- definition — what the job requires, beside what each applicant answered.
+  -- ---------------------------------------------------------------------------
+  if v_def.entity_type <> new.entity_type
+     and not (v_def.entity_type = 'job'
+              and new.entity_type = 'application'
+              and v_def.show_on_public_form)
+  then
+    raise exception 'custom field value entity_type (%) does not match its definition (%)',
+      new.entity_type, v_def.entity_type;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_custom_field_values_integrity on public.custom_field_values;
+create trigger trg_custom_field_values_integrity
+  before insert or update on public.custom_field_values
+  for each row execute function public.enforce_custom_field_value_integrity();
+
+-- -----------------------------------------------------------------------------
+-- updated_at (touch_updated_at() was created by Module 3).
+-- -----------------------------------------------------------------------------
+drop trigger if exists trg_custom_field_defs_touch_updated_at on public.custom_field_definitions;
+create trigger trg_custom_field_defs_touch_updated_at
+  before update on public.custom_field_definitions
+  for each row execute function public.touch_updated_at();
+
+drop trigger if exists trg_custom_field_values_touch_updated_at on public.custom_field_values;
+create trigger trg_custom_field_values_touch_updated_at
+  before update on public.custom_field_values
+  for each row execute function public.touch_updated_at();
+
+-- =============================================================================
+-- RLS
+--
+-- DEFINITIONS: every member reads (the render path needs them); Owner/Admin
+-- writes. Matches the brief's §6 exactly, and mirrors
+-- organization_document_templates, the closest existing analogue.
+--
+-- VALUES: every member reads; Owner/Admin/Recruiter writes. A value is ordinary
+-- record data — the same people who may edit a job's fixed fields may fill in
+-- its custom ones. Viewer is read-only on both, which falls out of not being in
+-- either write array.
+-- =============================================================================
+alter table public.custom_field_definitions enable row level security;
+alter table public.custom_field_values enable row level security;
+
+drop policy if exists custom_field_defs_select_member on public.custom_field_definitions;
+create policy custom_field_defs_select_member on public.custom_field_definitions
+  for select using (public.is_org_member(organization_id));
+
+drop policy if exists custom_field_defs_insert_admin on public.custom_field_definitions;
+create policy custom_field_defs_insert_admin on public.custom_field_definitions
+  for insert with check (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+drop policy if exists custom_field_defs_update_admin on public.custom_field_definitions;
+create policy custom_field_defs_update_admin on public.custom_field_definitions
+  for update
+  using (public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[]))
+  with check (public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[]));
+
+drop policy if exists custom_field_defs_delete_admin on public.custom_field_definitions;
+create policy custom_field_defs_delete_admin on public.custom_field_definitions
+  for delete using (
+    public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[])
+  );
+
+drop policy if exists custom_field_values_select_member on public.custom_field_values;
+create policy custom_field_values_select_member on public.custom_field_values
+  for select using (public.is_org_member(organization_id));
+
+drop policy if exists custom_field_values_insert_editor on public.custom_field_values;
+create policy custom_field_values_insert_editor on public.custom_field_values
+  for insert with check (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+drop policy if exists custom_field_values_update_editor on public.custom_field_values;
+create policy custom_field_values_update_editor on public.custom_field_values
+  for update
+  using (public.has_org_role(organization_id,
+         array['owner', 'admin', 'recruiter']::public.org_role[]))
+  with check (public.has_org_role(organization_id,
+         array['owner', 'admin', 'recruiter']::public.org_role[]));
+
+drop policy if exists custom_field_values_delete_editor on public.custom_field_values;
+create policy custom_field_values_delete_editor on public.custom_field_values
+  for delete using (
+    public.has_org_role(organization_id, array['owner', 'admin', 'recruiter']::public.org_role[])
+  );
+
+-- =============================================================================
+-- Orphan cleanup — the stand-in for the foreign key this table cannot have.
+--
+-- One trigger per entity table, all calling the same function. AFTER DELETE, so
+-- the row is already gone and nothing can re-reference it. Note these fire on
+-- HARD delete only: archiving a job sets archived_at and keeps its values,
+-- which is correct — an archived job that is restored still has its data.
+-- =============================================================================
+create or replace function public.delete_custom_field_values_for_entity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.custom_field_values
+   where entity_type = tg_argv[0]::public.custom_field_entity
+     and entity_id = old.id;
+  return old;
+end;
+$$;
+
+drop trigger if exists trg_jobs_delete_custom_values on public.jobs;
+create trigger trg_jobs_delete_custom_values
+  after delete on public.jobs
+  for each row execute function public.delete_custom_field_values_for_entity('job');
+
+drop trigger if exists trg_candidates_delete_custom_values on public.candidates;
+create trigger trg_candidates_delete_custom_values
+  after delete on public.candidates
+  for each row execute function public.delete_custom_field_values_for_entity('candidate');
+
+drop trigger if exists trg_applications_delete_custom_values on public.applications;
+create trigger trg_applications_delete_custom_values
+  after delete on public.applications
+  for each row execute function public.delete_custom_field_values_for_entity('application');
+
+comment on table public.custom_field_definitions is
+  'Module 27. Per-organization extra fields on jobs/candidates/applications. '
+  'Additive only — never replaces or renames a fixed column.';
+comment on table public.custom_field_values is
+  'Module 27. One answer per definition per record. entity_id is polymorphic; '
+  'see the cleanup triggers, which replace the foreign key it cannot have.';
+
+-- ############################################################################
+-- ## 0040_bind_invite_to_identity.sql
+-- ############################################################################
+
+-- =============================================================================
+-- S-01 (P0) — invite tokens were bearer credentials, not identity-bound.
+--
+-- docs/SECURITY.md §S-01. The original accept_invite() checked that the invite
+-- was pending and unexpired and then trusted whoever presented the token:
+--
+--   * Anyone who obtained a token — a forwarded email, a screenshot in a group
+--     chat, a proxy log, a synced browser history — could join that workspace
+--     WITH THE INVITED ROLE, including admin or owner.
+--   * It ended with `on conflict … do update set role = excluded.role`, so an
+--     EXISTING member who got hold of an admin invite meant for someone else
+--     escalated their own role by accepting it.
+--
+-- The invite page said "Use the email address the invite was sent to". That is
+-- advice printed next to the door, not a lock.
+--
+-- Two fixes, below: bind the invite to the identity it was issued to, and stop
+-- an invite from ever re-writing an existing member's role.
+--
+-- -----------------------------------------------------------------------------
+-- THE NEAR MISS THAT DECIDES WHERE THE EMAIL IS READ FROM
+-- -----------------------------------------------------------------------------
+--
+-- The obvious implementation compares the invite to `public.users.email`. IT IS
+-- WORTHLESS, and worse than no check because it looks like one.
+--
+-- `users_update_self` (migration 0001) is `for update using (auth_id =
+-- auth.uid())` with no column restriction, and the browser holds an
+-- authenticated PostgREST client. So any signed-in user can run
+--
+--     update public.users set email = 'victim@example.com' where auth_id = …
+--
+-- against their own profile row and walk straight through a check written that
+-- way. The comparison below therefore reads `auth.users.email`, which is
+-- Supabase Auth's own record and can only be changed through a verified email
+-- change flow.
+--
+-- If a future migration tightens `users_update_self` to a column allowlist, this
+-- function should STILL read auth.users. The authority for "who is this person"
+-- belongs with the identity provider, not with a profile table any feature may
+-- write to.
+-- =============================================================================
+
+create or replace function public.accept_invite(p_token uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+  v_auth_email text;
+  v_invite public.invites;
+  v_existing public.organization_members;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- The identity, from the identity provider. See the header above.
+  select lower(btrim(email)) into v_auth_email
+  from auth.users
+  where id = auth.uid();
+
+  select * into v_invite
+  from public.invites
+  where token = p_token
+    and status = 'pending'
+    and expires_at > now()
+  for update;
+
+  if v_invite.id is null then
+    raise exception 'Invalid or expired invite';
+  end if;
+
+  -- ---------------------------------------------------------------------------
+  -- S-01, part 1: the invite is for one address, and only that address.
+  --
+  -- Checked BEFORE anything is written, so a mismatch leaves the invite pending
+  -- and the real recipient can still use it. Accepting on the wrong account
+  -- must not burn the invite — otherwise a forwarded link becomes a denial of
+  -- service against the person it was meant for.
+  --
+  -- A null email is a phone-only auth identity. It cannot prove it is the
+  -- invited recipient, so it is refused rather than allowed through a null
+  -- comparison.
+  -- ---------------------------------------------------------------------------
+  if v_auth_email is null
+     or v_auth_email is distinct from lower(btrim(v_invite.email))
+  then
+    -- A custom SQLSTATE, so the API layer can tell this apart from "expired"
+    -- without matching on message text — the same reason isSchemaOutOfDate()
+    -- matches on codes. The message deliberately does NOT name the invited
+    -- address: whoever is holding a forwarded token should not learn a
+    -- colleague's email from the error.
+    raise exception 'This invite was issued to a different email address'
+      using errcode = 'INV01';
+  end if;
+
+  -- Defensive upsert, in case the auth.users trigger has not fired yet
+  -- (sign-up with email confirmation disabled). Unchanged, only moved below the
+  -- checks so a refused attempt writes nothing at all.
+  insert into public.users (auth_id, name, email)
+  select auth.uid(), split_part(au.email, '@', 1), au.email
+  from auth.users au
+  where au.id = auth.uid()
+  on conflict (auth_id) do nothing;
+
+  select id into v_user_id from public.users where auth_id = auth.uid();
+
+  select * into v_existing
+  from public.organization_members
+  where organization_id = v_invite.organization_id
+    and user_id = v_user_id
+  for update;
+
+  -- ---------------------------------------------------------------------------
+  -- S-01, part 2: an invite grants membership. It never re-grades a member.
+  --
+  -- The old `do update set role = excluded.role` was the escalation half of the
+  -- finding. Role changes belong to the Team page, which has its own guards
+  -- (only an Owner may grant Owner; migration 0036 stops anyone changing their
+  -- own role). Two mechanisms for one decision is how they drift apart.
+  --
+  -- Three cases, stated rather than folded into an upsert:
+  -- ---------------------------------------------------------------------------
+  if v_existing.id is null then
+    -- New member. The ordinary path.
+    insert into public.organization_members
+      (organization_id, user_id, role, status, invited_by, joined_at)
+    values
+      (v_invite.organization_id, v_user_id, v_invite.role, 'active', v_invite.invited_by, now());
+
+  elsif v_existing.status <> 'active' then
+    -- A removed member rejoining. The role on the invite IS what the inviter
+    -- chose for this address, and the address has now been proven, so it is
+    -- applied — someone removed as a Viewer and re-invited as an Admin comes
+    -- back as an Admin. See the trigger change below for why this is allowed
+    -- to change a role when nothing else may.
+    update public.organization_members
+       set role = v_invite.role,
+           status = 'active',
+           invited_by = coalesce(v_invite.invited_by, invited_by),
+           joined_at = now()
+     where id = v_existing.id;
+
+  end if;
+  -- An ALREADY-ACTIVE member keeps the role they have. Accepting is a silent
+  -- success so they still land in the workspace rather than meeting an error on
+  -- a link that is, from their point of view, working correctly.
+
+  update public.invites set status = 'accepted' where id = v_invite.id;
+
+  return v_invite.organization_id;
+end;
+$$;
+
+-- =============================================================================
+-- Let a rejoin carry a new role, and nothing else.
+--
+-- Migration 0036 blocks changing your OWN role, which is exactly right for the
+-- Team page and would otherwise break the rejoin branch above: the accepting
+-- user is the target of that update, so a Viewer re-invited as an Admin would
+-- be refused with "You cannot change your own role" on a link that is
+-- legitimate.
+--
+-- WHY THIS EXEMPTION CANNOT BE TURNED INTO AN ESCALATION. It applies only to a
+-- row moving from 'removed' to 'active', and that transition is unreachable
+-- outside accept_invite():
+--
+--   * organization_members has NO client-facing INSERT policy.
+--   * org_members_update_owner_admin requires has_org_role(...), which requires
+--     an ACTIVE membership row for the caller in that organization. There is at
+--     most one row per (organization, user), so a member whose own row is
+--     'removed' has no active membership and cannot update that row at all.
+--   * An active Owner/Admin reactivating SOMEBODY ELSE is a different user_id,
+--     so this trigger never applied to them in the first place.
+--
+-- So the only way to present old.status='removed' → new.status='active' on your
+-- own row is through the SECURITY DEFINER function above, which now proves the
+-- email first.
+-- =============================================================================
+
+create or replace function public.prevent_self_role_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- A rejoin: accept_invite() reactivating a removed member at the role their
+  -- invite names. See the block comment above for why this is not a hole.
+  if old.status = 'removed' and new.status = 'active' then
+    return new;
+  end if;
+
+  -- current_app_user_id() is null when there is no end-user session — the
+  -- service-role client (lib/supabase/admin.ts), the SQL Editor, migrations.
+  -- The comparison then yields null rather than true, so those contexts can
+  -- still repair a workspace that has locked itself out. That is deliberate:
+  -- an operator with the secret key is already past every other check here.
+  if new.role is distinct from old.role
+     and old.user_id = public.current_app_user_id()
+  then
+    raise exception
+      'You cannot change your own role. Ask another Owner or Admin to do it.'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+-- The trigger definition itself is unchanged from 0036 and is re-stated only so
+-- this file replays cleanly against a database that has never seen it.
+drop trigger if exists prevent_self_role_change on public.organization_members;
+create trigger prevent_self_role_change
+  before update of role on public.organization_members
+  for each row
+  execute function public.prevent_self_role_change();
+
+-- Unchanged from 0001, re-stated so a replay of this file leaves the grants in
+-- the state the function expects.
+revoke all on function public.accept_invite(uuid) from public, anon;
+grant execute on function public.accept_invite(uuid) to authenticated;

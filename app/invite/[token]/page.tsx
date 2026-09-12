@@ -21,10 +21,22 @@ export default async function AcceptInvitePage({
           {user ? (
             <>
               <p className="subtitle is-6 has-text-secondary">
-                Accept as {user.email} to join the workspace.
+                Accept as <strong>{user.email}</strong> to join the workspace. An invite only
+                works for the address it was sent to — if that isn&apos;t this one, sign out and
+                sign in with the right account first.
               </p>
-              {/* The token itself is the credential — validity is checked
-                  server-side by the accept_invite RPC, never here. */}
+              {/*
+                THE PAGE CANNOT PRE-CHECK THE ADDRESS, and that is deliberate
+                rather than a gap. It would have to read the invite to know who
+                it names, and showing that would hand a colleague's email to
+                whoever is holding a forwarded link. The invites table is
+                Owner/Admin-only for exactly that reason.
+
+                So the match is proved server-side by accept_invite() (migration
+                0040, reading auth.users), and the sentence above is what the
+                reader gets in advance. Before 0040 that sentence was the ONLY
+                thing standing between a forwarded token and an admin seat.
+              */}
               <AcceptInvite token={token} />
             </>
           ) : (

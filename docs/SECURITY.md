@@ -29,7 +29,7 @@ This closes an `ERR_TOO_MANY_REDIRECTS` loop that pointed nowhere near its cause
 own (Supabase Auth applies its own rate limits, which we neither configure nor
 verify).
 
-### S-01 · `RISK` (P0) — invite tokens are bearer credentials, not identity-bound
+### S-01 · `FIXED` 2026-09-12 — invite tokens are now identity-bound
 
 `supabase/migrations/0001_module1_authentication_organization.sql`,
 `public.accept_invite(p_token uuid)`.
@@ -42,23 +42,62 @@ on conflict (organization_id, user_id)
   do update set role = excluded.role, status = 'active';
 ```
 
-Consequences:
+Consequences, **as measured on a real database** rather than read off the code
+(`supabase/VERIFY_0040.sql` and the probes beside it, run against Postgres 16
+with the full migration set applied):
 
-- Anyone who obtains an invite token — a forwarded email, a shared screenshot, a
-  proxy log, a browser-history sync — can join that organization **with the
-  invited role**, including `admin` or `owner`.
-- An **existing lower-privileged member** who obtains an admin invite intended
-  for someone else **escalates their own role** through the `do update` branch.
+- **EXPLOITABLE.** Anyone who obtained an invite token — a forwarded email, a
+  shared screenshot, a proxy log, a browser-history sync — could join that
+  organization **with the invited role**, including `admin` or `owner`. Confirmed
+  by restoring the original function and watching a stranger join as admin with
+  somebody else's token. This is a fresh INSERT, so no trigger stood in the way.
+
+- **ALREADY MITIGATED, by accident, since migration 0036.** The second half — an
+  existing lower-privileged member re-grading themselves through the `do update`
+  branch — was blocked from the moment `prevent_self_role_change` shipped, and
+  that migration was written for an unrelated reason (an Admin demoting
+  themselves in the Team page). The audit above predates it.
+
+  Verified both ways: with `0001`'s function and `0036`'s trigger in place, the
+  attempt dies on *"You cannot change your own role"* — a misleading message on a
+  path where nobody was trying to, but a refusal nonetheless. **The escalation
+  was therefore never live after 0036; the identity hole was.**
+
+  It is still worth removing from `accept_invite` rather than leaning on a
+  trigger that exists for another purpose: the block was incidental, the error
+  was wrong, and anyone relaxing 0036 later would have silently re-opened this.
 
 The invite page tells the user *"Use the email address the invite was sent to"* —
 but that is advice, not a control. Mitigating factors: the token is a
 UUIDv4 (unguessable) and expires in 7 days. Neither changes the class of the
 issue.
 
-**Fix:** compare `lower(v_invite.email)` to the authenticated user's email inside
-the RPC and raise on mismatch; make the `on conflict` branch reactivate a removed
-member without changing `role` unless the invite's role is what the inviter
-intended for *that* person.
+**Fixed by `supabase/migrations/0040_bind_invite_to_identity.sql`**, in two parts:
+
+1. `accept_invite()` compares `lower(btrim(v_invite.email))` to the caller's
+   email **read from `auth.users`** and raises `INV01` on mismatch, before
+   writing anything — so a refusal leaves the invite pending and the real
+   recipient can still use it.
+2. The `on conflict … do update set role` branch is gone. An invite now grants
+   membership and never re-grades a member: an already-active member keeps the
+   role they have, and only a **removed** member rejoining takes the role their
+   invite names.
+
+**The near miss, recorded because it is the whole reason this works.** Comparing
+against `public.users.email` would have been worthless. `users_update_self` has
+no column restriction and the browser holds an authenticated PostgREST client,
+so any user can `update public.users set email = …` on their own row and walk
+through a check written that way. The authority for "who is this person" has to
+be the identity provider's own record.
+
+Migration 0040 also narrows `prevent_self_role_change()` (from 0036) to exempt a
+`removed → active` transition, which is unreachable outside `accept_invite()`:
+`has_org_role()` requires an *active* membership, so a member whose own row is
+removed cannot update it through PostgREST at all.
+
+**Verify it rather than believe it:** `supabase/VERIFY_0040.sql` creates its own
+fixtures, runs the attack four ways — including rewriting the profile email —
+and rolls back. Six PASS notices or a raised exception.
 
 ---
 
@@ -437,18 +476,18 @@ outlives a day) and is called out here only so it is a decision on the record.
 
 | ID | Severity | Finding | Status |
 | --- | --- | --- | --- |
-| **S-01** | **P0** | `accept_invite` does not bind the invite to its email; `on conflict do update set role` allows self-escalation | `RISK` |
+| **S-01** | ~~P0~~ | `accept_invite` did not bind the invite to its email; `on conflict do update set role` allowed self-escalation | `FIXED` (0040) |
 | **S-07** | **P1** | No rate limiting outside the public form — public coding routes and ~30 AI endpoints are uncapped | `MISSING` |
 | **S-04** | **P1** | No prompt-injection boundary; AI shortlisting acts automatically on attacker-controlled resume text | `RISK` |
 | — | **P1** | No AI cost metering, attribution, or budget | `MISSING` |
-| — | **P1** | No security headers (`next.config.ts` empty) | `MISSING` |
+| — | **P2** | No CSP. Frame/sniff/referrer/HSTS/permissions headers added 2026-09-12 | `PARTIAL` |
 | — | **P1** | No error tracking or structured logging | `MISSING` |
 | **S-02** | **P1** | Service-role client used in 16 modules with no test asserting the `organization_id` filter | `RISK` |
 | **S-05** | **P2** | Bolna webhook has no replay protection | `RISK` |
 | **S-06** | **P2** | `INTEGRATION_ENCRYPTION_KEY` serves five purposes; rotation is effectively impossible | `RISK` |
 | **S-08** | **P2** | Provider error bodies logged verbatim — PII in logs | `RISK` |
 | **S-03** | **P2** | Per-route hand-written validation with no aggregate assertion | `PARTIAL` |
-| — | **P2** | `CRON_SECRET` and 5 other env vars undocumented | `MISSING` |
+| — | ~~P2~~ | `CRON_SECRET` and 5 other env vars undocumented | `FIXED` |
 | — | **P2** | No file content sniffing or malware scanning | `RISK` |
 | — | **P3** | No CSRF token (mitigated by SameSite + JSON-only) | `PARTIAL` |
 | — | **P3** | No MFA, no session revocation UI | `MISSING` |

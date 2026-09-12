@@ -1,1 +1,24 @@
-writ
+-- =============================================================================
+-- INTENTIONALLY EMPTY. Module 15's schema is 0035, not this file.
+--
+-- This file was a 4-byte truncated write containing the fragment `writ` and
+-- nothing else. It is not valid SQL, so ANY attempt to replay the migration set
+-- from empty died right here — `ERROR: syntax error at or near "writ"` — and
+-- took every migration after it with it. That is 0031 through 0040: live coding,
+-- privacy, forms, voice agents, workflows, custom fields and the S-01 invite fix.
+--
+-- The number is kept and the file left in place rather than deleted, because
+-- filename order IS the apply order and a gap invites the question of whether
+-- something was lost. Nothing was: the schema this file was meant to contain was
+-- written later, in full, as
+--
+--     0035_module15_candidate_messaging.sql
+--
+-- which carries its own explanation of how the application layer came to be
+-- built against tables no migration had created.
+--
+-- Do not put anything here. A later module needing Module 15's tables should
+-- depend on 0035.
+-- =============================================================================
+
+-- No statements. Deliberately.
