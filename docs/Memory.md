@@ -386,9 +386,9 @@ Runs every migration one file at a time (a failure names the file) then every
 **Vercel deploy was failing on the cron schedule.** Hobby plan permits one cron
 invocation per day; `*/5 * * * *` is rejected at deploy time, so nothing shipped.
 
-- `vercel.json` schedule `*/5 * * * *` → `0 0 * * *`, as instructed. Still one
-  cron, still `/api/automations/sweep`. No code change — the endpoint is
-  schedule-agnostic.
+- First pass: `vercel.json` schedule `*/5 * * * *` → `0 0 * * *`. **Superseded
+  the same day** — see below. Kept in the log because the reasoning for why
+  daily is unacceptable is the reason the second pass exists.
 - **This makes time-based automation non-functional, not merely slower.** The
   sweep is the only clock, so `wait_then` delays, stale-stage rules and approval
   expiry are all up to 24h late. The 15-minute pre-call reminder and 30-minute
@@ -404,3 +404,41 @@ invocation per day; `*/5 * * * *` is rejected at deploy time, so nothing shipped
   removing it turns "late" into "never" and orphans the delay queue rows.
 - Rejected: a second cron / a worker / an in-process timer. Same rule as before,
   and the plan limit is per-account anyway.
+
+**Second pass — the cron left Vercel entirely.** Daily was accepted as a deploy
+unblocker, not as a design. Replaced with:
+
+- **`vercel.json` is now `{}`** — the `crons` entry removed outright, not
+  detuned. Hobby deploys fine with no cron at all. Chose an empty object over
+  deleting the file: Vercel rejects unknown top-level keys, so the "why" could
+  not live in a `//` comment there, and a deleted file leaves no anchor for the
+  doc cross-references.
+- **`.github/workflows/automation-sweep.yml`** is the clock: `*/5 * * * *` →
+  `GET $SWEEP_URL` with `Authorization: Bearer $CRON_SECRET`. No checkout,
+  `permissions: {}`, `concurrency` group so a late run cannot overlap the next.
+- **No application code changed.** The route already authenticated by shared
+  secret and never cared who called it. Only the header comment naming "Vercel
+  Cron" was corrected.
+- **The workflow prints the status code and never the body.** `runCronSweep()`
+  returns `organizationName` for every tenant swept, and this repo is public —
+  Actions logs are world-readable. Checked repo visibility before writing it;
+  that is the whole reason for `--output /dev/null`.
+- Distinct exit codes per status (401 = secret mismatch, 503 = endpoint
+  unconfigured) so a red run says which of the two systems is wrong.
+
+Requires manual setup before it does anything: repo **secret** `CRON_SECRET`
+(matching Vercel) and repo **variable** `SWEEP_URL`. Missing either fails the
+run loudly rather than passing vacuously.
+
+Caveats recorded in KNOWN_ISSUES B-05, not solved: GitHub's schedule is
+best-effort (5–15 min late under load, sometimes skipped); scheduled workflows
+auto-disable after 60 days of repo inactivity; `CRON_SECRET` now lives in two
+systems. Correct fix remains Vercel Pro → restore the `vercel.json` cron →
+delete the workflow, in that order.
+
+**Noticed, not changed:** `docs/API.md` claimed the `CRON_SECRET` check is a
+constant-time compare; `route.ts:47` uses `!==`. Corrected the doc rather than
+the code — the code change was outside what was asked, and a timing oracle on a
+bearer token over HTTP is not a practical attack. Worth doing anyway if anyone
+is in there: the file already imports nothing from `node:crypto`, and
+`lib/integrations/` has the constant-time helper pattern to copy.

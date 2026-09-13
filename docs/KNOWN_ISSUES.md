@@ -24,8 +24,11 @@ says which files to apply — but the features are simply absent until then.
 **Fix:** apply `0032`, `0037`, `0038` in order in the Supabase SQL Editor.
 
 ### B-02 · No CI, and 36 uncommitted files — `MISSING`
-No `.github/workflows`, no hooks. At audit time the tree carried 20 modified and
-16 untracked files (Modules 25 and 26). Nothing deployed corresponds to a commit.
+No hooks, and no CI: `.github/workflows/` now exists but holds only the
+scheduler (B-05), which builds nothing and tests nothing. `lint`, `typecheck`,
+`test` and `supabase/tests/replay.sh` still run only when a human remembers.
+At audit time the tree carried 20 modified and 16 untracked files (Modules 25
+and 26). Nothing deployed corresponds to a commit.
 
 ### B-03 · Backups and rollback are unverified — `UNKNOWN`
 No backup plan, retention period, PITR setting, storage-bucket backup, or tested
@@ -36,22 +39,32 @@ restore is recorded anywhere. No down-migrations exist. See
 348 `console.error` calls into ephemeral Vercel logs. No Sentry/Datadog/OTel, no
 alerting, no health check. A production failure is invisible.
 
-### B-05 · The sweep runs once a day, so time-based automations do not work — `RISK`
-`vercel.json`, 2026-09-13.
+### B-05 · The clock lives outside Vercel — `PARTIAL`
+`vercel.json`, `.github/workflows/automation-sweep.yml`, 2026-09-13.
 
 The Vercel **Hobby plan allows one cron invocation per day** and refuses to
-deploy a finer schedule, so the sweep was moved from `*/5 * * * *` to
-`0 0 * * *`. The sweep is the product's only clock: the `wait_then` delay queue,
-stale-stage rules and approval expiry all drain from it. On a daily schedule
-each of those is up to **24 hours** late — the default flow's 15-minute pre-call
-reminder and 30-minute post-call wait are useless, and nothing logs an error
-while that happens.
+deploy anything finer. The sweep is the product's only clock — the `wait_then`
+delay queue, stale-stage rules and approval expiry all drain from it — so a
+daily pass would put every time-based rule up to 24h late, silently. The `crons`
+entry was therefore removed from `vercel.json` (not detuned to daily) and a
+GitHub Actions workflow calls `GET /api/automations/sweep` every 5 minutes with
+the `CRON_SECRET` bearer token. No code changed; the endpoint never knew who was
+calling it.
 
-**Fix, best first:** upgrade to Vercel Pro and restore `*/5 * * * *`; or drive
-`GET /api/automations/sweep` from an external scheduler every 5 minutes with the
-`CRON_SECRET` bearer token (no code change, but the secret then lives in two
-places); or keep daily and state the limitation in the UI — pilot only. See
-`docs/DEPLOYMENT.md` §7.
+Residual risk, in order:
+
+1. **GitHub's scheduler is best-effort** — `*/5` is a ceiling. Runs are commonly
+   5–15 minutes late under load and are sometimes skipped outright. Acceptable
+   for a 30-minute wait; not equivalent to Vercel Cron.
+2. **Scheduled workflows are auto-disabled after 60 days of repository
+   inactivity.** Nothing announces this. A quiet repo stops the clock.
+3. **`CRON_SECRET` now exists in two systems**, so rotation is a two-place
+   operation and the GitHub copy inherits repo write-access as its blast radius.
+4. A failed run is an email to the repo owner and a red tick — still no paging.
+   Related: B-04.
+
+**Fix:** upgrade to Vercel Pro, restore the `vercel.json` cron, delete the
+workflow. See `docs/DEPLOYMENT.md` §7.
 
 ---
 

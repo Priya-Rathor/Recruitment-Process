@@ -1,0 +1,95 @@
+# THE PRODUCT'S ONLY CLOCK.
+#
+# Vercel Cron would be the natural home for this, but the Hobby plan caps crons
+# at one invocation per day and refuses to deploy anything finer — and the sweep
+# drains the `wait_then` delay queue, stale-stage rules and approval expiry, so
+# a daily pass means the default flow's 15-minute pre-call reminder and
+# 30-minute post-call wait are up to 24 hours late. `vercel.json` therefore
+# declares no cron at all and this workflow is the scheduler instead.
+#
+# Nothing about the endpoint changed: it is the same GET, the same
+# `Authorization: Bearer $CRON_SECRET`, the same 503-when-unconfigured. The only
+# difference is who dials the number.
+#
+# SETUP (both are required; without them every run fails loudly, by design):
+#   Settings → Secrets and variables → Actions
+#     Secret   CRON_SECRET  — must equal the CRON_SECRET set in Vercel
+#     Variable SWEEP_URL    — https://<your-domain>/api/automations/sweep
+#
+# THINGS THAT WILL BITE:
+#   • GitHub's scheduler is best-effort. `*/5` is an upper bound on frequency,
+#     not a guarantee; runs are routinely late by 5–15 minutes under load and
+#     are occasionally skipped. Good enough for a 30-minute wait, not a
+#     substitute for Vercel Pro if minute-accuracy ever matters.
+#   • GitHub disables scheduled workflows after 60 days with no repository
+#     activity, silently. If automations stop, check that first.
+#   • CRON_SECRET now lives in two places. Rotating it means rotating both, and
+#     the GitHub copy is only as safe as write access to this repository.
+#
+# The response body is deliberately never printed. It carries organizationName
+# for every tenant swept, and this repository is public — Actions logs are too.
+name: Automation sweep
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  # So a human can prove the wiring works without waiting for the schedule.
+  workflow_dispatch:
+
+# Nothing here reads or writes the repository; it makes one outbound request.
+permissions: {}
+
+# A late run must not overlap the next one. `runCronSweep()` dedupes, so an
+# overlap is survivable rather than corrupting — but two sweeps racing through
+# 50 organizations is wasted work either way.
+concurrency:
+  group: automation-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # No checkout: this job needs no source, and skipping it means no token.
+      - name: Run the sweep
+        env:
+          SWEEP_URL: ${{ vars.SWEEP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SWEEP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::SWEEP_URL variable or CRON_SECRET secret is missing. Time-based automations are NOT running." >&2
+            exit 1
+          fi
+
+          # --output /dev/null: the body names every organization swept.
+          # maxDuration on the route is 300s; allow the same before giving up.
+          # Retries cover connection failures only — a 4xx/5xx is a real answer.
+          status=$(curl \
+            --silent --show-error \
+            --output /dev/null \
+            --write-out '%{http_code}' \
+            --max-time 300 \
+            --retry 2 --retry-delay 5 --retry-connrefused \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            "${SWEEP_URL}")
+
+          case "${status}" in
+            200)
+              echo "Sweep completed (HTTP 200)."
+              ;;
+            401)
+              echo "::error::HTTP 401 — CRON_SECRET here does not match the one set in Vercel." >&2
+              exit 1
+              ;;
+            503)
+              echo "::error::HTTP 503 — the deployment has no CRON_SECRET or no Supabase service-role key, so it refused to sweep." >&2
+              exit 1
+              ;;
+            *)
+              echo "::error::Sweep failed with HTTP ${status}. Time-based automations did not run this pass." >&2
+              exit 1
+              ;;
+          esac

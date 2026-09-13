@@ -245,13 +245,16 @@ not, and that distinction is usually the whole bug.
 ORGANIZATION's configured timezone — never the server's or the browser's. Ranges
 are half-open `[start, end)`.
 
-**One clock.** `vercel.json` defines exactly one cron
-(`GET /api/automations/sweep`). Stale-stage rules, approval expiry and the
-`wait_then` delay queue all drain from that single sweep. Do not add a second
-cron, a worker, or a timer — add a pass to the existing sweep. The schedule is
-currently `0 0 * * *`, not the designed `*/5 * * * *`, because the Vercel Hobby
-plan caps crons at one run per day — so every time-based automation is up to 24h
-late. That is a billing constraint to undo, not the intended behaviour; see
+**One clock.** Exactly one scheduled caller hits `GET /api/automations/sweep`
+every 5 minutes. Stale-stage rules, approval expiry and the `wait_then` delay
+queue all drain from that single sweep. Do not add a second cron, a worker, or a
+timer — add a pass to the existing sweep.
+
+It is **not** a Vercel cron: the Hobby plan caps those at one run per day, which
+would put every time-based automation up to 24h late. `vercel.json` declares no
+cron and `.github/workflows/automation-sweep.yml` calls the endpoint instead —
+same GET, same `CRON_SECRET`, no code difference. On a Pro plan, restore the
+`vercel.json` cron and delete the workflow, in that order. See
 `docs/DEPLOYMENT.md` §7 and `docs/KNOWN_ISSUES.md` B-05.
 
 **Building against unbuilt modules.** Modules 2 and 16 read tables that later

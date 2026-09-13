@@ -36,7 +36,7 @@ generated client or schema.
 | Caller | Mechanism |
 | --- | --- |
 | Signed-in user | Supabase session cookie, refreshed at the edge by `proxy.ts`. |
-| Vercel Cron | `Authorization: Bearer $CRON_SECRET`, constant-time compare. |
+| Scheduler (GitHub Actions; Vercel Cron on a Pro plan) | `Authorization: Bearer $CRON_SECRET`. |
 | Bolna | HMAC-SHA256 over the **raw** request bytes, `x-bolna-signature` or `x-webhook-signature`, constant-time compare. |
 | Candidate (no login) | A purpose-scoped **signed token in the URL** — HMAC over the row id, nothing stored. |
 

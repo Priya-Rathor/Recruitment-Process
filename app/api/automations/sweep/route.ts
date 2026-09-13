@@ -16,7 +16,10 @@ export const maxDuration = 300;
  *   POST — an Owner or Admin pressing "Run the scheduler now". Their session,
  *          their organization only, RLS applied normally.
  *
- * WHY THE VERBS ARE SPLIT. Vercel Cron issues a GET. Accepting either verb on one
+ * WHY THE VERBS ARE SPLIT. The scheduler issues a GET — GitHub Actions here
+ * (.github/workflows/automation-sweep.yml), because the Vercel Hobby plan caps
+ * crons at one a day; Vercel Cron issues a GET too, so nothing here changes if
+ * the project moves to Pro. Accepting either verb on one
  * handler and guessing the caller from a header would mean an unauthenticated POST
  * could be mistaken for a cron, or a signed-in user's request treated as one —
  * and the difference between those two paths is "this organization" versus "every
