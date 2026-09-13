@@ -164,6 +164,43 @@ policy statements at the end of that file.
 
 ---
 
+## 6.1 Supabase Auth URLs — the `localhost` trap
+
+**Symptom:** a confirmation or password-reset email arrives from the deployed
+site, the link opens `http://localhost:3000/...`, and Chrome says
+`ERR_CONNECTION_REFUSED`.
+
+**It is not a code bug.** `SignupForm`, `LoginForm` and `ForgotPasswordForm` all
+pass `emailRedirectTo` / `redirectTo` built from `window.location.origin`, so a
+signup on the production domain asks for a production link. **Supabase discards
+that value when it is not on the allow-list** and silently substitutes the
+project's **Site URL**, which is `http://localhost:3000` on a new project. A
+fresh deployment therefore mails localhost links to real users, with no error
+anywhere.
+
+**Supabase Dashboard → Authentication → URL Configuration:**
+
+| Field | Value |
+| --- | --- |
+| Site URL | `https://<production-domain>` |
+| Redirect URLs | `https://<production-domain>/**` |
+| Redirect URLs | `http://localhost:3000/**` — keep, for local dev |
+| Redirect URLs | `https://*-<team>.vercel.app/**` — only if preview deploys must log in |
+
+Then **request a new email**. Links already sent are single-use and carry the
+old `redirect_to` baked in; fixing the setting does not repair one in an inbox.
+
+To salvage an email already opened: if the signup happened on the production
+domain, swap `localhost:3000` for the production host in the address bar — the
+PKCE verifier cookie is on that origin, so the exchange succeeds. If the signup
+happened on localhost, start `npm run dev` and reopen instead. One attempt
+either way; the code is consumed on first use.
+
+**Verify:** sign up with a throwaway address on the deployed site, confirm the
+emailed link's host is the production domain, and land on `/onboarding`.
+
+---
+
 ## 7. Scheduled work
 
 **`vercel.json` declares no cron.** The scheduler is

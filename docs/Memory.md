@@ -442,3 +442,23 @@ the code — the code change was outside what was asked, and a timing oracle on 
 bearer token over HTTP is not a practical attack. Worth doing anyway if anyone
 is in there: the file already imports nothing from `node:crypto`, and
 `lib/integrations/` has the constant-time helper pattern to copy.
+
+**Auth emails were linking to `localhost:3000` in production.** Not a code bug —
+the three auth forms all build `emailRedirectTo`/`redirectTo` from
+`window.location.origin`, which is correct. Supabase drops a `redirect_to` that
+is not on the **Redirect URLs** allow-list and silently falls back to the
+project's **Site URL**, still `http://localhost:3000` on a new project. No error
+is raised at any layer; the first sign it is wrong is a candidate staring at
+ERR_CONNECTION_REFUSED.
+
+Fix is dashboard-only (Authentication → URL Configuration): Site URL = the
+production domain, Redirect URLs = `https://<domain>/**` plus
+`http://localhost:3000/**`. Documented as DEPLOYMENT.md §6.1 — the repo had this
+nowhere; the only mention of redirect URLs was a local-dev aside in the QA guide
+(§Recommended setup, step 5), which is why it was missed at deploy time.
+
+Worth knowing for support: an email already sent cannot be repaired by fixing
+the setting, because `redirect_to` is baked into the link. If the signup
+happened on the production origin, editing the host in the address bar works
+(the PKCE verifier cookie lives on that origin); otherwise `npm run dev`. One
+attempt — the code is single-use.
