@@ -2,7 +2,7 @@
 -- ALL MIGRATIONS, concatenated in order.
 -- Generated from supabase/migrations/. Paste into the Supabase SQL Editor.
 --
--- REGENERATE THIS FILE WHENEVER YOU ADD A MIGRATION. It went stale once — it
+-- REGENERATE THIS FILE WHENEVER YOU ADD A MIGRATION. It went stale once —  it
 -- stopped at 0031 while nine more had landed, so a workspace built from it was
 -- missing privacy settings, forms, voice agents, stage workflows, custom fields
 -- and the S-01 invite fix, and every symptom looked like an application bug.
