@@ -246,9 +246,13 @@ ORGANIZATION's configured timezone — never the server's or the browser's. Rang
 are half-open `[start, end)`.
 
 **One clock.** `vercel.json` defines exactly one cron
-(`GET /api/automations/sweep`, every 5 minutes). Stale-stage rules, approval
-expiry and the `wait_then` delay queue all drain from that single sweep. Do not
-add a second cron, a worker, or a timer — add a pass to the existing sweep.
+(`GET /api/automations/sweep`). Stale-stage rules, approval expiry and the
+`wait_then` delay queue all drain from that single sweep. Do not add a second
+cron, a worker, or a timer — add a pass to the existing sweep. The schedule is
+currently `0 0 * * *`, not the designed `*/5 * * * *`, because the Vercel Hobby
+plan caps crons at one run per day — so every time-based automation is up to 24h
+late. That is a billing constraint to undo, not the intended behaviour; see
+`docs/DEPLOYMENT.md` §7 and `docs/KNOWN_ISSUES.md` B-05.
 
 **Building against unbuilt modules.** Modules 2 and 16 read tables that later
 modules own. Never let a missing table throw or report a fake `0` — a zero reads

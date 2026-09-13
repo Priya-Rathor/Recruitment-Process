@@ -2,8 +2,8 @@
   "crons": [
     {
       "path": "/api/automations/sweep",
-      "//": "Every five minutes, raised from hourly by Module 26. THE PRODUCT HAS EXACTLY ONE CLOCK and this is it: stale-stage rules, approval expiry and the 'Wait, then…' queue all drain from this single sweep. Hourly was fine while the only time-based rule was 'sat in a stage for three days'; the default recruitment flow added a 15-minute pre-call reminder and a 30-minute post-call wait, and on an hourly cron a 30-minute wait fires between 30 and 90 minutes late while a 15-minute reminder routinely arrives after the call it warns about. Five minutes bounds every delay's error at five minutes. Do not add a second cron entry for delays — the sweep already drains them.",
-      "schedule": "*/5 * * * *"
+      "//": "THE PRODUCT HAS EXACTLY ONE CLOCK and this is it: stale-stage rules, approval expiry and the 'Wait, then…' queue all drain from this single sweep. Do not add a second cron entry for delays — the sweep already drains them. SCHEDULE: dropped from '*/5 * * * *' to daily because the Vercel Hobby plan allows at most ONE cron invocation PER DAY and refuses to deploy anything finer. That is a billing constraint, not a design choice, and it points the wrong way: at daily, the default flow's 15-minute pre-call reminder and 30-minute post-call wait fire up to 24 hours late, so time-based automation is effectively off — silently, with nothing logged. Restore '*/5 * * * *' on a Pro plan, or drive GET /api/automations/sweep from an external scheduler every 5 minutes with the CRON_SECRET bearer token. See docs/DEPLOYMENT.md §7 and docs/KNOWN_ISSUES.md B-05.",
+      "schedule": "0 0 * * *"
     }
   ]
 }

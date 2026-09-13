@@ -169,14 +169,36 @@ policy statements at the end of that file.
 `vercel.json` defines **exactly one** cron:
 
 ```
-*/5 * * * *  →  GET /api/automations/sweep
+0 0 * * *  →  GET /api/automations/sweep      (Hobby plan — see below)
+*/5 * * * *                                    (the correct schedule; needs Pro)
 ```
 
 **This is the product's only clock.** Stale-stage rules, approval expiry and the
-`wait_then` delay queue all drain from this single sweep. The frequency is
-load-bearing: at hourly, a 30-minute wait fires 30–90 minutes late and a
-15-minute pre-call reminder arrives after the call it warns about.
+`wait_then` delay queue all drain from this single sweep.
 **Do not add a second cron entry for delays** — the sweep already drains them.
+
+**The frequency is load-bearing, and the current one is wrong.** The Vercel
+**Hobby plan permits at most one cron invocation per day** and rejects a finer
+schedule at deploy time, so the entry is pinned to `0 0 * * *`. At hourly a
+30-minute wait already fires 30–90 minutes late and a 15-minute pre-call
+reminder arrives after the call it warns about; **at daily, every time-based
+automation is up to 24 hours late — treat delayed actions, stale-stage rules and
+approval expiry as effectively off.** Nothing breaks or errors; it just silently
+never happens on time, which is the worst failure shape this system has.
+
+Three ways out, in order of preference:
+
+1. **Upgrade to Vercel Pro** and restore `*/5 * * * *` in `vercel.json`. This is
+   the only option that matches the product's design.
+2. **Drive the sweep externally** — any scheduler (GitHub Actions, cron-job.org,
+   an existing n8n instance) calling
+   `GET https://<domain>/api/automations/sweep` every 5 minutes with
+   `Authorization: Bearer $CRON_SECRET`. The endpoint is idempotent and
+   authenticates the same way regardless of caller, so this needs no code change
+   — but the secret now lives in a second place, which is a real exposure.
+3. **Stay on daily and say so in the UI.** Acceptable only for a demo/pilot
+   deployment with no live candidates. Do not ship a 15-minute pre-call reminder
+   to a real recruiter on this schedule.
 
 Authenticated by `Authorization: Bearer $CRON_SECRET`, compared in constant
 time. No secret ⇒ `503`, never open.
@@ -222,7 +244,9 @@ by a Postgres backup. CVs and identity documents have no stated backup at all.
    Never drop or rename a column in the same release that stops using it; split
    that across two releases.
 4. Note the current Vercel deployment id as the rollback target.
-5. Deploy; watch the first sweep cycle (5 minutes) before walking away.
+5. Deploy; watch the first sweep cycle before walking away — or trigger it
+   by hand with the `CRON_SECRET` bearer token, since on the Hobby schedule the
+   next natural one is at midnight UTC (§7).
 6. If rolling back: revert the Vercel deployment. Because migrations were
    additive, the old code still runs against the new schema. Remove the column
    in a later, separate release.

@@ -36,6 +36,23 @@ restore is recorded anywhere. No down-migrations exist. See
 348 `console.error` calls into ephemeral Vercel logs. No Sentry/Datadog/OTel, no
 alerting, no health check. A production failure is invisible.
 
+### B-05 · The sweep runs once a day, so time-based automations do not work — `RISK`
+`vercel.json`, 2026-09-13.
+
+The Vercel **Hobby plan allows one cron invocation per day** and refuses to
+deploy a finer schedule, so the sweep was moved from `*/5 * * * *` to
+`0 0 * * *`. The sweep is the product's only clock: the `wait_then` delay queue,
+stale-stage rules and approval expiry all drain from it. On a daily schedule
+each of those is up to **24 hours** late — the default flow's 15-minute pre-call
+reminder and 30-minute post-call wait are useless, and nothing logs an error
+while that happens.
+
+**Fix, best first:** upgrade to Vercel Pro and restore `*/5 * * * *`; or drive
+`GET /api/automations/sweep` from an external scheduler every 5 minutes with the
+`CRON_SECRET` bearer token (no code change, but the secret then lives in two
+places); or keep daily and state the limitation in the UI — pilot only. See
+`docs/DEPLOYMENT.md` §7.
+
 ---
 
 ## Security

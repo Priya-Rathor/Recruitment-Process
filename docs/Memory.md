@@ -378,3 +378,29 @@ Runs every migration one file at a time (a failure names the file) then every
 `supabase/VERIFY_*.sql`. ~1 minute, self-cleaning. Not wired to CI; there is no CI.
 
 `lint` clean · `typecheck` clean · 1789/1789 · containers removed.
+
+---
+
+## 2026-09-13
+
+**Vercel deploy was failing on the cron schedule.** Hobby plan permits one cron
+invocation per day; `*/5 * * * *` is rejected at deploy time, so nothing shipped.
+
+- `vercel.json` schedule `*/5 * * * *` → `0 0 * * *`, as instructed. Still one
+  cron, still `/api/automations/sweep`. No code change — the endpoint is
+  schedule-agnostic.
+- **This makes time-based automation non-functional, not merely slower.** The
+  sweep is the only clock, so `wait_then` delays, stale-stage rules and approval
+  expiry are all up to 24h late. The 15-minute pre-call reminder and 30-minute
+  post-call wait in the default flow are dead on this schedule. Nothing errors —
+  it just never happens on time, which is the failure shape DEPLOYMENT.md §10
+  already calls invisible by construction.
+- Recorded as `KNOWN_ISSUES.md` **B-05** (`RISK`); DEPLOYMENT.md §7 rewritten
+  with the three exits (Pro plan → restore `*/5`; external scheduler hitting the
+  endpoint with `CRON_SECRET`; or daily + say so in the UI, pilot only);
+  AGENTS.md "One clock" annotated so the next agent doesn't read `0 0 * * *` as
+  intended design and build on it.
+- Rejected: deleting the cron entry entirely. The sweep is load-bearing —
+  removing it turns "late" into "never" and orphans the delay queue rows.
+- Rejected: a second cron / a worker / an in-process timer. Same rule as before,
+  and the plan limit is per-account anyway.
