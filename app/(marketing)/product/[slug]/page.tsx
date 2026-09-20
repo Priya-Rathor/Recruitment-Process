@@ -34,12 +34,12 @@ export async function generateMetadata({
   if (!group) return {};
 
   return {
-    // The root layout's template appends "· MyRecruiter Partner".
+    // The root layout's template appends "· Scoreboad".
     title: group.tab,
     description: group.summary,
     alternates: { canonical: `/product/${group.slug}` },
     openGraph: {
-      title: `${group.tab} · MyRecruiter Partner`,
+      title: `${group.tab} · Scoreboad`,
       description: group.summary,
       type: "website",
     },

@@ -85,7 +85,7 @@ export function reportToCsv({
   const localDate = (date: Date) =>
     date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone });
 
-  rows.push(["Recruitment OS — analytics export"]);
+  rows.push(["Scoreboad — analytics export"]);
   rows.push(["Organization", organizationName]);
   rows.push([
     "Period",

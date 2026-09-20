@@ -284,27 +284,6 @@
     gap: 0.5rem;
   }
 
-  .mkt-wordmark__plate {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    /*
-      A DELIBERATE WHITE PLATE, and under FUTURE WORKFORCE it earns its place
-      more than it did before.
-
-      The monogram is a raster asset drawn for a light ground. The product is
-      now dark everywhere, so rather than the plate being a special case for one
-      marketing band, it is what gives a light-designed asset the ground it
-      needs. Re-drawing the PNGs for dark is a brand-asset job; until then this
-      is the honest fix and not a leftover.
-    */
-    background: #fff;
-    // Derived from the mark's own size so the badge stays proportional at any
-    // height the header or footer asks for.
-    border-radius: calc(var(--mkt-mark-size, 30px) * 0.28);
-    padding: calc(var(--mkt-mark-size, 30px) * 0.14);
-  }
-
   .mkt-wordmark__text {
     font-family: var(--font-heading);
     font-size: calc(var(--mkt-mark-size, 30px) * 0.58);
@@ -314,11 +293,16 @@
     white-space: nowrap;
   }
 
-  // The qualifier in the name. At full white it competes with the nav beside
-  // it; at this tone it is 9.1:1 on the navy — muted, not faint.
-  .mkt-wordmark__qualifier {
-    color: var(--mkt-on-dark-muted);
-    font-weight: var(--weight-medium);
+  /*
+    The second half of the name, in the periwinkle accent — matching the supplied
+    lockup, which sets "Score" in white and "boad" in the accent.
+    7.50:1 on the deep-space ground, so it is a colour change and not a
+    legibility one. It keeps the SAME weight as the first half: this is one word
+    in two colours, not a name plus a qualifier, so lightening it would break
+    the word in half.
+  */
+  .mkt-wordmark__accent {
+    color: var(--color-primary);
   }
 
   // Below 30rem the wordmark text, "Sign in" and "Get started" together are

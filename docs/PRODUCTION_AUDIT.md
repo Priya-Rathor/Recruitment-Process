@@ -1,6 +1,6 @@
 # Production Audit
 
-**Repository:** Recruitment OS · **Audited:** 2026-08-30 · **Branch:** `master`
+**Repository:** Scoreboad · **Audited:** 2026-08-30 · **Branch:** `master`
 **Scope:** full repository — 692 files, ~117,900 lines of TS/TSX, ~9,500 lines
 of SQL, 105 API routes, 51 tables, 38 migrations, 1,643 tests.
 

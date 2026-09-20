@@ -24,12 +24,12 @@ import { MarketingFooter } from "./_components/MarketingFooter";
  *      cache.
  *
  * The metadata title has no product suffix because the root layout already
- * defines the template "%s · MyRecruiter Partner".
+ * defines the template "%s · Scoreboad".
  */
 export const metadata: Metadata = {
   title: {
-    default: "Your AI hiring manager",
-    template: "%s · MyRecruiter Partner",
+    default: "Smarter Hiring. Brighter Teams.",
+    template: "%s · Scoreboad",
   },
 };
 

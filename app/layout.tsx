@@ -41,16 +41,26 @@ const grotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   // A template, so every page appends the product name instead of each one
-  // spelling it out. The 20-odd pages that hardcoded "· Recruitment OS" have
-  // been renamed, but new pages now only need their own title.
+  // spelling it out. New pages only need their own title.
   title: {
-    default: "MyRecruiter Partner — Your AI Hiring Manager",
-    template: "%s · MyRecruiter Partner",
+    default: "Scoreboad — Smarter Hiring. Brighter Teams.",
+    template: "%s · Scoreboad",
   },
-  description: "Your AI hiring manager: sourcing, screening and scheduling in one workspace.",
-  // app/icon.png and app/apple-icon.png are picked up automatically by the App
-  // Router; declared here only so the manifest name matches the brand.
-  applicationName: "MyRecruiter Partner",
+  description:
+    "Smarter hiring, brighter teams: AI-assisted sourcing, screening, interviews and " +
+    "scheduling in one workspace.",
+  /*
+    THE FAVICON IS FILE-BASED, not declared here.
+
+    app/icon.png (512x512) and app/apple-icon.png (180x180) are picked up
+    automatically by the App Router's file conventions and emitted as
+    <link rel="icon"> — which is why there is no `icons` key below and no
+    app/favicon.ico. Adding either back would create a SECOND icon declaration,
+    and whichever one the browser preferred would be the one nobody edited.
+
+    `applicationName` is here only so an installed PWA's name matches the brand.
+  */
+  applicationName: "Scoreboad",
 };
 
 // DEEP SPACE, so the browser's OWN chrome takes the theme — the address bar on

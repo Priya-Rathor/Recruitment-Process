@@ -24,7 +24,7 @@ export function MarketingHeader() {
       <div className="mkt-shell mkt-header__inner">
         <Link
           href="/"
-          aria-label="MyRecruiter Partner — home"
+          aria-label="Scoreboad — home"
           style={{ textDecoration: "none", display: "inline-flex" }}
         >
           {/* The dark-surface lockup, not the app's compact one — see the note

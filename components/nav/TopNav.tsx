@@ -69,10 +69,10 @@ export function TopNav({
             width-measuring hook would cause every time.
 
             The compact lockup is 4.22:1, so at 30px it occupies ~127px — a
-            little NARROWER than the "Recruitment OS" text wordmark it replaces,
+            little NARROWER than the text wordmark it replaced,
             which matters because this bar was already measured to overflow at
             1440px before two items moved into the account menu. ------------ */}
-        <Link href="/dashboard" className="topnav__brand" aria-label="MyRecruiter Partner — dashboard">
+        <Link href="/dashboard" className="topnav__brand" aria-label="Scoreboad — dashboard">
           <span className="topnav__logo-wide">
             <Logo variant="compact" height={30} priority />
           </span>

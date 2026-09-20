@@ -42,7 +42,7 @@ export function MarketingFooter() {
         </div>
 
         <div className="mkt-footer__bottom">
-          <span>© {year} MyRecruiter Partner</span>
+          <span>© {year} Scoreboad</span>
           <span>
             In active development. Pricing is not published yet — talk to us
             about where it stands for your use case.

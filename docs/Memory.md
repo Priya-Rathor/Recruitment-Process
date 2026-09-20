@@ -805,3 +805,77 @@ now has per-mode entries so the browser chrome matches whichever ground is live.
 
 `lint` clean · `typecheck` clean · `build` clean · 1880/1880 (+16) · served
 stylesheet verified to contain **zero** retired values in any notation.
+
+---
+
+## 2026-09-20 (fourth session)
+
+**REBRAND: "MyRecruiter Partner" / "Recruitment OS" → "Scoreboad".** New logo
+(blue swirl) and lockup supplied as two PNGs; tagline is now "Smarter Hiring.
+Brighter Teams."
+
+**Source assets inspected before use, and it mattered.** Wrote a dependency-free
+PNG decoder (`zlib` + un-filtering, ~40 lines) because there is no PIL here.
+Both sources are genuinely transparent RGBA — the black behind them was only the
+preview — so they sit on the deep-space ground directly. Content bboxes measured
+rather than guessed: mark 981x1000 inside 1254², lockup 1731x637 inside 2172x724
+with ~200px of empty margin.
+
+**Generated with `sips`** (macOS built-in; no ImageMagick needed):
+- `app/icon.png` 512² — the favicon. Square crop centred on the mark's content.
+- `app/apple-icon.png` 180²
+- `public/brand/mark.png` 256²
+- `public/brand/logo.png` 489x180 (full lockup, with tagline)
+- `public/brand/logo-compact.png` 499x120 (**no** tagline)
+
+**The compact crop needed measuring, not eyeballing.** Row-coverage analysis of
+the wordmark half only (x 700..1950, so the mark's tall glow does not mask the
+gap) put the wordmark at y≈280–445 and the tagline at y≈480–512. Cropping at
+y=465 drops the tagline cleanly. Result is 4.16:1 against the retired compact's
+4.22:1, so the nav's measured widths are unaffected — that bar has no spare room
+(see navItems.ts).
+
+**`app/favicon.ico` WAS the override the user suspected.** It existed alongside
+`app/icon.png`, and Next emits BOTH as `<link rel="icon">`; browsers requesting
+`/favicon.ico` by convention got the old one. Regenerated it from the new mark
+as a 2-entry **PNG-in-ICO** (32px + 64px) — an .ico entry may hold a whole PNG,
+which every browser in use supports and which avoids writing a BMP encoder and
+an alpha mask. `file` confirms both entries. Deleting it instead would have left
+`/favicon.ico` 404ing for legacy requests.
+
+`ASSETS` in `components/Logo.tsx` updated to the new intrinsic sizes — wrong
+numbers there cause layout shift, since width is derived from the ratio.
+
+**THE WHITE PLATE IS GONE, and that closes the item flagged last session.**
+`MarketingWordmark` existed because the retired lockup was painted for a light
+ground: on the dark marketing band its dark half dropped to ~1:1 and "Recruiter
+Partner" vanished. The Scoreboad mark is light-on-transparent with its own glow,
+so it needs no plate — removed, along with `.mkt-wordmark__plate`.
+
+**The component stays anyway**, and the reasons that were secondary are now the
+whole case: selectable text, no resampling at the hero's fluid sizes, a screen
+reader gets text not alt, no image request on first paint — and the supplied
+wordmark raster has visible edge artefacts that are obvious at hero size. Set in
+Space Grotesk it is simply clean. `.mkt-wordmark__qualifier` (muted "Partner")
+became `.mkt-wordmark__accent`: "Score" in the highlight, "boad" in periwinkle
+at 7.50:1, **same weight** — one word in two colours, not a name plus a
+qualifier, so lightening it would break the word in half.
+
+Renamed across `app/`, `components/`, `lib/`, README, AGENTS.md and four docs.
+Served HTML on `/` and `/login` verified to contain **zero** occurrences of
+either old name. Metadata now `Scoreboad — Smarter Hiring. Brighter Teams.`
+with template `%s · Scoreboad`; the marketing hero headline and its own title
+took the new tagline too.
+
+Also noted in `layout.tsx`: there is deliberately **no `icons` key** in
+`metadata` — the icons are file-convention based, and adding the key back would
+create a second declaration where whichever one the browser preferred would be
+the one nobody edited.
+
+**Spelling**: "Scoreboad" is used verbatim as supplied — it is what the logo
+raster itself renders and what the user wrote consistently, including the
+domain. If it was meant to be "Scoreboard" it is a one-line change plus new
+assets.
+
+`lint` clean · `typecheck` clean · `build` clean · 1880/1880 · brand assets
+backed up to the session scratchpad before overwriting.

@@ -1,4 +1,4 @@
-# Recruitment OS — working notes for agents
+# Scoreboad — working notes for agents
 
 Multi-tenant AI recruitment SaaS, built one module at a time against the spec in
 `docs/`. Read `docs/modules/<NN>-*.md` for the module you're building, plus the

@@ -44,9 +44,12 @@ export default function HomePage() {
           <p className="mkt-pill">In active development · built module by module</p>
 
           <h1 style={{ marginTop: "var(--space-6)" }}>
-            Your AI hiring manager.
+            Smarter hiring. Brighter teams.
             {/* The muted second line: the qualifier reads as a separate beat,
-                so a long headline scans in two passes instead of one wall. */}
+                so a long headline scans in two passes instead of one wall.
+                Kept from the previous brand because it is the honest half of
+                the promise — the headline is now the strapline, and this is
+                what stops it reading as "the AI decides". */}
             <span className="mkt-hero__h1-muted">You still make the decisions.</span>
           </h1>
 

@@ -1,4 +1,4 @@
-# Product Requirements — Recruitment OS (as-built)
+# Product Requirements — Scoreboad (as-built)
 
 **Status legend used throughout `docs/`:**
 `IMPLEMENTED` · `PARTIAL` · `MISSING` · `RISK` · `UNKNOWN`

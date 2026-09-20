@@ -1,4 +1,4 @@
-# Recruitment OS
+# Scoreboad
 
 AI-powered, multi-tenant Recruitment Operating System. Built module by module
 against the specification in `docs/` — 17 core modules plus two cross-cutting
