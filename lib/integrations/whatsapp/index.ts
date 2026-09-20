@@ -31,12 +31,14 @@
 //    text is attempted and Meta's own error is surfaced verbatim-in-substance
 //    rather than dressed up as our bug.
 //
-// 2. OPT-OUT IS "REPLY STOP", AND NOBODY IS LISTENING YET. Meta's own guidance
-//    is that a business honours an opt-out request in the message thread. This
-//    product has no inbound WhatsApp webhook, so a candidate replying STOP is
-//    read by a human, who records it on the candidate page. That is a real
-//    limitation and it is stated in the settings copy rather than implied away —
-//    the alternative is an opt-out instruction that goes nowhere.
+// 2. OPT-OUT IS "REPLY STOP", AND SOMETHING IS LISTENING NOW.
+//    Meta's own guidance is that a business honours an opt-out request in the
+//    message thread. Until migration 0041 this product had no inbound webhook, so
+//    a candidate replying STOP was only honoured if a human happened to read it
+//    and record it by hand. app/api/webhooks/whatsapp/route.ts now receives those
+//    replies and sets the opt-out itself. The manual control on the candidate
+//    page stays — a candidate who says "please don't text me again" in words we
+//    do not match is still a recruiter's job to record.
 // =============================================================================
 import {
   baseStatusFrom,
@@ -49,6 +51,7 @@ import {
   type BaseStatus,
   type IntegrationStatus,
 } from "@/lib/integrations/store";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDbError } from "@/lib/supabase/errors";
 
 export const WHATSAPP_PROVIDER = "whatsapp" as const;
@@ -67,9 +70,35 @@ export type WhatsAppStatus = BaseStatus & {
   messagingTemplate: string | null;
   /** Language code the Meta template was approved in. */
   messagingTemplateLanguage: string | null;
+  /**
+   * Whether inbound webhook events can be verified for this organization —
+   * either an app secret of its own or the platform-wide one. False means the
+   * inbox will stay empty, and the settings card says so rather than leaving an
+   * admin to conclude no candidate has ever replied.
+   */
+  webhookVerifiable: boolean;
 };
 
-type WhatsAppCredentials = { accessToken: string };
+type WhatsAppCredentials = {
+  accessToken: string;
+  /**
+   * The Meta App Secret, used to verify inbound webhook signatures.
+   *
+   * OPTIONAL, and the fallback is the platform-wide WHATSAPP_APP_SECRET. Which
+   * one is right depends on how the organization onboarded:
+   *
+   *   - One Meta app for the whole deployment (the Tech Provider model, where
+   *     customers' numbers are onboarded onto our app): every tenant's events
+   *     arrive signed with the same secret, so it belongs in the environment and
+   *     this field stays blank.
+   *   - The organization brought its own Meta app: its events are signed with
+   *     ITS secret, and no environment variable can cover the second tenant to
+   *     do that. So it is stored here, encrypted beside the access token — both
+   *     are credentials of the same Meta app, and keeping one in the vault and
+   *     the other in the environment would be an odd place to draw the line.
+   */
+  appSecret?: string;
+};
 
 export async function getStatus(organizationId: string): Promise<WhatsAppStatus> {
   const integration = await loadIntegration(organizationId, WHATSAPP_PROVIDER);
@@ -86,6 +115,8 @@ export async function getStatus(organizationId: string): Promise<WhatsAppStatus>
     displayNumber: text("displayNumber"),
     messagingTemplate: text("messagingTemplate"),
     messagingTemplateLanguage: text("messagingTemplateLanguage"),
+    webhookVerifiable:
+      base.settings.appSecretConfigured === true || platformAppSecret() !== null,
   };
 }
 
@@ -96,6 +127,7 @@ export async function connect({
   displayNumber,
   messagingTemplate,
   messagingTemplateLanguage,
+  appSecret,
   connectedBy,
 }: {
   organizationId: string;
@@ -104,6 +136,8 @@ export async function connect({
   displayNumber?: string;
   messagingTemplate?: string;
   messagingTemplateLanguage?: string;
+  /** Blank to fall back to WHATSAPP_APP_SECRET. See WhatsAppCredentials. */
+  appSecret?: string;
   connectedBy?: string | null;
 }): Promise<AdapterResult<{ credentialHint: string }>> {
   const token = accessToken.trim();
@@ -126,10 +160,25 @@ export async function connect({
     };
   }
 
+  const secret = appSecret?.trim() ?? "";
+  // A Meta app secret is a 32-character hex string. Checked because the failure
+  // it prevents is invisible: a mistyped secret rejects every inbound message as
+  // a forgery, and the endpoint's whole job is to look unremarkable to a
+  // forger — so there would be nothing to see but an inbox that stays empty.
+  if (secret && !/^[a-f0-9]{32}$/i.test(secret)) {
+    return {
+      ok: false,
+      error: "The app secret is the 32-character value from your Meta app's Basic Settings.",
+    };
+  }
+
   const saved = await saveCredentials({
     organizationId,
     provider: WHATSAPP_PROVIDER,
-    credentials: { accessToken: token } satisfies WhatsAppCredentials,
+    credentials: {
+      accessToken: token,
+      ...(secret ? { appSecret: secret } : {}),
+    } satisfies WhatsAppCredentials,
     credentialHint: maskCredential(token),
     // None of these is a secret — the number is printed on every message — so
     // they live in settings where the UI can show them without a decrypt.
@@ -138,6 +187,11 @@ export async function connect({
       displayNumber: displayNumber?.trim() || null,
       messagingTemplate: templateName || null,
       messagingTemplateLanguage: messagingTemplateLanguage?.trim() || "en",
+      // A marker, not the secret. Lets the settings card and the inbox say
+      // whether inbound messages can be verified without decrypting anything on
+      // a page load — getStatus() is read on every settings render and by
+      // lib/communications/channels.ts on every application page.
+      appSecretConfigured: secret.length > 0,
     },
     connectedBy,
   });
@@ -391,4 +445,300 @@ export async function sendWhatsApp({
     console.error(`[whatsapp] send failed: ${formatDbError(error)}`);
     return { ok: false, skipped: false, error: "Could not reach Meta's WhatsApp API." };
   }
+}
+
+// =============================================================================
+// INBOUND — the webhook's side of this adapter.
+//
+// app/api/webhooks/whatsapp/route.ts is a public, unauthenticated endpoint by
+// necessity: Meta calls it directly and has no session. Everything that makes
+// that safe lives here, because it is all Meta-specific knowledge and the route
+// should not be re-deriving it.
+// =============================================================================
+
+/** The deployment-wide Meta app secret, when there is one. */
+function platformAppSecret(): string | null {
+  const secret = process.env.WHATSAPP_APP_SECRET?.trim();
+  return secret && secret.length > 0 ? secret : null;
+}
+
+/**
+ * The string Meta echoes during the GET verification handshake.
+ *
+ * PLATFORM-WIDE, not per organization, and that is forced rather than chosen:
+ * the handshake carries no phone number, no WABA id and no body — only
+ * `hub.verify_token` — so there is nothing in the request to resolve a tenant
+ * from. Every Meta app pointed at this deployment's callback URL therefore
+ * configures the same verify token. It is a handshake string, not an
+ * authorisation: it proves nothing about later events, which is why every POST
+ * is signature-checked independently.
+ */
+export function webhookVerifyToken(): string | null {
+  const token = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
+  return token && token.length > 0 ? token : null;
+}
+
+export type InboundOrganization = {
+  organizationId: string;
+  /** Echoed back by Meta on every event; our own settings row, not the payload. */
+  phoneNumberId: string;
+};
+
+/**
+ * Which tenant a webhook event belongs to.
+ *
+ * THE ONE PLACE THIS PRODUCT RESOLVES A TENANT FROM SOMETHING IN A PAYLOAD, and
+ * it is a lookup rather than a claim. `phoneNumberId` is not trusted as an
+ * identity: it is used as a key into organization_integrations, a table only we
+ * write, and the organization_id comes off OUR row. A forged or unknown id finds
+ * nothing and the event is dropped — the same shape the Bolna webhook uses when
+ * it looks up a screening_call by the id we generated.
+ *
+ * Requires the integration to be CONNECTED. A disconnected one has had its
+ * credentials cleared, so we could neither verify the event with its own secret
+ * nor ever reply; accepting messages into an inbox that cannot answer them would
+ * be worse than declining them visibly in the settings card.
+ */
+export async function findOrganizationByPhoneNumberId(
+  phoneNumberId: string
+): Promise<InboundOrganization | null> {
+  if (!/^\d{5,}$/.test(phoneNumberId)) return null;
+
+  const admin = createAdminClient();
+  if (!admin) {
+    console.error("[whatsapp webhook] service-role client unavailable.");
+    return null;
+  }
+
+  const { data, error } = await admin
+    .from("organization_integrations")
+    .select("organization_id, status")
+    .eq("provider", WHATSAPP_PROVIDER)
+    .eq("status", "connected")
+    .eq("settings->>phoneNumberId", phoneNumberId)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`[whatsapp webhook] tenant lookup failed: ${formatDbError(error)}`);
+    return null;
+  }
+  if (!data) return null;
+
+  return {
+    organizationId: (data as { organization_id: string }).organization_id,
+    phoneNumberId,
+  };
+}
+
+/**
+ * Verifies Meta's X-Hub-Signature-256 over the RAW request body.
+ *
+ * Three things this gets right that a casual implementation gets wrong:
+ *
+ *   1. It hashes the raw bytes. A parsed-and-reserialised body differs from what
+ *      Meta signed by whitespace and key order alone, so the check would fail
+ *      for every legitimate event and the only way to "fix" it would be to
+ *      disable it.
+ *   2. It compares in constant time, so the endpoint cannot be used as an oracle
+ *      to discover a valid signature byte by byte.
+ *   3. NO SECRET MEANS NO EVENT IS ACCEPTED. Not a warning, not a pass-through.
+ *      An unsigned endpoint that writes messages into a recruiter's inbox is a
+ *      way to forge a candidate's words, and a forged "STOP" would silently
+ *      switch off a real candidate's messages.
+ *
+ * The organization's own app secret wins over the platform one — see
+ * WhatsAppCredentials for why both exist.
+ */
+export async function verifyWebhookSignature({
+  organizationId,
+  rawBody,
+  header,
+}: {
+  organizationId: string;
+  rawBody: string;
+  /** The X-Hub-Signature-256 header, verbatim. */
+  header: string | null;
+}): Promise<boolean> {
+  if (!header) return false;
+
+  const integration = await loadIntegration(organizationId, WHATSAPP_PROVIDER);
+  const credentials = await readCredentials<WhatsAppCredentials>(integration);
+  const secret = credentials?.appSecret?.trim() || platformAppSecret();
+
+  if (!secret) {
+    console.error(
+      `[whatsapp webhook] no app secret for organization ${organizationId}; rejecting. ` +
+        "Set WHATSAPP_APP_SECRET, or store one on the integration."
+    );
+    return false;
+  }
+
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+
+    const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
+    const expected = Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+
+    const provided = header.replace(/^sha256=/i, "").trim().toLowerCase();
+    if (provided.length !== expected.length) return false;
+
+    let mismatch = 0;
+    for (let index = 0; index < expected.length; index += 1) {
+      mismatch |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
+    }
+    return mismatch === 0;
+  } catch (error) {
+    console.error(`[whatsapp webhook] signature check failed: ${formatDbError(error)}`);
+    return false;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Payload parsing.
+//
+// PURE, and exported so it can be tested against real Meta payloads without a
+// database, a secret or a network. Everything below treats the payload as what
+// it is: JSON from the internet that happens to have arrived with a valid
+// signature. A signature proves who sent it, not that its shape is what the
+// documentation says.
+// -----------------------------------------------------------------------------
+
+export type InboundTextMessage = {
+  /** Meta's message id (`wamid.…`). The idempotency key. */
+  providerMessageId: string;
+  /** The sender, digits only. Meta already sends it normalised. */
+  from: string;
+  body: string;
+  /** Meta's own timestamp, seconds since epoch, as an ISO string. */
+  sentAt: string;
+};
+
+export type InboundStatusUpdate = {
+  /** The id of a message WE sent. */
+  providerMessageId: string;
+  status: "sent" | "delivered" | "read" | "failed";
+};
+
+export type ParsedWebhook = {
+  /** The business number the events arrived on. Resolves the tenant. */
+  phoneNumberId: string;
+  messages: InboundTextMessage[];
+  statuses: InboundStatusUpdate[];
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
+ * Turns one webhook body into the events we act on, grouped by business number.
+ *
+ * Meta batches: one POST carries entry[] → changes[] → value, and a single value
+ * can hold several messages and several statuses. Returns one entry per business
+ * number so the caller resolves each tenant once.
+ *
+ * NON-TEXT MESSAGES ARE DROPPED ON PURPOSE. An image, a location or a button
+ * reply has no body this inbox can render and no reply path that would make
+ * sense, and storing an empty row would put a blank bubble in a thread with no
+ * way to see what was actually sent. They are counted so the handler can log
+ * that something arrived it could not show — silence would look like the webhook
+ * had failed.
+ */
+export function parseWebhookPayload(payload: unknown): {
+  entries: ParsedWebhook[];
+  unsupportedMessages: number;
+} {
+  const entries: ParsedWebhook[] = [];
+  let unsupportedMessages = 0;
+
+  for (const entry of asArray(asRecord(payload).entry)) {
+    for (const change of asArray(asRecord(entry).changes)) {
+      const value = asRecord(asRecord(change).value);
+
+      // Only messages. Meta sends account, template and quality updates through
+      // the same webhook, and none of them belongs in a candidate's thread.
+      if (asRecord(change).field !== "messages") continue;
+
+      const phoneNumberId = asRecord(value.metadata).phone_number_id;
+      if (typeof phoneNumberId !== "string" || phoneNumberId.length === 0) continue;
+
+      const messages: InboundTextMessage[] = [];
+      const statuses: InboundStatusUpdate[] = [];
+
+      for (const raw of asArray(value.messages)) {
+        const message = asRecord(raw);
+        const id = message.id;
+        const from = message.from;
+
+        if (typeof id !== "string" || typeof from !== "string") continue;
+
+        const body = asRecord(message.text).body;
+        if (message.type !== "text" || typeof body !== "string" || body.trim().length === 0) {
+          unsupportedMessages += 1;
+          continue;
+        }
+
+        messages.push({
+          providerMessageId: id,
+          // Meta sends digits with the country code and no '+'. Stripped anyway,
+          // because the column's CHECK constraint accepts nothing else and a
+          // provider changing its mind should not become a 500.
+          from: from.replace(/\D/g, ""),
+          // Capped at the outbound limit. A 40 KB paste is not a chat message,
+          // and the column is the same one every outbound row uses.
+          body: body.slice(0, 4096),
+          sentAt: metaTimestampToIso(message.timestamp),
+        });
+      }
+
+      for (const raw of asArray(value.statuses)) {
+        const update = asRecord(raw);
+        const id = update.id;
+        const status = update.status;
+
+        if (typeof id !== "string") continue;
+        if (
+          status !== "sent" &&
+          status !== "delivered" &&
+          status !== "read" &&
+          status !== "failed"
+        ) {
+          continue;
+        }
+
+        statuses.push({ providerMessageId: id, status });
+      }
+
+      if (messages.length > 0 || statuses.length > 0) {
+        entries.push({ phoneNumberId, messages, statuses });
+      }
+    }
+  }
+
+  return { entries, unsupportedMessages };
+}
+
+/**
+ * Meta's timestamp is seconds-since-epoch as a STRING. Falls back to now()
+ * rather than throwing: a message that arrived is a fact, and losing it over an
+ * unparseable timestamp would be the wrong trade.
+ */
+function metaTimestampToIso(value: unknown): string {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return new Date().toISOString();
+
+  const date = new Date(seconds * 1000);
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
 }

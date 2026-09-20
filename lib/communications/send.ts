@@ -34,11 +34,22 @@
 //    If the message went out and the row did not, the caller is told. Silently
 //    losing the record of a message that reached a real person is the worst
 //    outcome available here — worse than not sending it.
+//
+// 6. EVERY WHATSAPP MESSAGE JOINS THE CANDIDATE'S THREAD (0041).
+//    Outbound rows carry conversation_id so /messages shows one timeline rather
+//    than only the half a candidate wrote. Attached HERE, in the one place every
+//    send passes through, so an automatic template, a manual compose and an
+//    inbox reply all land in the same thread without any of them knowing the
+//    inbox exists. Thread bookkeeping never affects the send: a thread that
+//    could not be opened produces a log row with a null conversation_id, which
+//    is exactly what every email row already looks like.
 // =============================================================================
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/integrations/email";
-import { sendWhatsApp } from "@/lib/integrations/whatsapp";
+import { normalizeWhatsAppNumber, sendWhatsApp } from "@/lib/integrations/whatsapp";
+import { bumpThread, findOrOpenThread } from "@/lib/messaging/thread";
+import { previewOf } from "@/lib/messaging/conversations";
 import { buildUnsubscribeUrl, withOptOutFooter } from "@/lib/communications/optout";
 import type { SendChannel } from "@/lib/communications/templates";
 import type { CommunicationEventKey } from "@/lib/communications/events";
@@ -355,6 +366,32 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
       body = withOptOutFooter({ body: input.body, channel, unsubscribeUrl });
     }
 
+    /*
+      --- The thread (0041) --------------------------------------------------
+
+      Resolved BEFORE the send so the log row can carry it, and only for a
+      WhatsApp message actually being attempted.
+
+      NOT for a skipped one. The earlier returns above — opted out, no number on
+      file — record their rows with no conversation_id on purpose: the inbox is
+      a record of what passed between us and a person, and "we decided not to
+      say this" is not something they can see in their chat. Those rows still
+      appear in the communication log, which is where that question is asked.
+
+      Not for an internal send either: sendOnChannel already refuses WhatsApp to
+      a colleague, so this only ever runs for the candidate's own number.
+    */
+    const conversationId =
+      channel === "whatsapp"
+        ? await resolveThread({
+            client,
+            organizationId: target.organizationId,
+            candidateId: target.candidateId,
+            phone: recipient,
+            countryCode: target.countryCode ?? null,
+          })
+        : null;
+
     // --- The provider -------------------------------------------------------
     const result =
       channel === "email"
@@ -389,7 +426,28 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
       providerMessageId: result.ok ? result.providerMessageId : null,
       sentBy,
       internalRecipientUserId: internal?.userId ?? null,
+      conversationId,
     });
+
+    /*
+      The thread moves to the top of the inbox only if the message actually
+      left. A failed send is in the log with its reason; putting it at the top
+      of a recruiter's inbox as the latest thing said to this candidate would be
+      a preview of words they never received.
+
+      unread_count is untouched — `inbound: false`. Our own outgoing message is
+      not something the team needs to be told about.
+    */
+    if (conversationId && result.ok) {
+      await bumpThread({
+        client,
+        conversationId,
+        organizationId: target.organizationId,
+        preview: previewOf(body),
+        messageAt: new Date().toISOString(),
+        inbound: false,
+      });
+    }
 
     return {
       channel,
@@ -434,6 +492,7 @@ async function recordMessage({
   recipientHint,
   providerMessageId,
   sentBy,
+  conversationId,
   internalRecipientUserId,
 }: {
   client: CommsClient;
@@ -448,6 +507,8 @@ async function recordMessage({
   recipientHint: string | null;
   providerMessageId: string | null;
   sentBy: string | null;
+  /** 0041 — the WhatsApp thread this row belongs to, if any. Null for email. */
+  conversationId?: string | null;
   /**
    * MODULE 25 — set when this row is a message to a COLLEAGUE about the
    * candidate, rather than to the candidate.
@@ -475,6 +536,7 @@ async function recordMessage({
       provider_message_id: providerMessageId,
       error_message: errorMessage,
       recipient_hint: recipientHint,
+      conversation_id: conversationId ?? null,
       internal_recipient_user_id: internalRecipientUserId ?? null,
       sent_by: sentBy,
       sent_at: status === "sent" ? new Date().toISOString() : null,
@@ -543,4 +605,49 @@ export async function alreadySentForEvent({
   }
 
   return (data ?? []).length > 0;
+}
+
+/**
+ * The WhatsApp thread an outbound message belongs to.
+ *
+ * Normalises the number the SAME WAY the adapter is about to, so the thread is
+ * keyed on exactly the digits Meta will be given. Deriving it twice from one
+ * function is the point: a thread keyed on the raw "+91 98765 43210" and an
+ * inbound message keyed on "919876543210" would open two threads for one
+ * conversation, and neither would look wrong on its own.
+ *
+ * Returns null rather than throwing on any failure — an unparseable number, a
+ * denied insert, a database blip. The send then records a row with no thread,
+ * which is what every email row already looks like, instead of failing a
+ * message to a real person over inbox bookkeeping.
+ */
+async function resolveThread({
+  client,
+  organizationId,
+  candidateId,
+  phone,
+  countryCode,
+}: {
+  client: CommsClient;
+  organizationId: string;
+  candidateId: string;
+  phone: string;
+  countryCode: string | null;
+}): Promise<string | null> {
+  try {
+    const number = normalizeWhatsAppNumber(phone, countryCode);
+    if (!number) return null;
+
+    const thread = await findOrOpenThread({
+      client,
+      organizationId,
+      phoneNumber: number,
+      candidateId,
+    });
+
+    return thread?.id ?? null;
+  } catch (error) {
+    console.error(`[comms] resolving the WhatsApp thread failed: ${formatDbError(error)}`);
+    return null;
+  }
 }
