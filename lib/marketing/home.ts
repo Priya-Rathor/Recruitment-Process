@@ -468,6 +468,228 @@ export const PLATFORM_HEAD = {
 */
 
 // -----------------------------------------------------------------------------
+// The AI screening call — the voice story
+// -----------------------------------------------------------------------------
+
+/**
+ * THE FEATURE IS AN AI SCREENING CALL, NOT AN "AI INTERVIEW".
+ *
+ * The brief for this section called it an AI voice interview throughout. In
+ * this product those are two different things and conflating them would be a
+ * claim about the wrong feature:
+ *
+ *   * `screening_calls` (Module 8) is the automated voice call. It is the
+ *     FIRST conversation, it asks the job's own configured questions, and
+ *     STAGE_LABELS calls the stage it belongs to "AI Screening Call".
+ *   * `interviews` (Module 11) are the later rounds. They are conducted by
+ *     PEOPLE, scheduled into a real calendar, and their modes are Video,
+ *     Phone and On-site. No model conducts one.
+ *
+ * So the section keeps the brief's H2 — "Let every candidate have a structured
+ * first conversation" is exactly right for a screening call — and names the
+ * feature the way the product does.
+ *
+ * WHAT IS REAL HERE, all of it read out of the schema and the script builder
+ * before this copy was written:
+ *
+ *   supabase/migrations/0007 — screening_calls: one row per ATTEMPT, with
+ *     status, transcript, recording_url, duration and consent_confirmed.
+ *   supabase/migrations/0008 — screening_reports: summary, interest level,
+ *     expected CTC, notice period, location acceptance, availability notes,
+ *     plus `ai_*` mirror columns that are NEVER updated after insert,
+ *     `uncertain_fields`, `corrected_fields`, reviewed_by and reviewed_at.
+ *     A database trigger refuses to create one without consent.
+ *   lib/screening/script.ts — the consent disclosure, always first, always
+ *     present, compliance-checked before the provider is ever called.
+ *   job_screening_questions — the questions are written by the hiring team.
+ *
+ * WHAT IS NOT REAL, and is therefore absent: a numeric score. A screening
+ * report has no score column. Inventing one for the picture would be the
+ * single easiest lie to tell in this section and the hardest for a reader to
+ * check.
+ */
+export const VOICE_STAGES: { key: string; num: string; label: string; copy: string }[] = [
+  {
+    key: "start",
+    num: "01",
+    label: "Start",
+    copy:
+      "A screening call is queued against one application. Calling is disconnected " +
+      "until somebody turns it on, and every attempt is counted against a cap — " +
+      "so a candidate cannot be dialled repeatedly by a loop nobody is watching.",
+  },
+  {
+    key: "connect",
+    num: "02",
+    label: "Connect",
+    copy:
+      "The first thing the candidate hears is that the call is automated and may " +
+      "be recorded, and that they can stop it. That line is built by the same " +
+      "function for every call and checked before the provider is contacted; there " +
+      "is no setting that removes it.",
+  },
+  {
+    key: "ask",
+    num: "03",
+    label: "Ask",
+    copy:
+      "The questions are the ones your team wrote on the job — not questions a " +
+      "model invented on the call. Every role carries its own list, asked in the " +
+      "order you set.",
+  },
+  {
+    key: "respond",
+    num: "04",
+    label: "Respond",
+    copy:
+      "Answers are captured as a transcript against the application, with the " +
+      "recording kept beside it. Nothing is treated as usable until the consent " +
+      "flag on the call is true — a database rule, not a code convention.",
+  },
+  {
+    key: "understand",
+    num: "05",
+    label: "Understand",
+    copy:
+      "The conversation becomes a structured report: interest, expected pay, " +
+      "notice period, whether the location works. Anything the model was unsure " +
+      "of is flagged as uncertain rather than guessed at.",
+  },
+  {
+    key: "review",
+    num: "06",
+    label: "Review",
+    copy:
+      "A recruiter reads it and corrects what is wrong. What the AI originally " +
+      "said is kept unchanged alongside, so the edit is always visible — and the " +
+      "candidate was told on the call that a person would be reviewing it.",
+  },
+];
+
+/**
+ * The transcript, with the consent line quoted VERBATIM from
+ * lib/screening/script.ts. It is the most reassuring thing this product says
+ * to a candidate and paraphrasing it into marketing prose would waste it.
+ *
+ * `at` is the stage the line belongs to. Everything else is synthetic
+ * demonstration content and the component labels it as such.
+ */
+export const VOICE_TRANSCRIPT: { at: number; who: "ai" | "candidate"; text: string }[] = [
+  {
+    at: 1,
+    who: "ai",
+    text:
+      "Hello, am I speaking with A. Sharma? I'm an automated assistant calling on " +
+      "behalf of Northwind about your application for the Senior Backend Engineer " +
+      "role. Before we start: this is an automated call and it may be recorded so a " +
+      "recruiter can review it. If you'd rather not continue, just say so and I'll " +
+      "end the call and arrange for a person to contact you instead.",
+  },
+  { at: 1, who: "candidate", text: "That's fine, go ahead." },
+  {
+    at: 2,
+    who: "ai",
+    text: "Thank you. This will take about five minutes. I'll ask a few short questions about your experience and availability.",
+  },
+  {
+    at: 2,
+    who: "ai",
+    text: "What is your current notice period, and when could you realistically start?",
+  },
+  {
+    at: 3,
+    who: "candidate",
+    text: "I'm on thirty days, and I could probably start the first week after that.",
+  },
+  {
+    at: 3,
+    who: "ai",
+    text: "The role is remote with occasional travel to Pune. Does that work for you?",
+  },
+  { at: 3, who: "candidate", text: "Remote is what I'm looking for. Travel now and then is no problem." },
+  {
+    at: 5,
+    who: "ai",
+    text: "That's everything — thank you for your time. A recruiter from Northwind will review this and be in touch about next steps.",
+  },
+];
+
+/**
+ * The structured report.
+ *
+ * These five fields are the actual columns of `screening_reports`, and
+ * `uncertain` marks the ones that would land in `uncertain_fields`. `corrected`
+ * shows the pair the schema keeps forever: what the model said, and what the
+ * recruiter changed it to.
+ */
+export const VOICE_REPORT: {
+  field: string;
+  value: string;
+  uncertain?: boolean;
+  corrected?: { from: string; by: string };
+}[] = [
+  { field: "Interest level", value: "High" },
+  { field: "Notice period", value: "30 days" },
+  { field: "Location accepted", value: "Accepted" },
+  {
+    field: "Expected CTC",
+    value: "Not stated on the call",
+    uncertain: true,
+  },
+  {
+    field: "Availability",
+    value: "From the first week after notice",
+    corrected: { from: "Immediately available", by: "R. Menon" },
+  },
+];
+
+export const VOICE_HEAD = {
+  eyebrow: "AI screening calls",
+  title: "Let every candidate have a structured first conversation.",
+  lead:
+    "Scoreboad can run the first-round call for you — the questions your team " +
+    "wrote, asked the same way every time, captured as a transcript and returned " +
+    "as a structured report against the application. A recruiter reads it and " +
+    "decides what happens next.",
+} as const;
+
+/**
+ * Three, not four. The brief's fourth suggestion was interview scheduling,
+ * which is real but belongs to a later module — and, more to the point, is not
+ * part of this story: nothing about scheduling a human round happens on an
+ * automated call.
+ */
+export const VOICE_CALLOUTS: (HomeCard & { href: string })[] = [
+  {
+    title: "Questions you wrote",
+    // job_screening_questions — per job, ordered, capped at MAX_QUESTIONS.
+    body:
+      "Each job carries its own screening questions, asked in the order you set. " +
+      "Up to twelve per role.",
+    icon: "ClipboardCheck",
+    href: "/product/source",
+  },
+  {
+    title: "Transcript and recording",
+    // screening_calls.transcript / recording_url, behind the consent gate.
+    body:
+      "Every call is captured against the application, and nothing is usable " +
+      "until the candidate has been told and has agreed to carry on.",
+    icon: "PhoneCall",
+    href: "/product/screen",
+  },
+  {
+    title: "A report a person edits",
+    // screening_reports: ai_* columns are never updated; corrected_fields records edits.
+    body:
+      "Interest, notice, pay and location come back as fields. What the AI said " +
+      "is kept beside what your recruiter changed it to.",
+    icon: "ClipboardCheck",
+    href: "/product/decide",
+  },
+];
+
+// -----------------------------------------------------------------------------
 // From application to hire
 // -----------------------------------------------------------------------------
 

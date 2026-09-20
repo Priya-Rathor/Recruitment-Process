@@ -2158,6 +2158,568 @@
   }
 
   // ===========================================================================
+  // THE AI SCREENING CALL — the voice story
+  //
+  // Two columns, both pinned: the stage's explanation on the left, the call
+  // interface on the right. Same sentinel-and-sticky machinery as the AI story
+  // band, driven by one `data-stage` attribute on `.vi-grid`.
+  // ===========================================================================
+  .vi-story {
+    position: relative;
+    // Six stages rather than five, so a little more runway. ~43vh a beat,
+    // matching the other story's pace — two sections that scroll at different
+    // speeds feel like two websites.
+    height: 260vh;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  .vi-story__runway {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1px;
+    pointer-events: none;
+  }
+
+  .vi-story__mark {
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 1px;
+
+    @for $i from 0 through 5 {
+      &[data-mark="#{$i}"] {
+        top: percentage(calc($i / 6));
+      }
+    }
+  }
+
+  .vi-story__pin {
+    position: sticky;
+    top: 5rem;
+  }
+
+  .vi-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    gap: clamp(1.5rem, 3vw, 2.75rem);
+    align-items: start;
+  }
+
+  // ---- LEFT: the stage rail and the changing copy ---------------------------
+  .vi-steps {
+    list-style: none;
+    margin: 0 0 1.25rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .vi-steps__item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: var(--text-label);
+    transition:
+      opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    // Never invisible: a reader landing mid-section has to see the whole shape
+    // of the story, not just the beat they arrived on.
+    &[data-state="off"] {
+      opacity: 0.38;
+      color: var(--mkt-on-dark-muted);
+    }
+
+    &[data-state="done"] {
+      opacity: 0.7;
+      color: var(--mkt-on-dark-muted);
+    }
+
+    &[data-state="on"] {
+      opacity: 1;
+      color: var(--mkt-on-dark);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .vi-steps__num {
+    font-family: var(--font-heading);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.04em;
+    color: var(--mkt-accent-on-dark);
+  }
+
+  /*
+    A FIXED HEIGHT ON THE COPY WELL.
+
+    The six explanations differ by about two lines, and without a floor the
+    left column — and therefore the pinned grid — would resize under the
+    reader's own scroll. A layout shift caused by scrolling is the worst kind,
+    because it moves the thing being read.
+  */
+  .vi-copy__body {
+    min-height: 7.5rem;
+  }
+
+  .vi-copy__text {
+    margin: 0;
+    font-size: var(--text-body-lg);
+    line-height: 1.65;
+    color: var(--mkt-on-dark-muted);
+    animation: mkt-enter 380ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  // ---- RIGHT: the call interface --------------------------------------------
+  /*
+    The tilt. --rx and --ry are written by the component once per frame and
+    default to 0, so the panel is square until a pointer arrives and on every
+    touch device. `perspective` on the parent rather than in the transform so
+    the rotation reads as depth rather than as a skew.
+  */
+  .vi-panel {
+    position: relative;
+    perspective: 1200px;
+  }
+
+  .vi-panel__inner {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid var(--mkt-dark-border-strong);
+    border-radius: var(--mkt-radius-lg);
+    background: var(--mkt-dark-2);
+    padding: clamp(1rem, 2vw, 1.375rem);
+    box-shadow: var(--mkt-glow-sheet);
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition: transform 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  /*
+    The cursor's own light, plus a fixed ambient wash so the panel looks
+    deliberate before any pointer arrives.
+  */
+  .vi-panel__glow {
+    position: absolute;
+    inset: -12%;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+      radial-gradient(18rem 18rem at var(--mx, 70%) var(--my, 18%), rgba(170, 183, 255, 0.22), transparent 70%),
+      radial-gradient(24rem 20rem at 12% 96%, rgba(127, 231, 196, 0.10), transparent 72%);
+    filter: blur(30px);
+  }
+
+  .vi-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.625rem;
+    border-bottom: 1px solid var(--mkt-dark-border);
+  }
+
+  .vi-panel__title {
+    font-family: var(--font-heading);
+    font-size: 14px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  /*
+    THE STATUS. A word plus a dot — never the dot alone. This is the element
+    that says whether a call is live, and carrying that on hue would fail the
+    one reader who most needs to know.
+  */
+  .vi-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    font-size: 11.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark-muted);
+    white-space: nowrap;
+  }
+
+  .vi-status__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentcolor;
+  }
+
+  .vi-status[data-tone="live"] {
+    color: var(--mkt-mint);       // 11.75:1 on dark-2
+    border-color: rgba(127, 231, 196, 0.35);
+  }
+
+  .vi-status[data-tone="done"] {
+    color: var(--mkt-accent-on-dark); // 9.09:1 on dark-2
+    border-color: rgba(170, 183, 255, 0.35);
+  }
+
+  .vi-panel__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.625rem;
+    font-size: var(--text-caption);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  // ---- The waveform ---------------------------------------------------------
+  .vi-voice {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    margin: 0.75rem 0;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-dark-3);
+    border: 1px solid var(--mkt-dark-border);
+  }
+
+  .vi-wave {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 2.25rem;
+    overflow: hidden;
+  }
+
+  .vi-wave__svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    // Amplitude per state. scaleY on the SVG box rather than on the path, so
+    // the stroke width does not scale with it and stay hairline-thin when
+    // quiet or fat when loud.
+    transform: scaleY(var(--amp, 0.25));
+    transition: transform 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .vi-wave__line {
+    fill: none;
+    stroke: var(--wave, var(--mkt-on-dark-faint));
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+    transition: stroke 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  @keyframes vi-scroll {
+    // Exactly one wave-width, which is where the second copy sits — so the
+    // reset is invisible. See the note in VoiceWaveform.tsx.
+    to { transform: translateX(-240px); }
+  }
+
+  .vi-wave__scroll {
+    animation: vi-scroll var(--speed, 3.2s) linear infinite;
+  }
+
+  /*
+    THE FIVE STATES. Amplitude, colour and speed — three signals, so the
+    difference between the assistant talking and the candidate talking is
+    legible even to a reader who cannot separate the two hues.
+  */
+  .vi-wave[data-state="idle"] { --amp: 0.18; --speed: 5s; --wave: var(--mkt-on-dark-faint); }
+  .vi-wave[data-state="ai"] { --amp: 1; --speed: 2.6s; --wave: var(--mkt-accent-bright); }
+  .vi-wave[data-state="candidate"] { --amp: 0.78; --speed: 3.6s; --wave: var(--mkt-mint); }
+  .vi-wave[data-state="processing"] { --amp: 0.3; --speed: 1.8s; --wave: var(--mkt-lavender); }
+  .vi-wave[data-state="complete"] {
+    --amp: 0.08;
+    --wave: var(--mkt-on-dark-faint);
+
+    // Settled, not scrolling. The call is over; a wave still travelling would
+    // say it was not.
+    .vi-wave__scroll {
+      animation: none;
+    }
+  }
+
+  .vi-voice__label {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 11.5px;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---- The transcript -------------------------------------------------------
+  .vi-transcript {
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-dark-border);
+    background: rgba(10, 17, 40, 0.5);
+    padding: 0.75rem;
+    opacity: 0.35;
+    transition: opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] {
+      opacity: 1;
+    }
+  }
+
+  .vi-transcript__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.5rem;
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  /*
+    SAYS SO ON THE FACE OF IT. The transcript is invented, and a fabricated
+    conversation that looks like a recorded one is exactly the thing this
+    codebase's rules forbid elsewhere. The label is not a disclaimer in small
+    print; it sits in the panel's own chrome.
+  */
+  .vi-transcript__demo {
+    padding: 1px 0.375rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .vi-transcript__lines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    // Tall enough for the longest state, so the panel does not grow under the
+    // reader as lines arrive.
+    min-height: 11rem;
+  }
+
+  .vi-line {
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    gap: 0.625rem;
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .vi-line__who {
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding-top: 2px;
+  }
+
+  .vi-line[data-who="ai"] .vi-line__who { color: var(--mkt-accent-on-dark); }
+  .vi-line[data-who="candidate"] .vi-line__who { color: var(--mkt-mint); }
+
+  .vi-line__text {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---- The structured report -------------------------------------------------
+  .vi-report {
+    margin-top: 0.75rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-dark-border);
+    background: rgba(10, 17, 40, 0.5);
+    padding: 0.75rem;
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .vi-report__head {
+    margin: 0 0 0.5rem;
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .vi-report__fields {
+    margin: 0;
+  }
+
+  .vi-report__row {
+    display: grid;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    gap: 0.625rem;
+    padding: 0.3125rem 0;
+
+    & + & {
+      border-top: 1px solid var(--mkt-dark-border);
+    }
+
+    dt {
+      font-size: 11.5px;
+      color: var(--mkt-on-dark-faint);
+    }
+
+    dd {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--mkt-on-dark);
+    }
+  }
+
+  .vi-flag {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.4;
+
+    &[data-kind="uncertain"] {
+      color: var(--mkt-lavender);   // 9.73:1 on dark-2
+    }
+
+    &[data-kind="corrected"] {
+      color: var(--mkt-mint);       // 11.75:1 on dark-2
+    }
+
+    // Present in the markup from the first paint, revealed at the review
+    // stage. `visibility` rather than `display` so the row's height never
+    // changes and the panel cannot jump as the reader arrives.
+    &[data-shown="false"] {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    &[data-shown="true"] {
+      opacity: 1;
+      transition: opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+  }
+
+  .vi-report__note {
+    margin: 0.625rem 0 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--mkt-dark-border);
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--mkt-on-dark-muted);
+    opacity: 0;
+    transition: opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] {
+      opacity: 1;
+    }
+  }
+
+  // ---- The callouts ----------------------------------------------------------
+  .vi-callouts {
+    list-style: none;
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  /*
+    A link that looks like a card, on a dark band. Same reasoning as the AI
+    band's callouts: it navigates, so it is an <a>.
+  */
+  .vi-callout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1.25rem;
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-dark-2);
+    text-decoration: none;
+    transition:
+      transform 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    h3 {
+      margin: 0.75rem 0 0.375rem;
+      font-family: var(--font-heading);
+      font-size: 15px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-on-dark);
+    }
+
+    p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--mkt-on-dark-muted);
+    }
+
+    &:hover {
+      transform: translateY(-4px);
+      border-color: var(--mkt-dark-border-strong);
+      box-shadow: var(--mkt-glow-accent);
+    }
+  }
+
+  .vi-callout__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-glass-strong);
+    color: var(--mkt-accent-on-dark);
+    transition: transform 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .vi-callout:hover .vi-callout__icon {
+    transform: translateY(-2px);
+  }
+
+  .vi-callout__more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: auto;
+    padding-top: 0.875rem;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-accent-on-dark);
+
+    svg {
+      transition: transform 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+  }
+
+  .vi-callout:hover .vi-callout__more svg {
+    transform: translateX(3px);
+  }
+
+  // ===========================================================================
   // THE AI SCREENING STORY
   //
   // A tall track, a sticky viewport, and five stages that light in sequence as
@@ -3941,6 +4503,125 @@
     query, and it avoids the class of bug where the server renders one layout
     and the client decides on another.
   */
+  /*
+    ===========================================================================
+    THE VOICE STORY ON A SMALL SCREEN
+    ===========================================================================
+
+    The two-column pinned composition cannot survive 390px — the left column
+    would be a paragraph and the right an unreadable call panel beside it. So
+    it becomes one column, unpinned, with the whole call interface shown in its
+    finished state and all six explanations visible at once as a numbered list.
+
+    That is the brief's mobile sequence read honestly: the stages still read in
+    order, top to bottom, they simply are not gated on scroll. Gating them
+    would mean a phone reader scrolling 260vh to see six paragraphs.
+  */
+  @media (max-width: 900px) {
+    .vi-story {
+      height: auto;
+    }
+
+    .vi-story__runway {
+      display: none;
+    }
+
+    .vi-story__pin {
+      position: static;
+    }
+
+    .vi-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    // Every explanation, as a list, because there is no active stage any more.
+    .vi-steps {
+      display: none;
+    }
+
+    .vi-copy__body {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.875rem;
+      margin-bottom: 1.5rem;
+      counter-reset: vistage;
+    }
+
+    .vi-copy__text[hidden] {
+      // The desktop version hides five of six; on a phone they are the content.
+      display: block !important;
+      animation: none;
+    }
+
+    .vi-copy__text {
+      counter-increment: vistage;
+      padding-left: 2rem;
+      position: relative;
+      font-size: var(--text-body);
+
+      &::before {
+        content: "0" counter(vistage);
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-family: var(--font-heading);
+        font-size: var(--text-caption);
+        font-weight: var(--weight-bold);
+        color: var(--mkt-accent-on-dark);
+      }
+    }
+
+    // The call panel arrives finished — every line of the transcript, the full
+    // report, no tilt.
+    .vi-transcript,
+    .vi-report,
+    .vi-report__note {
+      opacity: 1;
+      transform: none;
+    }
+
+    .vi-line {
+      opacity: 1;
+      transform: none;
+    }
+
+    .vi-panel__inner {
+      transform: none;
+    }
+
+    .vi-panel__glow {
+      // No cursor, so no cursor light — just the fixed ambient wash.
+      background: radial-gradient(20rem 18rem at 70% 12%, rgba(170, 183, 255, 0.18), transparent 70%);
+    }
+
+    .vi-callouts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 620px) {
+    .vi-callouts {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .vi-line {
+      // The speaker label moves above the line: a 4.75rem column plus text at
+      // 375px leaves about 40 characters, which is two words per line.
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1px;
+    }
+
+    .vi-report__row {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1px;
+    }
+
+    .vi-transcript__lines {
+      min-height: 0;
+    }
+  }
+
   @media (max-width: 900px) {
     // The track stops being a track: no extra height, nothing to stick to.
     .ai-story {
@@ -4284,6 +4965,56 @@
 
     .ai-rail__item {
       transition: none;
+    }
+
+    /*
+      THE CALL ARRIVES FINISHED, AND THE WAVE STOPS MOVING.
+
+      `animation: none` on the scroll group is the important one: a waveform
+      travelling for the length of a 260vh section is precisely the continuous
+      motion the preference exists to switch off. The wave is still DRAWN — it
+      is the picture of a voice, and removing it would remove information — it
+      simply holds still at its speaking amplitude.
+
+      Everything gated on a stage is forced open, because those things were
+      hidden by animation rather than merely moved by it.
+    */
+    .vi-wave__scroll {
+      animation: none !important;
+    }
+
+    .vi-wave__svg,
+    .vi-wave__line {
+      transition: none;
+    }
+
+    .vi-transcript,
+    .vi-report,
+    .vi-report__note,
+    .vi-line {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+
+    .vi-copy__text {
+      animation: none;
+    }
+
+    .vi-steps__item {
+      transition: none;
+    }
+
+    // The tilt and the cursor light both come off; the panel stays square.
+    .vi-panel__inner {
+      transform: none;
+      transition: none;
+    }
+
+    .vi-callout:hover,
+    .vi-callout:hover .vi-callout__icon,
+    .vi-callout:hover .vi-callout__more svg {
+      transform: none;
     }
 
     .ai-cand,
@@ -4929,6 +5660,7 @@
   .mkt-showcase__tab:focus-visible,
   .ai-cand:focus-visible,
   .ai-callout:focus-visible,
+  .vi-callout:focus-visible,
   .mkt-nav__link:focus-visible,
   .mkt-mega__link:focus-visible,
   .mkt-sheet__row:focus-visible,

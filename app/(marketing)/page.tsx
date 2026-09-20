@@ -14,6 +14,7 @@ import { Solution } from "./_components/home/Solution";
 import { PlatformOverview } from "./_components/home/PlatformOverview";
 import { HiringWorkflow } from "./_components/home/HiringWorkflow";
 import { AiFeatures } from "./_components/home/AiFeatures";
+import { VoiceInterview } from "./_components/home/VoiceInterview";
 import { HumanAi } from "./_components/home/HumanAi";
 import { PipelinePreview } from "./_components/home/PipelinePreview";
 import { BrandStatement } from "./_components/home/BrandStatement";
@@ -60,13 +61,14 @@ export const metadata: Metadata = {
  *   3. The solution                       the same pieces, connected
  *   4. The Scoreboad platform             the six things it covers, as screens
  *   5. From application to hire           how those six connect
- *   6. AI that handles the busy work      where the leverage is
- *   7. AI does the work, you decide       the objection, answered
- *   8. The pipeline at a glance           the product again, in use
- *   9. People x Intelligence x Opportunity  a beat
- *  10. Built for modern hiring teams      why trust it with candidate data
- *  11. FAQ                                the awkward questions
- *  12. Build your next team               the ask
+ *   6. AI-powered recruitment             how screening actually works
+ *   7. AI screening calls                 the first conversation, demonstrated
+ *   8. AI does the work, you decide       the objection, answered
+ *   9. The pipeline at a glance           the product again, in use
+ *  10. People x Intelligence x Opportunity  a beat
+ *  11. Built for modern hiring teams      why trust it with candidate data
+ *  12. FAQ                                the awkward questions
+ *  13. Build your next team               the ask
  *
  * STEPS 2 AND 3 WERE THE MISSING FIRST HALF OF THE ARGUMENT. The page used to
  * open with the hero's promise and go straight to a list of capabilities — the
@@ -77,8 +79,11 @@ export const metadata: Metadata = {
  * same six pieces of copy as captions. Nothing was cut; the grid that showed
  * nothing became the screen that shows it.
  *
- * THE COLOUR RHYTHM IS DELIBERATE: four deep bands (hero, the solution, Human +
- * AI, the closing CTA) against eight bright ones. That holds the 30/70 split,
+ * THE COLOUR RHYTHM IS DELIBERATE: five deep bands (hero, the solution, the
+ * screening call, Human + AI, the closing CTA) against eight bright ones.
+ * The screening-call band and Human + AI are adjacent AND both deep, which is
+ * intended: the call story ends on a recruiter reading the report, and Human +
+ * AI is the argument for why it ends there. They read as one movement. That holds the 30/70 split,
  * and it is what makes the bright product sections read as bright — brightness
  * is a relationship, not a value.
  *
@@ -129,6 +134,7 @@ export default function HomePage() {
       <PlatformOverview />
       <HiringWorkflow />
       <AiFeatures />
+      <VoiceInterview />
       <HumanAi />
       <PipelinePreview />
       <BrandStatement />

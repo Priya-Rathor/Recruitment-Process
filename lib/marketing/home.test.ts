@@ -30,6 +30,11 @@ import {
   HUMAN_SIDE,
   PIPELINE_PREVIEW,
   TRUST_CARDS,
+  VOICE_CALLOUTS,
+  VOICE_HEAD,
+  VOICE_REPORT,
+  VOICE_STAGES,
+  VOICE_TRANSCRIPT,
   WORKFLOW_PIECES,
   WORKFLOW_STEPS,
 } from "@/lib/marketing/home";
@@ -134,6 +139,10 @@ const ALL_COPY: string[] = [
   PLATFORM_HEAD.title,
   PLATFORM_HEAD.lead,
   ...AI_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  ...VOICE_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  VOICE_HEAD.title,
+  VOICE_HEAD.lead,
+  ...VOICE_STAGES.map((v) => v.copy),
   AI_STORY_HEAD.title,
   AI_STORY_HEAD.lead,
   ...AI_STORY_STEPS.flatMap((s) => [s.title, s.body]),
@@ -690,6 +699,124 @@ describe("the AI story describes this product's screening, not AI screening in g
     expect(AI_STORY_VERDICT_NOTE.toLowerCase()).not.toContain("ai assists");
     // It must still make the point.
     expect(/person|people|human|team/i.test(AI_STORY_VERDICT_NOTE)).toBe(true);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The AI screening call
+// -----------------------------------------------------------------------------
+
+describe("the voice story describes the screening call this product has", () => {
+  it("never calls it an AI interview", () => {
+    /*
+      THE CORRECTION THIS SECTION IS BUILT ON.
+
+      The brief called the feature an "AI voice interview" throughout. In this
+      product those are two different things: `screening_calls` is the
+      automated first call, and `interviews` (Module 11) are later rounds
+      conducted by PEOPLE and scheduled into a real calendar — their modes are
+      Video, Phone and On-site.
+
+      Calling the automated call an interview would advertise a model
+      conducting the rounds a person conducts. This fails if that wording ever
+      creeps back in.
+    */
+    const copy = [
+      VOICE_HEAD.eyebrow,
+      VOICE_HEAD.title,
+      VOICE_HEAD.lead,
+      ...VOICE_STAGES.map((s) => s.copy),
+      ...VOICE_CALLOUTS.flatMap((c) => [c.title, c.body]),
+    ].join(" ");
+
+    expect(/\bAI[- ]?(voice[- ])?interview/i.test(copy), "the automated call is not an interview").toBe(
+      false
+    );
+  });
+
+  it("states no score, because a screening report has none", () => {
+    /*
+      `screening_reports` has summary_text, interest_level, expected_ctc,
+      notice_period_days, location_accepted and availability_notes. There is
+      no score column. A number here would be the easiest thing in this
+      section to invent and the hardest for a reader to check.
+    */
+    for (const row of VOICE_REPORT) {
+      expect(/\b\d+\s*\/\s*\d+\b|\bscore\b/i.test(`${row.field} ${row.value}`), row.field).toBe(
+        false
+      );
+    }
+  });
+
+  it("only reports fields the schema actually has", () => {
+    // Mapped onto screening_reports' real columns. A seventh field would be a
+    // column the product does not store.
+    const real = new Set([
+      "Interest level",
+      "Notice period",
+      "Location accepted",
+      "Expected CTC",
+      "Availability",
+    ]);
+    for (const row of VOICE_REPORT) {
+      expect(real.has(row.field), `"${row.field}" is not a screening_reports column`).toBe(true);
+    }
+  });
+
+  it("shows both halves of the AI-said / human-corrected pair", () => {
+    /*
+      `ai_*` columns are never updated after insert and `corrected_fields`
+      records the edit, so the product can always show what the model said
+      beside what a person changed it to. It is the most distinctive honest
+      thing in the schema, and a demo that dropped it would be showing a
+      generic AI summary panel.
+    */
+    const corrected = VOICE_REPORT.filter((row) => row.corrected);
+    expect(corrected.length, "at least one field must show the correction pair").toBeGreaterThan(0);
+    for (const row of corrected) {
+      expect(row.corrected!.from).not.toBe(row.value);
+    }
+
+    // And at least one field the model itself was unsure about.
+    expect(VOICE_REPORT.some((row) => row.uncertain)).toBe(true);
+  });
+
+  it("opens with the consent disclosure and closes on a person", () => {
+    /*
+      lib/screening/script.ts puts the consent segment first, always, and
+      assertScriptIsCompliant() refuses to dial without it. The closing
+      segment tells the candidate a recruiter will review the call. Both are
+      quoted rather than paraphrased, so both must survive an edit.
+    */
+    const first = VOICE_TRANSCRIPT[0];
+    expect(first.who).toBe("ai");
+    expect(first.text).toMatch(/automated call and it may be recorded/i);
+    expect(first.text).toMatch(/rather not continue/i);
+
+    const last = VOICE_TRANSCRIPT.at(-1)!;
+    expect(last.text).toMatch(/recruiter .* will review/i);
+  });
+
+  it("orders the transcript by the stage it belongs to", () => {
+    // A line that appears before the stage that introduces it would show up in
+    // the panel out of sequence.
+    const stages = VOICE_TRANSCRIPT.map((line) => line.at);
+    expect([...stages].sort((a, b) => a - b)).toEqual(stages);
+    expect(Math.max(...stages)).toBeLessThan(VOICE_STAGES.length);
+  });
+
+  it("numbers six stages and ends on review", () => {
+    expect(VOICE_STAGES.map((s) => s.num)).toEqual(["01", "02", "03", "04", "05", "06"]);
+    expect(VOICE_STAGES.at(-1)?.key).toBe("review");
+  });
+
+  it("sends every callout to a page that exists, with no repeats", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    const hrefs = VOICE_CALLOUTS.map((c) => c.href);
+    for (const href of hrefs) {
+      expect(known.has(href.split("#")[0] || "/"), href).toBe(true);
+    }
+    expect(new Set(hrefs).size).toBe(hrefs.length);
   });
 });
 

@@ -1570,3 +1570,94 @@ resolving to real routes, CTA → /product/screen, sentinels compiled to
 **Still not verified:** the eight breakpoints, and the scroll choreography
 itself, visually. No browser — this is the module where that gap matters most,
 because the stage timing is the one thing that can only be judged by scrolling.
+
+---
+
+## 2026-09-20 — Module 07: AI screening call (cinematic voice story)
+
+**THE CENTRAL FINDING, and the whole module turns on it: this product has no
+"AI voice interview".** The brief used that name throughout. In this codebase:
+
+- `screening_calls` (Module 8, Bolna) is the automated FIRST call. It asks the
+  job's own `job_screening_questions` — written by the hiring team, capped at
+  `MAX_QUESTIONS = 12`.
+- `interviews` (Module 11) are the later rounds, conducted by **people**,
+  scheduled into a real calendar, modes Video / Phone / On-site.
+
+Calling the automated call an "interview" would advertise a model conducting
+the rounds a person conducts. Section is named **AI screening calls**; a test
+fails on `/AI[- ]?(voice[- ])?interview/i` anywhere in the section's copy. The
+brief's H2 was kept — "Let every candidate have a structured first
+conversation" is exactly right for a screening call.
+
+**What the schema gave the story (all read before any copy was written):**
+- `screening_calls`: one row per ATTEMPT, real status enum (queued / dialing /
+  answered / completed), transcript, recording_url, duration, consent_confirmed.
+- `screening_reports`: summary, interest_level, expected_ctc,
+  notice_period_days, location_accepted, availability_notes — plus **`ai_*`
+  mirror columns that are NEVER updated after insert**, `uncertain_fields`
+  (what the model itself was unsure about) and `corrected_fields`. A DB trigger
+  refuses to create a report without consent.
+- `lib/screening/script.ts`: the consent disclosure is always first, always
+  present, and `assertScriptIsCompliant()` blocks the dial without it.
+
+The demo **quotes the disclosure and the closing line verbatim**. The closing
+line is the human-in-the-loop story told by the product itself: *"A recruiter
+from {org} will review this and be in touch about next steps."*
+
+**NO SCORE, and that is a finding not an omission.** `screening_reports` has no
+score column — the call produces fields and a summary; the match score belongs
+to the resume stage. §11 said not to invent one. A test asserts no `n/m` or the
+word "score" appears in any report field.
+
+**The AI-said / human-corrected pair is the section's best moment** and comes
+free from the schema: "AI said 'Immediately available' · corrected by R. Menon".
+
+**Architecture:** same sentinel + sticky machinery as Module 06 (deliberate — a
+second scroll mechanism for the second scroll section is how you end up with
+two of everything), but a different composition: two pinned columns, stage copy
+left, call interface right.
+
+**Waveform:** one SVG polyline from a deterministic speech envelope (two sines
+under a slow third), drawn twice end-to-end and scrolled by exactly its own
+width so the loop has no visible seam. Amplitude via `scaleY` on the SVG box
+(not the path — `vector-effect: non-scaling-stroke` keeps the stroke even), hue
+and speed per state. Five states differ in **three** signals so AI-speaking vs
+candidate-speaking is not carried by hue alone. Deterministic because a random
+waveform is the textbook hydration mismatch. **Zero audio elements on the page**
+— verified in the served HTML.
+
+**Bug caught in review:** the correction pair was conditionally *rendered*
+(`row.corrected && stage >= 5`), so the single most distinctive line in the
+section was absent from crawlable HTML until somebody scrolled, and absent
+entirely without JS. Everything else gates visibility, not existence — made it
+consistent (`data-shown` + `visibility: hidden`, so the row height never
+changes either). Same reasoning already applied to the six stage paragraphs:
+all six in the DOM with `hidden`, so a crawler gets all of them.
+
+**Band rhythm:** this band is dark and sits directly above Human + AI, which is
+also dark. Intended — the call story ends on a recruiter reading the report and
+Human + AI is the argument for why it ends there. Five deep bands of thirteen.
+
+**Mobile (900px):** the two-column pin collapses to one column, unpinned; the
+call panel shows its finished state; all six explanations render at once as a
+numbered list via `counter-increment` (the desktop `hidden` is overridden). At
+620px the transcript speaker label moves above the line — a 4.75rem column plus
+text at 375px leaves ~40 characters.
+
+**Three callouts, not four.** The brief's fourth was interview scheduling —
+real, but nothing about scheduling a human round happens on an automated call,
+and it belongs to a later module. All three hrefs distinct: /product/source
+(the questions), /product/screen (transcript), /product/decide (the report).
+
+Contrast: status live/done 11.75 / 9.09, uncertain flag 9.73, corrected 11.75,
+transcript body 8.24 — all on `--mkt-dark-2`.
+
+`lint` clean · `typecheck` clean · `build` clean · 1953/1953 (+8). Verified on
+the dev server: one h1, zero `<audio>` and zero `autoplay`, consent + closing
+lines present in crawlable HTML, correction pair present but hidden, sentinels
+at 0/16.7/33.3/50/66.7/83.3%.
+
+**Still not verified:** the eight breakpoints and the scroll choreography,
+visually. No browser. Two sticky stories now run back to back (Modules 06 and
+07) — whether that is one beat too many is a judgement only scrolling can make.
