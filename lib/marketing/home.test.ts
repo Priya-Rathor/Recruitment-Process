@@ -8,7 +8,13 @@ import {
 import { METRIC_LABELS } from "@/lib/dashboard/metrics";
 import { CAPABILITY_GROUPS, INTERNAL_ROUTES } from "@/lib/marketing/content";
 import {
-  AI_CARDS,
+  AI_CALLOUTS,
+  AI_STORY_CANDIDATES,
+  AI_STORY_VERDICT_NOTE,
+  AI_STORY_HEAD,
+  AI_STORY_JOB,
+  AI_STORY_STAGES,
+  AI_STORY_STEPS,
   AI_SIDE,
   BRAND_STATEMENT,
   DASHBOARD,
@@ -127,7 +133,10 @@ const ALL_COPY: string[] = [
   ...PLATFORM_VIEWS.flatMap((v) => v.panel.rows.map((r) => r.secondary)),
   PLATFORM_HEAD.title,
   PLATFORM_HEAD.lead,
-  ...AI_CARDS.flatMap((c) => [c.title, c.body]),
+  ...AI_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  AI_STORY_HEAD.title,
+  AI_STORY_HEAD.lead,
+  ...AI_STORY_STEPS.flatMap((s) => [s.title, s.body]),
   ...TRUST_CARDS.flatMap((c) => [c.title, c.body]),
   ...WORKFLOW_STEPS.flatMap((s) => [s.title, s.body]),
   ...AI_SIDE.flatMap((s) => [s.title, s.body]),
@@ -584,6 +593,107 @@ describe("the platform showcase is a picture of the real application", () => {
 });
 
 // -----------------------------------------------------------------------------
+// The AI screening story
+// -----------------------------------------------------------------------------
+
+describe("the AI story describes this product's screening, not AI screening in general", () => {
+  it("shows that most of the pipeline is not the model", () => {
+    /*
+      THE LOAD-BEARING ASSERTION OF THE WHOLE SECTION.
+
+      lib/ai/matchCandidateToJob.ts is explicit in its own header: salary,
+      experience, location, notice and literal skill overlap are settled by
+      lib/matching/deterministic.ts, and the model is NEVER told them. A
+      diagram of this product's screening with one box marked "AI" would be a
+      picture of a different, worse product — and the temptation to simplify
+      it into exactly that is why this is a test rather than a comment.
+    */
+    const byModel = AI_STORY_STEPS.filter((step) => step.by === "ai");
+    expect(byModel.length, "the model must not own the whole pipeline").toBeLessThan(
+      AI_STORY_STEPS.length
+    );
+    expect(
+      AI_STORY_STEPS.some((step) => step.by === "code"),
+      "a deterministic step must be shown — code owns the checkable facts"
+    ).toBe(true);
+    expect(
+      AI_STORY_STEPS.some((step) => step.by === "human"),
+      "a human step must be shown — parseResume proposes, a person applies"
+    ).toBe(true);
+  });
+
+  it("never lets the model be the last word", () => {
+    // The final stage is the recruiter. If a refactor ever reorders these so
+    // the story ends on the AI layer, the section is claiming autonomous
+    // hiring — the one thing this codebase's rules forbid everywhere.
+    expect(AI_STORY_STAGES.at(-1)?.key).toBe("review");
+  });
+
+  it("numbers the stages in order", () => {
+    expect(AI_STORY_STAGES.map((s) => s.num)).toEqual(["01", "02", "03", "04", "05"]);
+  });
+
+  it("keeps every candidate's score and reasons consistent", () => {
+    /*
+      lib/matching/score.ts: "the model cannot state a score at all, so it
+      cannot state one that disagrees with the facts beside it." The mock has
+      to honour the same rule — a 91 with three gaps and no strengths would be
+      showing a guarantee the real product makes and this page breaks.
+    */
+    for (const person of AI_STORY_CANDIDATES) {
+      expect(person.score, person.name).toBeGreaterThanOrEqual(0);
+      expect(person.score, person.name).toBeLessThanOrEqual(RESUME_SCORE_MAX);
+      expect(person.strengths.length, `${person.name} needs a reason for its score`).toBeGreaterThan(0);
+
+      // The highest scorer must not also have the most gaps.
+      const others = AI_STORY_CANDIDATES.filter((p) => p.id !== person.id);
+      for (const other of others) {
+        if (person.score <= other.score) continue;
+        expect(
+          person.gaps.length <= other.gaps.length,
+          `${person.name} outscores ${other.name} but has more gaps`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("uses only verdicts the product can record", () => {
+    for (const person of AI_STORY_CANDIDATES) {
+      expect(Object.values(STATUS_LABELS), person.name).toContain(person.verdict);
+    }
+  });
+
+  it("names the job consistently with the rest of the page", () => {
+    // The hero, the showcase and this story all follow one role. Three
+    // different job titles in three product shots reads as three products.
+    expect(AI_STORY_JOB.title).toBe("Senior Backend Engineer");
+  });
+
+  it("sends every callout to a page that exists", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    for (const card of AI_CALLOUTS) {
+      expect(known.has(card.href.split("#")[0] || "/"), `${card.title} → ${card.href}`).toBe(
+        true
+      );
+    }
+  });
+
+  it("does not restate the Human + AI band's headline", () => {
+    /*
+      THE BRIEF ASKED FOR "AI assists. Your team decides." — which is almost
+      exactly the H2 of the Human + AI band further down this same page. This
+      says the same thing in different words; the assertion stops a later edit
+      from quietly converging them.
+    */
+    const humanAiHeadline = "ai does the work";
+    expect(AI_STORY_VERDICT_NOTE.toLowerCase()).not.toContain(humanAiHeadline);
+    expect(AI_STORY_VERDICT_NOTE.toLowerCase()).not.toContain("ai assists");
+    // It must still make the point.
+    expect(/person|people|human|team/i.test(AI_STORY_VERDICT_NOTE)).toBe(true);
+  });
+});
+
+// -----------------------------------------------------------------------------
 // Structure
 // -----------------------------------------------------------------------------
 
@@ -591,7 +701,7 @@ describe("the landing page's structure", () => {
   it("resolves every icon name to a real icon", () => {
     // A typo would otherwise render the fallback glyph silently, and a card grid
     // with one wrong icon is easy to miss in review.
-    for (const card of [...AI_CARDS, ...TRUST_CARDS]) {
+    for (const card of [...AI_CALLOUTS, ...TRUST_CARDS]) {
       expect(ICONS[card.icon], `${card.title} → ${card.icon}`).toBeDefined();
     }
   });
@@ -603,7 +713,7 @@ describe("the landing page's structure", () => {
     // laptop before the phone's scroll behaviour ever kicks in.
     expect(PLATFORM_VIEWS).toHaveLength(6);
     expect(TRUST_CARDS).toHaveLength(6);
-    expect(AI_CARDS).toHaveLength(8);
+    expect(AI_CALLOUTS).toHaveLength(4);
     expect(WORKFLOW_STEPS).toHaveLength(6);
   });
 

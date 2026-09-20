@@ -497,70 +497,198 @@ export const WORKFLOW_STEPS: { step: string; title: string; body: string }[] = [
  *     communication", because the part that drafts freely — the WhatsApp
  *     auto-reply agent — is off by default and gated behind a master switch.
  */
-export const AI_CARDS: HomeCard[] = [
+/**
+ * THE AI STORY — the scroll-driven screening demonstration.
+ *
+ * FIVE STAGES, and every one of them is a real step in this codebase rather
+ * than a diagram of how AI screening works in general:
+ *
+ *   role        a job with requirements            Module 3
+ *   candidates  applications against it            Module 5
+ *   ai          parse -> review -> check -> match  lib/ai + lib/matching
+ *   insight     the structured output              Module 7
+ *   review      a person decides                   the AI safety model
+ *
+ * THE THIRD STAGE IS THE ONE WORTH GETTING RIGHT, and it is the thing most AI
+ * recruitment sites get wrong about their own product. Screening here is NOT
+ * "send the resume to a model". lib/ai/matchCandidateToJob.ts says it in its
+ * own header: salary, experience, location, notice and literal skill overlap
+ * are settled by lib/matching/deterministic.ts, and the model is never told
+ * them. It answers only what code cannot — whether a missing skill is covered
+ * under another name, how close the current role is, whether the seniority
+ * reads as a fit.
+ *
+ * And lib/matching/score.ts owns the number: "the model cannot state a score
+ * at all, so it cannot state one that disagrees with the facts beside it."
+ * That sentence is the whole reason this section can show a score next to a
+ * list of reasons and have the two always agree.
+ */
+export const AI_STORY_STAGES: { key: string; num: string; label: string }[] = [
+  { key: "role", num: "01", label: "Role" },
+  { key: "candidates", num: "02", label: "Candidates" },
+  { key: "ai", num: "03", label: "AI" },
+  { key: "insight", num: "04", label: "Insight" },
+  { key: "review", num: "05", label: "Review" },
+];
+
+/** The job at the top of the flow. Consistent with the hero and the showcase. */
+export const AI_STORY_JOB = {
+  title: "Senior Backend Engineer",
+  meta: "Remote · Full-time · 4 stages",
+  requirements: ["Go", "PostgreSQL", "Distributed systems", "AWS"],
+} as const;
+
+/**
+ * The four steps inside the AI layer.
+ *
+ * `by` is not decoration — it is the point. Two of these four are code and one
+ * is a person; only ONE is the model. A section about AI screening that shows
+ * a single box marked "AI" would be describing a different product.
+ */
+export const AI_STORY_STEPS: { title: string; body: string; by: "ai" | "code" | "human" }[] = [
   {
-    title: "AI resume screening",
-    // lib/ai/parseResume.ts — proposes fields; a human review screen applies them.
+    title: "Resume parsed",
+    // lib/ai/parseResume.ts
+    body: "PDF, DOCX or pasted text read into structured fields.",
+    by: "ai",
+  },
+  {
+    title: "Extraction reviewed",
+    // The review diff — parseResume PROPOSES, a person applies.
+    body: "The proposed fields land on a review screen before anything is saved.",
+    by: "human",
+  },
+  {
+    title: "Requirements checked",
+    // lib/matching/deterministic.ts
+    body: "Must-haves, experience, location and notice settled in code, not by a model.",
+    by: "code",
+  },
+  {
+    title: "Semantic match",
+    // lib/ai/matchCandidateToJob.ts — its own header describes exactly this.
+    body: "Only what code cannot answer: is a missing skill covered under another name?",
+    by: "ai",
+  },
+];
+
+/**
+ * Three synthetic candidates. SYNTHETIC — invented for this page, and the only
+ * candidate-shaped data that has ever existed in the marketing bundle. This
+ * module is imported by a component that constructs no Supabase client and
+ * receives no props from a page that has one, so there is no path by which a
+ * real person's record could reach it.
+ *
+ * Scores are illustrative and internally consistent: the strengths and gaps
+ * listed explain the number, which is what the real product guarantees in code.
+ */
+export const AI_STORY_CANDIDATES: {
+  id: string;
+  name: string;
+  headline: string;
+  score: number;
+  verdict: string;
+  strengths: string[];
+  gaps: string[];
+  verify: string[];
+}[] = [
+  {
+    id: "sharma",
+    name: "A. Sharma",
+    headline: "Backend Engineer · 7 yrs",
+    score: 91,
+    verdict: "Needs Review",
+    strengths: ["Go and PostgreSQL in production", "Distributed systems at scale"],
+    gaps: ["No Kubernetes experience stated"],
+    verify: ["Team-lead scope is claimed but not evidenced"],
+  },
+  {
+    id: "iyer",
+    name: "M. Iyer",
+    headline: "Platform Engineer · 5 yrs",
+    score: 84,
+    verdict: "Needs Review",
+    strengths: ["AWS and infrastructure ownership", "Go via a service rewrite"],
+    gaps: ["PostgreSQL depth not stated"],
+    verify: ["Notice period missing from the application"],
+  },
+  {
+    id: "reddy",
+    name: "K. Reddy",
+    headline: "Backend Engineer · 4 yrs",
+    score: 63,
+    verdict: "Needs Review",
+    strengths: ["Strong PostgreSQL and schema design"],
+    gaps: ["Below the stated experience minimum", "No distributed systems work listed"],
+    verify: [],
+  },
+];
+
+export const AI_STORY_HEAD = {
+  eyebrow: "AI-powered recruitment",
+  title: "Turn candidate information into hiring insight.",
+  lead:
+    "Scoreboad reads candidate information, checks it against what the role " +
+    "actually requires and surfaces the signals worth a recruiter's attention — " +
+    "so the repetitive part of candidate screening stops being a person's job.",
+} as const;
+
+/**
+ * The closing line of the flow.
+ *
+ * THE BRIEF ASKED FOR "AI assists. Your team decides." — which is almost word
+ * for word the H2 of the Human + AI band further down this same page ("AI does
+ * the work. You make the decisions."). Two near-identical sentences on one page
+ * is the thing the last three modules have been removing, so this says the same
+ * thing in its own words and leaves the headline to the section that owns it.
+ */
+export const AI_STORY_VERDICT_NOTE =
+  "Every one of these is a draft until a person signs it off.";
+
+/**
+ * The four supporting capabilities under the story.
+ *
+ * DOWN FROM EIGHT. The old grid listed voice screening, interview briefs,
+ * candidate messaging and pipeline automation alongside these four — all real,
+ * and all owned by later modules of this redesign. Keeping them here would
+ * have made this section a summary of the whole product rather than of
+ * screening, which is what it is about.
+ */
+export const AI_CALLOUTS: (HomeCard & { href: string })[] = [
+  {
+    title: "Resume intelligence",
+    // lib/ai/parseResume.ts — proposes fields; a review screen applies them.
     body:
       "Resumes are read and structured automatically, then held for review before " +
       "anything is written to a candidate.",
     icon: "FileSearch",
+    href: "/product/understand",
   },
   {
-    title: "AI candidate matching",
-    // lib/ai/matchCandidateToJob.ts, beside the deterministic matcher.
+    title: "Candidate screening",
+    // lib/matching/deterministic.ts + lib/ai/matchCandidateToJob.ts.
     body:
-      "Each application is scored against the role's real requirements, with the " +
-      "strengths and gaps listed beside the number.",
+      "Requirements checked in code, judgement calls left to the model, and one " +
+      "score that cannot contradict either.",
     icon: "Target",
+    href: "/product/screen",
   },
   {
-    title: "AI voice screening",
-    // lib/integrations/bolna — disconnected by default, hard attempt cap.
-    body:
-      "Structured first-round calls whose answers land on the candidate's record. " +
-      "Disconnected by default, and every call opens with a disclosure.",
-    icon: "PhoneCall",
-  },
-  {
-    title: "Screening summaries",
-    // lib/ai/generateScreeningSummary.ts — figures checked against the source.
-    body:
-      "A readable account of what a screening call covered, with every figure " +
-      "checked in code against the recorded answers.",
-    icon: "FileText",
-  },
-  {
-    title: "Interview briefs",
-    // lib/ai/generateInterviewBrief.ts
-    body:
-      "What to probe in the next round, drawn from the resume and the rounds " +
-      "already completed.",
-    icon: "NotebookPen",
-  },
-  {
-    title: "Candidate evaluation",
+    title: "AI evaluation",
     // lib/ai/generateApplicationSummary.ts — numeric guard on every figure.
     body:
       "One paragraph on where an application stands, derived strictly from its " +
       "own recorded fields.",
     icon: "Gauge",
+    href: "/product/decide",
   },
   {
-    title: "Candidate messaging",
-    // lib/communications — approved templates on pipeline events, opt-out gate.
+    title: "Recruiter review",
+    // The AI safety model: raw -> AI -> structured -> validation -> human.
     body:
-      "Approved templates that send on pipeline events over email and WhatsApp, " +
-      "with opt-outs honoured automatically.",
-    icon: "MessagesSquare",
-  },
-  {
-    title: "Pipeline automation",
-    // lib/automations — conditions, actions, and an approval step.
-    body:
-      "Rules that move, assign, notify or message when something happens, with an " +
-      "approval step for anything consequential.",
-    icon: "Zap",
+      "Every AI output lands on a screen before it counts. No stage moves itself.",
+    icon: "UserCheck",
+    href: "/how-it-works#ai-safety",
   },
 ];
 

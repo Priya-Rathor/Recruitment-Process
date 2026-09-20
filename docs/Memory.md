@@ -1469,3 +1469,104 @@ against the dev server: one h1, 13 distinct h2s, all ARIA references resolve,
 
 **Still not verified:** the eight breakpoints, visually. No browser — unchanged
 from the previous five sessions.
+
+---
+
+## 2026-09-20 — Module 06: AI recruitment experience (scroll-driven story)
+
+Replaced `AiFeatures`' eight-card icon grid — the exact pattern §3 forbids —
+with a scroll-driven demonstration of the screening pipeline plus four
+supporting callouts. The band named every AI capability and demonstrated none,
+on the one subject where the reader's real question is "but what does it DO?".
+
+**The section's argument, and it came out of the code.**
+`lib/ai/matchCandidateToJob.ts`'s own header: salary, experience, location,
+notice and literal skill overlap are settled by `lib/matching/deterministic.ts`
+and **the model is never told them** — it answers only what code cannot.
+`lib/matching/score.ts`: *"CODE owns the number. The model cannot state a score
+at all, so it cannot state one that disagrees with the facts beside it."*
+
+So the AI layer shows **four steps with a `by` badge**: AI / Person / Code / AI.
+Two of four are not the model. A test asserts a `code` step and a `human` step
+both exist and that `ai` is not all of them — because the temptation to
+simplify that into one box marked "AI" is exactly how this section would come
+to describe a different, worse product.
+
+**Scroll architecture — no scroll handler.** A 220vh track, a sticky viewport,
+five zero-size sentinels at 0/20/40/60/80%, and ONE IntersectionObserver with
+`rootMargin: -50% 0px -50% 0px` (the viewport reduced to its middle line, so
+exactly one sentinel is active). Five callbacks for the whole section. Rejected:
+a rAF'd scroll listener (main-thread work during the gesture it decorates),
+`animation-timeline: view()` (no Firefox → needs the observer as fallback
+anyway = two mechanisms), and any scroll library (§21).
+
+**Bug caught by reasoning, not by a browser:** the first version put
+`height: 220vh` on the *absolutely positioned* runway. An out-of-flow child
+contributes no height, so `.ai-story` collapsed to the viewport's ~600px, the
+sticky element released after half a screen, and the runway hung over the next
+section. **A sticky element is only sticky while its PARENT is on screen.**
+Height moved to the track.
+
+**Stage gating is one attribute.** `data-stage` on the panel + `data-at` on each
+block; a nested Sass `@for` emits the 15 `[data-stage=i] [data-at=j]` pairs.
+Blocks dim to **0.3, never 0** — a reader landing mid-section, or a crawler
+rendering one frame, still sees the whole story.
+
+**Mobile is a different composition, one media query.** Below 900px the track
+loses its height, the viewport stops being sticky, every stage is lit, and the
+pulse/path-draw/cursor-light are removed. Same markup, so no second render tree
+and no hydration risk; the observer still runs and the rule simply outranks it.
+Below 620px the converging SVG is dropped — three cards became one column, so
+three converging paths no longer describe the layout.
+
+**Interaction choices:**
+- Candidates are a **radiogroup**, not tabs — partly semantics (a choice that
+  filters content), mostly because the platform showcase one band above IS a
+  tablist and two consecutive identical switchers is how a page starts to feel
+  like a template.
+- **Cursor light** writes `--mx`/`--my` as CSS custom properties, rAF-throttled,
+  gated on `(hover:hover) and (pointer:fine)` + not reduced-motion. A style
+  mutation, NOT React state — state would re-render the subtree on every mouse
+  move.
+- **No infinite animation anywhere.** The connector pulse runs twice, only while
+  its own stage is active. The background mesh is three fixed radial fields, not
+  an animated gradient: a 20s infinite blur on a full panel is a compositor job
+  that never ends.
+- **The recruiter controls are spans with `aria-hidden`, not buttons.** A button
+  on a marketing page that looks like it advances a real candidate and does
+  nothing is worse than no button — the section's claim is that a person
+  decides, so faking the deciding would undercut it.
+
+**Deviated from the brief in two places, both reported:**
+1. §18 asked for the trust line *"AI assists. Your team decides."* — almost word
+   for word the H2 of the Human + AI band further down the same page. Used
+   "Every one of these is a draft until a person signs it off." instead, with a
+   test pinning the divergence.
+2. §8's example candidate ("Alex Morgan / AI Engineer / Python LLM RAG") was
+   replaced with the page's existing Senior Backend Engineer + Go/PostgreSQL, so
+   all three product shots describe one company. Test asserts the job title.
+
+**Eight callouts → four** (§17). The dropped four — voice screening, interview
+briefs, candidate messaging, pipeline automation — are real and each is owned by
+a later module per §36; keeping them made this band a summary of the whole
+product rather than of screening.
+
+Skipped deliberately: parallax (§13 — conflicts with a sticky viewport for
+little gain) and magnetic buttons (§20 — "primarily for primary CTA"; the CTA
+already has the Module 03 hover lift). 3D is one 1.5deg hover lift on the
+candidate cards, which is the most that reads as depth rather than distortion.
+
+Server/client split (§33): `AiFeatures` stays a server component — heading,
+callouts, CTA carry no JS. Only `AiStory` is `"use client"`.
+
+Contrast computed: rail 9.72, step badges 9.09 / 9.73 / 11.75, body 8.24,
+callout link 6.03.
+
+`lint` clean · `typecheck` clean · `build` clean · 1945/1945 (+8). Verified on
+the dev server: one h1, radiogroup with roving tabindex, four callouts all
+resolving to real routes, CTA → /product/screen, sentinels compiled to
+0/20/40/60/80%, 15 stage-gating rules emitted.
+
+**Still not verified:** the eight breakpoints, and the scroll choreography
+itself, visually. No browser — this is the module where that gap matters most,
+because the stage timing is the one thing that can only be judged by scrolling.

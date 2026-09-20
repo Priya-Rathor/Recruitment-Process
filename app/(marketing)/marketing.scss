@@ -2158,6 +2158,663 @@
   }
 
   // ===========================================================================
+  // THE AI SCREENING STORY
+  //
+  // A tall track, a sticky viewport, and five stages that light in sequence as
+  // the reader scrolls past. Everything below is driven by ONE attribute —
+  // `data-stage` on `.ai-story__stage` — which the component sets from an
+  // IntersectionObserver. No element here reads the scroll position itself.
+  //
+  // THE WHOLE SCROLL CHOREOGRAPHY COLLAPSES AT 900px. Below that the track has
+  // no height, the viewport is not sticky, and every stage is lit: the flow
+  // becomes a vertical sequence that reads on a phone. That is a different
+  // composition rather than a scaled-down one, which is what the brief asks
+  // for and also the only version that works — a 250vh sticky story on a
+  // 390px screen is a reader trapped in a section.
+  // ===========================================================================
+  /*
+    THE SCROLL TRACK.
+
+    THE HEIGHT LIVES HERE, ON THE TRACK ITSELF — and the first version put it
+    on the absolutely-positioned runway inside, which was simply wrong: an
+    out-of-flow child contributes no height, so `.ai-story` collapsed to the
+    viewport's ~600px, the sticky element released after half a screen of
+    scroll, and the runway hung over the section below it. A sticky element is
+    only sticky for as long as its PARENT is still on screen.
+
+    220vh for five stages — about 44vh of scroll each, which is roughly half a
+    screen per beat. Longer and the page feels like it has stopped responding;
+    shorter and two stages fire on one flick of a trackpad.
+  */
+  .ai-story {
+    position: relative;
+    height: 220vh;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  /*
+    The sentinels' container: the full height of the track, one pixel wide, out
+    of flow and out of the way. It holds nothing but the five marks the
+    observer watches.
+  */
+  .ai-story__runway {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1px;
+    pointer-events: none;
+  }
+
+  .ai-story__mark {
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 1px;
+
+    @for $i from 0 through 4 {
+      &[data-mark="#{$i}"] {
+        top: percentage(calc($i / 5)) ;
+      }
+    }
+  }
+
+  .ai-story__viewport {
+    position: sticky;
+    // Clear of the floating navbar, which is 3.5rem tall at top: 0.75rem.
+    top: 5rem;
+  }
+
+  /*
+    THE STAGE — the dark panel the whole story sits on.
+
+    `isolation: isolate` so the mesh and the cursor light stack inside it
+    rather than against the light band behind it, and `overflow: hidden` so
+    neither can escape the rounded corners.
+  */
+  .ai-story__stage {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: var(--mkt-radius-lg);
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-dark);
+    padding: clamp(1.25rem, 2.5vw, 2rem);
+    box-shadow: var(--mkt-glow-sheet);
+  }
+
+  /*
+    THE BACKGROUND MESH. Three soft radial fields, fixed — not animated.
+
+    The brief asks for a slowly shifting gradient; a 20-second infinite
+    animation on a full-panel blurred layer is a compositor job that never
+    ends, on a page that already has a sticky element and an observer. The
+    depth here comes from three overlapping fields at different scales, which
+    costs one paint.
+  */
+  .ai-story__mesh {
+    position: absolute;
+    inset: -20%;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(38% 42% at 18% 14%, rgba(139, 158, 255, 0.28), transparent 70%),
+      radial-gradient(34% 38% at 84% 22%, rgba(198, 184, 255, 0.22), transparent 72%),
+      radial-gradient(44% 40% at 60% 96%, rgba(127, 231, 196, 0.12), transparent 74%);
+    filter: blur(50px);
+  }
+
+  /*
+    THE CURSOR LIGHT. Follows the pointer via --mx / --my, which the component
+    writes once per animation frame. Defaults put it centre-panel, so the panel
+    looks deliberate before the pointer ever arrives and on every touch device.
+  */
+  .ai-story__cursor {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      26rem 26rem at var(--mx, 50%) var(--my, 40%),
+      rgba(170, 183, 255, 0.13),
+      transparent 68%
+    );
+    transition: opacity var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  // ---- The progress rail ----------------------------------------------------
+  .ai-rail {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1.25rem;
+    margin: 0 0 clamp(1.25rem, 2.5vw, 1.75rem);
+    padding: 0 0 0.875rem;
+    border-bottom: 1px solid var(--mkt-dark-border);
+  }
+
+  .ai-rail__item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4375rem;
+    font-size: var(--text-caption);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition:
+      opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    // Not-yet-reached: dimmed, but never invisible — a reader who lands
+    // mid-section must be able to see where the story goes.
+    &[data-state="off"] {
+      opacity: 0.4;
+      color: var(--mkt-on-dark-muted);
+    }
+
+    &[data-state="done"] {
+      opacity: 0.75;
+      color: var(--mkt-on-dark-muted);
+    }
+
+    &[data-state="on"] {
+      opacity: 1;
+      color: var(--mkt-on-dark);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .ai-rail__num {
+    font-family: var(--font-heading);
+    font-weight: var(--weight-bold);
+    color: var(--mkt-accent-on-dark);
+  }
+
+  // ---- The flow -------------------------------------------------------------
+  .ai-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /*
+    STAGE GATING, THE ONE RULE EVERYTHING ELSE HANGS OFF.
+
+    A block is dimmed and slightly low until the stage it belongs to has been
+    reached, then it settles. `data-at` is the stage index the block belongs
+    to; the comparisons are written out rather than generated because Sass
+    cannot compare an attribute to a variable — five pairs is the honest cost
+    of not reaching for JavaScript to add a class.
+
+    DIMMED, NOT HIDDEN — 0.3 opacity, not 0. The section must still make sense
+    to somebody who lands in the middle of it, or to a crawler that renders one
+    frame and screenshots it.
+  */
+  .ai-flow__block,
+  .ai-converge,
+  .ai-flow__link {
+    opacity: 0.3;
+    transform: translateY(10px);
+    transition:
+      opacity 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  @for $i from 0 through 4 {
+    .ai-story__stage[data-stage="#{$i}"] {
+      @for $j from 0 through $i {
+        [data-at="#{$j}"] {
+          opacity: 1;
+          transform: none;
+        }
+      }
+    }
+  }
+
+  .ai-flow__kicker {
+    margin: 0 0 0.5rem;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .ai-flow__block {
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius);
+    background: rgba(15, 24, 53, 0.72);
+    backdrop-filter: blur(10px);
+    padding: 0.875rem 1rem;
+  }
+
+  /*
+    THE CONNECTOR, AND THE THING TRAVELLING DOWN IT.
+
+    The pulse runs only while its stage is the active one — `data-stage` gates
+    the animation, so nothing is moving on this page except during the two
+    seconds a reader is actually looking at that beat. That is the brief's
+    "alive" without its "constant movement", and it is also why there is no
+    infinite animation anywhere in this section.
+  */
+  .ai-flow__link {
+    position: relative;
+    align-self: center;
+    width: 1px;
+    height: 1.75rem;
+    background: linear-gradient(180deg, rgba(139, 158, 255, 0.5), rgba(139, 158, 255, 0.12));
+  }
+
+  .ai-flow__pulse {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 5px;
+    height: 5px;
+    margin-left: -2.5px;
+    border-radius: 999px;
+    background: var(--mkt-accent-bright);
+    box-shadow: var(--mkt-glow-accent);
+    opacity: 0;
+  }
+
+  @keyframes ai-pulse {
+    0% { opacity: 0; transform: translateY(0); }
+    18% { opacity: 1; }
+    82% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(1.75rem); }
+  }
+
+  .ai-story__stage[data-stage="1"] .ai-flow__link[data-at="1"] .ai-flow__pulse,
+  .ai-story__stage[data-stage="3"] .ai-flow__link[data-at="3"] .ai-flow__pulse {
+    animation: ai-pulse 900ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) 2;
+  }
+
+  // ---- 01 · the job ---------------------------------------------------------
+  .ai-job__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .ai-job__meta {
+    margin: 2px 0 0;
+    font-size: var(--text-caption);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .ai-job__reqs {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0.625rem 0 0;
+    padding: 0;
+
+    li {
+      padding: 0.1875rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid var(--mkt-dark-border-strong);
+      background: var(--mkt-glass);
+      font-size: 11.5px;
+      color: var(--mkt-on-dark);
+    }
+  }
+
+  // ---- 02 · the candidates --------------------------------------------------
+  .ai-cands {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  /*
+    A card that is really a radio. `perspective` on the parent plus a tiny
+    rotateX on hover is the whole of the 3D in this section — the brief allows
+    CSS perspective and warns against making the UI hard to read, and 1.5deg
+    is the most that stays invisible as distortion while still registering as
+    depth.
+  */
+  .ai-cand {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-dark-2);
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition:
+      transform 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      background 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover {
+      transform: translateY(-2px);
+      border-color: var(--mkt-dark-border-strong);
+    }
+
+    /*
+      SELECTED IS A BORDER, A FILL, A LIFT AND A GLOW — four signals, none of
+      them colour alone, because `aria-checked` is the styling hook and what a
+      screen reader is told and what a reader sees must be one fact.
+    */
+    &[aria-checked="true"] {
+      border-color: var(--mkt-accent);
+      background: var(--mkt-dark-3);
+      transform: translateY(-3px);
+      box-shadow: var(--mkt-glow-accent);
+    }
+  }
+
+  .ai-cand__name {
+    font-size: 13px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .ai-cand__role {
+    font-size: 11.5px;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---- the converging paths -------------------------------------------------
+  .ai-converge {
+    display: block;
+    width: 100%;
+    height: 2.75rem;
+
+    path {
+      fill: none;
+      stroke: rgba(139, 158, 255, 0.55);
+      stroke-width: 1;
+      // Drawn on when the stage lands. 400 comfortably exceeds the longest
+      // path in a 300x48 viewBox, so one value serves all three.
+      stroke-dasharray: 400;
+      stroke-dashoffset: 400;
+      transition: stroke-dashoffset 900ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+  }
+
+  .ai-story__stage[data-stage="2"] .ai-converge path,
+  .ai-story__stage[data-stage="3"] .ai-converge path,
+  .ai-story__stage[data-stage="4"] .ai-converge path {
+    stroke-dashoffset: 0;
+  }
+
+  // ---- 03 · the AI layer ----------------------------------------------------
+  .ai-layer__steps {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    counter-reset: none;
+  }
+
+  .ai-step {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0.625rem 0.6875rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-dark-2);
+  }
+
+  /*
+    WHO PERFORMED THE STEP. The badge carries the word; the tint is the second
+    signal. Two of the four steps in this product are not the model, and that
+    fact must survive a reader who cannot separate mint from periwinkle.
+  */
+  .ai-step__by {
+    align-self: flex-start;
+    padding: 1px 0.375rem;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .ai-step[data-by="ai"] .ai-step__by {
+    background: rgba(139, 158, 255, 0.18);
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .ai-step[data-by="code"] .ai-step__by {
+    background: rgba(198, 184, 255, 0.18);
+    color: var(--mkt-lavender);
+  }
+
+  .ai-step[data-by="human"] .ai-step__by {
+    background: rgba(127, 231, 196, 0.18);
+    color: var(--mkt-mint);
+  }
+
+  .ai-step__title {
+    font-size: 12.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .ai-step__body {
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---- 04 + 05 · insight and review ----------------------------------------
+  .ai-out {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .ai-insight__who {
+    margin: 0 0 0.5rem;
+    font-size: 11.5px;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .ai-insight__score {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3125rem;
+    margin: 0 0 0.375rem;
+
+    strong {
+      font-family: var(--font-heading);
+      font-size: 26px;
+      font-weight: var(--weight-bold);
+      color: var(--mkt-on-dark);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    span {
+      font-size: 12px;
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  .ai-insight__track {
+    display: block;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--mkt-dark-3);
+    overflow: hidden;
+  }
+
+  .ai-insight__bar {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--mkt-accent), var(--mkt-lavender));
+  }
+
+  .ai-insight__lists {
+    margin: 0.75rem 0 0;
+
+    div + div {
+      margin-top: 0.4375rem;
+    }
+
+    dt {
+      font-size: 10.5px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--mkt-on-dark-faint);
+    }
+
+    dd {
+      margin: 1px 0 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  .ai-review__verdict {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 17px;
+    font-weight: var(--weight-bold);
+    color: var(--mkt-mint);
+  }
+
+  .ai-review__note {
+    margin: 0.25rem 0 0.75rem;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  /*
+    A PICTURE OF THE CONTROLS. Spans, not buttons, and `aria-hidden` on the
+    group — a control on a marketing page that looks like it advances a real
+    candidate and does nothing is worse than no control. The section's claim is
+    that a person decides; faking the deciding would undercut it.
+  */
+  .ai-review__acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3125rem;
+  }
+
+  .ai-review__act {
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    font-size: 11.5px;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark-muted);
+
+    &.is-primary {
+      background: var(--color-primary);
+      border-color: transparent;
+      // Navy on periwinkle — 7.50:1. White here is 2.49:1, and this is the
+      // single most repeated mistake available in this theme.
+      color: var(--mkt-on-accent);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  // ---- The supporting callouts ---------------------------------------------
+  .ai-callouts {
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  /*
+    A LINK THAT LOOKS LIKE A CARD, not a card with a click handler. It
+    navigates, so it is an <a>: middle-click opens a tab, Enter activates it,
+    and it appears in a screen reader's link list. The hover is the site's own
+    card language plus two extras the brief asks for — the icon shifts and a
+    gradient edge appears.
+  */
+  .ai-callout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1.25rem;
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+    text-decoration: none;
+    transition:
+      transform 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    h3 {
+      margin: 0.75rem 0 0.375rem;
+      font-family: var(--font-heading);
+      font-size: 15px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--mkt-ink-muted);
+    }
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--mkt-glow-card-hover);
+      border-color: var(--mkt-light-border-strong);
+    }
+  }
+
+  .ai-callout__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--mkt-radius-sm);
+    background: var(--color-primary-tint);
+    color: var(--mkt-accent-ink);
+    transition: transform 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .ai-callout:hover .ai-callout__icon {
+    transform: translateY(-2px);
+  }
+
+  .ai-callout__more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: auto;
+    padding-top: 0.875rem;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-accent-ink); // 6.03:1 — the accent AS TEXT needs this step
+
+    svg {
+      transition: transform 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+  }
+
+  .ai-callout:hover .ai-callout__more svg {
+    transform: translateX(3px);
+  }
+
+  .ai-cta {
+    display: flex;
+    justify-content: center;
+    margin-top: clamp(1.75rem, 3vw, 2.5rem);
+  }
+
+  // ===========================================================================
   // THE PLATFORM SHOWCASE — six views, one frame
   // ===========================================================================
 
@@ -3268,6 +3925,91 @@
     }
   }
 
+  /*
+    ===========================================================================
+    THE AI STORY ON A SMALL SCREEN — a different composition, not a smaller one
+    ===========================================================================
+
+    The track loses its height, the viewport stops being sticky, and EVERY
+    stage is lit. What was a five-beat sticky story becomes a vertical sequence
+    the reader scrolls past once. The markup is identical — this is the only
+    place the difference lives — so there is no second render tree and no
+    hydration risk.
+
+    The observer still runs and still sets `data-stage`; the rule below simply
+    outranks it. That is cheaper than tearing the observer down behind a media
+    query, and it avoids the class of bug where the server renders one layout
+    and the client decides on another.
+  */
+  @media (max-width: 900px) {
+    // The track stops being a track: no extra height, nothing to stick to.
+    .ai-story {
+      height: auto;
+    }
+
+    .ai-story__runway {
+      display: none;
+    }
+
+    .ai-story__viewport {
+      position: static;
+    }
+
+    .ai-flow__block,
+    .ai-converge,
+    .ai-flow__link {
+      opacity: 1;
+      transform: none;
+    }
+
+    // The pulse and the path-drawing are scroll-beat decorations with no beats
+    // left to hang on.
+    .ai-flow__pulse {
+      display: none;
+    }
+
+    .ai-converge path {
+      stroke-dashoffset: 0;
+    }
+
+    // The cursor light is meaningless without a cursor.
+    .ai-story__cursor {
+      display: none;
+    }
+
+    .ai-rail {
+      // Still useful as a contents list of what follows; just not a progress
+      // indicator, because nothing is progressing.
+      gap: 0.25rem 0.875rem;
+    }
+
+    .ai-rail__item[data-state="off"],
+    .ai-rail__item[data-state="done"] {
+      opacity: 0.8;
+    }
+
+    .ai-layer__steps {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ai-out {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .ai-cands,
+    .ai-layer__steps {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    // Three cards became one column, so the three converging paths no longer
+    // describe the layout they are drawn over.
+    .ai-converge {
+      display: none;
+    }
+  }
+
   @media (max-width: 860px) {
     .mkt-cardgrid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3503,6 +4245,53 @@
     }
 
     .mkt-lcard--numbered:hover .mkt-problems__num {
+      transform: none;
+    }
+
+    /*
+      THE AI STORY ARRIVES FINISHED.
+
+      Every stage is lit, every path is drawn, the pulse never runs and the
+      cursor light is removed. This is not "the animation but faster": a
+      reader who asked for less motion gets the completed state and loses
+      nothing, because the stages were only ever dimmed to 0.3 rather than
+      hidden — the content was always there.
+
+      The sticky viewport stays. Position is not motion, and unpinning it would
+      change the layout rather than the animation.
+    */
+    .ai-flow__block,
+    .ai-converge,
+    .ai-flow__link {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+
+    .ai-converge path {
+      stroke-dashoffset: 0;
+      transition: none;
+    }
+
+    .ai-flow__pulse {
+      animation: none !important;
+      display: none;
+    }
+
+    .ai-story__cursor {
+      display: none;
+    }
+
+    .ai-rail__item {
+      transition: none;
+    }
+
+    .ai-cand,
+    .ai-cand:hover,
+    .ai-cand[aria-checked="true"],
+    .ai-callout:hover,
+    .ai-callout:hover .ai-callout__icon,
+    .ai-callout:hover .ai-callout__more svg {
       transform: none;
     }
 
@@ -4138,6 +4927,8 @@
   */
   .mkt-btn:focus-visible,
   .mkt-showcase__tab:focus-visible,
+  .ai-cand:focus-visible,
+  .ai-callout:focus-visible,
   .mkt-nav__link:focus-visible,
   .mkt-mega__link:focus-visible,
   .mkt-sheet__row:focus-visible,
