@@ -443,7 +443,7 @@ export function parseSettingsPayload(value: unknown): ParseResult {
     } else if (typeof color === "string" && /^#[0-9A-Fa-f]{6}$/.test(color.trim())) {
       updates.brand_color = color.trim();
     } else {
-      return { ok: false, error: "Brand colour must be a hex value like #004CF5." };
+      return { ok: false, error: "Brand colour must be a hex value like #8B9EFF." };
     }
   }
 

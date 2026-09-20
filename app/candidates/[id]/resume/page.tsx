@@ -28,7 +28,7 @@ const STATUS_STYLE: Record<ResumeParseStatus, { background: string; color: strin
       label: "Parsing…",
     },
     parsed: {
-      background: "#eff6ff",
+      background: "var(--color-primary-tint)",
       color: "var(--color-info)",
       label: "Awaiting review",
     },

@@ -37,7 +37,7 @@ const TONES: Record<
   warning: { bg: "var(--status-attention-bg)", color: "var(--status-attention-text)", icon: AlertTriangle },
   error: { bg: "var(--status-error-bg)", color: "var(--status-error-text)", icon: XCircle },
   neutral: { bg: "var(--status-disconnected-bg)", color: "var(--status-disconnected-text)", icon: MinusCircle },
-  info: { bg: "#dbeafe", color: "#1d4ed8", icon: Clock },
+  info: { bg: "var(--status-disconnected-bg)", color: "var(--color-info)", icon: Clock },
 };
 
 export function StatusChip({

@@ -192,7 +192,7 @@ describe("parseSettingsPayload", () => {
 
   it("rejects a non-hex brand colour", () => {
     expect(parseSettingsPayload({ brand_color: "red" }).ok).toBe(false);
-    expect(parseSettingsPayload({ brand_color: "#4F46E5" }).ok).toBe(true);
+    expect(parseSettingsPayload({ brand_color: "#8B9EFF" }).ok).toBe(true);
   });
 
   it("normalises screening settings on write, not only on read", () => {

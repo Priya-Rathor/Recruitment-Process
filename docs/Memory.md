@@ -695,3 +695,113 @@ test because Next 16 refuses a second dev server in the same directory, so the
 correct-verify-token path could not be exercised locally without restarting the
 running server. Five unit tests now cover it, including the whitespace-only-token
 and no-token-configured cases.
+
+---
+
+## 2026-09-20 (third session)
+
+**FULL THEME REPLACEMENT: "Future Workforce".** Not a patch — the previous theme
+is gone, and `app/theme.test.ts` (new, 17 assertions) fails the build if any of
+it comes back.
+
+**Tokens.** `app/globals.scss` `:root` rewritten end to end. Given values used
+verbatim: deep space `#0a1128`, periwinkle `#8b9eff`, white `#ffffff`, mint
+`#7fe7c4`, lavender `#c6b8ff`. Radius 10/12/16px. Soft-glow elevation, no hard
+shadow anywhere. Space Grotesk headings, Plus Jakarta Sans body.
+
+**DARK IS NOW THE DEFAULT, which is a reversal.** The old theme actively FORCED
+light (`color-scheme: light` plus pinned Bulma vars) because its tokens were
+light-only and Bulma's auto-dark flipped underneath them. That whole block is
+replaced: tokens are dark, so Bulma and the design system agree by default.
+Light is a designed counterpart under `prefers-color-scheme: light` with every
+role re-declared — not an inversion. No toggle, because none was asked for and
+there is no switcher in the product.
+
+**THE FINDING THAT SHAPED THE COMPONENT LAYER.** Computed, not eyeballed:
+white on periwinkle is **2.49:1**, on mint 1.49:1, on the warning amber ~1.4:1.
+All three are what you reach for on a filled button. Deep space on those fills
+gives 7.50 / 12.57 / 10.41:1. So `--color-on-accent` exists and **flips per
+mode** (deep space on dark, white on light) — a component hard-coding either is
+wrong in one mode. Fixed ~14 sites that said `color: #fff` on an accent or
+status fill, including Bulma's own `.button.is-primary` (Bulma derives its
+invert at build time and was choosing white for a light accent).
+
+**Accent hover goes LIGHTER, plus a glow.** On a dark ground "darker" reads as
+disabled — the inverse of the old rule, and exactly the kind of thing that
+survives a rebrand by accident.
+
+**Charts: orbital where it is also CORRECT, linear where it is not.** Loaded the
+`dataviz` skill first. Split by data job:
+- ratio against a limit → new `OrbitalMeter` (radial arc, hero number inside).
+  Replaced three `BarChart` rate usages; `rateBar()` → `rateMeter()`. A rate in
+  a relative-scaled bar made 40% next to 45% look nearly full.
+- ordered part-to-whole → `FunnelChart` as **concentric orbits**, every ring
+  starting at 12 o'clock so the comparison is end-angle against a common
+  origin, every ring direct-labelled. That shared start angle is what makes a
+  radial funnel legitimate where a pie is not.
+- **magnitude across unordered categories stayed LINEAR** ("days in stage",
+  "candidates by source"). Arcs at differing radii compare badly and a longer
+  arc at a smaller radius can be the smaller value; the skill's anti-pattern
+  list names it outright. Restyled instead. Flagged to the user rather than
+  done quietly.
+
+**Chart palette had to be DERIVED, not reused.** The five brand accents cluster
+at OKLCH L 0.73–0.88 — outside the dark-mode band [0.48, 0.67] — and lavender
+sits exactly on the 0.10 chroma floor; the validator FAILED them. Re-derived
+keeping each hue (drift ≤0.2°) and snapping L into the band, spread across it so
+lightness carries separation too. Now passes all six checks (worst adjacent CVD
+ΔE 12.5 deutan / 8.0 tritan, normal-vision 19.6, all ≥3:1 on both surfaces).
+Ordinal ramp re-derived at ΔL 0.068 — the old ramp's 0.06 is below the
+validator's gate, which is why it was re-generated rather than re-tinted.
+Ramp/series now live in tokens; `charts.tsx` holds `var(--ramp-N)` only. Its
+colour maths moved to `theme.test.ts`, closer to the values.
+
+**Two bugs in my own tooling, worth recording.** The OKLCH snapper first
+maximised chroma (periwinkle → electric blue) and then returned LINEAR rgb
+without the sRGB gamma encode, so every step came out dark and oversaturated.
+Fixed both; hue drift went to 0.0–0.2° and L landed on target.
+
+**WHAT THE ENFORCEMENT TEST CAUGHT — the argument for writing it.** The
+codebase looked clean by hex search while the SERVED stylesheet still carried
+the retired navy twice, as `#010c2714` (Sass minifying `rgba(1,12,39,.08)`). So
+the test now derives rgb()/rgb-slash notations from the retired hex list. Total
+haul, all pre-existing or newly exposed:
+- 6 hard shadows built from retired ink, invisible on a near-black ground
+- 2 `rgba()` washes from a palette **two** rebrands old (an avatar, an error
+  hover) — one sitting directly below a comment describing the last time
+  exactly this happened
+- `--color-secondary-text` referenced in 6 files: **a token that never existed
+  in either theme**, silently resolving to nothing all along
+- `app/(marketing)/marketing.scss` deriving its local tokens from `--brand-navy`
+  / `--brand-sky`, so deleting those left every dark marketing section resolving
+  to an undefined variable — the failure mode of a local token derived from a
+  global one
+- a sticky-header scrim hard-coded to the retired navy at 88%, which would have
+  put a near-black bar over a light page in light mode. Now `color-mix()` on the
+  live token.
+
+Test-writing notes: the font check needs a WORD BOUNDARY (`Inter` matches
+"Interview" — this is a recruitment product, six false positives first run), it
+is scoped to lines that actually render (`font-family` / `next/font` / `$family-`)
+so the explanatory comments about Inter being gone can survive, and the rgb
+patterns must be compiled ONCE (90 regexes/line timed out at 5s).
+
+**Substitution, named rather than buried: Aeonik → Plus Jakarta Sans.** Aeonik
+is a commercial licence; `next/font` cannot fetch it and the repo has no
+licensed files. Closest licensable neo-grotesque. `theme.test.ts` asserts the
+substitution so it stays visible — swapping in real Aeonik should fail that test
+on purpose, as a prompt to update it. One-line change in `app/layout.tsx`.
+
+**Kept deliberately, not leftovers:** three white plates behind RASTER assets —
+the coding-round QR (a phone camera needs the quiet zone), the marketing
+wordmark plate, and a logo preview. The PNG brand assets were drawn for a light
+ground and the product is now dark everywhere, so **re-drawing them is an
+outstanding brand-asset job**; until then the plates are the honest fix.
+
+**Not changed, and why:** the type SIZE scale and the spacing scale. The brief
+specified families, colour, radius and shadow; it gave no scale values, and
+inventing them would be a change nobody asked for. `themeColor` in `viewport`
+now has per-mode entries so the browser chrome matches whichever ground is live.
+
+`lint` clean · `typecheck` clean · `build` clean · 1880/1880 (+16) · served
+stylesheet verified to contain **zero** retired values in any notation.

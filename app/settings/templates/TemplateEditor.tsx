@@ -383,7 +383,7 @@ function CharacterCount({ value, limit }: { value: string; limit: number }) {
       style={{
         fontSize: 12,
         marginTop: 4,
-        color: over ? "var(--color-error)" : "var(--color-secondary-text)",
+        color: over ? "var(--color-error)" : "var(--color-text-secondary)",
       }}
     >
       {over

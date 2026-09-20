@@ -7,9 +7,9 @@ import { STAGE_LABELS, type ApplicationStage } from "@/lib/applications/stages";
 // carries the same information as the stepper does, at badge size.
 const STAGE_STYLE: Record<ApplicationStage, { background: string; color: string }> = {
   applied: { background: "var(--status-disconnected-bg)", color: "var(--status-disconnected-text)" },
-  shortlisted: { background: "#eff6ff", color: "var(--color-info)" },
-  ai_screening_call: { background: "#eff6ff", color: "var(--color-info)" },
-  phone_interview: { background: "#eff6ff", color: "var(--color-info)" },
+  shortlisted: { background: "var(--color-primary-tint)", color: "var(--color-info)" },
+  ai_screening_call: { background: "var(--color-primary-tint)", color: "var(--color-info)" },
+  phone_interview: { background: "var(--color-primary-tint)", color: "var(--color-info)" },
   video_interview: {
     background: "var(--status-attention-bg)",
     color: "var(--status-attention-text)",

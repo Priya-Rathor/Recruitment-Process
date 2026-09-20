@@ -7,7 +7,7 @@ import {
 } from "@/lib/interviews/feedback";
 
 const STATUS_STYLE: Record<InterviewStatus, { background: string; color: string }> = {
-  scheduled: { background: "#eff6ff", color: "var(--color-info)" },
+  scheduled: { background: "var(--color-primary-tint)", color: "var(--color-info)" },
   completed: {
     background: "var(--status-connected-bg)",
     color: "var(--status-connected-text)",

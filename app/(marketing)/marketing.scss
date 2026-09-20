@@ -23,25 +23,39 @@
 // scoping means that even if a future page imports both, no rule here can
 // change a table cell or a form field in the app.
 //
-// ON THE BRAND GRADIENT. globals.scss documents that the gradient is decoration
-// only — contrast across its stops runs from about 6:1 down to under 3:1, so
-// text placed on it is readable over one end and invisible over the other, and
-// which end depends on the element's width. It is used here only as thin accent
-// rules and glows. No text sits on it anywhere.
+// ON THE BRAND GRADIENT. Still decoration only, and the reason is unchanged by
+// the theme replacement: the ramp runs deep space -> periwinkle -> lavender, so
+// contrast against any fixed ink colour swings from ~18:1 at the dark end to
+// under 2:1 at the light end. Text on it is legible over one half and invisible
+// over the other, and which half depends on the element's width. Used here for
+// thin accent rules and the hero aura. No text sits on it anywhere.
 // =============================================================================
 
 .mkt {
   // ---------------------------------------------------------------------------
   // Local tokens. Derived from the brand tokens, never new colours.
   // ---------------------------------------------------------------------------
-  --mkt-dark: var(--brand-navy);          // #010c27 — the dark section ground
-  --mkt-dark-raised: #061437;             // navy lifted ~4%, for cards on dark
-  --mkt-dark-border: rgba(255, 255, 255, 0.14);
-  --mkt-dark-border-strong: rgba(255, 255, 255, 0.26);
-  --mkt-on-dark: #ffffff;
-  --mkt-on-dark-muted: rgba(255, 255, 255, 0.66); // 9.1:1 on --mkt-dark
-  --mkt-on-dark-faint: rgba(255, 255, 255, 0.44);
-  --mkt-accent-on-dark: var(--brand-sky); // #00abf8 — 7.4:1 on the navy
+  /*
+    FUTURE WORKFORCE. These pointed at two of the retired brand tokens, which
+    the theme replacement DELETED — so every dark marketing section was
+    resolving to an undefined variable and falling back to transparent. That is
+    the failure mode of a local token derived from a global one: it breaks
+    silently, one page away from the file that changed. app/theme.test.ts now
+    fails the build on a dangling token reference for exactly this reason.
+
+    They now derive from the theme's own surfaces, which means the marketing
+    site's "dark section" and the app's ground are the same colour for the first
+    time — the whole product is dark now, so a separately-toned dark band would
+    read as a seam rather than as a section.
+  */
+  --mkt-dark: var(--color-background);      // deep space — the dark section ground
+  --mkt-dark-raised: var(--color-card);     // cards on dark
+  --mkt-dark-border: var(--color-border);
+  --mkt-dark-border-strong: var(--color-border-strong);
+  --mkt-on-dark: var(--color-text);              // 18.69:1 on deep space
+  --mkt-on-dark-muted: var(--color-text-secondary);  //  8.82:1
+  --mkt-on-dark-faint: var(--color-text-muted);      //  6.11:1
+  --mkt-accent-on-dark: var(--color-primary);        //  7.50:1 — periwinkle
 
   // Section rhythm. One scale, so no section invents its own padding.
   --mkt-section-y: clamp(4rem, 9vw, 7.5rem);
@@ -196,25 +210,44 @@
     white-space: nowrap;
   }
 
+  /*
+    THE INK ON A FILLED BUTTON IS --color-on-accent, NOT WHITE.
+
+    These said `color: #fff`, which was right on the retired brand blue and is
+    WRONG on periwinkle: white on #8b9eff is 2.49:1. Deep space on it is 7.50:1.
+    This is the single most repeated mistake available in this theme, which is
+    why the token is named for the job rather than for a colour — and why it
+    flips per mode (deep space on dark, white on light) so a component never has
+    to know which mode it is in.
+
+    Glow on hover rather than a darker fill: on a dark ground "darker" reads as
+    disabled, so the affordance is the accent appearing to emit light.
+  */
   .mkt-btn--primary {
     background: var(--color-primary);
-    color: #fff;
+    color: var(--color-on-accent);
 
     &:hover {
       background: var(--color-primary-hover);
-      color: #fff;
+      color: var(--color-on-accent);
+      box-shadow: var(--glow-accent);
     }
   }
 
-  // On the dark hero a white button outreads a blue one, and it keeps the blue
-  // exclusively for the primary action further down the page.
+  /*
+    The inverted button: the page's INK as the fill, the page's GROUND as the
+    ink. Stated as tokens rather than as `#fff` on navy so it stays correct in
+    both modes — white-on-deep-space in dark, deep-space-on-light in light.
+    Hard-coding either one would make it invisible in the other mode.
+  */
   .mkt-btn--invert {
-    background: #fff;
-    color: var(--brand-navy);
+    background: var(--color-text);
+    color: var(--color-background);
 
     &:hover {
-      background: #e9eefc;
-      color: var(--brand-navy);
+      background: var(--color-text-secondary);
+      color: var(--color-background);
+      box-shadow: var(--glow-soft);
     }
   }
 
@@ -224,8 +257,8 @@
     color: var(--mkt-on-dark);
 
     &:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.4);
+      background: var(--color-primary-tint);
+      border-color: var(--color-primary);
       color: var(--mkt-on-dark);
     }
   }
@@ -255,6 +288,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    /*
+      A DELIBERATE WHITE PLATE, and under FUTURE WORKFORCE it earns its place
+      more than it did before.
+
+      The monogram is a raster asset drawn for a light ground. The product is
+      now dark everywhere, so rather than the plate being a special case for one
+      marketing band, it is what gives a light-designed asset the ground it
+      needs. Re-drawing the PNGs for dark is a brand-asset job; until then this
+      is the honest fix and not a leftover.
+    */
     background: #fff;
     // Derived from the mark's own size so the badge stays proportional at any
     // height the header or footer asks for.
@@ -297,7 +340,13 @@
     position: sticky;
     top: 0;
     z-index: 40;
-    background: rgba(1, 12, 39, 0.88);
+    /*
+      The sticky header's scrim was the retired navy at 88%. Expressed with
+      color-mix against the live token instead, so it follows the theme — and
+      follows it into LIGHT mode too, where a near-black scrim over a light page
+      was the most obvious thing a mode switch would have broken.
+    */
+    background: color-mix(in srgb, var(--color-background) 88%, transparent);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--mkt-dark-border);
   }
@@ -548,7 +597,7 @@
     &[aria-selected="true"] {
       background: var(--color-primary);
       border-color: var(--color-primary);
-      color: #fff;
+      color: var(--color-on-accent);
     }
   }
 

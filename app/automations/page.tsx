@@ -134,7 +134,7 @@ async function AutomationsList() {
                       {automation.drafted_by_ai && (
                         <div
                           className="mt-1"
-                          style={{ fontSize: 12, color: "var(--color-info, #0067AA)" }}
+                          style={{ fontSize: 12, color: "var(--color-info, var(--color-info))" }}
                         >
                           Drafted by AI
                           {automation.activated_at ? " · reviewed and activated" : " · not yet activated"}
@@ -153,7 +153,7 @@ async function AutomationsList() {
                         </span>
                       )}
                       {automation.awaitingApprovalCount > 0 && (
-                        <div style={{ fontSize: 12, color: "var(--color-info, #0067AA)" }}>
+                        <div style={{ fontSize: 12, color: "var(--color-info, var(--color-info))" }}>
                           {automation.awaitingApprovalCount} waiting for approval
                         </div>
                       )}

@@ -213,7 +213,7 @@ function MessageRow({
             fontSize: 13,
             color:
               message.status === "skipped"
-                ? "var(--color-secondary-text)"
+                ? "var(--color-text-secondary)"
                 : "var(--color-error)",
           }}
         >

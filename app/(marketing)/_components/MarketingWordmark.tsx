@@ -5,17 +5,19 @@ import { Logo } from "@/components/Logo";
  *
  * WHY THIS EXISTS RATHER THAN REUSING <Logo variant="compact" />.
  *
- * The compact lockup is a raster asset, and globals.scss records why: the
- * wordmark is painted in two flat brand colours — "My" in the brand blue
- * (#004cf5) and "Recruiter" in the brand navy (#010c27). That is correct on the
- * white and near-white surfaces the app uses it on.
+ * The compact lockup is a RASTER asset painted in two flat colours — one for
+ * "My", a dark one for "Recruiter" — and it was drawn for a light ground.
  *
- * The marketing header and footer are the brand navy. Rendering the compact
- * lockup there paints #010c27 text onto a #010c27 ground, so "Recruiter
- * Partner" drops to roughly a 1:1 contrast ratio and simply disappears — a
- * screenshot of the header showed a blue "My" followed by nothing. Which half
- * of the company's name vanishes depends only on which colour the asset happened
- * to use, so no amount of resizing fixes it.
+ * Under the previous light theme that was fine everywhere except the marketing
+ * site's dark band, where the dark half of the wordmark landed on a dark ground
+ * and "Recruiter Partner" dropped to roughly 1:1 and simply disappeared: a
+ * screenshot showed a blue "My" followed by nothing.
+ *
+ * FUTURE WORKFORCE MADE THAT THE DEFAULT CASE RATHER THAN THE EXCEPTION. The
+ * whole product is dark now, so the asset's dark half is on a dark ground on
+ * every screen, not just this one. Re-drawing the PNGs is a brand-asset job
+ * (see docs/Memory.md) — but this component was already the right answer and is
+ * now the right answer everywhere.
  *
  * Three ways out, and why this one:
  *

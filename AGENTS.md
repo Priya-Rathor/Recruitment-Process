@@ -273,16 +273,55 @@ number that contradicts the KPI tiles" — enforce it in code and test the
 enforcement, rather than relying on prompt wording. Keep the irreversible
 decision a pure function and let the executor do only what it is told.
 
-## Design system
+## Design system — theme: FUTURE WORKFORCE (dark-default)
 
 Tokens live in `app/globals.scss` as CSS custom properties. Use
-`var(--color-primary)` etc., never raw hex. Cards are flat: white, 1px
-`--color-border`, 12px radius, 24px padding (16px mobile). No drop shadows, no
-rainbow palettes, no 3D charts.
+`var(--color-primary)` etc., **never raw hex** — `app/theme.test.ts` fails the
+build on a retired value in any notation, including `rgba()`.
+
+**Dark is the default.** Light is a designed counterpart under
+`prefers-color-scheme: light`, not an automatic flip; every role it overrides is
+re-declared with its own value. There is no theme toggle in the product.
+
+- **Surfaces**: `--color-background` (deep space) is the ground,
+  `--color-card` is a panel, `--color-raised` a modal. The step between them is
+  small on purpose — elevation is the glow and the hairline border, not a
+  lighter fill.
+- **Cards**: 16px radius, 1px `--color-border` (periwinkle at low alpha), 24px
+  padding (16px mobile), and `box-shadow: var(--glow-soft)`.
+- **Elevation is soft glow only. Never a hard shadow.** Use `--glow-soft`,
+  `--glow-raised`, `--glow-accent`; there is a test asserting every
+  `box-shadow` is a token, `none`, or an inset accent edge.
+- **Radius is 10/12/16px** (`--radius-sm` / `--radius-base` / `--radius-lg`).
+  Nothing sharp anywhere.
+
+**THE ONE RULE THAT WILL BITE YOU:** ink on a filled accent is
+`var(--color-on-accent)`, **never white**. White on periwinkle is 2.49:1, on
+mint 1.49:1, on the warning amber ~1.4:1 — all unusable, and all what you reach
+for first. The token flips per mode (deep space on dark, white on light), so a
+component never needs to know which mode it is in. Hover on an accent adds
+`--glow-accent`; it does **not** darken the fill, because darker reads as
+disabled on a dark ground.
+
+**Charts**: the form follows the data's job, and the theme's orbital preference
+applies where the two agree. A ratio against a limit is an `OrbitalMeter`; the
+funnel is concentric orbits sharing a 12 o'clock start; magnitude across
+unordered categories stays **linear** — arcs at differing radii compare badly,
+and that was a deliberate exception, not an oversight. Series come from
+`--chart-1..5` in fixed order (never cycled) and the ordinal ramp from
+`--ramp-0..5`; both were generated in OKLCH and validated with the `dataviz`
+skill's `validate_palette.js`. No rainbow palettes, no 3D charts.
 
 Every data-bearing view needs loading (skeletons, never a full-page spinner),
 empty, and error states — use `components/states.tsx`. Config edits use an
 explicit Save, never silent auto-save.
+
+**Changing the theme again**: the user's theme-command format means FULL
+replacement. Wipe the tokens, add the outgoing values to `RETIRED_COLORS` in
+`app/theme.test.ts`, and let that test find the leftovers — it has caught, in
+one pass, six hard shadows, two `rgba()` washes from a palette two rebrands old,
+a token name (`--color-secondary-text`) that never existed in either theme, and
+two local marketing tokens left pointing at deleted globals.
 
 ## Conventions
 

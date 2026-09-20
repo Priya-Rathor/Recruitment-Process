@@ -66,7 +66,7 @@ export function RetentionForm({
           <p
             style={{
               fontSize: 13,
-              color: "var(--status-attention-text, #B45309)",
+              color: "var(--status-attention-text, var(--status-attention-text))",
               marginTop: 8,
             }}
           >

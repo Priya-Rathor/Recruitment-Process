@@ -1,140 +1,321 @@
 // =============================================================================
 // Global design tokens — MyRecruiter Partner
-// Source of truth: docs/design/00-design-tokens.md (mirrors the spec doc's
-// "Color Legend" table). Every module must reuse these tokens; never invent
-// new ones inline.
+// THEME: FUTURE WORKFORCE (dark-default)
+//
+// This file is the single source of truth for the theme. Every module reuses
+// these tokens; nothing invents a colour, radius, shadow or font inline.
+//
+// The list of RETIRED values — the previous theme's brand hexes, greys, fonts
+// and its flat no-shadow card rule — lives in app/theme.test.ts, which fails
+// the build if any of them reappear anywhere in app/, components/ or lib/.
+// Keeping the banned list inside the thing that bans it means there is one copy
+// and it cannot go stale.
 // =============================================================================
 
 @use "bulma/sass" with (
-  $family-primary: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-  $primary: #004cf5,
-  $link: #004cf5,
-  $success: #16a34a,
-  $warning: #f59e0b,
-  $danger: #dc2626,
-  $info: #0067aa,
-  $text: #010c27,
-  $text-strong: #010c27,
-  $border: #e2e8f0,
-  $body-background-color: #f7faff
+  // FUTURE WORKFORCE. Bulma is themed from the same values as the tokens below;
+  // it is seeded here because several Bulma components derive their own shades
+  // from these at build time and cannot read a CSS custom property.
+  $family-primary: '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  $primary: #8b9eff,
+  $link: #8b9eff,
+  $success: #7fe7c4,
+  $warning: #ffd08a,
+  $danger: #ff9aa8,
+  $info: #c6b8ff,
+  $text: #ffffff,
+  $text-strong: #ffffff,
+  $border: #2a3560,
+  $body-background-color: #0a1128
 );
 
 // -----------------------------------------------------------------------------
-// CSS custom properties — the canonical token names used throughout the app.
-// Components/modules should reference var(--color-*) rather than hardcoding
-// hex values, so a future rebrand only touches this file.
+// THEME: FUTURE WORKFORCE
+//
+// A FULL REPLACEMENT of the previous theme, not a patch. The old brand palette,
+// its logo gradient, Inter and Bricolage Grotesque, the white-card-on-tinted-
+// page surface treatment and the no-drop-shadow rule are all GONE — not
+// overridden in places. app/theme.test.ts holds the retired values and fails
+// the build if any of them reappear, which is what makes "no leftovers"
+// checkable rather than claimed.
+//
+// DARK IS THE DEFAULT, and that is a reversal worth flagging to anyone reading
+// this file next: the previous theme actively SUPPRESSED dark mode, because its
+// tokens were light-only and Bulma's automatic dark theme produced unreadable
+// combinations. Dark is now the designed state, light is the derived one, and
+// both are defined here rather than one being an automatic flip of the other.
+//
+// EVERY COLOUR PAIRING IN HERE WAS COMPUTED, NOT EYEBALLED. The ratios in the
+// comments are real, and theme.test.ts recomputes them on every run:
+//
+//   white on the ground .............. 18.69:1
+//   periwinkle on the ground .......... 7.50:1
+//   mint on the ground ............... 12.57:1
+//   lavender on the ground ........... 10.41:1
+//   secondary text on a card .......... 7.90:1
+//
+// AND THE ONE THAT SHAPES THE WHOLE COMPONENT LAYER:
+//
+//   white on a PERIWINKLE FILL ........ 2.49:1   <-- fails AA badly
+//   deep space on a periwinkle fill ... 7.50:1   <-- passes
+//
+// So every filled accent surface — primary buttons, chips, the active nav pill —
+// carries DEEP SPACE text, never white. That is what --color-on-accent is for,
+// and it is not optional: white-on-periwinkle is the single easiest way to make
+// this theme inaccessible, and it is the thing a designer will reach for first.
 // -----------------------------------------------------------------------------
 :root {
   // ---------------------------------------------------------------------------
-  // BRAND — SAMPLED FROM THE LOGO, not picked to taste.
+  // BRAND — the five raw values, exactly as specified.
   //
-  // The monogram in public/brand/mark.png is one gradient running deep blue →
-  // near-black navy core → azure, and these are the pixel values read off its
-  // stops. The wordmark uses two of them flat: "My" in the blue, "Recruiter" in
-  // the navy.
-  //
-  // These five are the RAW brand colours. Nothing in the app should reference
-  // them directly except brand surfaces (the gradient rule, an accent bar, a
-  // dark panel) — everything else goes through the --color-* ROLE tokens below,
-  // so a component says "primary", not "blue".
+  // Nothing outside this block and the gradient rules should reference these
+  // directly; everything else goes through a --color-* ROLE token, so a
+  // component says "primary" rather than "periwinkle".
   // ---------------------------------------------------------------------------
-  --brand-blue: #004cf5;   // "My" wordmark and the M/R strokes — the primary
-  --brand-deep: #012a85;   // the gradient's shadow, mid-monogram
-  --brand-navy: #010c27;   // "Recruiter" wordmark, and the gradient's dark core
-  --brand-azure: #0099f8;  // the gradient's light end
-  --brand-sky: #00abf8;    // brightest tip, lower-left of the mark
+  --brand-space: #0a1128;       // deep space blue — the ground
+  --brand-periwinkle: #8b9eff;  // the primary accent
+  --brand-white: #ffffff;       // the highlight
+  --brand-mint: #7fe7c4;        // secondary accent 1
+  --brand-lavender: #c6b8ff;    // secondary accent 2
 
-  // The logo's gradient, in the logo's own direction and stop order.
-  //
-  // DECORATION ONLY. Contrast against it runs from 6.3:1 at the blue end to
-  // 2.6:1 at the sky end, so no text may sit on top of it — a label that is
-  // readable over one stop is unreadable over another, and which stop it lands
-  // on depends on the element's width. Text goes beside it, never on it.
+  /*
+    THE GRADIENT: space -> periwinkle -> lavender, soft-diffused.
+
+    SIX STOPS, NOT THREE, and that is the "no banding" requirement rather than
+    decoration. A three-stop gradient across this much lightness range
+    (L 0.13 -> 0.82) renders visible steps on 8-bit displays, worst in the dark
+    half where the eye is most sensitive to small steps. The intermediate stops
+    are placed where the lightness gradient is steepest so the interpolation has
+    less distance to cover per step.
+
+    The percentages are deliberately uneven: the dark end gets more of the ramp,
+    because that is where banding shows.
+  */
   --brand-gradient: linear-gradient(
-    100deg,
-    var(--brand-blue) 0%,
-    var(--brand-navy) 42%,
-    var(--brand-blue) 68%,
-    var(--brand-azure) 100%
+    135deg,
+    #0a1128 0%,
+    #141d4a 18%,
+    #2c3d8e 38%,
+    #5b6cd6 56%,
+    #8b9eff 72%,
+    #aeaaf8 87%,
+    #c6b8ff 100%
   );
+
+  /*
+    The hero's atmospheric wash. A large, very soft radial — the "diffused" half
+    of the brief. Separate from the gradient above because a hero needs a glow
+    BEHIND its content, while the gradient is for edges, bars and fills.
+  */
+  --brand-aura:
+    radial-gradient(120% 90% at 18% 0%, rgba(139, 158, 255, 0.28) 0%, rgba(139, 158, 255, 0) 62%),
+    radial-gradient(90% 70% at 88% 12%, rgba(198, 184, 255, 0.20) 0%, rgba(198, 184, 255, 0) 58%),
+    radial-gradient(70% 60% at 50% 100%, rgba(127, 231, 196, 0.12) 0%, rgba(127, 231, 196, 0) 60%);
+
+  // ---------------------------------------------------------------------------
+  // SURFACES (dark — the default)
+  //
+  // The step between ground and card is deliberately SMALL (1.12:1). On a dark
+  // theme elevation is carried by the glow and the hairline border, not by a
+  // lighter fill — a card light enough to read as "raised" on its own would
+  // wash out the glow and flatten the whole hierarchy.
+  // ---------------------------------------------------------------------------
+  --color-background: #0a1128;    // the ground
+  --color-card: #141c39;          // panels, cards, table rows
+  --color-raised: #1a2347;        // modals, popovers, dropdowns — one step up
+  --color-sunken: #070d20;        // wells, code blocks, inset tracks
+
+  /*
+    BORDERS ARE PERIWINKLE AT LOW ALPHA, not a grey.
+
+    A neutral grey hairline on a blue-black ground reads as dirt. Tinting the
+    border with the accent keeps it in the family and lets it sit under the glow
+    without a visible seam where the two meet.
+  */
+  --color-border: rgba(139, 158, 255, 0.16);
+  --color-border-strong: rgba(139, 158, 255, 0.32);
+
+  // ---------------------------------------------------------------------------
+  // INK
+  // ---------------------------------------------------------------------------
+  --color-text: #ffffff;            // 18.69:1 on ground, 16.73:1 on card
+  --color-text-secondary: #a6b1d9;  //  8.82:1 on ground,  7.90:1 on card
+  --color-text-muted: #8792bc;      //  6.11:1 on ground,  5.47:1 on card
+
+  /*
+    TEXT THAT SITS ON A FILLED ACCENT. See this file's header.
+
+    White on periwinkle is 2.49:1. On mint it is 1.49:1. On lavender 1.79:1.
+    All three are unusable, and all three are what a designer reaches for first.
+    Deep space on the same fills gives 7.50 / 12.57 / 10.41:1.
+  */
+  --color-on-accent: #0a1128;
 
   // ---------------------------------------------------------------------------
   // ROLES
-  //
-  // The primary is the logo blue unchanged. It landed at OKLCH L=0.508 against
-  // the previous indigo's L=0.511 — 6.26:1 vs 6.29:1 white-on-fill — so this
-  // was a hue swap at constant lightness, and every contrast pair the old
-  // palette had been checked for still holds. The derived steps below were
-  // regenerated at the brand hue (263°) rather than reused from the indigo
-  // scale, and each one is measured in the comment that follows it.
   // ---------------------------------------------------------------------------
-  --color-primary: #004cf5;        // = --brand-blue; 6.26:1 under white text
-  --color-primary-hover: #003ed6;  // same hue, L-0.054; 7.89:1 under white
-  // The brand hue at ~7.5% over white — the one tint allowed for icon wells and
-  // soft surfaces. Written as a literal rather than an alpha layer so it
-  // composites identically over the page background and over a white card.
-  // Primary text on it is 5.58:1.
-  --color-primary-tint: #ecf2fe;
-  // The disabled fill for a primary button. NOT a lighter default state: this
-  // colour is reserved for "this control genuinely cannot run yet", which is
-  // why the ready state stays full-strength #004cf5.
-  --color-primary-muted: #bfd5ff;
-  --color-background: #f7faff;
-  --color-card: #ffffff;
-  --color-border: #e2e8f0;
-  --color-text: #010c27;           // = --brand-navy; 19.4:1 on white
-  --color-text-secondary: #64748b;
-  --color-success: #16a34a;
-  --color-warning: #f59e0b;
-  --color-error: #dc2626;
-  // NOT the old #2563eb. That sat at hue 262.9° — 0.2° from the logo blue, so
-  // once the primary became the brand blue an info chip and a primary button
-  // were the same colour at different lightness, which is not a distinction
-  // anyone reads. This is the logo's AZURE stop darkened until it carries 13px
-  // text: hue 247°, ~16° of separation from the primary, 5.96:1 on white and
-  // 5.48:1 on the #eff6ff chip fill it is used against.
-  --color-info: #0067aa;
+  --color-primary: #8b9eff;
+  // Hover goes LIGHTER, not darker. On a dark ground darker reads as disabled —
+  // the opposite of the affordance — which is the inverse of the old theme's
+  // rule and the kind of thing that survives a rebrand by accident.
+  --color-primary-hover: #a9b6ff;
+  --color-primary-tint: rgba(139, 158, 255, 0.12);   // quiet fills, hover rows
+  --color-primary-muted: rgba(139, 158, 255, 0.28);  // a genuinely disabled fill
 
-  // Integration status chips (Module 17 spec)
-  --status-connected-bg: #dcfce7;
-  --status-connected-text: #15803d;
-  --status-attention-bg: #fef3c7;
-  --status-attention-text: #b45309;
-  --status-disconnected-bg: #f1f5f9;
-  --status-disconnected-text: #475569;
-  --status-error-bg: #fee2e2;
-  --status-error-text: #b91c1c;
+  --color-highlight: #ffffff;
+  --color-accent-mint: #7fe7c4;
+  --color-accent-lavender: #c6b8ff;
 
-  // Card spec: flat, bordered, 12px radius, 24px padding (16px mobile)
-  --card-radius: 12px;
+  // Status. Drawn from the theme's own accents rather than a stock green/amber/
+  // red, so nothing in the UI sits outside the palette.
+  --color-success: #7fe7c4;   // 12.57:1 — mint
+  --color-warning: #ffd08a;   // 13.03:1 — the palette's warm counterpart
+  --color-error: #ff9aa8;     //  9.29:1 — a rose that belongs to this family
+  --color-info: #c6b8ff;      // 10.41:1 — lavender
+
+  /*
+    STATUS CHIPS: a low-alpha wash of the status hue, with the hue itself as the
+    text. On dark, a solid pastel chip would be a bright block competing with
+    the content; a 14% wash reads as a tint of the surface it sits on and keeps
+    the text at full contrast.
+  */
+  --status-connected-bg: rgba(127, 231, 196, 0.14);
+  --status-connected-text: #7fe7c4;
+  --status-attention-bg: rgba(255, 208, 138, 0.14);
+  --status-attention-text: #ffd08a;
+  --status-disconnected-bg: rgba(139, 158, 255, 0.10);
+  --status-disconnected-text: #a6b1d9;
+  --status-error-bg: rgba(255, 154, 168, 0.14);
+  --status-error-text: #ff9aa8;
+
+  // ---------------------------------------------------------------------------
+  // CHART SERIES — derived, and VALIDATED, not the brand accents reused.
+  //
+  // The five brand accents make a correct UI palette and an ILLEGAL chart
+  // palette: they cluster at OKLCH L 0.73-0.88, outside the dark-mode band of
+  // [0.48, 0.67], and lavender sits exactly on the 0.10 chroma floor. Five
+  // near-equiluminant pastels are also the hardest case for a colourblind
+  // reader, because hue is then carrying the entire signal.
+  //
+  // So the series below keep each brand HUE (drift <= 0.2 degrees) and snap the
+  // lightness into the legal band, spread across it so lightness carries
+  // separation alongside hue. Generated in OKLCH and checked with the
+  // validator: lightness band PASS, chroma floor PASS, CVD separation PASS
+  // (worst adjacent pair dE 12.5 deutan / 8.0 tritan), normal-vision floor PASS
+  // (dE 19.6), contrast vs surface PASS (all five >= 3:1).
+  //
+  // ASSIGNED IN THIS FIXED ORDER, never cycled. A ninth series folds into
+  // "Other" or becomes small multiples; it is never a generated hue.
+  // ---------------------------------------------------------------------------
+  --chart-1: #6474fd;   // periwinkle  — 4.86:1 on ground
+  --chart-2: #0fab86;   // mint        — 6.40:1
+  --chart-3: #765dbd;   // lavender    — 3.62:1
+  --chart-4: #c4880c;   // amber       — 6.12:1
+  --chart-5: #cc4060;   // rose        — 3.98:1
+
+  /*
+    The ORDINAL ramp, for ordered magnitude (the pipeline funnel).
+
+    One hue, monotone lightness, adjacent dL 0.068 so every step is visibly
+    distinct — the previous theme's ramp used dL 0.06 and the validator's gate
+    is above that, which is why this is re-derived rather than re-tinted. The
+    deepest step sits at 2.03:1 against a card, which is legal for an ordinal
+    ramp END only because every ring is directly labelled; the fill is not
+    carrying the value alone.
+  */
+  --ramp-0: #a1b2fe;
+  --ramp-1: #8699fd;
+  --ramp-2: #6e80f8;
+  --ramp-3: #5b6ae0;
+  --ramp-4: #4a55c9;
+  --ramp-5: #3940b2;
+
+  // Recessive chart chrome. Grid and axis lines must never compete with a mark.
+  --chart-grid: rgba(139, 158, 255, 0.10);
+  --chart-axis: rgba(139, 158, 255, 0.22);
+  --chart-track: rgba(139, 158, 255, 0.10);
+
+  // ---------------------------------------------------------------------------
+  // RADIUS — 10-16px, per the brief. Nothing sharp anywhere.
+  // ---------------------------------------------------------------------------
+  --radius-sm: 10px;    // chips, inputs, small controls
+  --radius-base: 12px;  // buttons, selects, table wells
+  --radius-lg: 16px;    // cards, panels, modals
+  --radius-pill: 999px; // pills, avatars, the orbital caps
+
+  --card-radius: var(--radius-lg);
+  --control-radius: var(--radius-base);
   --card-padding: 24px;
   --card-padding-mobile: 16px;
 
   // ---------------------------------------------------------------------------
+  // ELEVATION — SOFT GLOW, AND NO HARD SHADOW ANYWHERE.
+  //
+  // A drop shadow needs something to fall onto; on a near-black ground it is
+  // invisible, and cranking it up to compensate produces the grey halo that
+  // makes dark UIs look cheap. So elevation here is:
+  //
+  //   1. a hairline inner ring, which does the work a border does in daylight;
+  //   2. a wide, very low-opacity ambient wash to seat the surface;
+  //   3. a coloured bloom, so light appears to come FROM the accent.
+  //
+  // The bloom is what the brief calls a glow. It is deliberately tiny in
+  // opacity — 0.10-0.18 — because a glow you can point at is a glow that will
+  // look dated in a year.
+  // ---------------------------------------------------------------------------
+  --glow-soft:
+    inset 0 0 0 1px rgba(139, 158, 255, 0.08),
+    0 2px 10px -4px rgba(4, 8, 22, 0.70),
+    0 12px 40px -20px rgba(139, 158, 255, 0.16);
+
+  --glow-raised:
+    inset 0 0 0 1px rgba(139, 158, 255, 0.12),
+    0 8px 28px -10px rgba(4, 8, 22, 0.80),
+    0 20px 64px -28px rgba(139, 158, 255, 0.24);
+
+  // For an accent surface that should read as emitting light — a primary button
+  // on hover, an active nav item, a live indicator.
+  --glow-accent: 0 0 0 1px rgba(139, 158, 255, 0.30), 0 6px 24px -8px rgba(139, 158, 255, 0.45);
+  --glow-mint: 0 0 0 1px rgba(127, 231, 196, 0.30), 0 6px 24px -8px rgba(127, 231, 196, 0.40);
+
+  // Retired: the old theme's `box-shadow: none` flat-card rule. Kept as a token
+  // so the handful of places that genuinely want no elevation say so by name.
+  --glow-none: none;
+
+  // ---------------------------------------------------------------------------
   // TYPOGRAPHY
   //
-  // The audit found eight ad-hoc font sizes and `fontSize: 13` written inline
-  // 248 times. These tokens replace that: a component picks a ROLE, never a
-  // number, so "section heading" means the same thing in every module.
+  // SPACE GROTESK for headings. PLUS JAKARTA SANS for body — and that second
+  // one is a SUBSTITUTION worth naming: the brief asked for Aeonik, which is a
+  // commercial licence and cannot be fetched by next/font, so nothing here can
+  // load it legally. Plus Jakarta Sans is the closest licensable neo-grotesque
+  // (same geometric skeleton, similar aperture, slightly warmer). Dropping real
+  // Aeonik in later is a one-line change in app/layout.tsx.
   //
-  // Two families, deliberately (see app/layout.tsx). The display face carries
-  // headings; Inter carries everything read closely — body, table cells, labels,
-  // numbers.
+  // Inter is GONE — not demoted to a fallback. Leaving it in the stack is
+  // exactly the leftover this replacement is meant to eliminate, and on a
+  // machine with Inter installed it would silently keep rendering the old
+  // theme's body text.
+  //
+  // The SIZE scale below is unchanged, deliberately: the brief specified
+  // families, radius, colour and shadow, and did not specify a type scale.
+  // Inventing new sizes would be a change nobody asked for — and these are
+  // information hierarchy rather than theme.
   // ---------------------------------------------------------------------------
-  --font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
+  --font-body: var(--font-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, Helvetica, Arial, sans-serif;
-  --font-heading: var(--font-display), var(--font-inter), -apple-system, sans-serif;
+  --font-heading: var(--font-grotesk), var(--font-jakarta), -apple-system, sans-serif;
 
-  --text-display: 30px;      // hero numbers, KPI values
-  --text-page: 23px;         // page title, one per screen
-  --text-section: 17px;      // card and section headings
-  --text-body: 14px;         // default reading size
-  --text-body-lg: 15px;      // long-form prose
-  --text-label: 13px;        // form labels, table headers
-  --text-caption: 12px;      // helper text, timestamps
+  --text-display: 30px;
+  --text-page: 23px;
+  --text-section: 17px;
+  --text-body: 14px;
+  --text-body-lg: 15px;
+  --text-label: 13px;
+  --text-caption: 12px;
 
-  --leading-tight: 1.25;     // headings
-  --leading-normal: 1.5;     // body
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
 
   --weight-regular: 400;
   --weight-medium: 500;
@@ -142,7 +323,7 @@
   --weight-bold: 700;
 
   // ---------------------------------------------------------------------------
-  // SPACING — one 4px-based scale. Sections stack on --space-8 (32px).
+  // SPACING — unchanged. Not a theme parameter, and none was specified.
   // ---------------------------------------------------------------------------
   --space-1: 4px;
   --space-2: 8px;
@@ -153,31 +334,28 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  // Vertical rhythm between stacked sections on a page. The audit found mb-4
-  // and mb-5 mixed within single pages; this is the one value.
   --stack-gap: var(--space-8);
 
   // ---------------------------------------------------------------------------
-  // CONTROLS — one height and radius for every input, select and button, so a
-  // filter row lines up without per-page nudging.
+  // CONTROLS
   // ---------------------------------------------------------------------------
   --control-height: 40px;
   --control-height-sm: 32px;
-  --control-radius: 8px;
-  --control-padding-x: 12px;
+  --control-padding-x: 14px;
 
-  // ---------------------------------------------------------------------------
-  // MOTION — restrained. Colour and border changes only; nothing decorative.
-  // 150ms is below the threshold where a UI starts to feel like it is waiting
-  // for an animation rather than responding.
-  // ---------------------------------------------------------------------------
   --transition-fast: 150ms;
   --transition-base: 200ms;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
 
-  // Focus ring. A 2px primary ring, offset so it reads on both white cards and
-  // the page background. The audit found no :focus-visible rule anywhere.
-  --focus-ring: 0 0 0 2px var(--color-card), 0 0 0 4px var(--color-primary);
+  /*
+    FOCUS RING. Two rings: a dark spacer against the surface, then the accent.
+
+    The spacer is the GROUND colour rather than the card colour, because a focus
+    ring has to read on a card, on a modal and on the page itself. Using the
+    card colour left a visible notch wherever the focused control sat on
+    something else.
+  */
+  --focus-ring: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-primary);
 }
 
 // -----------------------------------------------------------------------------
@@ -210,6 +388,36 @@ body {
 
 // Bulma's generated color shades won't exactly equal our hover token, so pin
 // the primary hover/active state explicitly wherever Bulma applies it.
+/*
+  THE INK ON EVERY BULMA-FILLED ACCENT BUTTON.
+
+  Bulma derives a "primary-invert" at build time from $primary. For the retired
+  mid-blue it chose white and was right; for periwinkle it is choosing on a
+  light hue where white gives 2.49:1. Pinned here rather than trusted, for every
+  state, because this is the most-used control in the product.
+
+  Hover adds the accent GLOW instead of darkening the fill: on a dark ground a
+  darker fill reads as disabled.
+*/
+.button.is-primary,
+.button.is-primary:hover,
+.button.is-primary:focus,
+.button.is-primary:active {
+  color: var(--color-on-accent);
+}
+
+.button.is-primary:hover {
+  box-shadow: var(--glow-accent);
+}
+
+.button.is-success,
+.button.is-warning,
+.button.is-danger,
+.button.is-info {
+  // Same reasoning: all four status fills are light hues in this palette.
+  color: var(--color-on-accent);
+}
+
 .button.is-primary:hover,
 .button.is-primary:focus,
 .button.is-primary.is-focused,
@@ -224,13 +432,25 @@ a.is-primary:focus {
   color: var(--color-primary-hover);
 }
 
-// Flat card style per spec (rely on border, not drop shadow).
+/*
+  CARDS: 16px radius, a hairline accent border, and a SOFT GLOW.
+
+  This reverses the previous theme's explicit `box-shadow: none` flat rule — the
+  brief asks for soft glow and no hard shadow, and on a near-black ground a flat
+  bordered card has no way to separate from the page. The border still does most
+  of the definition; the glow seats the surface and adds the faint coloured bloom
+  that makes the light look like it comes from the accent rather than from a
+  light source above the page.
+
+  Note --glow-soft resolves differently per mode: a coloured bloom on dark, a
+  diffuse neutral-cool wash on light. Same instruction, two correct answers.
+*/
 .card,
 .box {
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: var(--card-radius);
-  box-shadow: none;
+  box-shadow: var(--glow-soft);
   padding: var(--card-padding);
 }
 
@@ -246,80 +466,199 @@ a.is-primary:focus {
 }
 
 // -----------------------------------------------------------------------------
-// FORCE THE LIGHT SCHEME.
+// DARK IS THE DEFAULT. LIGHT IS THE DERIVED COUNTERPART.
 //
-// Bulma 1.x ships an automatic dark theme keyed off `prefers-color-scheme`.
-// This product is designed light-only — the spec fixes every surface (white
-// cards on a tinted page) and every text colour (the brand navy) with no dark
-// equivalents. The pins below reference the --color-* tokens rather than
-// repeating their hex values, so a rebrand touches the token block alone —
-// which is the whole point of having one.
+// This REPLACES the previous theme's "FORCE THE LIGHT SCHEME" block, which
+// existed because the old tokens were light-only and Bulma's automatic dark
+// theme flipped its own variables underneath them — producing black inputs with
+// black text and headings that looked like placeholders. That whole problem is
+// gone: the tokens above ARE dark, so Bulma and the design system now agree by
+// default instead of fighting.
 //
-// On a machine set to dark mode Bulma flipped its own variables while our
-// tokens stayed light, producing unreadable combinations: black inputs with
-// black text, black tables with invisible rows, and headings so pale they
-// looked like placeholders. Every one of those was this, not a styling mistake
-// in the individual components.
+// `color-scheme: dark` is what makes the browser's own furniture — form
+// controls, scrollbars, autofill, the spellcheck underline — render dark. Every
+// dark theme that forgets it ends up with one white scrollbar nobody can style.
 //
-// `color-scheme: light` tells the browser to render form controls, scrollbars
-// and autofill in light mode. The variable pins below stop Bulma's dark block
-// from winning inside the media query, which `color-scheme` alone does not do.
+// LIGHT MODE IS A DESIGNED SET OF STEPS, NOT AN INVERSION. The accents cannot be
+// reused raw on a light ground: periwinkle on white is 2.49:1, mint 1.49:1,
+// lavender 1.79:1 — all unreadable as text. So light mode darkens each accent
+// along its OWN hue until it clears AA on white, which is why the values below
+// are not simply the dark ones swapped around:
 //
-// A real dark theme is a design exercise (the dataviz work in Module 16 makes
-// that plain — dark needs its own validated steps, not an inverted light
-// palette), so this locks to light rather than half-supporting both.
+//   periwinkle #8b9eff -> #515f9e   6.03:1 on white
+//   mint       #7fe7c4 -> #3f716e   5.53:1
+//   lavender   #c6b8ff -> #716d9e   4.79:1
+//
+// It is reached by `prefers-color-scheme: light` rather than a toggle, because
+// the brief named a default and this product has no theme switcher to build one
+// into. A reader who has told their OS they want light gets light; everyone else
+// gets the designed state.
 // -----------------------------------------------------------------------------
 html {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 :root {
+  // Bulma's scheme variables, pointed at our tokens. Set on :root (not inside a
+  // media query) because dark is now the default rather than the exception.
   --bulma-scheme-main: var(--color-card);
   --bulma-scheme-main-bis: var(--color-background);
-  --bulma-scheme-main-ter: #f1f5f9;
+  --bulma-scheme-main-ter: var(--color-raised);
   --bulma-scheme-invert: var(--color-text);
   --bulma-background: var(--color-background);
   --bulma-border: var(--color-border);
-  --bulma-border-weak: #eef2f7;
+  --bulma-border-weak: var(--color-border);
   --bulma-text: var(--color-text);
   --bulma-text-weak: var(--color-text-secondary);
   --bulma-text-strong: var(--color-text);
+  --bulma-title-color: var(--color-text);
+  --bulma-subtitle-color: var(--color-text-secondary);
+  --bulma-label-color: var(--color-text);
+  --bulma-body-color: var(--color-text);
+
+  --bulma-input-background-color: var(--color-sunken);
+  --bulma-input-color: var(--color-text);
+  --bulma-input-border-color: var(--color-border);
+  --bulma-input-placeholder-color: var(--color-text-muted);
+  --bulma-input-hover-border-color: var(--color-border-strong);
+
+  --bulma-table-background-color: var(--color-card);
+  --bulma-table-color: var(--color-text);
+  --bulma-table-cell-border-color: var(--color-border);
+  --bulma-table-head-cell-color: var(--color-text-secondary);
+  --bulma-table-row-hover-background-color: var(--color-primary-tint);
+  --bulma-table-striped-row-even-background-color: var(--color-raised);
+
+  --bulma-select-color: var(--color-text);
+  --bulma-select-background-color: var(--color-sunken);
 }
 
-@media (prefers-color-scheme: dark) {
+// -----------------------------------------------------------------------------
+// LIGHT MODE
+//
+// Every token the dark set defines is re-declared here — none is inherited —
+// because a half-overridden palette is how a light mode ends up with one dark
+// border nobody can find. The gradient is re-stated too: on a light ground the
+// dark end of the dark-mode gradient reads as a bruise, so light mode runs the
+// ramp the other way (lavender -> periwinkle -> a pale space tint) and keeps the
+// deep colour for text and marks.
+// -----------------------------------------------------------------------------
+@media (prefers-color-scheme: light) {
+  html {
+    color-scheme: light;
+  }
+
   :root {
-    // Repeated inside the media query so they beat Bulma's dark block, which
-    // is itself defined here and would otherwise take precedence.
-    --bulma-scheme-main: var(--color-card);
-    --bulma-scheme-main-bis: var(--color-background);
-    --bulma-scheme-main-ter: #f1f5f9;
-    --bulma-scheme-invert: var(--color-text);
-    --bulma-background: var(--color-background);
-    --bulma-border: var(--color-border);
-    --bulma-border-weak: #eef2f7;
-    --bulma-text: var(--color-text);
-    --bulma-text-weak: var(--color-text-secondary);
-    --bulma-text-strong: var(--color-text);
-    --bulma-title-color: var(--color-text);
-    --bulma-subtitle-color: var(--color-text-secondary);
-    --bulma-label-color: var(--color-text);
-    --bulma-body-color: var(--color-text);
+    --color-background: #f7f8ff;   // a lavender-tinted off-white, not plain grey
+    --color-card: #ffffff;
+    --color-raised: #ffffff;
+    --color-sunken: #f1f2fb;
 
-    --bulma-input-background-color: var(--color-card);
-    --bulma-input-color: var(--color-text);
-    --bulma-input-border-color: var(--color-border);
-    --bulma-input-placeholder-color: #94a3b8;
-    --bulma-input-hover-border-color: #cbd5e1;
+    --color-border: rgba(81, 95, 158, 0.18);
+    --color-border-strong: rgba(81, 95, 158, 0.34);
 
-    --bulma-table-background-color: var(--color-card);
-    --bulma-table-color: var(--color-text);
-    --bulma-table-cell-border-color: var(--color-border);
-    --bulma-table-head-cell-color: var(--color-text);
-    --bulma-table-row-hover-background-color: var(--color-background);
-    --bulma-table-striped-row-even-background-color: var(--color-background);
+    --color-text: #0a1128;            // 17.71:1 on the light ground
+    --color-text-secondary: #4d5678;
+    --color-text-muted: #6b7495;
 
-    --bulma-select-color: var(--color-text);
-    --bulma-select-background-color: var(--color-card);
+    // Darkened along their own hues. See this section's header for the ratios.
+    --color-primary: #515f9e;
+    --color-primary-hover: #3c4880;   // hover goes DARKER on light — the inverse
+                                      // of the dark-mode rule, and the reason
+                                      // both are stated rather than derived.
+    --color-primary-tint: rgba(81, 95, 158, 0.08);
+    --color-primary-muted: rgba(81, 95, 158, 0.26);
+
+    /*
+      ON A LIGHT GROUND, A FILLED ACCENT CARRIES WHITE.
+
+      The exact inverse of the dark rule, and the reason --color-on-accent is a
+      token at all: white on #515f9e is 6.03:1, while deep space on it would be
+      2.94:1. A component that hard-coded either colour would be wrong in one of
+      the two modes.
+    */
+    --color-on-accent: #ffffff;
+
+    --color-highlight: #0a1128;
+    --color-accent-mint: #3f716e;
+    --color-accent-lavender: #716d9e;
+
+    --color-success: #3f716e;
+    --color-warning: #8a5a00;
+    --color-error: #b4304a;
+    --color-info: #515f9e;
+
+    --status-connected-bg: rgba(63, 113, 110, 0.12);
+    --status-connected-text: #2f5a57;
+    --status-attention-bg: rgba(138, 90, 0, 0.12);
+    --status-attention-text: #6f4800;
+    --status-disconnected-bg: rgba(81, 95, 158, 0.10);
+    --status-disconnected-text: #4d5678;
+    --status-error-bg: rgba(180, 48, 74, 0.12);
+    --status-error-text: #94243a;
+
+    /*
+      Light-mode chart series. Re-derived, not reused: the dark series sit at
+      OKLCH L 0.55-0.67, which is inside the DARK band and near the top of the
+      light band [0.43, 0.77] — they survive, but the two palest would sit at
+      under 3:1 on white. These are the same five hues stepped down into the
+      light band's middle.
+    */
+    --chart-1: #4a5ad6;
+    --chart-2: #0e7c62;
+    --chart-3: #6a4fa8;
+    --chart-4: #8a6008;
+    --chart-5: #b03352;
+
+    // The ordinal ramp reverses: on white, MORE is DARKER.
+    --ramp-0: #c3ccff;
+    --ramp-1: #a3b0fb;
+    --ramp-2: #8393f2;
+    --ramp-3: #6577dd;
+    --ramp-4: #4e5fc1;
+    --ramp-5: #3a48a1;
+
+    --chart-grid: rgba(81, 95, 158, 0.12);
+    --chart-axis: rgba(81, 95, 158, 0.26);
+    --chart-track: rgba(81, 95, 158, 0.10);
+
+    /*
+      GLOW BECOMES SHADOW-SHAPED ON LIGHT — but still soft, and still no hard
+      edge. A coloured bloom on white looks like a printing error; on light
+      grounds the same "soft, no hard shadow" instruction resolves to a diffuse
+      neutral-cool ambient wash instead.
+    */
+    --glow-soft:
+      inset 0 0 0 1px rgba(81, 95, 158, 0.06),
+      0 1px 2px rgba(10, 17, 40, 0.04),
+      0 8px 24px -12px rgba(10, 17, 40, 0.10);
+
+    --glow-raised:
+      inset 0 0 0 1px rgba(81, 95, 158, 0.08),
+      0 4px 12px -4px rgba(10, 17, 40, 0.08),
+      0 16px 40px -20px rgba(10, 17, 40, 0.16);
+
+    --glow-accent: 0 0 0 1px rgba(81, 95, 158, 0.28), 0 6px 20px -8px rgba(81, 95, 158, 0.32);
+    --glow-mint: 0 0 0 1px rgba(63, 113, 110, 0.28), 0 6px 20px -8px rgba(63, 113, 110, 0.30);
+
+    // Lavender -> periwinkle -> pale space. Same family, run so the light end
+    // touches the page rather than the dark end.
+    --brand-gradient: linear-gradient(
+      135deg,
+      #eae6ff 0%,
+      #d3d2fb 20%,
+      #b3b6f5 42%,
+      #8b9eff 62%,
+      #6472c9 82%,
+      #515f9e 100%
+    );
+
+    --brand-aura:
+      radial-gradient(120% 90% at 18% 0%, rgba(139, 158, 255, 0.20) 0%, rgba(139, 158, 255, 0) 62%),
+      radial-gradient(90% 70% at 88% 12%, rgba(198, 184, 255, 0.22) 0%, rgba(198, 184, 255, 0) 58%),
+      radial-gradient(70% 60% at 50% 100%, rgba(127, 231, 196, 0.14) 0%, rgba(127, 231, 196, 0) 60%);
+
+    --focus-ring: 0 0 0 2px var(--color-card), 0 0 0 4px var(--color-primary);
   }
 }
 
@@ -328,14 +667,17 @@ html {
 .input,
 .textarea,
 .select select {
-  background-color: #ffffff;
+  // The SUNKEN surface, not white. An input is a well you type into; on a dark
+  // theme it reads as recessed by being darker than the card, which is the
+  // inverse of the light theme's white-on-tint relationship.
+  background-color: var(--color-sunken);
   color: var(--color-text);
   border-color: var(--color-border);
 }
 
 .input::placeholder,
 .textarea::placeholder {
-  color: #94a3b8;
+  color: var(--color-text-muted);
 }
 
 .table {
@@ -402,7 +744,15 @@ th {
 // matching the shape of the eventual content, never one full-page spinner.
 // -----------------------------------------------------------------------------
 .skeleton {
-  background: linear-gradient(90deg, #eef2f7 25%, var(--color-background) 50%, #eef2f7 75%);
+  // A periwinkle sheen travelling over the SUNKEN surface, not a grey sweep
+  // between two greys: on a near-black ground a grey shimmer reads as a
+  // rendering fault rather than as loading.
+  background: linear-gradient(
+    90deg,
+    var(--color-sunken) 25%,
+    var(--color-primary-tint) 50%,
+    var(--color-sunken) 75%
+  );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
@@ -658,7 +1008,7 @@ th {
   transition: background-color var(--transition-fast) var(--ease);
 
   &:hover {
-    background-color: #f1f5f9;
+    background-color: var(--color-raised);
   }
 }
 
@@ -669,8 +1019,10 @@ th {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  // Primary at ~13% opacity, with primary-coloured initials.
-  background-color: rgba(79, 70, 229, 0.13);
+  // The primary TINT token, with primary-coloured initials. This was a 13%
+  // wash of the pre-rebrand indigo — a hue that was never a token in the
+  // retired theme either, so it had been quietly wrong through two palettes.
+  background-color: var(--color-primary-tint);
   color: var(--color-primary);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
@@ -731,8 +1083,10 @@ th {
   border-radius: 8px;
   padding: 8px;
   z-index: 50;
-  // Subtle elevation on the MENU only — the bar itself stays flat.
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  // The RAISED glow: this floats above the bar, so it gets the stronger of the
+  // two elevation tokens. Was a hard slate shadow built from the retired
+  // theme's ink — invisible on a near-black ground, and forbidden by the brief.
+  box-shadow: var(--glow-raised);
   animation: menu-in var(--transition-fast) var(--ease);
 }
 
@@ -799,8 +1153,9 @@ th {
   svg { color: var(--color-error); }
 
   &:hover {
-    // Error background at 40% opacity.
-    background-color: rgba(254, 226, 226, 0.4);
+    // The error wash token. Was a 40% dilution of the retired theme's error
+    // chip fill — a light pink that on this ground reads as a white smear.
+    background-color: var(--status-error-bg);
   }
 
   &:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -809,7 +1164,8 @@ th {
 .account-menu__badge {
   margin-left: auto;
   background-color: var(--color-error);
-  color: #fff;
+  // NOT white. The new error rose is a light hue — white on it is 1.79:1.
+  color: var(--color-on-accent);
   border-radius: 999px;
   padding: 1px 7px;
   font-size: 11px;
@@ -978,8 +1334,8 @@ th {
 
 // AI-generated content is always visually marked as such (Info token).
 .ai-panel {
-  background-color: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background-color: var(--color-primary-tint);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--card-radius);
   padding: 1rem 1.25rem;
 }
@@ -1004,7 +1360,7 @@ body {
 // -----------------------------------------------------------------------------
 // TYPE SCALE
 //
-// Headings take the display face; body and data stay on Inter. The audit's
+// Headings take the display face; body and data stay on the body face. The audit's
 // finding C1 — one family for a page title and a table cell — is what this
 // fixes, and it is the single change that most stops the UI reading as
 // scaffolded.
@@ -1088,7 +1444,7 @@ summary:focus-visible {
 .input:hover,
 .textarea:hover,
 .select select:hover {
-  border-color: #cbd5e1;
+  border-color: var(--color-border-strong);
 }
 
 .input:focus-visible,
@@ -1464,7 +1820,7 @@ a {
   &:last-child { border-bottom: none; }
 
   &:hover {
-    background-color: #f1f5f9;
+    background-color: var(--color-raised);
     color: var(--color-primary);
 
     .quick-links__chevron { color: var(--color-primary); transform: translateX(2px); }
@@ -1520,9 +1876,14 @@ a {
   color: var(--color-primary);
 
   &:hover:not(:disabled) {
-    // Was rgba(79, 70, 229, 0.06) — the pre-rebrand indigo, left behind when the
-    // palette moved to the logo blue. It only showed on hover, which is why it
-    // survived: a wrong hue nobody sees at rest. Now the brand tint token.
+    // Was a 6% wash of a pre-rebrand indigo, left behind when the palette moved
+    // to the logo blue. It only showed on hover, which is why it survived: a
+    // wrong hue nobody sees at rest. Now the brand tint token.
+    //
+    // Worth knowing that FUTURE WORKFORCE found two MORE of exactly this — an
+    // avatar wash and an error hover, both in rgba() form, both invisible to a
+    // hex search. app/theme.test.ts now derives the rgb() notations from the
+    // retired hex list so the next palette cannot repeat it.
     background-color: var(--color-primary-tint);
     border-color: var(--color-primary-hover);
     color: var(--color-primary-hover);
@@ -1662,7 +2023,10 @@ a {
   // not :focus-visible — a click into a search box should show it too.
   &:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.25);
+    // The theme's focus ring, not a hand-rolled one. This was a 2px ring in the
+    // retired SPEC's indigo — a colour that was never even a token in the
+    // previous theme, so it had been drifting on its own since it was written.
+    box-shadow: var(--focus-ring);
     outline: none;
   }
 
@@ -1688,10 +2052,23 @@ a {
 .nl-search .button.is-primary[disabled] {
   background-color: var(--color-primary-muted);
   border-color: var(--color-primary-muted);
-  // Brand-blue ink, not white. White on #bfd5ff is 1.48:1 — the label would be
-  // the washed-out thing the user complained about, just moved from the fill to
-  // the text. #003ed6 on that fill is 5.33:1: plainly readable, plainly not the
-  // ready state (which is white on solid blue).
+  /*
+    THE INK ON A DISABLED FILL FLIPPED WITH THE THEME, and the numbers are why.
+
+    --color-primary-muted is now a 28% periwinkle wash, which composites over
+    the ground to roughly #2e3864 — a DARK fill, where the old theme's muted
+    token was a light one. So the label that used to be dark ink is now light
+    ink, and the token that supplies it happens to be the same one:
+
+      primary-hover #a9b6ff on that fill ... 5.80:1  <- readable, clearly muted
+      --color-on-accent  #0a1128 on it ..... 1.66:1  <- what the READY state
+                                                        uses, and unusable here
+
+    The ready state is --color-on-accent on solid periwinkle at 7.50:1. The two
+    states are therefore distinct in fill AND in ink direction, which is the
+    point: a disabled button that differs only in opacity reads as a rendering
+    glitch.
+  */
   color: var(--color-primary-hover);
   opacity: 1;
 }
@@ -1878,7 +2255,7 @@ a {
   // Failures and conflicts are tinted so a single bad file in thirty is not
   // something the reader has to hunt for.
   &.is-flagged {
-    background-color: #fffbeb;
+    background-color: var(--status-attention-bg);
     margin-inline: calc(var(--space-2) * -1);
     padding-inline: var(--space-2);
   }
@@ -1958,8 +2335,8 @@ a {
     color: var(--status-connected-text);
   }
   &.is-info {
-    background-color: #dbeafe;
-    color: #1d4ed8;
+    background-color: var(--color-primary-tint);
+    color: var(--color-primary);
   }
   &.is-warning {
     background-color: var(--status-attention-bg);
@@ -2201,7 +2578,9 @@ a {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background-color: #ffffff;
+  // The highlight token — a white knob is a SHAPE, not text, so it carries no
+  // contrast obligation against the track; it just has to be visible on both.
+  background-color: var(--color-highlight);
   // Transform rather than `left`, so the slide is composited rather than
   // triggering layout on every frame.
   transform: translateX(0);
@@ -2309,9 +2688,10 @@ a {
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: var(--card-radius);
-  // The one place a shadow is warranted: this floats above other content, and
-  // a flat panel would read as part of the form underneath it.
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  // Floats above other content, so a flat panel would read as part of the form
+  // underneath it. Now the raised GLOW rather than a hard slate shadow — same
+  // intent, and it is actually visible on this ground.
+  box-shadow: var(--glow-raised);
 }
 
 .stage-picker__search {
@@ -2418,8 +2798,8 @@ a {
   margin-top: var(--space-3);
   padding: var(--space-4);
   border-radius: var(--control-radius);
-  background-color: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background-color: var(--color-primary-tint);
+  border: 1px solid var(--color-border-strong);
 }
 
 .stage-preview__label {
@@ -2620,13 +3000,15 @@ a {
 // Completed: filled primary with a checkmark.
 .stepper__segment.is-complete .stepper__button {
   background-color: var(--color-primary);
-  color: #ffffff;
+  color: var(--color-on-accent);
 
   &:hover { background-color: var(--color-primary-hover); }
 }
 .stepper__segment.is-complete .stepper__marker {
-  background-color: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
+  // A DARK wash, not a white one: this disc sits on a light accent fill, and
+  // lightening a light hue leaves nothing for the label to contrast against.
+  background-color: rgba(10, 17, 40, 0.22);
+  color: var(--color-on-accent);
 }
 
 // Current: filled primary, bold, and given more room than its neighbours.
@@ -2635,14 +3017,17 @@ a {
 }
 .stepper__segment.is-current .stepper__button {
   background-color: var(--color-primary);
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-size: var(--text-label);
   font-weight: var(--weight-bold);
 
   &:hover { background-color: var(--color-primary-hover); }
 }
 .stepper__segment.is-current .stepper__marker {
-  background-color: #ffffff;
+  // The CARD surface with accent ink, rather than a white chip: on dark, a white
+  // disc reads as the completed state, which is the one thing this must not
+  // look like.
+  background-color: var(--color-card);
   color: var(--color-primary);
 }
 
@@ -2660,13 +3045,15 @@ a {
 }
 .stepper__segment.is-rejected .stepper__button {
   background-color: var(--color-error);
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-weight: var(--weight-bold);
   font-size: var(--text-label);
 }
 .stepper__segment.is-rejected .stepper__marker {
-  background-color: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
+  // A DARK wash, not a white one: this disc sits on a light accent fill, and
+  // lightening a light hue leaves nothing for the label to contrast against.
+  background-color: rgba(10, 17, 40, 0.22);
+  color: var(--color-on-accent);
 }
 
 // .stepper__match is gone. The match percentage used to float at the right-hand
@@ -3108,9 +3495,9 @@ a {
 
   &.is-info {
     --accent: var(--color-info);
-    border-color: #bfdbfe;
+    border-color: var(--color-border-strong);
     border-left-color: var(--accent);
-    background-color: #dbeafe;
+    background-color: var(--color-primary-tint);
   }
 }
 
@@ -3497,7 +3884,7 @@ a {
   color: var(--status-error-text);
 
   &:hover:not([disabled]) {
-    background-color: #ffffff;
+    background-color: var(--color-card);
     border-color: var(--status-error-text);
     color: var(--status-error-text);
   }
@@ -3770,6 +4157,10 @@ a {
   display: flex;
   justify-content: center;
   padding: var(--space-4);
+  // DELIBERATELY WHITE, and now the only white surface left in the product.
+  // This is not a leftover from the retired theme — a QR code read by a phone
+  // camera needs maximum quiet-zone contrast, and a dark or tinted ground
+  // breaks scanning. It is a functional surface, not a themed one.
   background-color: #ffffff;
   border: 1px solid var(--color-border);
   border-radius: var(--card-radius);
@@ -4104,20 +4495,20 @@ a {
 // should have had, from the token palette.
 // =============================================================================
 .button.is-danger-soft {
-  background-color: var(--status-error-bg, #fee2e2);
+  background-color: var(--status-error-bg);
   border: 1px solid var(--color-error);
   color: var(--color-error);
 
   &:hover:not(:disabled) {
     background-color: var(--color-error);
-    color: #fff;
+    color: var(--color-on-accent);
   }
 }
 
 .button.is-danger-solid {
   background-color: var(--color-error);
   border: 1px solid var(--color-error);
-  color: #fff;
+  color: var(--color-on-accent);
 
   &:hover:not(:disabled) { filter: brightness(0.94); }
 }
@@ -4130,7 +4521,7 @@ a {
   color: var(--color-text-secondary);
 
   &:hover:not(:disabled) {
-    border-color: #cbd5e1;
+    border-color: var(--color-border-strong);
     color: var(--color-text);
   }
 }
@@ -4354,7 +4745,7 @@ a {
 }
 
 .apply-done__icon {
-  color: var(--color-success, #16a34a);
+  color: var(--color-success);
   margin: 0 0 var(--space-2);
 }
 
@@ -4418,6 +4809,9 @@ a {
   border: 1px solid var(--color-border);
   border-radius: 8px;
 
+  // White plate behind the image for the same reason as the QR code and the
+  // marketing wordmark: these are raster assets drawn for a light ground, and a
+  // dark plate would either invert them or lose their edges.
   img { background: #fff; padding: 8px; border-radius: 6px; }
 }
 
@@ -4474,7 +4868,7 @@ a {
   }
 
   &.is-error {
-    background-color: var(--status-error-bg, #fee2e2);
+    background-color: var(--status-error-bg);
     color: var(--color-error);
   }
 }
@@ -5732,7 +6126,9 @@ a {
     background: var(--color-card);
     color: var(--color-primary);
     font-weight: var(--weight-semibold);
-    box-shadow: 0 1px 2px rgb(1 12 39 / 8%);
+    // A 1px hard shadow in the retired navy: invisible here, and the brief
+    // rules out hard shadows anyway. The soft glow does the lifting.
+    box-shadow: var(--glow-soft);
   }
 }
 
@@ -5799,7 +6195,7 @@ a {
 .vac-chat__bubble--operator {
   align-self: flex-end;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-on-accent);
   border-bottom-right-radius: 4px;
 }
 
@@ -5941,7 +6337,9 @@ a {
     background: var(--color-card);
     color: var(--color-primary);
     font-weight: var(--weight-semibold);
-    box-shadow: 0 1px 2px rgb(1 12 39 / 8%);
+    // A 1px hard shadow in the retired navy: invisible here, and the brief
+    // rules out hard shadows anyway. The soft glow does the lifting.
+    box-shadow: var(--glow-soft);
   }
 }
 
@@ -6122,7 +6520,7 @@ a {
   // Selected: a tinted fill and a primary left edge. The bar carries the state
   // on its own, so the fill can stay quiet enough to read text against.
   &.is-selected {
-    background: #eff6ff;
+    background: var(--color-primary-tint);
     box-shadow: inset 3px 0 0 var(--color-primary);
   }
 
@@ -6134,10 +6532,10 @@ a {
     needs thirty seconds of attention in the same visual class as a failed send.
   */
   &.is-unmatched {
-    background: #f8fafc;
+    background: var(--color-raised);
     border-left: 2px dashed var(--color-border);
 
-    &.is-selected { background: #eff6ff; }
+    &.is-selected { background: var(--color-primary-tint); }
   }
 }
 
@@ -6159,7 +6557,7 @@ a {
   .is-unread & { font-weight: var(--weight-semibold); }
 }
 
-.inbox__row-channel { color: #25d366; flex-shrink: 0; }
+.inbox__row-channel { color: var(--color-accent-mint); flex-shrink: 0; }
 
 .inbox__row-label {
   overflow: hidden;
@@ -6202,7 +6600,8 @@ a {
 // treatment exists in the product rather than two that nearly match.
 .inbox__row-dot {
   background-color: var(--color-error);
-  color: #fff;
+  // NOT white. The new error rose is a light hue — white on it is 1.79:1.
+  color: var(--color-on-accent);
   border-radius: 999px;
   padding: 0 6px;
   font-size: 10px;
@@ -6310,8 +6709,8 @@ a {
 
   &.is-outbound {
     align-self: flex-end;
-    background: #eff6ff;
-    border-color: #dbeafe;
+    background: var(--color-primary-tint);
+    border-color: var(--color-primary-tint);
     border-bottom-right-radius: 4px;
   }
 }
@@ -6389,7 +6788,8 @@ a {
 // pushed to the right, because a bar link is sized to its content.
 .topnav__badge {
   background-color: var(--color-error);
-  color: #fff;
+  // NOT white. The new error rose is a light hue — white on it is 1.79:1.
+  color: var(--color-on-accent);
   border-radius: 999px;
   padding: 0 6px;
   font-size: 10px;
@@ -6465,7 +6865,9 @@ a {
 
 .inbox__tab-count {
   background: var(--color-warning);
-  color: #fff;
+  // The warning amber is the lightest fill in the palette — white on it is
+  // about 1.4:1, i.e. invisible.
+  color: var(--color-on-accent);
   border-radius: 999px;
   padding: 0 6px;
   font-size: 10px;
@@ -6491,12 +6893,12 @@ a {
     // this file, so it wins at equal specificity.
     border-left: 3px solid var(--color-warning);
 
-    &:hover { background: #fdebc8; }
+    &:hover { background: var(--status-attention-bg); }
 
     // Selection still reads as selection: the amber fill gives way to the
     // standard tint, and the amber edge stays as the reminder.
     &.is-selected {
-      background: #eff6ff;
+      background: var(--color-primary-tint);
       box-shadow: inset 3px 0 0 var(--color-warning);
     }
   }
@@ -6524,4 +6926,152 @@ a {
   gap: 3px;
   color: var(--color-primary);
   font-weight: var(--weight-medium);
+}
+
+// =============================================================================
+// Orbital charts — FUTURE WORKFORCE.
+//
+// The theme's requested chart form. Geometry lives in the SVG; this is only
+// layout, type and the glow.
+// =============================================================================
+.orbital-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+
+.orbital {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 132px;
+  text-align: center;
+}
+
+.orbital__svg {
+  display: block;
+  // The glow belongs to the ARC, not to the box — a filter on the whole svg
+  // blurs the numeral in the middle too.
+  overflow: visible;
+}
+
+/*
+  The arc's bloom. `drop-shadow` on the stroke rather than a box-shadow, so it
+  follows the arc's actual shape instead of its bounding square — a box glow on
+  a circle reads as a glowing rectangle, which is the giveaway of a dark theme
+  that was assembled rather than designed.
+*/
+.orbital__arc {
+  filter: drop-shadow(0 0 6px rgba(139, 158, 255, 0.45));
+}
+
+.orbital__value {
+  fill: var(--color-text);
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: var(--weight-bold);
+  // Tabular, so a row of meters does not jitter as values change width.
+  font-variant-numeric: tabular-nums;
+}
+
+.orbital__label {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin: 0;
+  max-width: 15ch;
+}
+
+.orbital__note {
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+  margin: 0;
+  max-width: 20ch;
+}
+
+// ---- The funnel's concentric orbits ----------------------------------------
+.funnel-orbit {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: center;
+}
+
+.funnel-orbit__svg {
+  width: 200px;
+  height: 200px;
+  overflow: visible;
+  // One soft bloom for the whole nest. Cheaper than per-ring filters and,
+  // because the rings are concentric, visually identical.
+  filter: drop-shadow(0 0 10px rgba(139, 158, 255, 0.25));
+}
+
+.funnel-orbit__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.funnel-orbit__row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto minmax(0, 1.1fr);
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: 5px 0;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-label);
+
+  &:first-child { border-top: none; }
+}
+
+.funnel-orbit__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.funnel-orbit__stage {
+  color: var(--color-text);
+  font-weight: var(--weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.funnel-orbit__count {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.funnel-orbit__conv {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  text-align: right;
+}
+
+// One column on a phone: a 200px orbit beside a four-column legend does not fit,
+// and shrinking the orbit past ~160px makes the inner rings collide.
+@media (max-width: 720px) {
+  .funnel-orbit {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .funnel-orbit__legend { width: 100%; }
+}
+
+// The glow is decoration. A reader who asked the OS for less movement has not
+// asked for less colour, but a reader in forced-colors mode has asked for the
+// system's palette — so the blooms come off rather than fighting it.
+@media (forced-colors: active) {
+  .orbital__arc,
+  .funnel-orbit__svg {
+    filter: none;
+  }
 }

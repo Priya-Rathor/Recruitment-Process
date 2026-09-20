@@ -194,11 +194,11 @@ export function OrganizationForm({
           />
         </Field>
 
-        <Field label="Brand colour" hint="Hex, e.g. #004CF5.">
+        <Field label="Brand colour" hint="Hex, e.g. #8B9EFF.">
           <input
             className="input"
             style={{ maxWidth: 160 }}
-            placeholder="#004CF5"
+            placeholder="#8B9EFF"
             value={values.brand_color ?? ""}
             onChange={(event) => set("brand_color", event.target.value || null)}
           />

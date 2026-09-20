@@ -320,7 +320,7 @@ function Composer({
               color:
                 body.length > MAX_WHATSAPP_BODY_LENGTH
                   ? "var(--color-error)"
-                  : "var(--color-secondary-text)",
+                  : "var(--color-text-secondary)",
             }}
           >
             {MAX_WHATSAPP_BODY_LENGTH - body.length} characters left

@@ -1,61 +1,75 @@
 // =============================================================================
-// Chart primitives.
+// Chart primitives — FUTURE WORKFORCE.
 //
-// Plain HTML/CSS and inline SVG — no charting library. The spec asks for a
-// funnel and two focused bar charts, and a dependency would be more code than
-// the charts.
+// Plain HTML/CSS and inline SVG. No charting library: a dependency would be more
+// code than these four forms.
 //
-// COLOR DECISIONS, and why they are what they are:
+// THE FORM FOLLOWS THE DATA'S JOB, and the theme asked for orbital/radial. Those
+// two things agree in some places and conflict in others, so they were resolved
+// case by case rather than globally:
 //
-// - The funnel uses an ORDINAL ramp: one hue, monotonically lighter. Funnel
-//   stages have a natural order, which is exactly when a ramp is correct (a
-//   value-ramp on unordered categories would be wrong — it double-encodes bar
-//   length as hue and burns the only free channel).
+//   RATIO AGAINST A LIMIT -> OrbitalMeter (a radial arc).
+//     Conversion rates, hire rates, completion rates. A ratio against 100% is
+//     exactly what a meter is for, so here the requested form IS the correct
+//     one. Each of these used to be a bar in a track, which spent a length
+//     encoding on a number that only ever ranges 0-100.
 //
-//   The steps were generated in OKLCH at the BRAND hue (263°, read off the
-//   logo's blue) and VALIDATED, not eyeballed: monotone lightness, adjacent
-//   ΔL ≥ 0.06, and the lightest step clearing 2:1 contrast against the white
-//   card. Sampling the logo gradient directly does NOT work — its stops run
-//   blue → near-black → azure, which is non-monotonic in lightness and would
-//   put the palest step in the middle of the funnel. The ramp therefore takes
-//   the logo's HUE and generates its own lightness sequence.
+//   ORDERED PART-TO-WHOLE -> FunnelChart, as CONCENTRIC ORBITS.
+//     Every ring starts at twelve o'clock and sweeps by its share of the top of
+//     the funnel. Nested arcs from a SHARED START ANGLE stay comparable — the
+//     reader compares sweep against a common origin — which is the one radial
+//     arrangement that does not wreck comparison. Pie slices at differing start
+//     angles would.
 //
-//   The naive alternative — a stock Tailwind ramp such as #C7D2FE…#4338CA —
-//   FAILS both the step-gap and light-end checks: its lightest step sits at
-//   1.49:1 on white, effectively invisible.
+//   MAGNITUDE ACROSS CATEGORIES -> BarChart, STILL LINEAR. Deliberately.
+//     "Median days in each stage" and "candidates by source" compare magnitudes
+//     across unordered categories, and arc length at differing radii is the
+//     worst common encoding for that: arcs compare badly by eye, and a longer
+//     arc at a smaller radius can be the smaller value. The dataviz
+//     anti-pattern list names a donut for comparing close values as simply
+//     wrong. Converting these would have cost a recruiter the ability to see
+//     which stage is slow in exchange for looking more orbital, so they stayed
+//     linear and were restyled instead. Called out in the completion report
+//     rather than changed quietly.
 //
-// - Bar charts are SINGLE-SERIES, so every bar is the same colour. Colouring
-//   bars darker-where-bigger would double-encode the length.
+// COLOUR COMES FROM TOKENS, NEVER A LITERAL HERE. Every ramp step and series
+// colour is a var() into app/globals.scss, so there is one copy of the palette
+// and app/theme.test.ts can assert its contrast and monotonicity against the
+// real values. The retired theme hard-coded six hexes in this file, which is
+// exactly how its ramp drifted out of step with its own tokens.
 //
-// - Status colours (warning, error) appear only where the value MEANS a status,
-//   never as decoration, and always beside a text label so the meaning is not
-//   carried by colour alone.
+// The ramp and the series were generated in OKLCH and validated with the
+// dataviz skill's validator — lightness band, chroma floor, CVD separation,
+// normal-vision floor, contrast against the surface, and ordinal step gaps.
+// The numbers are recorded in globals.scss beside the tokens.
 //
-// - No dual axis anywhere. Two measures of different scale get two charts.
+// STILL TRUE FROM BEFORE, AND WORTH KEEPING:
+//   - Status colours appear only where the value MEANS a status, never as
+//     decoration, and always beside a text label so meaning is not colour-alone.
+//   - No dual axis anywhere. Two measures of different scale get two charts.
 // =============================================================================
 
 /**
- * The validated funnel ramp, LIGHT → DARK down the funnel.
+ * The ordinal funnel ramp — LIGHT at the top of the funnel, DEEP at the bottom.
  *
- * Generated at OKLCH hue 263 — the logo blue's hue — L from 0.74 to 0.40, so
- * the funnel reads as the brand's blue rather than a neighbouring indigo.
- * Regenerate and re-validate (skill `dataviz`,
- * scripts/validate_palette.js --ordinal) before changing it.
+ * TOKEN REFERENCES, not hexes. The values live in app/globals.scss
+ * (--ramp-0 .. --ramp-5) and app/theme.test.ts asserts them there for monotone
+ * lightness and visible step gaps. Holding them here as literals is what let
+ * the retired theme's ramp drift away from its own tokens.
  *
- * The direction was chosen after rendering it. Dark→light looked conventional
- * but compounded two weaknesses: bars get SHORTER down a funnel, so the last
- * steps ended up both smallest and palest — and those last steps (Offers,
- * Hired) are the ones anyone actually cares about. Reversed, the large top
- * bars are a calm light wash and the small outcome bars carry the most weight,
- * which is both more legible and the right emphasis.
+ * The DIRECTION was chosen after rendering it, and it survives the theme change
+ * for the reason it was chosen: rings get shorter down a funnel, so light-to-deep
+ * leaves the small outcome rings (Offers, Hired) — the ones anyone actually
+ * cares about — carrying the most visual weight, while the big top rings stay a
+ * calm wash. Deep-to-light made the last steps both smallest and palest.
  */
 export const FUNNEL_RAMP = [
-  "#7EA9FF",
-  "#6292F4",
-  "#4E7DDD",
-  "#3B68C6",
-  "#2853B0",
-  "#163F99",
+  "var(--ramp-0)",
+  "var(--ramp-1)",
+  "var(--ramp-2)",
+  "var(--ramp-3)",
+  "var(--ramp-4)",
+  "var(--ramp-5)",
 ] as const;
 
 export function rampStep(index: number): string {
@@ -111,7 +125,7 @@ export function KpiTile({
       <p style={{ fontSize: 30, fontWeight: 700, margin: "4px 0 0", lineHeight: 1.1 }}>{value}</p>
 
       {trend && (
-        <p style={{ fontSize: 13, margin: "6px 0 0", color: trend.color ?? "var(--color-secondary-text)" }}>
+        <p style={{ fontSize: 13, margin: "6px 0 0", color: trend.color ?? "var(--color-text-secondary)" }}>
           {/* The arrow follows the NUMBER; the colour follows the VERDICT. A
               falling time-to-hire is a green down arrow. */}
           {trend.arrow === "up" ? "▲" : trend.arrow === "down" ? "▼" : "■"} {trend.text}
@@ -128,7 +142,143 @@ export function KpiTile({
 }
 
 // -----------------------------------------------------------------------------
-// Funnel
+// Orbital meter — a ratio against a limit
+// -----------------------------------------------------------------------------
+
+/**
+ * ORBITAL METER — one ratio against 100%.
+ *
+ * The theme's signature form, and the correct form for this data rather than a
+ * concession to it: a ratio against a limit is what a meter is for. The value
+ * is the hero number in the middle; the arc is the at-a-glance read.
+ *
+ * GEOMETRY. One circle, stroked twice — a full-circumference track and a value
+ * arc clipped with stroke-dasharray. No path arithmetic, which means no
+ * arc-flag edge case at 50% and none of the wrapping bugs a hand-built arc
+ * path has at 0 and 100.
+ *
+ * Starts at TWELVE O'CLOCK and sweeps clockwise, because that is where a reader
+ * expects zero to be. Round caps, because the brief says nothing sharp.
+ *
+ * A NULL VALUE IS NOT ZERO. An absent rate draws an empty track and says so —
+ * a meter pinned at 0% is a claim that nobody converted, which is a different
+ * statement from "we cannot compute this yet".
+ */
+export function OrbitalMeter({
+  label,
+  percent,
+  displayValue,
+  note,
+  tone = "primary",
+  size = 132,
+}: {
+  label: string;
+  /** 0-100, or null when there is nothing to show. */
+  percent: number | null;
+  /** Pre-formatted. The meter never does arithmetic. */
+  displayValue: string;
+  note?: string | null;
+  /** Status tone only where the value MEANS a status. */
+  tone?: "primary" | "success" | "warning" | "error";
+  size?: number;
+}) {
+  const RADIUS = 48;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+  // Clamped, because a rate computed from a tiny denominator can exceed 100 and
+  // an arc longer than its circumference silently wraps back over itself.
+  const clamped =
+    percent === null || !Number.isFinite(percent) ? null : Math.min(Math.max(percent, 0), 100);
+
+  const stroke =
+    tone === "success"
+      ? "var(--color-success)"
+      : tone === "warning"
+        ? "var(--color-warning)"
+        : tone === "error"
+          ? "var(--color-error)"
+          : "var(--color-primary)";
+
+  return (
+    <div className="orbital">
+      <svg
+        viewBox="0 0 120 120"
+        width={size}
+        height={size}
+        role="img"
+        aria-label={`${label}: ${displayValue}`}
+        className="orbital__svg"
+      >
+        {/* The track. Recessive — it is the scale, not a mark. */}
+        <circle
+          cx="60"
+          cy="60"
+          r={RADIUS}
+          fill="none"
+          stroke="var(--chart-track)"
+          strokeWidth="9"
+        />
+
+        {clamped !== null && clamped > 0 && (
+          <circle
+            cx="60"
+            cy="60"
+            r={RADIUS}
+            fill="none"
+            stroke={stroke}
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={CIRCUMFERENCE * (1 - clamped / 100)}
+            // -90deg puts zero at twelve o'clock; the sweep then runs clockwise.
+            transform="rotate(-90 60 60)"
+            className="orbital__arc"
+          />
+        )}
+
+        {/*
+          The value, inside the ring. TEXT TOKENS, not the arc's colour — the
+          mark beside it already carries the identity, and colouring the number
+          too makes a figure that is hard to read at 12px.
+        */}
+        <text
+          x="60"
+          y="60"
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="orbital__value"
+        >
+          {displayValue}
+        </text>
+      </svg>
+
+      <p className="orbital__label">{label}</p>
+      {note && <p className="orbital__note">{note}</p>}
+    </div>
+  );
+}
+
+/** A row of meters, so a set of rates shares one scale and one rhythm. */
+export function OrbitalMeterRow({ meters }: { meters: React.ComponentProps<typeof OrbitalMeter>[] }) {
+  if (meters.length === 0) {
+    return (
+      <p className="has-text-secondary" style={{ fontSize: 13 }}>
+        No data in this period.
+      </p>
+    );
+  }
+
+  return (
+    <div className="orbital-row">
+      {meters.map((meter) => (
+        <OrbitalMeter key={meter.label} {...meter} />
+      ))}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Funnel — concentric orbits
 // -----------------------------------------------------------------------------
 
 export type FunnelBar = {
@@ -139,67 +289,132 @@ export type FunnelBar = {
 };
 
 /**
- * Horizontal funnel bars.
+ * THE FUNNEL AS CONCENTRIC ORBITS.
  *
- * Horizontal rather than the classic tapering trapezoid: a trapezoid encodes
- * value in AREA, which people read badly, and the spec says "avoid 3D funnels".
- * Bar length is the one encoding everyone reads accurately.
+ * Each stage is a ring. Every ring starts at twelve o'clock and sweeps by its
+ * share of the TOP of the funnel, so the outermost ring is a full circle and
+ * each one inside it is shorter. The drop-off is the gap between one sweep and
+ * the next.
  *
- * Widths are relative to the FIRST step, so the shape of the drop-off is the
- * visible thing. Every bar is direct-labelled with its count, because there are
- * six of them and the numbers are the point — this is the case where labelling
- * every mark is right rather than noise.
+ * WHY THIS RADIAL FORM IS LEGITIMATE WHERE A PIE IS NOT. The usual objection to
+ * radial encodings is that the reader has to compare arcs at different radii,
+ * which they do badly. Two things fix it here: every arc shares a start angle,
+ * so the comparison is of END angle against a common origin rather than of
+ * length; and every ring is DIRECT-LABELLED with its count and conversion, so
+ * the arc is the at-a-glance shape while the numbers are the precise read. The
+ * fill never carries the value alone.
+ *
+ * Replaces a horizontal bar list. The bars were a better pure encoding — this
+ * is a considered trade for the theme's requested form, made safe by the shared
+ * start angle and the labels, and it is called out in the report.
+ *
+ * The legend is not optional at six rings: the dataviz rules require one for
+ * more than four series, and it doubles as the table view.
  */
 export function FunnelChart({ bars }: { bars: FunnelBar[] }) {
-  const max = Math.max(...bars.map((bar) => bar.count), 1);
+  if (bars.length === 0) {
+    return (
+      <p className="has-text-secondary" style={{ fontSize: 13 }}>
+        No applications in this period.
+      </p>
+    );
+  }
+
+  // Share of the TOP of the funnel, not of the widest ring — the top is the
+  // denominator a funnel is read against.
+  const top = Math.max(bars[0]?.count ?? 0, 1);
+
+  const OUTER = 88;
+  const STEP = 14;        // ring pitch
+  const WIDTH = 10;       // stroke, leaving a 4px surface gap between rings
 
   return (
-    <div>
-      {bars.map((bar, index) => {
-        const width = barWidthPercent(bar.count, max);
+    <div className="funnel-orbit">
+      <svg
+        viewBox="0 0 200 200"
+        className="funnel-orbit__svg"
+        role="img"
+        aria-label={`Pipeline funnel: ${bars
+          .map((bar) => `${bar.label} ${bar.count}`)
+          .join(", ")}`}
+      >
+        {bars.map((bar, index) => {
+          const radius = OUTER - index * STEP;
+          if (radius <= WIDTH / 2) return null;
 
-        return (
-          <div key={bar.label} style={{ marginBottom: index === bars.length - 1 ? 0 : 14 }}>
-            <div
-              className="is-flex is-justify-content-space-between"
-              style={{ fontSize: 13, marginBottom: 4 }}
-            >
-              <span style={{ fontWeight: 600 }}>{bar.label}</span>
-              <span className="has-text-secondary">
-                {bar.conversion ? `${bar.conversion} from previous` : ""}
-                {bar.conversionNote ? bar.conversionNote : ""}
-              </span>
-            </div>
+          const circumference = 2 * Math.PI * radius;
+          const share = Math.min(Math.max(bar.count / top, 0), 1);
 
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 8 }}
-              // The hover layer: an accessible name carrying the same facts the
-              // visual does, for keyboard and screen-reader users.
-              title={`${bar.label}: ${bar.count}${
-                bar.conversion ? `, ${bar.conversion} conversion from the previous step` : ""
-              }`}
-            >
-              <div
-                style={{
-                  width: `${width}%`,
-                  height: 22,
-                  background: rampStep(index),
-                  // 4px rounded data-end, anchored square to the baseline.
-                  borderRadius: "2px 4px 4px 2px",
-                  minWidth: bar.count > 0 ? 4 : 0,
-                }}
+          return (
+            <g key={bar.label}>
+              <circle
+                cx="100"
+                cy="100"
+                r={radius}
+                fill="none"
+                stroke="var(--chart-track)"
+                strokeWidth={WIDTH}
               />
-              <span style={{ fontSize: 14, fontWeight: 600, flexShrink: 0 }}>{bar.count}</span>
-            </div>
-          </div>
-        );
-      })}
+              {share > 0 && (
+                <circle
+                  cx="100"
+                  cy="100"
+                  r={radius}
+                  fill="none"
+                  stroke={rampStep(index)}
+                  strokeWidth={WIDTH}
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference * (1 - share)}
+                  transform="rotate(-90 100 100)"
+                >
+                  {/* The hover layer, carrying the same facts the visual does. */}
+                  <title>
+                    {`${bar.label}: ${bar.count}`}
+                    {bar.conversion ? ` — ${bar.conversion} from the previous stage` : ""}
+                  </title>
+                </circle>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/*
+        THE LEGEND, WHICH IS ALSO THE TABLE VIEW. Identity is never carried by
+        colour alone: every row pairs its swatch with the stage name, the count
+        and the conversion, so a colourblind reader, a screen-reader user and
+        somebody reading a greyscale printout all get the whole dataset.
+      */}
+      <ol className="funnel-orbit__legend">
+        {bars.map((bar, index) => (
+          <li key={bar.label} className="funnel-orbit__row">
+            <span
+              className="funnel-orbit__swatch"
+              style={{ background: rampStep(index) }}
+              aria-hidden="true"
+            />
+            <span className="funnel-orbit__stage">{bar.label}</span>
+            <span className="funnel-orbit__count">{bar.count}</span>
+            <span className="funnel-orbit__conv">
+              {bar.conversion ? `${bar.conversion} from previous` : ""}
+              {bar.conversionNote ?? ""}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
 
 // -----------------------------------------------------------------------------
-// Single-series bar chart
+// Single-series bar chart — STILL LINEAR, deliberately
+//
+// See this file's header. These compare magnitudes across unordered categories
+// ("median days in each stage", "candidates by source"), which is the one job a
+// radial form does measurably worse: arcs at differing radii compare badly by
+// eye, and a longer arc at a smaller radius can be the smaller value. Restyled
+// into the theme rather than converted.
 // -----------------------------------------------------------------------------
 
 export type Bar = {
@@ -254,7 +469,15 @@ export function BarChart({
           </div>
 
           <div
-            style={{ background: "var(--color-border)", borderRadius: 4, height: 8 }}
+            style={{
+              // The TRACK token rather than the border colour: a track is chart
+              // chrome and must stay recessive behind its mark, while the border
+              // token is tuned to be visible as an edge.
+              background: "var(--chart-track)",
+              borderRadius: "var(--radius-pill)",
+              height: 8,
+              overflow: "hidden",
+            }}
             title={`${bar.label}: ${bar.displayValue ?? bar.value}${bar.note ? ` — ${bar.note}` : ""}`}
           >
             <div
@@ -262,8 +485,10 @@ export function BarChart({
                 width: `${barWidthPercent(bar.value, max)}%`,
                 height: 8,
                 // One series, one colour. Status colour only where it means one.
-                background: bar.statusColor ?? "var(--color-primary)",
-                borderRadius: 4,
+                background: bar.statusColor ?? "var(--chart-1)",
+                // Pill ends, matching the meters' round caps — the theme's
+                // "nothing sharp" applied to a data mark.
+                borderRadius: "var(--radius-pill)",
               }}
             />
           </div>

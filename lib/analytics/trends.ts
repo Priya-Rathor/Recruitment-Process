@@ -3,8 +3,12 @@
 //
 // THE TRAP THE SPEC CALLS OUT BY NAME:
 //
-//   "Positive trend #16A34A, negative trend #DC2626 (note: for time-to-hire,
-//    lower is better - do not assume all increases are positive)"
+//   "Positive trend --color-success, negative trend --color-error (note: for
+//    time-to-hire, lower is better - do not assume all increases are positive)"
+//
+// (The spec named two hexes; under FUTURE WORKFORCE those roles resolve to mint
+// and rose. The trap below is about the SIGN, not the palette, so it survived
+// the theme replacement untouched.)
 //
 // Every dashboard that colours by the sign of the delta gets this wrong. A
 // time-to-hire that rose from 21 to 34 days is a bad month rendered in

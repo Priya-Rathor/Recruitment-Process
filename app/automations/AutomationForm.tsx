@@ -943,7 +943,7 @@ export function AutomationForm({
           <p style={{ fontSize: 15 }}>{summary}</p>
 
           {consequential.length > 0 && (
-            <p className="mt-3" style={{ fontSize: 13, color: "var(--status-attention-text, #B45309)" }}>
+            <p className="mt-3" style={{ fontSize: 13, color: "var(--status-attention-text, var(--status-attention-text))" }}>
               This rule spends money when it runs
               {consequential.some((action) => action.type === "start_screening_call")
                 ? " and telephones candidates"

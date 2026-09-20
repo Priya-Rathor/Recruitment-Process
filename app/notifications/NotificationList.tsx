@@ -31,7 +31,7 @@ function DeliveryNote({ notification }: { notification: NotificationWithDelivery
       style={{
         fontSize: 12,
         margin: "4px 0 0",
-        color: isSkipped ? "var(--color-secondary-text)" : "var(--color-error)",
+        color: isSkipped ? "var(--color-text-secondary)" : "var(--color-error)",
       }}
     >
       {isSkipped ? "Not emailed" : "Email failed"}

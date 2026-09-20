@@ -12,7 +12,7 @@ const STYLES: Record<string, { background: string; color: string; label: string 
     color: "var(--status-attention-text)",
     label: "Dialling",
   },
-  answered: { background: "#eff6ff", color: "var(--color-info)", label: "In progress" },
+  answered: { background: "var(--color-primary-tint)", color: "var(--color-info)", label: "In progress" },
   completed: {
     background: "var(--status-connected-bg)",
     color: "var(--status-connected-text)",
@@ -29,7 +29,7 @@ const STYLES: Record<string, { background: string; color: string; label: string 
     label: "Busy",
   },
   callback_requested: {
-    background: "#eff6ff",
+    background: "var(--color-primary-tint)",
     color: "var(--color-info)",
     label: "Callback requested",
   },

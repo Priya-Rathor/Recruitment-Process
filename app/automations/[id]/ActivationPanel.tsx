@@ -94,7 +94,7 @@ export function ActivationPanel({
       )}
 
       {contactsCandidates && (
-        <p className="mb-3" style={{ fontSize: 13, color: "var(--status-attention-text, #B45309)" }}>
+        <p className="mb-3" style={{ fontSize: 13, color: "var(--status-attention-text, var(--status-attention-text))" }}>
           Once active, this rule will telephone candidates without anyone approving each call. It
           runs at most once per application per stage-entry, and every attempt is recorded.
         </p>

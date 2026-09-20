@@ -1,35 +1,42 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Bricolage_Grotesque } from "next/font/google";
+import { Space_Grotesk, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.scss";
 
 /**
- * TWO typefaces, on purpose.
+ * TWO typefaces — FUTURE WORKFORCE.
  *
- * The UI audit found a single family (Inter) used for page headings, table
- * cells, buttons and captions alike. That uniformity is what makes an interface
- * read as scaffolded rather than designed — nothing in the type itself tells
- * the eye what is a heading and what is data.
+ * A FULL REPLACEMENT. Inter and Bricolage Grotesque are gone, and neither is
+ * kept as a fallback: leaving Inter in the stack is exactly the leftover a theme
+ * replacement is meant to eliminate, and on any machine with Inter installed it
+ * would silently keep rendering the retired theme's body text.
  *
- * Bricolage Grotesque carries the headings: a grotesk with enough character to
- * be recognisable at 22-32px, and tight enough at display sizes to hold a page
- * title. Inter keeps everything a user reads closely — body text, table cells,
- * form labels, numbers — because it was drawn for exactly that and stays
- * legible at 12-13px where a display face would not.
+ * SPACE GROTESK carries the headings — a geometric grotesk with enough character
+ * to hold a page title at 23-30px and the slightly technical cast the theme
+ * asks for.
  *
- * Both are variable fonts loaded through next/font, so they are self-hosted and
- * subset at build time. No layout shift, no third-party request.
+ * PLUS JAKARTA SANS carries body text, AND THAT IS A SUBSTITUTION worth naming
+ * rather than burying. The brief asked for Aeonik, which is a commercial licence
+ * — next/font cannot fetch it and self-hosting it needs licensed files this
+ * repository does not have. Plus Jakarta Sans is the closest licensable
+ * neo-grotesque: the same geometric skeleton, comparable aperture, a touch
+ * warmer. If real Aeonik is licensed later, it is a one-line change here plus
+ * `localFont` pointing at the files — nothing downstream knows the difference,
+ * because everything reads --font-body.
+ *
+ * Both are variable fonts through next/font, so they stay self-hosted and
+ * subset at build time: no layout shift, no third-party request.
  */
-const inter = Inter({
-  variable: "--font-inter",
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
   display: "swap",
 });
 
-const display = Bricolage_Grotesque({
-  variable: "--font-display",
+const grotesk = Space_Grotesk({
+  variable: "--font-grotesk",
   subsets: ["latin"],
   display: "swap",
-  weight: ["600", "700"],
+  weight: ["500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -46,23 +53,31 @@ export const metadata: Metadata = {
   applicationName: "MyRecruiter Partner",
 };
 
-// The logo blue, so the browser's OWN chrome takes the brand colour — the
-// address bar on Android Chrome, the status bar on an installed PWA. Without it
-// those surfaces render default grey directly above a branded page, which is
-// the one piece of the frame the CSS tokens cannot reach.
+// DEEP SPACE, so the browser's OWN chrome takes the theme — the address bar on
+// Android Chrome, the status bar on an installed PWA. Without it those surfaces
+// render default light grey directly above a near-black page, which is the one
+// piece of the frame the CSS tokens cannot reach and the most obvious way a
+// dark theme looks unfinished.
+//
+// Two entries, because the theme has two modes: `media` picks the ground each
+// mode actually uses. A single dark value would put a black bar above a light
+// page for anyone whose OS is set to light.
 //
 // Exported as the static `viewport` object rather than via `generateViewport`
 // (it depends on nothing in the request), and on `viewport` rather than
 // `metadata` because that is where `themeColor` now lives.
 export const viewport: Viewport = {
-  themeColor: "#004CF5",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7F8FF" },
+    { media: "(prefers-color-scheme: dark)", color: "#0A1128" },
+  ],
 };
 
 // Explicit props type rather than Next's generated `LayoutProps` global, so
 // `tsc --noEmit` typechecks without first running a build to emit .next/types.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${display.variable}`}>
+    <html lang="en" className={`${jakarta.variable} ${grotesk.variable}`}>
       <body>{children}</body>
     </html>
   );

@@ -13,7 +13,7 @@ import { CredentialDisclosure } from "./CredentialDisclosure";
 /**
  * Integration status, rendered with the shared chip.
  *
- * The colours the spec names for this module (Connected #DCFCE7/#15803D and so
+ * The colours the spec names for this module (Connected var(--status-connected-bg)/var(--status-connected-text) and so
  * on) are the same tokens StatusChip already uses for its tones, so mapping to
  * a tone gives the specified appearance AND one consistent chip geometry across
  * every module — rather than a fourth bespoke chip with its own padding.

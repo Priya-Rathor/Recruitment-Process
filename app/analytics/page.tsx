@@ -27,7 +27,7 @@ import { explainRate, formatRate, type Rate } from "@/lib/analytics/metrics";
 import { trendArrow, trendColor } from "@/lib/analytics/trends";
 import { AnalyticsFilterBar } from "./AnalyticsFilters";
 import { AskAnalytics } from "./AskAnalytics";
-import { BarChart, ChartCard, FunnelChart, KpiTile } from "./charts";
+import { BarChart, ChartCard, FunnelChart, KpiTile, OrbitalMeterRow } from "./charts";
 import { Briefcase, Building2, CheckCircle2, Inbox, Users } from "lucide-react";
 
 export const metadata = { title: "Analytics" };
@@ -56,10 +56,22 @@ function visibleTabs(agencyMode: boolean) {
   return TABS.filter((entry) => !("agencyOnly" in entry && entry.agencyOnly) || agencyMode);
 }
 
-function rateBar(label: string, value: Rate) {
+/**
+ * A rate becomes an ORBITAL METER, not a bar.
+ *
+ * A rate is a ratio against 100%, which is what a meter is for — the retired
+ * bar spent a length encoding on a number that can only ever range 0-100, and
+ * then scaled it relative to the other bars so a 40% rate beside a 45% one
+ * looked nearly full.
+ *
+ * `percent: null` when there is no computable rate, which is NOT zero: a meter
+ * pinned at 0% claims nobody converted, and "we cannot compute this yet" is a
+ * different statement. formatRate()/explainRate() already say which it is.
+ */
+function rateMeter(label: string, value: Rate) {
   return {
     label,
-    value: value.kind === "rate" ? value.percent : 0,
+    percent: value.kind === "rate" ? value.percent : null,
     displayValue: formatRate(value),
     note: explainRate(value),
   };
@@ -282,15 +294,17 @@ async function AnalyticsBody({
             title="Hire rate by source"
             subtitle="A source with too few candidates shows its raw counts instead of a percentage."
           >
-            <BarChart bars={report.sources.map((source) => rateBar(source.source, source.hireRate))} />
+            <OrbitalMeterRow
+              meters={report.sources.map((source) => rateMeter(source.source, source.hireRate))}
+            />
           </ChartCard>
 
           <ChartCard title="Conversion">
-            <BarChart
-              bars={[
-                rateBar("Interview to offer", report.interviewToOffer),
-                rateBar("Offer to hire", report.offerToHire),
-                rateBar("Interview completion", report.interviews.completionRate),
+            <OrbitalMeterRow
+              meters={[
+                rateMeter("Interview to offer", report.interviewToOffer),
+                rateMeter("Offer to hire", report.offerToHire),
+                rateMeter("Interview completion", report.interviews.completionRate),
               ]}
             />
           </ChartCard>
@@ -480,7 +494,7 @@ async function JobsTab({
                 <td>
                   <Link href={`/jobs/${row.job_id}`}>{row.title}</Link>
                   {row.status === "open" && row.screening_question_count === 0 && (
-                    <div style={{ fontSize: 12, color: "var(--status-attention-text, #B45309)" }}>
+                    <div style={{ fontSize: 12, color: "var(--status-attention-text, var(--status-attention-text))" }}>
                       Needs attention — no screening questions
                     </div>
                   )}

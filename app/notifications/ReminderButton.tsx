@@ -81,7 +81,7 @@ export function ReminderButton() {
         <span
           style={{
             fontSize: 13,
-            color: isError ? "var(--color-error)" : "var(--color-secondary-text)",
+            color: isError ? "var(--color-error)" : "var(--color-text-secondary)",
           }}
         >
           {result}

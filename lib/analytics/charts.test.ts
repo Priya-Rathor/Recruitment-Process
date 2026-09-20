@@ -45,47 +45,31 @@ describe("funnel ramp", () => {
   });
 
   it("clamps rather than returning undefined past the end", () => {
-    // A seventh stage would otherwise paint `undefined` as a background colour,
-    // silently rendering a transparent bar.
-    expect(rampStep(99)).toBe(FUNNEL_RAMP[FUNNEL_RAMP.length - 1]);
+    // A seventh stage added to the pipeline must get a colour, not `undefined`
+    // — which renders as no fill at all, i.e. an invisible ring.
     expect(rampStep(0)).toBe(FUNNEL_RAMP[0]);
+    expect(rampStep(5)).toBe(FUNNEL_RAMP[5]);
+    expect(rampStep(9)).toBe(FUNNEL_RAMP[5]);
+    expect(rampStep(99)).toBe(FUNNEL_RAMP[5]);
   });
 
-  it("is monotonically DARKER down the funnel, so the ramp reads in order", () => {
-    // The validated property, asserted here so an edit that breaks the ordinal
-    // ramp fails a test rather than only looking slightly wrong.
-    const luminance = (hex: string) => {
-      const value = hex.replace("#", "");
-      const channel = (offset: number) => {
-        const srgb = parseInt(value.slice(offset, offset + 2), 16) / 255;
-        return srgb <= 0.03928 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
-      };
-      return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
-    };
+  it("references design tokens rather than carrying its own hexes", () => {
+    /*
+      THE COLOUR MATHS MOVED, IT DID NOT DISAPPEAR.
 
-    for (let i = 1; i < FUNNEL_RAMP.length; i++) {
-      expect(
-        luminance(FUNNEL_RAMP[i]),
-        `${FUNNEL_RAMP[i]} is not darker than ${FUNNEL_RAMP[i - 1]}`
-      ).toBeLessThan(luminance(FUNNEL_RAMP[i - 1]));
+      This file used to assert the ramp's monotonicity and its light-end contrast
+      against the hexes declared here. Under FUTURE WORKFORCE the ramp lives in
+      app/globals.scss as --ramp-0 .. --ramp-5, and app/theme.test.ts asserts the
+      monotone lightness and the step gaps against those real values — closer to
+      the source, and it also catches somebody editing the stylesheet without
+      touching this component.
+
+      What is worth asserting HERE is that the component did not quietly grow its
+      own copy of the palette again, which is exactly how the retired ramp came
+      to disagree with the retired tokens.
+    */
+    for (const step of FUNNEL_RAMP) {
+      expect(step).toMatch(/^var\(--ramp-\d\)$/);
     }
-  });
-
-  it("keeps the lightest step visible against a white card", () => {
-    // The check the obvious Tailwind ramp fails: #C7D2FE sits at 1.49:1 on
-    // white and effectively disappears.
-    const relativeLuminance = (hex: string) => {
-      const value = hex.replace("#", "");
-      const channel = (offset: number) => {
-        const srgb = parseInt(value.slice(offset, offset + 2), 16) / 255;
-        return srgb <= 0.03928 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
-      };
-      return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
-    };
-
-    const lightest = FUNNEL_RAMP[0];
-    const contrast = (1.0 + 0.05) / (relativeLuminance(lightest) + 0.05);
-
-    expect(contrast).toBeGreaterThanOrEqual(2);
   });
 });

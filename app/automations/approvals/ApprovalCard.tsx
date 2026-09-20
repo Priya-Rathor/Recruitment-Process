@@ -193,7 +193,7 @@ export function ApprovalCard({
                     {")"}
                   </>
                 ) : (
-                  <span style={{ color: "var(--status-attention-text, #B45309)" }}>
+                  <span style={{ color: "var(--status-attention-text, var(--status-attention-text))" }}>
                     the template it named has since been deleted, so this will not send
                   </span>
                 )}
@@ -204,7 +204,7 @@ export function ApprovalCard({
       </ul>
 
       {contactsCandidate && (
-        <p className="mb-3" style={{ fontSize: 13, color: "var(--status-attention-text, #B45309)" }}>
+        <p className="mb-3" style={{ fontSize: 13, color: "var(--status-attention-text, var(--status-attention-text))" }}>
           This one reaches the candidate directly. Once approved it cannot be recalled.
         </p>
       )}
