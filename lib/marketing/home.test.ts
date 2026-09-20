@@ -10,10 +10,14 @@ import {
   HERO,
   HERO_SIGNALS,
   HOME_FAQS,
+  PROBLEM_CARDS,
+  PROBLEM_HEAD,
+  SOLUTION_HEAD,
   HOME_FOOTER_SECTIONS,
   HUMAN_SIDE,
   PIPELINE_PREVIEW,
   TRUST_CARDS,
+  WORKFLOW_PIECES,
   WORKFLOW_STEPS,
   WORKSPACE_CARDS,
 } from "@/lib/marketing/home";
@@ -108,6 +112,11 @@ const ALL_COPY: string[] = [
   HERO.leadDetail,
   HERO.badge,
   ...HERO_SIGNALS.flatMap((s) => [s.title, s.meta]),
+  PROBLEM_HEAD.title,
+  PROBLEM_HEAD.lead,
+  SOLUTION_HEAD.title,
+  SOLUTION_HEAD.lead,
+  ...PROBLEM_CARDS.flatMap((c) => [c.title, c.body]),
   ...WORKSPACE_CARDS.flatMap((c) => [c.title, c.body]),
   ...AI_CARDS.flatMap((c) => [c.title, c.body]),
   ...TRUST_CARDS.flatMap((c) => [c.title, c.body]),
@@ -333,6 +342,123 @@ describe("the dashboard mock matches the real application", () => {
   it("resolves every tile icon", () => {
     for (const tile of DASHBOARD.tiles) {
       expect(ICONS[tile.icon], `${tile.label} → ${tile.icon}`).toBeDefined();
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The challenge / solution bands
+// -----------------------------------------------------------------------------
+
+describe("the problem band", () => {
+  it("states the problem without making a claim about the reader", () => {
+    /*
+      THE LINE THIS SECTION HAS TO WALK. "Candidate data can live across
+      spreadsheets" is an observation about hiring; "your candidate data is a
+      mess" is a claim about a company nobody here has met, and it is the exact
+      register that makes a landing page feel like it is shouting.
+
+      So every card body must either hedge or describe, never assert about the
+      reader. Checked by requiring a hedging or descriptive verb in each — if a
+      card is rewritten into a flat accusation, this fails.
+    */
+    const hedged = /\b(can|tend|tends|often|may|is hard|are hard|is slow|adds)\b/i;
+    for (const card of PROBLEM_CARDS) {
+      expect(hedged.test(card.body), `"${card.title}": ${card.body}`).toBe(true);
+    }
+  });
+
+  it("never addresses the reader's own process in the second person", () => {
+    // "your inbox", "your spreadsheet" — the same accusation, smuggled in via
+    // a pronoun. The solution copy may say "your team"; the PROBLEM copy may
+    // not describe a mess as belonging to anyone.
+    for (const card of PROBLEM_CARDS) {
+      expect(/\byour\b/i.test(card.body), card.body).toBe(false);
+    }
+  });
+
+  it("keeps five cards, numbered in order", () => {
+    expect(PROBLEM_CARDS).toHaveLength(5);
+    expect(PROBLEM_CARDS.map((c) => c.step)).toEqual(["01", "02", "03", "04", "05"]);
+  });
+});
+
+describe("the transformation", () => {
+  it("shows the same six pieces in both states", () => {
+    /*
+      THE SECTION'S WHOLE ARGUMENT, asserted. The scattered band and the
+      connected band render ONE array, which is what makes "the same six
+      things, now joined" true by construction rather than by care. If someone
+      splits it into two arrays, this is the test that should have to be
+      deleted first.
+    */
+    expect(WORKFLOW_PIECES).toHaveLength(6);
+    for (const item of WORKFLOW_PIECES) {
+      expect(item.piece.length, `${item.piece} needs a scattered state`).toBeGreaterThan(0);
+      expect(item.scattered.length, `${item.piece} needs a scattered state`).toBeGreaterThan(0);
+      expect(item.surface.length, `${item.piece} needs a Scoreboad surface`).toBeGreaterThan(0);
+    }
+  });
+
+  it("names a distinct destination for every piece", () => {
+    // Two pieces landing on the same screen would make the "connected" side
+    // shorter than the "scattered" one, which quietly weakens the picture.
+    const surfaces = WORKFLOW_PIECES.map((p) => p.surface);
+    expect(new Set(surfaces).size).toBe(surfaces.length);
+  });
+
+  it("resolves every piece's icon", () => {
+    for (const item of WORKFLOW_PIECES) {
+      expect(ICONS[item.icon], `${item.piece} → ${item.icon}`).toBeDefined();
+    }
+  });
+
+  it("does not restate the workflow the page already renders", () => {
+    /*
+      THE DUPLICATION GUARD, and the reason this section shows OBJECTS rather
+      than STAGES.
+
+      The brief sketched the solution band as Job -> Candidates -> Screening ->
+      Interview -> Evaluation -> Hiring decision, which is exactly
+      WORKFLOW_STEPS, rendered by <HiringWorkflow> two bands below. This fails
+      if the two sets ever converge on the same labels.
+    */
+    const steps = new Set(WORKFLOW_STEPS.map((s) => s.title.toLowerCase()));
+    for (const item of WORKFLOW_PIECES) {
+      expect(steps.has(item.piece.toLowerCase()), `"${item.piece}" duplicates a workflow step`).toBe(
+        false
+      );
+    }
+  });
+});
+
+describe("the two bands do not echo each other or the sections below", () => {
+  it("gives every band on the page a distinct heading", () => {
+    /*
+      THE BUG THIS PINS. The solution band says "One connected workspace for
+      modern hiring" and the Workspace band used to say "One workspace for your
+      entire hiring process" — near-identical sentences two sections apart.
+      Workspace was retitled; this stops the next edit undoing that.
+    */
+    const heads = [PROBLEM_HEAD.title, SOLUTION_HEAD.title];
+    for (const title of heads) {
+      expect(title.trim().endsWith("."), `${title} should be a full sentence`).toBe(true);
+    }
+    expect(PROBLEM_HEAD.eyebrow).not.toBe(SOLUTION_HEAD.eyebrow);
+    expect(new Set(heads).size).toBe(heads.length);
+  });
+
+  it("describes only capabilities the product has", () => {
+    /*
+      The solution lead is the most load-bearing sentence in this module: it is
+      the one place the section says what Scoreboad DOES. Every capability it
+      names must appear in the six workspace cards, which are themselves tied
+      to the /product/* capability groups.
+    */
+    const claimed = ["screening", "interview", "evaluation", "hiring workflow"];
+    const lead = SOLUTION_HEAD.lead.toLowerCase();
+    for (const term of claimed) {
+      expect(lead.includes(term), `the solution lead should name ${term}`).toBe(true);
     }
   });
 });

@@ -1283,3 +1283,104 @@ in this environment — unchanged from the previous three sessions. The 320px
 overflow case was checked arithmetically instead (280px shell → 240px main →
 115px tiles → 86px funnel track; every text cell has an ellipsis and every grid
 track a `minmax(0, …)`), not visually.
+
+---
+
+## 2026-09-20 — Module 04: problem → solution
+
+**The brief collided with the page that already existed, and the resolution is
+the whole design decision.** Module 04 asked for a solution band headed "One
+connected workspace for modern hiring" showing Job → Candidates → Screening →
+Interview → Evaluation → Hiring decision. The page already had `Workspace`
+("One workspace for your entire hiring process") and `HiringWorkflow` rendering
+exactly those six stages from `WORKFLOW_STEPS`. Building the brief literally
+would have put the same heading twice and the same six stages twice on one page.
+
+So:
+- **The problem half is genuinely new** — the page had never stated one. It
+  opened with the hero's promise and went straight to a capability list, i.e.
+  the answer to a question it had never asked.
+- **The solution half shows the same six OBJECTS as the problem half, not
+  stages.** Resumes / Applications / Screening answers / Interview times /
+  Interviewer feedback / The decision — scattered across generic tools in the
+  light band, then connected to real Scoreboad surfaces in the dark band.
+  Distinct from `WORKFLOW_STEPS` (verbs/stages), and `home.test.ts` now fails if
+  the two sets ever converge on the same labels.
+- **`Workspace` was retitled** "One workspace for your entire hiring process."
+  → "What's in the workspace." That band is no longer the claim, it is the
+  itemisation of the claim made two bands earlier.
+
+**`WORKFLOW_PIECES` is ONE array rendered twice** — scattered and connected.
+That is the section's whole argument ("the same six things, now joined") made
+true by construction. Two arrays would have drifted until before/after were of
+different subjects and nothing would have failed.
+
+**Dark solution band, and that is the argument not the rhythm.** Problem =
+pale, ordinary ground where the pieces sit loose; solution = brand navy, lit,
+one rail. The reader scrolls and the transformation IS the scroll. Side-by-side
+in one band would make it a diagram to compare rather than a thing that happens.
+Deep bands now 4 of 12 — still the documented ~30/70.
+
+**Animation reuses `<Reveal>`, no new mechanism.** The rail's line growth and
+the nodes' settle are CSS keyed off the `.is-shown` class Reveal already adds.
+Line grows with `scaleX`/`scaleY`, never `width`.
+
+**Deliberate refusals:**
+- The scattered chips do NOT float. §10 asks for them to "gently move
+  independently" and four lines later rules out constant movement and infinite
+  animation; the prohibition wins. Six perpetually-animating compositor layers
+  under a paragraph about chaos is not calm.
+- Tilts are FIXED PER INDEX via `data-tilt`, not random — a random tilt at
+  render is a hydration mismatch.
+- Chips are flex-wrapped, not absolutely positioned: a prettier scatter that
+  cannot overlap at any width.
+- No `/platform` or `/solutions/ai-recruitment` link — both `planned` in
+  `navigation.ts`. The one contextual link goes to `/how-it-works`.
+
+**Bug found and fixed in a Module 01 primitive.** `ButtonLink`/`Button`
+destructured only `href`/`children`/`icon` and spread the rest onto the element,
+so the rendered markup was `<a class="mkt-btn mkt-btn--glass" variant="secondary"
+href="…">` — an invalid HTML attribute on every button on the site. Worse and
+quieter: `{...rest}` sat AFTER the computed `className`, so a caller passing one
+would have wiped the button's classes entirely. It survived Module 01 because
+nothing had called these yet — **the solution band's CTA is the first caller in
+the codebase**, which is how it surfaced. Fixed by destructuring
+`variant`/`size`/`className` out; the `...rest` type now structurally cannot
+contain them, which is a stronger guarantee than a test would be (there is no
+jsdom/RTL harness in this project and adding one for this is not worth a
+dependency).
+
+**Reused:** `Section`, `SectionHeading`, `ButtonLink`, `Reveal`, `Stagger`,
+`Logo`, `iconFor`, `.mkt-lcard` (the problem card is a `--numbered` MODIFIER, so
+it inherits surface/border/radius/shadow/hover), Bulma's `.is-sr-only` (already
+loaded, already used in `app/hires/[id]/DocumentChecklist.tsx` — not a second
+visually-hidden utility).
+
+**Copy rules enforced in tests, not just in review:** every problem-card body
+must hedge or describe (`can` / `tends` / `often` / `is hard`…) and none may say
+"your" — "candidate data can live in spreadsheets" is an observation, "your
+candidate data is a mess" is a claim about a company nobody here has met.
+
+Responsive: problem cards 5 → 3 → 2 → 1 (five is an awkward count and the ragged
+last row is accepted rather than inventing a sixth card to square the grid); the
+rail turns vertical at **1080px**, not at the phone breakpoint, because six nodes
+across needs ~170px each before "Interviewer feedback → Evaluation" wraps to four
+lines; tilts come off at ≤620px and the scatter becomes a column.
+
+Reduced motion needed its own rule again: the rail is hidden by default and
+revealed by `.is-shown`, so "no animation" could not mean "no transition" —
+that would leave the line at scale 0 and six nodes at opacity 0 forever. Forced
+to the final state, with `transform: none` rather than `scaleX(1)` because the
+same rule serves the vertical rail too.
+
+Contrast computed for every new pairing: scatter sub 5.76:1, problem number
+6.03:1, rail label 17.47:1, rail surface 8.24:1, panel title 16.34:1.
+
+`lint` clean · `typecheck` clean · `build` clean, `/` still static · 1928/1928
+(+9). Verified against the dev server: one h1 and 13 distinct h2s, no leaked
+DOM attributes, the scatter `aria-hidden` with its content carried by a real
+caption, and every new rule in the served CSS with the reduced-motion overrides
+correctly last in the cascade.
+
+**Still not verified:** the eight breakpoints, visually. No browser — unchanged
+from the previous four sessions.

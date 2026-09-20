@@ -9,6 +9,8 @@ import {
 } from "@/lib/marketing/seo";
 import { HOME_FAQS } from "@/lib/marketing/home";
 import { Hero } from "./_components/home/Hero";
+import { Problem } from "./_components/home/Problem";
+import { Solution } from "./_components/home/Solution";
 import { Workspace } from "./_components/home/Workspace";
 import { HiringWorkflow } from "./_components/home/HiringWorkflow";
 import { AiFeatures } from "./_components/home/AiFeatures";
@@ -54,20 +56,30 @@ export const metadata: Metadata = {
  * talk about architecture only after showing the product:
  *
  *   1. Hero + the product itself          what it is, and what it looks like
- *   2. One workspace                      the six things it covers
- *   3. From application to hire           how those six connect
- *   4. AI that handles the busy work      where the leverage is
- *   5. AI does the work, you decide       the objection, answered
- *   6. The pipeline at a glance           the product again, in use
- *   7. People x Intelligence x Opportunity  a beat
- *   8. Built for modern hiring teams      why trust it with candidate data
- *   9. FAQ                                the awkward questions
- *  10. Build your next team               the ask
+ *   2. The challenge                      what goes wrong without it
+ *   3. The solution                       the same pieces, connected
+ *   4. What is in the workspace           the six things it covers
+ *   5. From application to hire           how those six connect
+ *   6. AI that handles the busy work      where the leverage is
+ *   7. AI does the work, you decide       the objection, answered
+ *   8. The pipeline at a glance           the product again, in use
+ *   9. People x Intelligence x Opportunity  a beat
+ *  10. Built for modern hiring teams      why trust it with candidate data
+ *  11. FAQ                                the awkward questions
+ *  12. Build your next team               the ask
  *
- * THE COLOUR RHYTHM IS DELIBERATE: three deep bands (hero, Human + AI, the
- * closing CTA) against seven bright ones. That lands near the 30/70 split the
- * brief asks for, and it is what makes the bright product sections read as
- * bright — brightness is a relationship, not a value.
+ * STEPS 2 AND 3 WERE THE MISSING FIRST HALF OF THE ARGUMENT. The page used to
+ * open with the hero's promise and go straight to a list of capabilities — the
+ * answer to a question it had never asked. The challenge band asks it.
+ *
+ * THE COLOUR RHYTHM IS DELIBERATE: four deep bands (hero, the solution, Human +
+ * AI, the closing CTA) against eight bright ones. That holds the 30/70 split,
+ * and it is what makes the bright product sections read as bright — brightness
+ * is a relationship, not a value.
+ *
+ * The solution band is deep on purpose rather than for rhythm: the challenge
+ * band above it is the pale, ordinary ground where the scattered pieces sit,
+ * and the turn into brand navy IS the transformation the section is describing.
  *
  * WHAT IS STILL DELIBERATELY MISSING. No logo wall, no testimonial, no "trusted
  * by 500 teams". This product has no customers to name yet, and inventing the
@@ -107,6 +119,8 @@ export default function HomePage() {
       />
 
       <Hero />
+      <Problem />
+      <Solution />
       <Workspace />
       <HiringWorkflow />
       <AiFeatures />

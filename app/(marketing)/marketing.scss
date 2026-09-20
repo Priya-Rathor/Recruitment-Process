@@ -2138,6 +2138,317 @@
     }
   }
 
+  // ===========================================================================
+  // THE PROBLEM BAND — numbered cards, and the scattered state
+  // ===========================================================================
+
+  /*
+    FIVE ACROSS, THEN 3 / 2 / 1.
+
+    Five is an awkward count for a grid and there is no arrangement of it that
+    is clean at every width: 3 columns leaves a row of two, 2 leaves a row of
+    one. Rather than pad the set to six with a card nobody needed, the ragged
+    last row is accepted — it is a list of five real points, and inventing a
+    sixth to square the grid is letting the layout write the copy.
+  */
+  .mkt-problems {
+    list-style: none;
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  /*
+    The numbered variant of the light card. A MODIFIER, not a new card: it
+    inherits the surface, border, radius, shadow and hover lift from
+    `.mkt-lcard`, and changes only what is genuinely different — the number
+    where the icon well would be.
+  */
+  .mkt-lcard--numbered {
+    padding: 1.25rem 1.125rem;
+
+    h3 {
+      margin-top: 0.625rem;
+      font-size: 14.5px;
+    }
+
+    p {
+      font-size: 13px;
+    }
+  }
+
+  .mkt-problems__num {
+    display: block;
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.06em;
+    color: var(--mkt-accent-ink); // 6.03:1 — the accent AS TEXT needs this step
+    transition: transform 220ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  // The hover "icon movement" the card system already implies, applied to the
+  // one mark this card has. 2px, and only on the number — the card itself is
+  // already lifting.
+  .mkt-lcard--numbered:hover .mkt-problems__num {
+    transform: translateX(3px);
+  }
+
+  // ---- The scattered state --------------------------------------------------
+  /*
+    SIX CHIPS, FLEX-WRAPPED AND TILTED — not absolutely positioned.
+
+    Absolute positioning would give a prettier scatter and would also overlap
+    at some width nobody tested. A wrapping flex row cannot overlap at any
+    width, and a few degrees of tilt per chip reads as "loose" without putting
+    the layout at risk. The tilts are FIXED PER INDEX rather than random:
+    random values computed at render differ between server and client and are
+    a hydration mismatch.
+
+    There are deliberately NO connecting lines here. That is the entire point
+    of this half of the story, and it is why the connected band gets a rail.
+  */
+  .mkt-scatterwrap {
+    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+  }
+
+  .mkt-scatter {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.875rem 1.125rem;
+  }
+
+  .mkt-scatter__chip {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius-sm);
+    box-shadow: var(--mkt-glow-card);
+
+    &[data-tilt="0"] { transform: rotate(-2.5deg) translateY(6px); }
+    &[data-tilt="1"] { transform: rotate(1.8deg) translateY(-4px); }
+    &[data-tilt="2"] { transform: rotate(-1.2deg) translateY(2px); }
+    &[data-tilt="3"] { transform: rotate(2.6deg) translateY(5px); }
+    &[data-tilt="4"] { transform: rotate(-2deg) translateY(-3px); }
+    &[data-tilt="5"] { transform: rotate(1.4deg) translateY(3px); }
+  }
+
+  .mkt-scatter__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    // A glyph, not text — the muted ink would make it disappear, and the
+    // accent at full saturation is fine at this size.
+    color: var(--mkt-ink-muted);
+  }
+
+  .mkt-scatter__text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+
+    strong {
+      font-size: 13px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    span {
+      font-size: 11.5px;
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  /*
+    NOT A DECORATIVE CAPTION. The graphic above it is `aria-hidden`, so this
+    sentence is the only place its content exists for a screen reader, a
+    crawler, or anyone who finds a diagram of six tilted boxes unreadable.
+    Deleting it would delete the information.
+  */
+  .mkt-scatter__caption {
+    margin: 1.5rem auto 0;
+    max-width: 44rem;
+    text-align: center;
+    font-size: var(--text-body);
+    line-height: 1.6;
+    color: var(--mkt-ink-muted);
+  }
+
+  // ===========================================================================
+  // THE SOLUTION BAND — the connected rail
+  // ===========================================================================
+
+  .mkt-railwrap {
+    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+  }
+
+  /*
+    A GLASS PANEL, so the connected state reads as a surface rather than as a
+    diagram floating on the band. Same glass language as the navbar and the
+    hero's secondary button — no new treatment invented for this section.
+  */
+  .mkt-rail {
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius-lg);
+    background: var(--mkt-dark-2);
+    overflow: hidden;
+  }
+
+  .mkt-rail__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.125rem;
+    border-bottom: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-glass);
+  }
+
+  .mkt-rail__mark {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .mkt-rail__title {
+    margin: 0;
+    font-size: var(--text-label);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .mkt-rail__body {
+    position: relative;
+    padding: clamp(1.5rem, 3vw, 2.25rem) clamp(1rem, 2.5vw, 2rem);
+  }
+
+  /*
+    THE RAIL LINE.
+
+    Drawn once, behind the dots, and grown with `scaleX` from the left when the
+    section lands. `transform` rather than `width`: growing a width is a layout
+    animation on every frame of a 900ms transition, which is the one thing the
+    performance rules rule out.
+
+    `top` is the dot's vertical centre — the padding above, plus half the dot.
+    Stated as a calc off the same values rather than a magic number, so moving
+    the padding moves the line with it.
+  */
+  .mkt-rail__line {
+    position: absolute;
+    left: clamp(1rem, 2.5vw, 2rem);
+    right: clamp(1rem, 2.5vw, 2rem);
+    top: calc(clamp(1.5rem, 3vw, 2.25rem) + 1.125rem);
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      rgba(139, 158, 255, 0.10),
+      rgba(139, 158, 255, 0.55) 18%,
+      rgba(198, 184, 255, 0.55) 82%,
+      rgba(198, 184, 255, 0.10)
+    );
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 900ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  /*
+    KEYED OFF THE SITE'S EXISTING REVEAL, not off a second mechanism.
+    <Reveal> puts `.is-shown` on the wrapper when the element enters the
+    viewport; these two rules are all the "scroll-linked" this section needs.
+  */
+  .mkt-reveal.is-shown .mkt-rail__line {
+    transform: scaleX(1);
+  }
+
+  .mkt-rail__nodes {
+    position: relative;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .mkt-rail__node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.625rem;
+    opacity: 0;
+    transform: translateY(10px);
+    transition:
+      opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .mkt-reveal.is-shown .mkt-rail__node {
+    opacity: 1;
+    transform: none;
+  }
+
+  /*
+    The dot sits ON the line, so its background must be opaque enough to break
+    it — a translucent dot with a line running through it reads as a bead on a
+    wire rather than as a station on it.
+  */
+  .mkt-rail__dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    background: var(--mkt-dark-3);
+    border: 1px solid var(--mkt-dark-border-strong);
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .mkt-rail__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    strong {
+      font-size: 12.5px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-on-dark);
+      line-height: 1.3;
+    }
+  }
+
+  .mkt-rail__surface {
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .mkt-rail__arrow {
+    color: var(--mkt-accent-on-dark);
+    margin-right: 2px;
+  }
+
+  .mkt-solution__cta {
+    display: flex;
+    justify-content: center;
+    margin-top: clamp(1.75rem, 3vw, 2.5rem);
+  }
+
   // ---------------------------------------------------------------------------
   // LIGHT CARDS
   // ---------------------------------------------------------------------------
@@ -2625,6 +2936,63 @@
     }
   }
 
+  @media (max-width: 1080px) {
+    .mkt-problems {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    /*
+      THE RAIL TURNS VERTICAL EARLY — at 1080px, not at the phone breakpoint.
+
+      Six nodes across needs about 170px each before "Interviewer feedback →
+      Evaluation" starts wrapping to four lines and the row goes ragged. The
+      vertical form is not a degraded fallback: it is a list with a spine down
+      the left, which is arguably the clearer reading of the same idea.
+    */
+    .mkt-rail__nodes {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.125rem;
+    }
+
+    .mkt-rail__node {
+      flex-direction: row;
+      align-items: center;
+      text-align: left;
+      gap: 0.875rem;
+    }
+
+    .mkt-rail__text {
+      // The two lines sit side by side once there is a whole row for them.
+      flex-direction: row;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0 0.5rem;
+    }
+
+    // The line runs DOWN the left, through the dots' centres.
+    .mkt-rail__line {
+      left: calc(clamp(1rem, 2.5vw, 2rem) + 1.125rem);
+      right: auto;
+      top: clamp(1.5rem, 3vw, 2.25rem);
+      bottom: clamp(1.5rem, 3vw, 2.25rem);
+      width: 1px;
+      height: auto;
+      background: linear-gradient(
+        180deg,
+        rgba(139, 158, 255, 0.10),
+        rgba(139, 158, 255, 0.55) 18%,
+        rgba(198, 184, 255, 0.55) 82%,
+        rgba(198, 184, 255, 0.10)
+      );
+      transform: scaleY(0);
+      transform-origin: top center;
+    }
+
+    .mkt-reveal.is-shown .mkt-rail__line {
+      transform: scaleY(1);
+    }
+  }
+
   @media (max-width: 860px) {
     .mkt-cardgrid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2670,10 +3038,37 @@
     }
   }
 
+  @media (max-width: 720px) {
+    .mkt-problems {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   @media (max-width: 620px) {
     .mkt-cardgrid,
     .mkt-cardgrid--four {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mkt-problems {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /*
+      THE TILTS COME OFF ON A PHONE. A rotated card in a single narrow column
+      is not "scattered", it is crooked — and a 2.6deg rotation on a chip that
+      now spans the full width pushes its corner past the gutter. The scatter
+      reads from the wrapping and the caption instead.
+    */
+    .mkt-scatter__chip[data-tilt] {
+      transform: none;
+    }
+
+    .mkt-scatter {
+      // Full-width rows rather than a wrapped cloud: at this width a "cloud"
+      // is just a column with uneven gaps.
+      flex-direction: column;
+      gap: 0.5rem;
     }
 
     .mkt-product__tiles {
@@ -2781,6 +3176,31 @@
     .mkt-btn:hover,
     .mkt-btn:focus-visible,
     .mkt-btn:active {
+      transform: none;
+    }
+
+    /*
+      THE RAIL ARRIVES BUILT.
+
+      The line and the nodes are hidden by default and revealed by `.is-shown`,
+      so "no animation" cannot mean "no transition" here — that would leave the
+      line at scaleX(0) and the six nodes at opacity 0 forever, which is the
+      whole section missing. They are forced to their final state instead.
+    */
+    .mkt-rail__line {
+      transition: none;
+      // `none`, not `scaleX(1)` — the same rule has to serve the horizontal
+      // rail AND the vertical one at =<1080px, which is grown with scaleY.
+      transform: none;
+    }
+
+    .mkt-rail__node {
+      transition: none;
+      opacity: 1;
+      transform: none;
+    }
+
+    .mkt-lcard--numbered:hover .mkt-problems__num {
       transform: none;
     }
 

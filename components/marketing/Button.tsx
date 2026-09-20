@@ -37,20 +37,43 @@ const CLASSES: Record<ButtonVariant, string> = {
   tertiary: "mkt-btn mkt-btn--text",
 };
 
-function classesFor({ variant = "primary", size = "md", className = "" }: CommonProps) {
+function classesFor(variant: ButtonVariant, size: "md" | "sm", className: string) {
   return [CLASSES[variant], size === "sm" ? "mkt-btn--sm" : "", className]
     .filter(Boolean)
     .join(" ");
 }
 
+/*
+  EVERY STYLING PROP IS DESTRUCTURED OUT OF `rest`, and that is a bug fix
+  rather than a tidy-up.
+
+  The first version pulled only `href`, `children` and `icon` off, then spread
+  the remainder onto the element. `variant` and `size` are not HTML attributes,
+  so React 19 passed them straight through and the rendered markup was
+  `<a class="mkt-btn mkt-btn--glass" variant="secondary" href="...">` — invalid
+  HTML on every button on the site.
+
+  `className` was worse in a quieter way: `{...rest}` sat AFTER the computed
+  `className`, so a caller passing one would have REPLACED the button's classes
+  entirely and got an unstyled link, with nothing to explain why.
+
+  It survived Module 01 because these primitives were written before anything
+  called them; the first real caller (the solution band's CTA) surfaced both.
+*/
 export function ButtonLink({
   href,
   children,
   icon: Icon,
+  variant = "primary",
+  size = "md",
+  className = "",
   ...rest
-}: CommonProps & { href: string } & Omit<ComponentProps<typeof Link>, "href" | "className">) {
+}: CommonProps & { href: string } & Omit<
+    ComponentProps<typeof Link>,
+    "href" | "className"
+  >) {
   return (
-    <Link href={href} className={classesFor({ children, ...rest })} {...rest}>
+    <Link href={href} className={classesFor(variant, size, className)} {...rest}>
       {children}
       {Icon && <Icon size={17} aria-hidden="true" />}
     </Link>
@@ -61,10 +84,13 @@ export function Button({
   children,
   icon: Icon,
   type = "button",
+  variant = "primary",
+  size = "md",
+  className = "",
   ...rest
 }: CommonProps & Omit<ComponentProps<"button">, "className">) {
   return (
-    <button type={type} className={classesFor({ children, ...rest })} {...rest}>
+    <button type={type} className={classesFor(variant, size, className)} {...rest}>
       {children}
       {Icon && <Icon size={17} aria-hidden="true" />}
     </button>

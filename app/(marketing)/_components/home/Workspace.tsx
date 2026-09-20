@@ -19,10 +19,19 @@ import { iconFor } from "./icons";
 export function Workspace() {
   return (
     <Section tone="light" id="product">
+      {/*
+        RETITLED WHEN THE CHALLENGE / SOLUTION BANDS LANDED ABOVE IT.
+
+        This used to say "One workspace for your entire hiring process." The
+        solution band now says "One connected workspace for modern hiring." two
+        sections earlier, and the two read as the same sentence twice. This band
+        is not the claim any more — it is the ITEMISATION of the claim — so the
+        heading now says what the six cards under it actually are.
+      */}
       <SectionHeading
         eyebrow="The platform"
-        title="One workspace for your entire hiring process."
-        lead="From the first application to the final decision, Scoreboad keeps your hiring workflow connected."
+        title="What's in the workspace."
+        lead="Six parts of the hiring process, on one set of records — from the first application to the final decision."
       />
 
       <Stagger as="ul" className="mkt-cardgrid">

@@ -176,6 +176,109 @@ export const PIPELINE_PREVIEW = {
 } as const;
 
 // -----------------------------------------------------------------------------
+// The problem, and the turn into the solution
+// -----------------------------------------------------------------------------
+
+/**
+ * WHY THIS SECTION EXISTS AT ALL, given that the page already has "One
+ * workspace" and "From application to hire".
+ *
+ * Those two describe the SOLUTION. Nothing on the page had ever described the
+ * problem, so the reader met a list of capabilities without having been told
+ * what they are for. This is the missing first half of that argument, and it
+ * is deliberately the only thing here that is new: the workflow itself is not
+ * restated, because WORKFLOW_STEPS already renders it two bands below and a
+ * second copy would be the same six stages twice on one page.
+ *
+ * EVERY LINE IS A STATEMENT ABOUT HIRING, NOT A CLAIM ABOUT A COMPANY.
+ * "Resumes can arrive as email attachments" is observably true of the world;
+ * "your resumes are lost in your inbox" is a claim about a reader nobody here
+ * has met. The modal verb is doing real work in each of these and should not
+ * be edited out for punchiness.
+ */
+export const PROBLEM_CARDS: { step: string; title: string; body: string }[] = [
+  {
+    step: "01",
+    title: "Scattered candidate data",
+    body: "Candidate information can live across resumes, spreadsheets, inboxes and separate recruiting tools.",
+  },
+  {
+    step: "02",
+    title: "Repetitive screening",
+    body: "Reading every application and working out which ones fit the role is slow, and it is the same work every time.",
+  },
+  {
+    step: "03",
+    title: "Interview coordination",
+    body: "Scheduling rounds, sending invites and keeping candidate conversations organised adds real overhead.",
+  },
+  {
+    step: "04",
+    title: "Inconsistent evaluation",
+    body: "Feedback is hard to compare when each interviewer records it somewhere different, in a different shape.",
+  },
+  {
+    step: "05",
+    title: "One process, many tools",
+    body: "A single hire can touch a job board, an inbox, a spreadsheet, a calendar and a chat thread before anyone decides.",
+  },
+];
+
+/**
+ * THE TRANSFORMATION, AS ONE ARRAY RENDERED TWICE.
+ *
+ * Six pieces of a hire. The problem band shows them scattered — each labelled
+ * with the generic tool it tends to end up in — and the solution band shows the
+ * same six connected, each labelled with the Scoreboad surface that holds it.
+ *
+ * ONE ARRAY RATHER THAN TWO IS THE POINT. The section's whole argument is that
+ * these are the SAME six things in both states; two arrays would let the two
+ * halves drift until the "before" and "after" were of different subjects, and
+ * nothing would have failed.
+ *
+ * `surface` NAMES A REAL SCREEN IN THE PRODUCT, in every case: the candidate
+ * record (Module 4), applications (Module 5), the structured screening report
+ * (Module 8), interviews (Module 11), the evaluation panel (Module 12) and the
+ * pipeline board (Module 5). Nothing here is aspirational.
+ */
+export const WORKFLOW_PIECES: {
+  /** The thing itself. Identical in both states — that is the story. */
+  piece: string;
+  /** Where it tends to live when nothing is joined up. */
+  scattered: string;
+  /** The Scoreboad screen that holds it instead. */
+  surface: string;
+  icon: string;
+}[] = [
+  { piece: "Resumes", scattered: "Email attachments", surface: "Candidate record", icon: "FileText" },
+  { piece: "Applications", scattered: "A spreadsheet", surface: "Applications", icon: "ClipboardCheck" },
+  { piece: "Screening answers", scattered: "Call notes", surface: "Screening report", icon: "PhoneCall" },
+  { piece: "Interview times", scattered: "Calendar invites", surface: "Interviews", icon: "CalendarCheck" },
+  { piece: "Interviewer feedback", scattered: "Chat threads", surface: "Evaluation", icon: "MessagesSquare" },
+  { piece: "The decision", scattered: "A meeting", surface: "Pipeline", icon: "Gauge" },
+];
+
+/** The two headings, here rather than in the components so the copy tests see them. */
+export const PROBLEM_HEAD = {
+  eyebrow: "The challenge",
+  title: "Great candidates shouldn't get lost in a fragmented hiring process.",
+  lead:
+    "Sourcing, resumes, screening, interviews, evaluation and candidate " +
+    "communication each tend to end up in a different place. The work of hiring " +
+    "then becomes the work of keeping those places in sync.",
+} as const;
+
+export const SOLUTION_HEAD = {
+  eyebrow: "The solution",
+  title: "One connected workspace for modern hiring.",
+  lead:
+    "Scoreboad brings candidate screening, interviews, evaluation and the " +
+    "hiring workflow into one place, and uses AI to take the repetitive reading " +
+    "and summarising off your team — so the time goes into the decision instead " +
+    "of the admin around it.",
+} as const;
+
+// -----------------------------------------------------------------------------
 // One workspace — six cards, one per capability group
 // -----------------------------------------------------------------------------
 
