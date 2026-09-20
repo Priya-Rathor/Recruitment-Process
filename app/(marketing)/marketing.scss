@@ -158,6 +158,25 @@
     soft wide shadows are not a hard shadow, but an exception carved for them
     would be the crack the next one comes through.
   */
+  /*
+    The product frame on a LIGHT band.
+
+    `--mkt-glow-product` opens with a 1px white ring, which is right over deep
+    navy and invisible on #f7f9fc — the frame lost its edge entirely. This
+    drops the ring (the light variant carries a real border instead) and keeps
+    a softer version of the periwinkle bloom, which on a pale ground reads as
+    the product being lit rather than as a smudge.
+
+    A TOKEN AND NOT AN INLINE DECLARATION, because app/theme.test.ts asserts
+    every box-shadow in the codebase is a token, `none`, or an inset accent
+    edge — and it caught this one as a literal within a minute of it being
+    written, which is the rule doing exactly its job.
+  */
+  --mkt-glow-product-light:
+    0 1px 2px rgba(11, 16, 32, 0.04),
+    0 30px 60px -30px rgba(11, 16, 32, 0.22),
+    0 0 80px -30px rgba(139, 158, 255, 0.45);
+
   --mkt-glow-nav:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 12px 32px -18px rgba(4, 8, 22, 0.85);
@@ -2139,6 +2158,262 @@
   }
 
   // ===========================================================================
+  // THE PLATFORM SHOWCASE — six views, one frame
+  // ===========================================================================
+
+  .mkt-showcase {
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  /*
+    THE TAB ROW SCROLLS SIDEWAYS ON A PHONE, and the scroll is CONTAINED here.
+
+    Six labels do not fit 390px and wrapping them to three rows turns a control
+    into a paragraph. `overflow-x: auto` on this wrapper means the tabs scroll
+    and the PAGE does not — which is the difference between the pattern the
+    brief allows and the page-level horizontal scroll it forbids.
+
+    The scrollbar is hidden because it would sit across the tabs' underline;
+    the row's overflow is obvious from the clipped sixth tab.
+  */
+  .mkt-showcase__tabscroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    // A hair of vertical room so the focus ring is not clipped by the scroller.
+    padding-block: 3px;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .mkt-showcase__tabs {
+    display: flex;
+    gap: 0.25rem;
+    min-width: max-content;
+    padding: 0.3125rem;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    border: 1px solid var(--mkt-light-border);
+  }
+
+  .mkt-showcase__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375rem;
+    // 2.5rem is the touch-target floor, not a rounding of the label's height.
+    min-height: 2.5rem;
+    padding-inline: 0.875rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: none;
+    font-family: var(--font-body);
+    font-size: var(--text-label);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink-muted);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover {
+      color: var(--mkt-ink);
+    }
+
+    /*
+      THE SELECTED TAB IS A RAISED WHITE PILL, not a colour change.
+
+      `aria-selected` is the styling hook rather than a parallel `is-active`
+      class, so the thing a screen reader is told and the thing a sighted
+      reader sees cannot drift apart — there is only one source for both. The
+      white fill, the border and the weight are three non-colour signals.
+    */
+    &[aria-selected="true"] {
+      background: var(--mkt-white);
+      border-color: var(--mkt-light-border-strong);
+      color: var(--mkt-ink);
+      font-weight: var(--weight-semibold);
+      box-shadow: var(--mkt-glow-card);
+    }
+  }
+
+  .mkt-showcase__tabnum {
+    font-family: var(--font-heading);
+    font-size: 11px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.04em;
+    color: var(--mkt-accent-ink); // 6.03:1 — the accent AS TEXT needs this step
+  }
+
+  .mkt-showcase__caption {
+    margin: 1.125rem 0 0;
+    max-width: 46rem;
+    font-size: var(--text-body-lg);
+    line-height: 1.6;
+    color: var(--mkt-ink-muted);
+  }
+
+  .mkt-showcase__panel {
+    margin-top: clamp(1.5rem, 3vw, 2rem);
+  }
+
+  /*
+    THE FRAME ON A LIGHT BAND.
+
+    `--mkt-glow-product` opens with a 1px WHITE ring, which is exactly right
+    over deep navy and completely invisible on #f7f9fc — the frame lost its
+    edge and read as a torn-out rectangle. This swaps the ring for a real
+    border and keeps the periwinkle bloom, which on a light ground reads as the
+    product being lit rather than as a shadow.
+  */
+  .mkt-product--onlight {
+    .mkt-product__frame {
+      border: 1px solid var(--mkt-light-border-strong);
+      box-shadow: var(--mkt-glow-product-light);
+    }
+
+    // Softer on light: the same bloom that lifts the frame off navy turns into
+    // a visible purple smudge on a near-white ground.
+    .mkt-product__halo {
+      opacity: 0.5;
+    }
+  }
+
+  // ---- The swapping view ----------------------------------------------------
+  /*
+    THE PANEL SWAP ANIMATION.
+
+    Keyed off the attribute rather than off a remount: all six panels are in
+    the DOM now, so nothing unmounts and a `key`-driven replay would not fire.
+    When `hidden` is removed this rule starts matching, and a CSS animation
+    runs the moment its rule begins to apply — which is the whole transition,
+    with no library and no state machine. It reuses the hero's keyframe rather
+    than adding a second one.
+  */
+  .mkt-showcase__view:not([hidden]) {
+    animation: mkt-enter 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  .mkt-showcase__view:focus-visible {
+    outline: none;
+    border-radius: var(--mkt-radius-sm);
+    box-shadow: var(--mkt-focus-ring-light);
+  }
+
+  .mkt-showcase__cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr) minmax(0, 8.5rem);
+    gap: 0.75rem;
+    padding: 0 0.625rem 0.5rem;
+    border-bottom: 1px solid var(--mkt-light-border);
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+
+    span:last-child {
+      text-align: right;
+    }
+  }
+
+  .mkt-showcase__rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .mkt-showcase__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr) minmax(0, 8.5rem);
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.625rem;
+    border-bottom: 1px solid var(--mkt-light-border);
+    transition: background var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    // The gentle highlight the brief asks of the product surface. A row tint
+    // only — no lift, because a row that rises out of a table looks broken.
+    &:hover {
+      background: var(--mkt-light);
+    }
+  }
+
+  /*
+    A FIXED HEIGHT WHETHER OR NOT THE ROW HAS A BAR.
+
+    Three of the six views carry progress bars and three do not, which made
+    those panels ~44px taller — so switching tabs moved the section's whole
+    lower half. A layout shift caused by the reader's own click is the worst
+    kind, because it looks like the page broke rather than like it loaded.
+  */
+  .mkt-showcase__cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    min-height: 1.875rem;
+    min-width: 0;
+
+    strong {
+      font-size: 13px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+      line-height: 1.3;
+    }
+  }
+
+  .mkt-showcase__track {
+    height: 5px;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    overflow: hidden;
+  }
+
+  .mkt-showcase__bar {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--mkt-accent);
+  }
+
+  .mkt-showcase__sub {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--mkt-ink-muted);
+    min-width: 0;
+  }
+
+  .mkt-showcase__meta {
+    justify-self: end;
+    font-size: 12px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+
+    /*
+      The two tones, and both use the DARKENED step of their hue because these
+      are words. Mint at full saturation on white is 1.41:1 and amber is worse;
+      the tint is a second signal on top of the label, never the label itself.
+    */
+    &[data-tone="good"] {
+      color: var(--mkt-mint-ink); // 5.53:1 on white
+    }
+
+    &[data-tone="warn"] {
+      color: var(--mkt-amber-ink); // 5.65:1 on white
+    }
+  }
+
+  // ===========================================================================
   // THE PROBLEM BAND — numbered cards, and the scattered state
   // ===========================================================================
 
@@ -2998,6 +3273,33 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    /*
+      THE SHOWCASE ROW GOES TO TWO LINES.
+
+      Three columns need roughly 30rem before the middle one starts breaking
+      "Requirements met, weighted by the job" into five words per line. Below
+      that the row becomes: name and status on the first line, the detail
+      underneath — which is how the real tables render on a narrow screen too.
+    */
+    .mkt-showcase__cols {
+      display: none;
+    }
+
+    .mkt-showcase__row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.25rem 0.75rem;
+      align-items: start;
+    }
+
+    .mkt-showcase__sub {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    .mkt-showcase__meta {
+      grid-row: 1;
+    }
+
     .mkt-product__body {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -3203,6 +3505,13 @@
     .mkt-lcard--numbered:hover .mkt-problems__num {
       transform: none;
     }
+
+    /*
+      The showcase's panel swap is `.mkt-enter` replayed by a remount, so it is
+      already covered by the `.mkt-enter { animation: none }` rule above — the
+      new view appears instantly instead of fading. Nothing else to neutralise
+      here: the tabs only transition colour, which is not motion.
+    */
 
     .mkt-lcard:hover {
       transform: none;
@@ -3828,6 +4137,7 @@
     ring behind, but a keyboard user always sees one.
   */
   .mkt-btn:focus-visible,
+  .mkt-showcase__tab:focus-visible,
   .mkt-nav__link:focus-visible,
   .mkt-mega__link:focus-visible,
   .mkt-sheet__row:focus-visible,

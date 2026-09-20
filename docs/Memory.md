@@ -1384,3 +1384,88 @@ correctly last in the cascade.
 
 **Still not verified:** the eight breakpoints, visually. No browser — unchanged
 from the previous four sessions.
+
+---
+
+## 2026-09-20 — Module 05: platform overview / product showcase
+
+**The six `WORKSPACE_CARDS` mapped exactly onto the six capabilities Module 05
+asked for**, so this REPLACED that band rather than adding a seventh section.
+The card grid (icon + heading + paragraph ×6) is gone — §3 of the brief
+explicitly names that pattern as the thing to avoid — and the same six
+capabilities are now six views of ONE product frame. Their copy survives
+verbatim as `PLATFORM_VIEWS[].caption`; `WORKSPACE_CARDS` was deleted rather
+than left as an unused export, because dead CONTENT data is worse than dead
+code (nobody can tell which of two arrays the site renders).
+
+**One frame, six panels — not six dashboards** (§9). Chrome, sidebar and
+surface are constant; only the table swaps, and the sidebar's active item moves
+to match. `.mkt-product__*` is the hero's own stylesheet, so the two product
+shots on the page are recognisably the same application.
+
+**Every label is real, and a test enforces it.** Sources read during
+inspection: `app/jobs/page.tsx` (Title/Status/Health), `ApplicationTable.tsx`
+(Candidate/Job/Stage/Match), `lib/evaluation/sources.ts` (strong_matches / gaps
+/ needs_verification — Module 7's three labelled lists), `lib/evaluation/verdict.ts`
+(Pass / Fail / Needs Review, RESUME_SCORE_MAX 100, ROUND_SCORE_MAX 10),
+`lib/interviews/feedback.ts` (MODE_LABELS / STATUS_LABELS),
+`lib/applications/stages.ts` (STAGE_LABELS), `components/nav/navItems.ts`.
+
+Tests now assert: every view's `nav` is a real `DASHBOARD.nav` entry; pipeline
+rows are real `STAGE_LABELS`; the evaluation verdict is a real `STATUS_LABELS`
+value; any `n / m` score uses a real max and stays inside it; and the showcase
+agrees with the hero about pipeline size (124 both places) — **two product shots
+on one page must describe one company.**
+
+**`nav` for screening AND evaluation is "Applications"**, deliberately. Neither
+is a separate app; both are views on an application record. Two tabs lighting
+one sidebar item is the most honest thing the showcase says about the product
+being connected.
+
+**Three bugs caught during the build, all by the repo's own checks:**
+1. `app/theme.test.ts` flagged an inline three-line `box-shadow` on the
+   light-band frame within a minute of it being written → became
+   `--mkt-glow-product-light`. (`--mkt-glow-product` opens with a 1px WHITE
+   ring — right over navy, invisible on #f7f9fc, so the frame lost its edge.)
+2. A stray `}` in my SCSS edit closed the 860px media query early and orphaned
+   everything after it — caught by the Turbopack build, not by lint.
+3. **Dangling ARIA IDREFs.** The first version rendered only the selected
+   panel, leaving `aria-controls` on the other five tabs pointing at ids not in
+   the DOM. Fixed by rendering all six with `hidden` — which is not the "six
+   dashboards" the brief forbids: chrome and sidebar stay single and what
+   duplicates is four rows of text. Verified: zero dangling `aria-controls` or
+   `aria-labelledby` in the served HTML.
+
+**Layout-shift fix:** three of the six views carry progress bars and three do
+not, which made those panels ~44px taller — switching tabs moved the section's
+lower half. `.mkt-showcase__cell { min-height: 1.875rem }` equalises. A layout
+shift caused by the reader's own click is the worst kind.
+
+**Panel-swap animation had to change mechanism** when all six went into the
+DOM: a `key`-driven remount no longer fires, so it keys off
+`.mkt-showcase__view:not([hidden])` — a CSS animation runs the moment its rule
+begins to apply. Still the hero's `mkt-enter` keyframe, so reduced motion is
+already covered by the existing `animation: none` rule.
+
+**Tabs:** real WAI-ARIA pattern — roving tabindex, arrow keys with wraparound,
+Home/End, **automatic activation** (focus and selection move together; manual
+activation would make a keyboard user press twice for what a mouse does once).
+`aria-selected` is the CSS hook rather than a parallel `is-active` class, so
+what a screen reader is told and what a sighted reader sees cannot drift.
+
+**No CTA**, per §15's own instruction: `/platform` is `planned` in
+`navigation.ts`, and the only other honest destination (`/how-it-works`) is
+already the Module 04 band's CTA two sections up.
+
+**Known redundancy, not resolved here:** `PipelinePreview` ("See your hiring
+pipeline at a glance", the applications table) is now the page's third product
+visual and largely superseded by this showcase. Left alone because §29 assigns
+"Hiring Pipeline" to a future module — that module should decide whether it
+survives.
+
+`lint` clean · `typecheck` clean · `build` clean · 1937/1937 (+9). Verified
+against the dev server: one h1, 13 distinct h2s, all ARIA references resolve,
+5 panels hidden, sidebar highlight correct, all CSS served.
+
+**Still not verified:** the eight breakpoints, visually. No browser — unchanged
+from the previous five sessions.

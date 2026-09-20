@@ -11,7 +11,7 @@ import { HOME_FAQS } from "@/lib/marketing/home";
 import { Hero } from "./_components/home/Hero";
 import { Problem } from "./_components/home/Problem";
 import { Solution } from "./_components/home/Solution";
-import { Workspace } from "./_components/home/Workspace";
+import { PlatformOverview } from "./_components/home/PlatformOverview";
 import { HiringWorkflow } from "./_components/home/HiringWorkflow";
 import { AiFeatures } from "./_components/home/AiFeatures";
 import { HumanAi } from "./_components/home/HumanAi";
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
  *   1. Hero + the product itself          what it is, and what it looks like
  *   2. The challenge                      what goes wrong without it
  *   3. The solution                       the same pieces, connected
- *   4. What is in the workspace           the six things it covers
+ *   4. The Scoreboad platform             the six things it covers, as screens
  *   5. From application to hire           how those six connect
  *   6. AI that handles the busy work      where the leverage is
  *   7. AI does the work, you decide       the objection, answered
@@ -71,6 +71,11 @@ export const metadata: Metadata = {
  * STEPS 2 AND 3 WERE THE MISSING FIRST HALF OF THE ARGUMENT. The page used to
  * open with the hero's promise and go straight to a list of capabilities — the
  * answer to a question it had never asked. The challenge band asks it.
+ *
+ * STEP 4 USED TO BE THAT LIST OF CAPABILITIES — six cards, each an icon, a
+ * heading and a paragraph. It is now six views of one product frame, with the
+ * same six pieces of copy as captions. Nothing was cut; the grid that showed
+ * nothing became the screen that shows it.
  *
  * THE COLOUR RHYTHM IS DELIBERATE: four deep bands (hero, the solution, Human +
  * AI, the closing CTA) against eight bright ones. That holds the 30/70 split,
@@ -121,7 +126,7 @@ export default function HomePage() {
       <Hero />
       <Problem />
       <Solution />
-      <Workspace />
+      <PlatformOverview />
       <HiringWorkflow />
       <AiFeatures />
       <HumanAi />

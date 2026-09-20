@@ -279,51 +279,193 @@ export const SOLUTION_HEAD = {
 } as const;
 
 // -----------------------------------------------------------------------------
-// One workspace — six cards, one per capability group
+// The platform showcase — six real screens, one frame
 // -----------------------------------------------------------------------------
 
 /**
- * Six cards, deliberately one per capability group in content.ts, so this
- * section and the /product/* routes cannot drift apart.
+ * THE SIX CAPABILITIES, EACH AS A SCREEN RATHER THAN AS A CARD.
+ *
+ * This REPLACED the six icon-and-paragraph cards that used to sit here. Their
+ * copy is not lost — each one is now a `caption` below — but the card grid
+ * itself is gone, because a row of icon/heading/paragraph is the single most
+ * generic thing a SaaS homepage can do and it was the page's only answer to
+ * "what does this actually look like".
+ *
+ * EVERY LABEL IN EVERY ROW IS REAL, and that is checked by a test rather than
+ * by care. The sources:
+ *
+ *   Jobs        app/jobs/page.tsx        Title / Status / Health columns
+ *   Candidates  app/candidates           one record per person, many applications
+ *   Screening   lib/evaluation/sources   strong_matches / gaps / needs_verification
+ *   Interviews  lib/interviews/feedback  MODE_LABELS + STATUS_LABELS
+ *   Evaluation  lib/evaluation/verdict   Pass / Fail / Needs Review, /100 and /10
+ *   Pipeline    lib/applications/stages  STAGE_LABELS, plus real SLA tracking
+ *
+ * `nav` IS WHICH SIDEBAR ITEM LIGHTS UP, and screening and evaluation both
+ * point at Applications on purpose: neither is a separate app, both are views
+ * on an application record. Two tabs highlighting one nav item is the most
+ * honest thing this showcase says about the product being connected.
+ *
+ * THE FIGURES ARE ILLUSTRATIVE and the frame's caption says so. They are
+ * internally consistent with the hero's dashboard — 124 new candidates there,
+ * 124 at the top of the funnel here — because a reader who compares the two
+ * product shots on one page should not find two different companies.
  */
-export const WORKSPACE_CARDS: HomeCard[] = [
+export type PlatformRow = {
+  primary: string;
+  secondary: string;
+  /** The right-hand cell: a status, a count, or a score. */
+  meta: string;
+  /** Tints the meta cell. `warn` is the product's own "needs attention". */
+  tone?: "good" | "warn";
+  /** Renders a bar under the row. A share of something, 0-100. */
+  pct?: number;
+};
+
+export const PLATFORM_VIEWS: {
+  key: string;
+  /** The tab label. Short — these sit in a row on desktop. */
+  tab: string;
+  /** Which DASHBOARD.nav entry is active while this view is shown. */
+  nav: string;
+  /** One line under the tabs. These are the old workspace cards' bodies. */
+  caption: string;
+  panel: {
+    title: string;
+    meta: string;
+    columns: [string, string, string];
+    rows: PlatformRow[];
+  };
+}[] = [
   {
-    title: "Job creation",
-    // Module 3 — jobs, with per-job hiring stages and screening questions.
-    body: "Open a role with its own hiring stages, requirements and screening questions.",
-    icon: "Briefcase",
+    key: "jobs",
+    tab: "Jobs",
+    nav: "Jobs",
+    caption:
+      "Open a role with its own hiring stages, requirements and screening questions.",
+    panel: {
+      title: "Jobs",
+      meta: "4 open",
+      columns: ["Title", "Location", "Health"],
+      rows: [
+        { primary: "Senior Backend Engineer", secondary: "Remote · Full-time", meta: "Healthy", tone: "good" },
+        { primary: "Product Designer", secondary: "Bengaluru · Full-time", meta: "Needs attention", tone: "warn" },
+        { primary: "Data Analyst", secondary: "Remote · Contract", meta: "Healthy", tone: "good" },
+        { primary: "Support Lead", secondary: "Pune · Full-time", meta: "Draft" },
+      ],
+    },
   },
   {
-    title: "Candidate management",
-    // Module 4 — one candidate record, many applications; dedup on contact.
-    body: "One record per person, carrying their resumes, contact history and every application they hold.",
-    icon: "Users",
+    key: "candidates",
+    tab: "Candidates",
+    nav: "Candidates",
+    caption:
+      "One record per person, carrying their resumes, contact history and every application they hold.",
+    panel: {
+      title: "Candidates",
+      meta: "248 on file",
+      columns: ["Candidate", "Current role", "Applications"],
+      rows: [
+        { primary: "A. Sharma", secondary: "Backend Engineer · 7 yrs", meta: "2 applications" },
+        { primary: "M. Iyer", secondary: "Platform Engineer · 5 yrs", meta: "1 application" },
+        { primary: "R. Nair", secondary: "Product Designer · 6 yrs", meta: "3 applications" },
+        { primary: "S. Bose", secondary: "Data Analyst · 3 yrs", meta: "1 application" },
+      ],
+    },
   },
   {
-    title: "AI screening",
-    // Module 6/7 — parseResume + matchCandidateToJob, both reviewable.
-    body: "Resumes parsed and scored against the role, with the reasoning shown beside the score.",
-    icon: "ScanSearch",
+    key: "screening",
+    tab: "AI screening",
+    nav: "Applications",
+    caption:
+      "Resumes parsed and scored against the role, with the reasoning shown beside the score.",
+    panel: {
+      title: "Resume match",
+      meta: "A. Sharma · Senior Backend Engineer",
+      columns: ["Signal", "Detail", "Score"],
+      rows: [
+        { primary: "Match score", secondary: "Requirements met, weighted by the job", meta: "91 / 100", tone: "good", pct: 91 },
+        { primary: "Strong matches", secondary: "Go, PostgreSQL, distributed systems at scale", meta: "3 found", tone: "good" },
+        { primary: "Gaps", secondary: "No Kubernetes experience stated on the resume", meta: "1 found", tone: "warn" },
+        { primary: "Needs verification", secondary: "Team-lead scope is claimed but not evidenced", meta: "1 found", tone: "warn" },
+      ],
+    },
   },
   {
-    title: "Interviews",
-    // Module 11 — scheduling, the calendar adapter, structured feedback.
-    body: "Schedule rounds, send invites through the connected calendar, and collect structured feedback.",
-    icon: "CalendarCheck",
+    key: "interviews",
+    tab: "Interviews",
+    nav: "Interviews",
+    caption:
+      "Schedule rounds, send invites through the connected calendar, and collect structured feedback.",
+    panel: {
+      title: "Interviews",
+      meta: "This week",
+      columns: ["Candidate", "Round", "Status"],
+      rows: [
+        { primary: "A. Sharma", secondary: "Video · Tomorrow, 10:00", meta: "Scheduled" },
+        { primary: "M. Iyer", secondary: "Phone · Yesterday, 15:30", meta: "Feedback due", tone: "warn" },
+        { primary: "R. Nair", secondary: "On-site · Thursday, 11:00", meta: "Scheduled" },
+        { primary: "S. Bose", secondary: "Video · Monday, 09:00", meta: "Completed", tone: "good" },
+      ],
+    },
   },
   {
-    title: "Candidate evaluation",
-    // Module 10 — the evaluation panel: score, screening, feedback, verdict.
-    body: "Screening results, interview feedback and match score on one panel per application.",
-    icon: "ClipboardCheck",
+    key: "evaluation",
+    tab: "Evaluation",
+    nav: "Applications",
+    caption:
+      "Screening results, interview feedback and match score on one panel per application.",
+    panel: {
+      title: "Evaluation",
+      meta: "A. Sharma · Senior Backend Engineer",
+      columns: ["Stage", "Recorded by", "Result"],
+      rows: [
+        { primary: "Resume match", secondary: "Scored against the job's requirements", meta: "91 / 100", tone: "good", pct: 91 },
+        { primary: "AI Screening Call", secondary: "Structured report from the call", meta: "8 / 10", tone: "good", pct: 80 },
+        { primary: "Video Interview", secondary: "Panel feedback, two interviewers", meta: "7 / 10", pct: 70 },
+        { primary: "Verdict", secondary: "A person decides — the panel only gathers", meta: "Needs Review", tone: "warn" },
+      ],
+    },
   },
   {
-    title: "Hiring workflow",
-    // Module 10/13 — the pipeline board and the automation engine.
-    body: "A pipeline that shows what has moved, what is stuck, and what is waiting on somebody.",
-    icon: "Workflow",
+    key: "pipeline",
+    tab: "Hiring workflow",
+    nav: "Pipeline",
+    caption:
+      "A pipeline that shows what has moved, what is stuck, and what is waiting on somebody.",
+    panel: {
+      title: "Hiring pipeline",
+      meta: "Senior Backend Engineer",
+      columns: ["Stage", "In stage", "SLA"],
+      rows: [
+        { primary: "Applied", secondary: "124 in stage", meta: "On track", tone: "good", pct: 100 },
+        { primary: "Shortlisted", secondary: "46 in stage", meta: "3 overdue", tone: "warn", pct: 37 },
+        { primary: "AI Screening Call", secondary: "28 in stage", meta: "On track", tone: "good", pct: 23 },
+        { primary: "Video Interview", secondary: "9 in stage", meta: "2 awaiting feedback", tone: "warn", pct: 7 },
+      ],
+    },
   },
 ];
+
+export const PLATFORM_HEAD = {
+  eyebrow: "The Scoreboad platform",
+  title: "Everything you need to manage hiring in one workspace.",
+  lead:
+    "Jobs, candidates, AI screening, interviews, evaluation and the hiring " +
+    "pipeline are six views of the same records — not six tools that have to be " +
+    "kept in step. Pick one to see it.",
+} as const;
+
+/*
+  WORKSPACE_CARDS LIVED HERE — six {icon, title, body} entries rendered as a
+  card grid. The grid is gone (see PLATFORM_VIEWS, which shows the same six
+  capabilities as product screens instead), and the six bodies moved verbatim
+  into those views' `caption` fields.
+
+  Deleted rather than left in place as an unused export: dead content data is
+  worse than dead code, because the next person to edit the marketing copy has
+  no way to tell which of two arrays the site is actually rendering.
+*/
 
 // -----------------------------------------------------------------------------
 // From application to hire

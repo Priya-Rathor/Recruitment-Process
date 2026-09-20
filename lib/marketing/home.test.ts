@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { STAGE_LABELS } from "@/lib/applications/stages";
+import {
+  RESUME_SCORE_MAX,
+  ROUND_SCORE_MAX,
+  STATUS_LABELS,
+} from "@/lib/evaluation/verdict";
 import { METRIC_LABELS } from "@/lib/dashboard/metrics";
 import { CAPABILITY_GROUPS, INTERNAL_ROUTES } from "@/lib/marketing/content";
 import {
@@ -10,6 +15,8 @@ import {
   HERO,
   HERO_SIGNALS,
   HOME_FAQS,
+  PLATFORM_HEAD,
+  PLATFORM_VIEWS,
   PROBLEM_CARDS,
   PROBLEM_HEAD,
   SOLUTION_HEAD,
@@ -19,7 +26,6 @@ import {
   TRUST_CARDS,
   WORKFLOW_PIECES,
   WORKFLOW_STEPS,
-  WORKSPACE_CARDS,
 } from "@/lib/marketing/home";
 import { ICONS } from "@/app/(marketing)/_components/home/icons";
 
@@ -117,7 +123,10 @@ const ALL_COPY: string[] = [
   SOLUTION_HEAD.title,
   SOLUTION_HEAD.lead,
   ...PROBLEM_CARDS.flatMap((c) => [c.title, c.body]),
-  ...WORKSPACE_CARDS.flatMap((c) => [c.title, c.body]),
+  ...PLATFORM_VIEWS.map((v) => v.caption),
+  ...PLATFORM_VIEWS.flatMap((v) => v.panel.rows.map((r) => r.secondary)),
+  PLATFORM_HEAD.title,
+  PLATFORM_HEAD.lead,
   ...AI_CARDS.flatMap((c) => [c.title, c.body]),
   ...TRUST_CARDS.flatMap((c) => [c.title, c.body]),
   ...WORKFLOW_STEPS.flatMap((s) => [s.title, s.body]),
@@ -464,6 +473,117 @@ describe("the two bands do not echo each other or the sections below", () => {
 });
 
 // -----------------------------------------------------------------------------
+// The platform showcase
+// -----------------------------------------------------------------------------
+
+describe("the platform showcase is a picture of the real application", () => {
+  it("lights up a real nav item for every view", () => {
+    /*
+      The mock sidebar is DASHBOARD.nav, which is the application's real
+      top-level navigation. A view pointing at a sidebar entry that does not
+      exist would render with nothing highlighted — a broken-looking screenshot
+      that no test would otherwise catch.
+    */
+    const nav = new Set<string>(DASHBOARD.nav);
+    for (const view of PLATFORM_VIEWS) {
+      expect(nav.has(view.nav), `${view.tab} → "${view.nav}" is not a real nav item`).toBe(
+        true
+      );
+    }
+  });
+
+  it("uses real application stage names wherever it names a stage", () => {
+    /*
+      The pipeline and evaluation views name stages. Those must be
+      STAGE_LABELS, for the same reason the hero's funnel must: a stage rename
+      should break the marketing page rather than leave it quietly describing
+      a product that no longer exists.
+    */
+    const stages = new Set(Object.values(STAGE_LABELS));
+    const named = PLATFORM_VIEWS.find((v) => v.key === "pipeline")!.panel.rows;
+    for (const row of named) {
+      expect(stages.has(row.primary), `"${row.primary}" is not a real stage`).toBe(true);
+    }
+  });
+
+  it("uses the real evaluation verdict vocabulary", () => {
+    // Pass / Fail / Needs Review — from lib/evaluation/verdict.ts. Inventing a
+    // fourth verdict on the homepage would be advertising a decision the
+    // product cannot record.
+    const verdict = PLATFORM_VIEWS.find((v) => v.key === "evaluation")!.panel.rows.at(-1)!;
+    expect(Object.values(STATUS_LABELS)).toContain(verdict.meta);
+  });
+
+  it("scores within the ranges the product actually uses", () => {
+    /*
+      RESUME_SCORE_MAX is 100 and ROUND_SCORE_MAX is 10. A mock showing "94/10"
+      or a resume score of 140 would be a number the product cannot produce,
+      and it is exactly the kind of detail that survives review.
+    */
+    for (const view of PLATFORM_VIEWS) {
+      for (const row of view.panel.rows) {
+        const match = row.meta.match(/^(\d+)\s*\/\s*(\d+)$/);
+        if (!match) continue;
+        const [, value, max] = match;
+        expect([RESUME_SCORE_MAX, ROUND_SCORE_MAX], `${row.primary}: out of ${max}`).toContain(
+          Number(max)
+        );
+        expect(Number(value), `${row.primary}: ${row.meta}`).toBeLessThanOrEqual(Number(max));
+      }
+    }
+  });
+
+  it("keeps every bar a percentage", () => {
+    for (const view of PLATFORM_VIEWS) {
+      for (const row of view.panel.rows) {
+        if (row.pct === undefined) continue;
+        expect(row.pct, `${view.tab} → ${row.primary}`).toBeGreaterThanOrEqual(0);
+        expect(row.pct, `${view.tab} → ${row.primary}`).toBeLessThanOrEqual(100);
+      }
+    }
+  });
+
+  it("agrees with the hero's dashboard about how big the pipeline is", () => {
+    /*
+      TWO PRODUCT SHOTS ON ONE PAGE MUST DESCRIBE ONE COMPANY. The hero says
+      124 new candidates and 124 applied; the showcase's pipeline view says
+      124 in the Applied stage. A reader who compares them should not find two
+      different businesses.
+    */
+    const applied = PLATFORM_VIEWS.find((v) => v.key === "pipeline")!.panel.rows[0];
+    expect(applied.secondary).toContain(String(DASHBOARD.funnel[0].value));
+  });
+
+  it("gives every view a distinct tab, key and panel", () => {
+    expect(new Set(PLATFORM_VIEWS.map((v) => v.key)).size).toBe(PLATFORM_VIEWS.length);
+    expect(new Set(PLATFORM_VIEWS.map((v) => v.tab)).size).toBe(PLATFORM_VIEWS.length);
+    // The tab labels sit in one pill row. Three words is where it stops being
+    // a tab and starts being a sentence.
+    for (const view of PLATFORM_VIEWS) {
+      expect(view.tab.split(/\s+/).length, view.tab).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("keeps every panel to four rows", () => {
+    // The frame's height is fixed by its tallest state, so an uneven row count
+    // makes the panel jump when the reader switches tabs — a layout shift
+    // caused by a control, which is the worst kind.
+    for (const view of PLATFORM_VIEWS) {
+      expect(view.panel.rows, view.tab).toHaveLength(4);
+    }
+  });
+
+  it("carries the six capability descriptions the card grid used to show", () => {
+    // The grid was deleted; its copy was not. Each caption is a full sentence
+    // describing something the product does.
+    for (const view of PLATFORM_VIEWS) {
+      expect(view.caption.trim().endsWith("."), view.tab).toBe(true);
+      expect(view.caption.length, view.tab).toBeGreaterThan(40);
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
 // Structure
 // -----------------------------------------------------------------------------
 
@@ -471,15 +591,17 @@ describe("the landing page's structure", () => {
   it("resolves every icon name to a real icon", () => {
     // A typo would otherwise render the fallback glyph silently, and a card grid
     // with one wrong icon is easy to miss in review.
-    for (const card of [...WORKSPACE_CARDS, ...AI_CARDS, ...TRUST_CARDS]) {
+    for (const card of [...AI_CARDS, ...TRUST_CARDS]) {
       expect(ICONS[card.icon], `${card.title} → ${card.icon}`).toBeDefined();
     }
   });
 
   it("keeps the card grids at the counts their layouts assume", () => {
-    // Six in a 3-column grid, eight in a 4-column grid. A seventh workspace
-    // card would leave one orphan on the last row at every breakpoint.
-    expect(WORKSPACE_CARDS).toHaveLength(6);
+    // Six platform views, six trust cards, eight AI cards in a 4-column grid.
+    // A seventh trust card would leave one orphan on the last row at every
+    // breakpoint; a seventh platform tab would overflow the pill row on a
+    // laptop before the phone's scroll behaviour ever kicks in.
+    expect(PLATFORM_VIEWS).toHaveLength(6);
     expect(TRUST_CARDS).toHaveLength(6);
     expect(AI_CARDS).toHaveLength(8);
     expect(WORKFLOW_STEPS).toHaveLength(6);
