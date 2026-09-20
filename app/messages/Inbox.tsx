@@ -21,11 +21,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, Plug, RefreshCw, Search } from "lucide-react";
+import { Bot, MessageCircle, Plug, RefreshCw, Search, TriangleAlert } from "lucide-react";
 import { EmptyState } from "@/components/states";
+import { Toggle } from "@/components/ui/Toggle";
 import {
+  applyInboxFilter,
+  countNeedsHuman,
   filterConversations,
+  INBOX_FILTER_LABELS,
   type ConversationSummary,
+  type InboxFilter,
 } from "@/lib/messaging/conversations";
 import { ConversationRow } from "./ConversationRow";
 import { Thread } from "./Thread";
@@ -40,6 +45,9 @@ export function Inbox({
   webhookUnverifiable,
   canManageIntegration,
   initialConversationId,
+  autoReplyEnabled,
+  canToggleAutoReply,
+  aiConfigured,
 }: {
   initialConversations: ConversationSummary[];
   /** The org named a Meta-approved template, so out-of-window replies can go. */
@@ -52,12 +60,22 @@ export function Inbox({
   canManageIntegration: boolean;
   /** From ?c=, so a link from a candidate page opens that thread. */
   initialConversationId: string | null;
+  /** 0042 — the organization-wide master switch's current state. */
+  autoReplyEnabled: boolean;
+  /** Owner/Admin. A Recruiter sees the state and cannot change it. */
+  canToggleAutoReply: boolean;
+  /** False means the agent can never run, whatever the switch says. */
+  aiConfigured: boolean;
 }) {
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedId, setSelectedId] = useState<string | null>(initialConversationId);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<InboxFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [staleSince, setStaleSince] = useState<number | null>(null);
+  const [autoReply, setAutoReply] = useState(autoReplyEnabled);
+  const [autoReplyBusy, setAutoReplyBusy] = useState(false);
+  const [autoReplyError, setAutoReplyError] = useState<string | null>(null);
 
   // Monotonic request id: a slow earlier poll landing after a fast later one
   // would replace fresh data with stale. Same guard CandidatePicker uses.
@@ -130,6 +148,44 @@ export function Inbox({
     };
   }, [refresh]);
 
+  /**
+   * The master kill switch.
+   *
+   * OPTIMISTIC, and deliberately so. Somebody pressing this OFF is reacting to
+   * something the agent just said to a candidate; a spinner between the decision
+   * and the effect is the wrong experience for a control whose whole purpose is
+   * to stop something immediately. It reverts on failure and says why.
+   *
+   * The switch itself is only a hint until the server agrees — every gate in
+   * lib/autoReply/run.ts re-reads the real value from organization_settings
+   * before sending, including for a reply that was queued minutes ago. Turning
+   * it off therefore stops queued replies too, not just future ones.
+   */
+  async function toggleAutoReply(next: boolean) {
+    setAutoReplyBusy(true);
+    setAutoReplyError(null);
+    setAutoReply(next);
+
+    try {
+      const response = await fetch("/api/settings/auto-reply", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ master_enabled: next }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        setAutoReplyError(payload.error ?? "Couldn't change that setting.");
+        setAutoReply(!next);
+      }
+    } catch {
+      setAutoReplyError("Couldn't reach the server. The setting was not changed.");
+      setAutoReply(!next);
+    } finally {
+      setAutoReplyBusy(false);
+    }
+  }
+
   async function manualRefresh() {
     setRefreshing(true);
     await refresh();
@@ -148,7 +204,8 @@ export function Inbox({
     []
   );
 
-  const visible = filterConversations(conversations, query);
+  const visible = applyInboxFilter(filterConversations(conversations, query), filter);
+  const needsHuman = countNeedsHuman(conversations);
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
 
   /*
@@ -189,6 +246,70 @@ export function Inbox({
         </div>
       )}
 
+      {/* ---- The agent's master switch and the oversight filters -------- */}
+      <div className="card mb-4 inbox__agentbar">
+        <div className="inbox__agentbar-switch">
+          <Bot size={17} aria-hidden="true" />
+          <div style={{ minWidth: 0 }}>
+            <p className="inbox__agentbar-title">Auto-reply</p>
+            <p className="inbox__agentbar-note">
+              {!autoReply
+                ? "Off — every message waits for a person."
+                : aiConfigured
+                  ? "On — the agent answers what it can and flags the rest."
+                  : "On, but no AI provider is configured, so nothing is being answered."}
+            </p>
+          </div>
+
+          {canToggleAutoReply ? (
+            <Toggle
+              checked={autoReply}
+              disabled={autoReplyBusy}
+              onChange={(next) => void toggleAutoReply(next)}
+              label={autoReply ? "On" : "Off"}
+            />
+          ) : (
+            /* A Recruiter sees the state. Configuring it is Owner/Admin (§7),
+               and the API enforces that independently of this. */
+            <span className="has-text-secondary" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+              {autoReply ? "On" : "Off"} · set by an admin
+            </span>
+          )}
+        </div>
+
+        {autoReplyError && (
+          <p style={{ fontSize: 13, color: "var(--color-error)", margin: 0 }}>{autoReplyError}</p>
+        )}
+
+        {/*
+          The three views. Tabs rather than a dropdown — the same treatment the
+          template library's channel filter uses, and "who is waiting on me" is
+          worth one click.
+        */}
+        <div className="inbox__tabs" role="tablist" aria-label="Filter conversations">
+          {(["all", "needs_human", "auto_replied"] as InboxFilter[]).map((option) => {
+            const selected = filter === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                className={`inbox__tab${selected ? " is-active" : ""}`}
+                onClick={() => setFilter(option)}
+              >
+                {option === "needs_human" && <TriangleAlert size={13} aria-hidden="true" />}
+                {option === "auto_replied" && <Bot size={13} aria-hidden="true" />}
+                {INBOX_FILTER_LABELS[option]}
+                {option === "needs_human" && needsHuman > 0 && (
+                  <span className="inbox__tab-count">{needsHuman}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="inbox">
         {/* ---- Left pane ------------------------------------------------- */}
         <aside className="inbox__list card" aria-label="Conversations">
@@ -222,13 +343,25 @@ export function Inbox({
             {visible.length === 0 ? (
               <EmptyState
                 compact
-                headline={query ? "No matches" : "No conversations yet"}
+                headline={
+                  query
+                    ? "No matches"
+                    : filter === "needs_human"
+                      ? "Nothing waiting"
+                      : filter === "auto_replied"
+                        ? "No auto-replies yet"
+                        : "No conversations yet"
+                }
                 message={
                   query
                     ? "No thread matches that name or number."
-                    : "When a candidate replies on WhatsApp, their conversation appears here."
+                    : filter === "needs_human"
+                      ? "No conversation is waiting on a person right now."
+                      : filter === "auto_replied"
+                        ? "The agent hasn't answered anybody yet. Everything here was sent by a person."
+                        : "When a candidate replies on WhatsApp, their conversation appears here."
                 }
-                icon={MessageCircle}
+                icon={filter === "all" ? MessageCircle : Bot}
               />
             ) : (
               visible.map((conversation) => (

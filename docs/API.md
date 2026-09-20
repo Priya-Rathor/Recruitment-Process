@@ -193,6 +193,17 @@ worth stating because neither is visible in the table:
 | `/api/settings/message-templates`, `/[id]` | GET, POST, PATCH, DELETE | member / owner+admin |
 | `/api/settings/document-templates`, `/[id]`, `/reorder` | GET, POST, PATCH, PUT, DELETE | member / owner+admin |
 | `/api/settings/voice-agents` and all sub-routes | GET, POST, PUT, DELETE | owner, admin |
+| `/api/settings/auto-reply` | GET, PUT, PATCH, DELETE | owner, admin |
+
+`/api/settings/auto-reply` configures the WhatsApp auto-reply agent (0042).
+`PUT` saves the organization default (`job_id: null`) or one job's override;
+`PATCH` flips the organization-wide **master switch**, which the inbox also
+reaches; `DELETE?id=` removes a job override so that job falls back to the
+default — the only way back, because a *disabled* override stops the agent for
+that job rather than falling through. Every method is Owner/Admin in the route
+**and** in RLS, and switching the master on or off is written to the audit log in
+both directions: on, because it begins sending unattended AI messages to real
+people; off, because it is the fact that explains a gap in the replies.
 
 ### Webhooks & auth callback
 | Route | Methods | Auth |
@@ -212,7 +223,7 @@ worth stating because neither is visible in the table:
 | **Bolna AI** | Voice screening calls | **Per organization**, AES-GCM encrypted | Disconnected by default; hard attempt cap; consent disclosure not disableable. |
 | **Google Calendar** | Interview invites | Env OAuth client + per-org encrypted refresh token | Unconfigured → interviews still schedule, no invites sent, settings page says so. |
 | **Email (Resend-compatible)** | Internal + candidate email | Per-org encrypted key, `EMAIL_API_URL` override | Send recorded as "not sent" with a reason; nothing else fails. |
-| **WhatsApp (Meta Cloud API)** | Candidate messaging, **and inbound replies** | Per-org encrypted token + phone id; inbound needs `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET` (or a per-org app secret) | Same as email. Refused loudly for internal staff (no phone column on `users`; falling back to the candidate's number would misdeliver). **Inbound fails closed and silently-shaped**: with no app secret every reply is rejected and the inbox stays empty while sending still works, so `/messages` and the integration card both say so on the page. |
+| **WhatsApp (Meta Cloud API)** | Candidate messaging, inbound replies, **and the auto-reply agent** | Per-org encrypted token + phone id; inbound needs `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET` (or a per-org app secret) | Same as email. Refused loudly for internal staff (no phone column on `users`; falling back to the candidate's number would misdeliver). **Inbound fails closed and silently-shaped**: with no app secret every reply is rejected and the inbox stays empty while sending still works, so `/messages` and the integration card both say so on the page. |
 | **n8n** | Orchestration | `N8N_WEBHOOK_URL` | Monitored only. Automations execute in-process, not through n8n. |
 
 ---
@@ -266,3 +277,34 @@ passes; an unsigned request costs one indexed SELECT against our own
 integrations table.
 
 Unlike Bolna, replay is **not** a gap here — see point 4.
+
+### The auto-reply agent (0042)
+
+The webhook's one side effect beyond storing the message: it queues, and may
+immediately run, `lib/autoReply/run.ts`. Six gates stand between an inbound
+message and an AI reply, and every one of them can only ever **stop** a message:
+
+1. `organization_settings.auto_reply_master_enabled` — read first, defaults
+   **false**, and re-read again at send time so pressing it off stops replies
+   that were already queued.
+2. A linked candidate. An unmatched number is never answered.
+3. A 30-minute human cooldown (`sent_by not null and auto_replied = false`).
+4. Config precedence — the job's override, else the organization default.
+5. A **deterministic** escalation guard that runs *before* the model, so pay,
+   contested decisions, visas, distress and data requests never reach it.
+6. The model, plus its own refusal, plus a numeric guard over every digit in the
+   draft and a rejection of any URL or address.
+
+Anything other than a validated, grounded answer sends a fixed holding message
+and sets `whatsapp_conversations.needs_human`. `auto_reply_queue.inbound_message_id`
+is unique, so a Meta redelivery cannot produce a second reply; an `immediate`
+reply runs inline and the same row is the backstop if that attempt is cut short.
+Delayed replies drain from the **existing** automation sweep (a pass in
+`runCronSweep`, gated on its own master switch rather than on
+`automations_enabled`), never a second clock.
+
+The agent writes exactly two things: one WhatsApp message through
+`sendOnChannel()` — the same path as every other outbound message — and the
+`needs_human` flag. It cannot move a stage, schedule anything, or send on any
+other channel, because it returns text and has no client, no tools and no
+field any caller reads as an instruction.

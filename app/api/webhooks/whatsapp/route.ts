@@ -7,6 +7,8 @@ import {
   webhookVerifyToken,
 } from "@/lib/integrations/whatsapp";
 import { applyStatusUpdate, recordInboundMessage } from "@/lib/messaging/inbound";
+import { enqueueAutoReply, processAutoReply } from "@/lib/autoReply/run";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDbError } from "@/lib/supabase/errors";
 
 /**
@@ -51,10 +53,11 @@ import { formatDbError } from "@/lib/supabase/errors";
  * it is not a delivery problem and Meta will never send that request again.
  */
 
-// One batch of writes per event. Meta's own timeout is short; ours is shorter
-// than the platform default so a slow database surfaces as a retry rather than a
-// hung function.
-export const maxDuration = 30;
+// One batch of writes per event, plus — since 0042 — possibly one auto-reply
+// draft and send. Meta's own timeout is short, so generateAutoReply() carries a
+// 12s budget of its own and the queue row is the backstop when this runs out:
+// an unprocessed row is picked up by the next sweep rather than lost.
+export const maxDuration = 45;
 
 /**
  * GET — Meta's verification handshake.
@@ -166,6 +169,31 @@ export async function POST(request: NextRequest) {
         if (outcome.handled) {
           handled += 1;
           if (outcome.duplicate) duplicates += 1;
+
+          /*
+            MODULE 0042 — the auto-reply agent.
+
+            Queued rather than run directly, always, even when it is due
+            immediately. The queue row is the idempotency key (unique on the
+            inbound message id, so a Meta redelivery cannot produce a second
+            reply) AND the backstop: if the inline attempt below is cut short by
+            Meta's timeout or a frozen serverless function, the row is still
+            pending and the next sweep takes it.
+
+            Wrapped and never allowed to fail the webhook. A message that was
+            recorded but not auto-replied is a message waiting in the inbox for a
+            person — the behaviour before this feature existed. Returning 500
+            here would make Meta redeliver an event we have already stored.
+          */
+          if (!outcome.duplicate && outcome.messageId) {
+            await maybeAutoReply({
+              organizationId: tenant.organizationId,
+              conversationId: outcome.conversationId,
+              inboundMessageId: outcome.messageId,
+              candidateId: outcome.candidateId,
+              inboundText: outcome.body,
+            });
+          }
         } else {
           // Only a write that did not land is worth a redelivery. A sender
           // number we cannot store never will be.
@@ -204,4 +232,66 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ received: true, handled, duplicates });
+}
+
+/**
+ * Queues the auto-reply agent, and runs it inline when it is due now.
+ *
+ * NEVER THROWS AND NEVER AFFECTS THE RESPONSE. The candidate's message is
+ * already recorded by the time this runs; the worst outcome here is that nobody
+ * answers automatically, which is exactly what happened before the agent
+ * existed and leaves the thread waiting for a person.
+ *
+ * The inline run is what makes 'immediate' mean immediate — the sweep is every
+ * five minutes, which is not a conversation. Everything about whether a reply is
+ * appropriate is decided inside lib/autoReply/run.ts, re-checked at send time;
+ * this function only decides WHEN to attempt it.
+ */
+async function maybeAutoReply({
+  organizationId,
+  conversationId,
+  inboundMessageId,
+  candidateId,
+  inboundText,
+}: {
+  organizationId: string;
+  conversationId: string;
+  inboundMessageId: string;
+  candidateId: string | null;
+  inboundText: string;
+}): Promise<void> {
+  try {
+    const queued = await enqueueAutoReply({
+      organizationId,
+      conversationId,
+      inboundMessageId,
+      candidateId,
+      inboundText,
+    });
+
+    /*
+      No row id means no inline attempt, and that is a correctness rule rather
+      than caution. processAutoReply() closes the queue row by id; running it
+      against an id we made up would leave the row `pending`, and the next sweep
+      would send the candidate a SECOND reply to the same question. Neither can
+      be unsent.
+    */
+    if (!queued.dueNow || !queued.queueId) return;
+
+    const admin = createAdminClient();
+    if (!admin) return;
+
+    await processAutoReply({
+      client: admin,
+      row: {
+        id: queued.queueId,
+        organization_id: organizationId,
+        conversation_id: conversationId,
+        inbound_message_id: inboundMessageId,
+        attempts: 0,
+      },
+    });
+  } catch (error) {
+    console.error(`[whatsapp webhook] auto-reply attempt failed: ${formatDbError(error)}`);
+  }
 }

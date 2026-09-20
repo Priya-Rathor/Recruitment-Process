@@ -75,16 +75,32 @@ describe("the settings catalogue", () => {
     Two or three items per card. A fourth is probably fine; a sixth is the bug
     coming back, and this fails before anyone sees it in a browser.
   */
-  it("keeps every card within two to three items, so heights stay balanced", () => {
+  /*
+    RAISED FROM THREE TO FOUR BY 0042, and the trade is worth recording rather
+    than quietly widening.
+
+    The cap existed so cards in a row stay a similar height. Communications now
+    carries four — templates, email, WhatsApp and the auto-reply agent — because
+    that is one workflow: what candidates are told, through which channel, and by
+    whom. Filing the agent under "AI & automation" (which has room) would have
+    put it beside resume parsing and matching, neither of which talks to anybody,
+    and away from the only three pages that do.
+
+    Safe because `.settings-grid` uses `align-items: start` with auto row
+    heights, so a taller card does not stretch its neighbours — it just ends
+    lower. Four is the new ceiling, not an invitation: a fifth item in any card
+    is the point at which the grouping itself is wrong.
+  */
+  it("keeps every card within two to four items, so heights stay balanced", () => {
     for (const category of SETTINGS_CATEGORIES) {
       expect(category.links.length, `${category.label} has ${category.links.length} items`)
         .toBeGreaterThanOrEqual(2);
       expect(category.links.length, `${category.label} has ${category.links.length} items`)
-        .toBeLessThanOrEqual(3);
+        .toBeLessThanOrEqual(4);
     }
   });
 
-  it("totals 20 settings in 8 categories", () => {
+  it("totals 22 settings in 8 categories", () => {
     /*
       Pinned so a regrouping cannot silently drop a link.
 
@@ -92,11 +108,14 @@ describe("the settings catalogue", () => {
       without adding any) → 20 in 8 (Communication & AI split into Communications
       and AI & automation, plus Automations added — the one genuinely new link)
       → 21 in 8 (Module 27's Custom fields, added to Data & activity because
-      Recruitment defaults was already at the three-item cap below).
+      Recruitment defaults was already at the three-item cap below)
+      → 22 in 8 (0042's auto-reply agent, which took Communications to four and
+      raised the per-card cap — see the test above for why that was the right
+      trade rather than filing it elsewhere).
       The grid's counter is computed from these, so this test and the visible
-      "21 settings in 8 categories" cannot disagree.
+      "22 settings in 8 categories" cannot disagree.
     */
-    expect(SETTINGS_LINKS).toHaveLength(21);
+    expect(SETTINGS_LINKS).toHaveLength(22);
     expect(SETTINGS_CATEGORIES).toHaveLength(8);
   });
 

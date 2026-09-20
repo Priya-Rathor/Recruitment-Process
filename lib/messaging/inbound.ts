@@ -27,7 +27,19 @@ import { formatDbError } from "@/lib/supabase/errors";
 type Admin = NonNullable<ReturnType<typeof createAdminClient>>;
 
 export type InboundOutcome =
-  | { handled: true; conversationId: string; duplicate: boolean; optedOut: boolean }
+  | {
+      handled: true;
+      conversationId: string;
+      duplicate: boolean;
+      optedOut: boolean;
+      /** 0042 — the row just written, so the auto-reply agent can be queued
+       *  against it. Null for a duplicate, which is already queued. */
+      messageId: string | null;
+      /** Null for an unmatched sender. The agent refuses to answer those. */
+      candidateId: string | null;
+      /** The text, so the caller need not re-read it to queue a reply. */
+      body: string;
+    }
   | { handled: false; reason: string };
 
 /**
@@ -89,6 +101,12 @@ export async function recordInboundMessage({
       conversationId: row.conversation_id ?? "",
       duplicate: true,
       optedOut: false,
+      // Null on purpose: a redelivery must not queue a second auto-reply. The
+      // queue's unique index would refuse it anyway; this makes the intent
+      // visible rather than relying on the constraint to express it.
+      messageId: null,
+      candidateId: null,
+      body: message.body,
     };
   }
 
@@ -102,7 +120,7 @@ export async function recordInboundMessage({
   if (!conversation) return { handled: false, reason: "conversation_write_failed" };
 
   // --- 3. The message -------------------------------------------------------
-  const { error: insertError } = await admin.from("message_log").insert({
+  const { data: inserted, error: insertError } = await admin.from("message_log").insert({
     organization_id: organizationId,
     conversation_id: conversation.id,
     candidate_id: conversation.candidateId,
@@ -128,9 +146,11 @@ export async function recordInboundMessage({
     // automatic send uses. There is no user to credit for a message we received.
     sent_by: null,
     sent_at: message.sentAt,
-  });
+  })
+    .select("id")
+    .single();
 
-  if (insertError) {
+  if (insertError || !inserted) {
     console.error(`[whatsapp webhook] inbound insert failed: ${formatDbError(insertError)}`);
     return { handled: false, reason: "message_insert_failed" };
   }
@@ -153,7 +173,15 @@ export async function recordInboundMessage({
     ? await honourOptOut({ admin, organizationId, candidateId: conversation.candidateId })
     : false;
 
-  return { handled: true, conversationId: conversation.id, duplicate: false, optedOut };
+  return {
+    handled: true,
+    conversationId: conversation.id,
+    duplicate: false,
+    optedOut,
+    messageId: (inserted as { id: string }).id,
+    candidateId: conversation.candidateId,
+    body: message.body,
+  };
 }
 
 /**

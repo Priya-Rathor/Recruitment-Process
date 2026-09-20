@@ -21,6 +21,12 @@ export type ConversationSummary = {
   last_inbound_at: string | null;
   last_message_preview: string | null;
   unread_count: number;
+  /** 0042 — the agent answered the newest message in this thread. */
+  last_message_auto_replied: boolean;
+  /** 0042 — the agent declined and a person has to answer. */
+  needs_human: boolean;
+  /** Why, in words a recruiter can act on. Never shown to the candidate. */
+  needs_human_reason: string | null;
 };
 
 export type ConversationMessage = {
@@ -31,6 +37,14 @@ export type ConversationMessage = {
   error_message: string | null;
   /** Null for an automatic send and for every inbound message. */
   sender_name: string | null;
+  /**
+   * 0042 — drafted by the auto-reply agent.
+   *
+   * The bubble renders an explicit "Auto-replied" label from this. An agent
+   * message must never be presentable as something a person typed, which is why
+   * it is a column on the row rather than anything inferred at render time.
+   */
+  auto_replied: boolean;
   created_at: string;
   sent_at: string | null;
 };
@@ -275,4 +289,62 @@ export function filterConversations(
     if (name.includes(trimmed)) return true;
     return digits.length > 0 && conversation.phone_number.includes(digits);
   });
+}
+
+// -----------------------------------------------------------------------------
+// 0042 — the inbox's view of the agent
+// -----------------------------------------------------------------------------
+
+export type InboxFilter =
+  /** Everything, newest first — but with flagged threads lifted to the top. */
+  | "all"
+  /** Only threads the agent declined. The queue a person has to work through. */
+  | "needs_human"
+  /** Only threads the agent answered. The spot-check view. */
+  | "auto_replied";
+
+export function isInboxFilter(value: unknown): value is InboxFilter {
+  return value === "all" || value === "needs_human" || value === "auto_replied";
+}
+
+export const INBOX_FILTER_LABELS: Record<InboxFilter, string> = {
+  all: "All",
+  needs_human: "Needs human reply",
+  auto_replied: "Recent auto-replies",
+};
+
+/**
+ * Applies the inbox filter, then the ordering.
+ *
+ * FLAGGED THREADS SORT TO THE TOP of the "All" view, ahead of newer unflagged
+ * ones. The same choice the pipeline board makes with most-overdue-first, and
+ * for the same reason: a list ordered purely by recency buries the thing
+ * somebody has to act on under the things that handled themselves. A candidate
+ * the agent declined to answer is waiting on a person, and every auto-replied
+ * thread that arrives after them would otherwise push them further down.
+ *
+ * Within each group the order is unchanged — most recent first, as the server
+ * returned it — so the ordering is stable and a thread does not move while
+ * somebody is reading it.
+ */
+export function applyInboxFilter(
+  conversations: ConversationSummary[],
+  filter: InboxFilter
+): ConversationSummary[] {
+  if (filter === "needs_human") {
+    return conversations.filter((conversation) => conversation.needs_human);
+  }
+
+  if (filter === "auto_replied") {
+    return conversations.filter((conversation) => conversation.last_message_auto_replied);
+  }
+
+  const flagged = conversations.filter((conversation) => conversation.needs_human);
+  const rest = conversations.filter((conversation) => !conversation.needs_human);
+  return [...flagged, ...rest];
+}
+
+/** How many threads are waiting on a person. For the filter's own count. */
+export function countNeedsHuman(conversations: ConversationSummary[]): number {
+  return conversations.filter((conversation) => conversation.needs_human).length;
 }

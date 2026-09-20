@@ -377,7 +377,75 @@ export async function runCronSweep(): Promise<CronSweepResult> {
     );
   }
 
+  /*
+    MODULE 0042 — the delayed auto-reply queue.
+
+    A PASS IN THIS SWEEP, not a second clock. AGENTS.md: "Do not add a second
+    cron, a worker, or a timer — add a pass to the existing sweep." A delayed
+    auto-reply is a row with a `due_at`, exactly like a `wait_then` action.
+
+    ITS OWN ORGANIZATION LIST, and that is the point of it being here rather than
+    inside sweepOrganization(). The loop above only visits organizations with
+    `automations_enabled`; the auto-reply agent has its own master switch, so an
+    organization that had switched automations off would otherwise find its
+    delayed replies silently never firing — the invisible-by-construction failure
+    DEPLOYMENT.md §10 warns about, and the one this product has already been bitten
+    by once with the cron itself.
+
+    Failures here never affect the automation results above: two independent
+    features sharing one clock, not one feature.
+  */
+  await drainAutoRepliesForDueOrganizations(client);
+
   return { organizations: results, truncated, configured: true };
+}
+
+/**
+ * Drains every organization with the auto-reply master switch on.
+ *
+ * Gated on `auto_reply_master_enabled` in the query rather than in the drain, so
+ * an organization that has switched the agent off costs this sweep nothing —
+ * and, more importantly, cannot have a queued reply fire after somebody pressed
+ * the kill switch. The drain re-checks the switch per row anyway; this is the
+ * cheap outer half of the same rule.
+ */
+async function drainAutoRepliesForDueOrganizations(client: EngineClient): Promise<void> {
+  try {
+    const { data, error } = await client
+      .from("organization_settings")
+      .select("organization_id")
+      .eq("auto_reply_master_enabled", true)
+      .limit(MAX_ORGANIZATIONS_PER_SWEEP);
+
+    if (error) {
+      console.error(`[autoReply] sweep could not list organizations: ${formatDbError(error)}`);
+      return;
+    }
+
+    const rows = (data ?? []) as { organization_id: string }[];
+    if (rows.length === 0) return;
+
+    const { drainDueAutoReplies } = await import("@/lib/autoReply/run");
+
+    for (const row of rows) {
+      const drained = await drainDueAutoReplies({
+        client,
+        organizationId: row.organization_id,
+      });
+
+      if (drained.considered > 0) {
+        console.log(
+          `[autoReply] ${row.organization_id}: considered ${drained.considered}, ` +
+            `sent ${drained.sent}, escalated ${drained.escalated}, ` +
+            `skipped ${drained.skipped}, failed ${drained.failed}`
+        );
+      }
+    }
+  } catch (error) {
+    // Never allowed to fail the sweep: the stale-stage rules and the delay queue
+    // are unrelated work that has already completed by this point.
+    console.error(`[autoReply] drain pass failed: ${formatDbError(error)}`);
+  }
 }
 
 /**

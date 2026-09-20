@@ -35,12 +35,16 @@ type ConversationRow = {
   last_inbound_at: string | null;
   last_message_preview: string | null;
   unread_count: number;
+  last_message_auto_replied: boolean;
+  needs_human: boolean;
+  needs_human_reason: string | null;
   candidate: { name: string } | null;
 };
 
 const CONVERSATION_COLUMNS =
   "id, candidate_id, phone_number, last_message_at, last_inbound_at, " +
-  "last_message_preview, unread_count, candidate:candidates(name)";
+  "last_message_preview, unread_count, last_message_auto_replied, needs_human, " +
+  "needs_human_reason, candidate:candidates(name)";
 
 function flatten(row: ConversationRow): ConversationSummary {
   return {
@@ -52,6 +56,9 @@ function flatten(row: ConversationRow): ConversationSummary {
     last_inbound_at: row.last_inbound_at,
     last_message_preview: row.last_message_preview,
     unread_count: row.unread_count,
+    last_message_auto_replied: row.last_message_auto_replied === true,
+    needs_human: row.needs_human === true,
+    needs_human_reason: row.needs_human_reason,
   };
 }
 
@@ -247,7 +254,7 @@ export async function listConversationMessages({
   const { data, error } = await supabase
     .from("message_log")
     .select(
-      "id, direction, body_sent, status, error_message, created_at, sent_at, " +
+      "id, direction, body_sent, status, error_message, auto_replied, created_at, sent_at, " +
         "sender:users!message_log_sent_by_fkey(name, email)"
     )
     .eq("organization_id", organizationId)
@@ -266,6 +273,7 @@ export async function listConversationMessages({
     body_sent: string;
     status: string;
     error_message: string | null;
+    auto_replied: boolean;
     created_at: string;
     sent_at: string | null;
     sender: { name: string | null; email: string } | null;
@@ -280,6 +288,7 @@ export async function listConversationMessages({
     // Null on an automatic send is the schema's own meaning, and the bubble
     // renders it as "Automatic" rather than as a missing name.
     sender_name: row.sender ? row.sender.name ?? row.sender.email : null,
+    auto_replied: row.auto_replied === true,
     created_at: row.created_at,
     sent_at: row.sent_at,
   }));

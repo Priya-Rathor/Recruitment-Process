@@ -209,6 +209,20 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         description: "Candidate messages, alongside email",
         roles: ["owner", "admin"],
       },
+      /*
+        0042. In Communications rather than under AI & automation, and the reason
+        is whose question it answers: an admin looking for "what do we say to
+        candidates, and who says it" looks here, beside the templates and the two
+        channels. Filing it with the AI settings would put the agent next to
+        resume parsing and matching — neither of which talks to anybody — and
+        away from the only three pages that do.
+      */
+      {
+        href: "/settings/auto-reply",
+        label: "Message auto-reply agent",
+        description: "Whether an AI answers candidate WhatsApp messages",
+        roles: ["owner", "admin"],
+      },
     ],
   },
   {

@@ -17,7 +17,7 @@
 // putting them there, and they are exercised by supabase/tests/replay.sh and by
 // the manual checklist in docs/modules/15-testing-guide.md.
 // =============================================================================
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   filterConversations,
   formatPhoneForDisplay,
@@ -28,7 +28,11 @@ import {
   replyCapability,
   type ConversationSummary,
 } from "@/lib/messaging/conversations";
-import { matchesSignature, parseWebhookPayload } from "@/lib/integrations/whatsapp";
+import {
+  matchesSignature,
+  parseWebhookPayload,
+  webhookHandshakeMatches,
+} from "@/lib/integrations/whatsapp";
 
 // -----------------------------------------------------------------------------
 // Opt-out detection
@@ -390,6 +394,9 @@ describe("search", () => {
       last_inbound_at: null,
       last_message_preview: "Hello",
       unread_count: 0,
+      last_message_auto_replied: false,
+      needs_human: false,
+      needs_human_reason: null,
     },
     {
       id: "b",
@@ -400,6 +407,9 @@ describe("search", () => {
       last_inbound_at: null,
       last_message_preview: "Who is this?",
       unread_count: 2,
+      last_message_auto_replied: false,
+      needs_human: false,
+      needs_human_reason: null,
     },
   ];
 
@@ -498,5 +508,62 @@ describe("X-Hub-Signature-256 verification", () => {
     */
     const header = await sign(body);
     await expect(matchesSignature({ rawBody: body, header, secret: "" })).resolves.toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The GET verification handshake
+//
+// Meta calls this once when the callback URL is saved, and the happy path is the
+// hardest thing to exercise by hand: Next 16 refuses a second dev server in the
+// same directory, so setting the env var locally means restarting the one that
+// is running. That made it the single untested path after 0041 shipped — hence
+// these.
+// -----------------------------------------------------------------------------
+describe("webhookHandshakeMatches", () => {
+  const original = process.env.WHATSAPP_VERIFY_TOKEN;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.WHATSAPP_VERIFY_TOKEN;
+    else process.env.WHATSAPP_VERIFY_TOKEN = original;
+  });
+
+  it("accepts the configured token", () => {
+    process.env.WHATSAPP_VERIFY_TOKEN = "a-chosen-verify-token";
+    expect(webhookHandshakeMatches("a-chosen-verify-token")).toBe(true);
+  });
+
+  it("rejects a wrong token, a prefix and a superstring", () => {
+    process.env.WHATSAPP_VERIFY_TOKEN = "a-chosen-verify-token";
+
+    for (const token of [
+      "wrong",
+      "a-chosen-verify-toke",
+      "a-chosen-verify-tokenX",
+      "A-CHOSEN-VERIFY-TOKEN",
+      "",
+      null,
+    ]) {
+      expect(webhookHandshakeMatches(token), String(token)).toBe(false);
+    }
+  });
+
+  it("rejects everything when no token is configured", () => {
+    /*
+      Fails closed, and the route turns this into a 503 rather than a 403 — an
+      UNCONFIGURED deployment is a different problem from a wrong token, and
+      saying so is the difference between an operator checking their env vars and
+      an operator checking Meta's dashboard.
+    */
+    delete process.env.WHATSAPP_VERIFY_TOKEN;
+    expect(webhookHandshakeMatches("anything")).toBe(false);
+    expect(webhookHandshakeMatches("")).toBe(false);
+  });
+
+  it("rejects a whitespace-only configured token", () => {
+    // Otherwise `WHATSAPP_VERIFY_TOKEN=" "` in a .env file would look set and
+    // complete a handshake against a secret nobody meant to choose.
+    process.env.WHATSAPP_VERIFY_TOKEN = "   ";
+    expect(webhookHandshakeMatches("   ")).toBe(false);
   });
 });

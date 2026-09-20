@@ -7,6 +7,8 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/states";
 import { hasRole, requireMembershipOrRedirect } from "@/lib/tenant";
 import { getStatus as getWhatsAppStatus } from "@/lib/integrations/whatsapp";
 import { listConversations } from "@/lib/messaging/queries";
+import { getMasterEnabled } from "@/lib/autoReply/queries";
+import { isAiConfigured } from "@/lib/ai/provider";
 import { Inbox } from "./Inbox";
 
 export const metadata = { title: "Messages" };
@@ -72,13 +74,14 @@ async function InboxLoader({
 }) {
   const membership = await requireMembershipOrRedirect();
 
-  const [whatsapp, { conversations, failed }] = await Promise.all([
+  const [whatsapp, { conversations, failed }, autoReplyOn] = await Promise.all([
     getWhatsAppStatus(membership.organization.id).catch(() => null),
     listConversations({
       organizationId: membership.organization.id,
       viewerRole: membership.role,
       viewerId: membership.user_id,
     }),
+    getMasterEnabled(membership.organization.id),
   ]);
 
   const connected = whatsapp?.status === "connected";
@@ -146,6 +149,16 @@ async function InboxLoader({
       webhookUnverifiable={unverifiable}
       canManageIntegration={hasRole(membership.role, ["owner", "admin"])}
       initialConversationId={initialConversationId}
+      autoReplyEnabled={autoReplyOn}
+      /*
+        0042 — only an Owner or Admin may flip the master switch (spec §7). A
+        Recruiter sees its STATE, because "did the AI already answer this?" is
+        something they need to know to do their job, and a switch that is
+        invisible rather than disabled leaves them guessing why some threads
+        answer themselves.
+      */
+      canToggleAutoReply={hasRole(membership.role, ["owner", "admin"])}
+      aiConfigured={isAiConfigured()}
     />
   );
 }

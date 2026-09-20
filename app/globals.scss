@@ -6399,3 +6399,129 @@ a {
 }
 
 .topnav__drawer-link .topnav__badge { margin-left: auto; }
+
+// =============================================================================
+// 0042 — the auto-reply agent's surfaces in the inbox.
+// =============================================================================
+.inbox__agentbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.inbox__agentbar-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text);
+}
+
+.inbox__agentbar-title {
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  margin: 0;
+}
+
+.inbox__agentbar-note {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 2px 0 0;
+}
+
+// The switch sits hard right, so its position is constant whatever the note
+// underneath it says.
+.inbox__agentbar-switch > :last-child {
+  margin-left: auto;
+}
+
+// ---- The three views --------------------------------------------------------
+.inbox__tabs {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.inbox__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:hover { color: var(--color-text); }
+
+  &.is-active {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    font-weight: var(--weight-medium);
+  }
+}
+
+.inbox__tab-count {
+  background: var(--color-warning);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1.7;
+}
+
+// ---- Row signals ------------------------------------------------------------
+//
+// The agent's mark is PRIMARY-tinted, not a status colour: it reports who spoke,
+// which is neither good news nor bad. The flag is amber, because it is the one
+// row state that needs somebody to do something.
+.inbox__row-agent {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.inbox__row {
+  &.is-needs-human {
+    background: var(--status-attention-bg);
+    // Overrides the dashed grey edge an unmatched row carries — a thread that is
+    // both needs the more urgent treatment. Declared after `.is-unmatched` in
+    // this file, so it wins at equal specificity.
+    border-left: 3px solid var(--color-warning);
+
+    &:hover { background: #fdebc8; }
+
+    // Selection still reads as selection: the amber fill gives way to the
+    // standard tint, and the amber edge stays as the reminder.
+    &.is-selected {
+      background: #eff6ff;
+      box-shadow: inset 3px 0 0 var(--color-warning);
+    }
+  }
+}
+
+.inbox__row-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--status-attention-text);
+  font-weight: var(--weight-semibold);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+// ---- The bubble's author ----------------------------------------------------
+//
+// Deliberately NOT styled to look like a person's name. An auto-reply must be
+// readable as machine-sent at a glance, so it carries an icon and the primary
+// tint while a colleague's name stays plain secondary text.
+.bubble__agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--color-primary);
+  font-weight: var(--weight-medium);
+}

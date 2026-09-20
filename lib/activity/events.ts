@@ -645,6 +645,41 @@ export const EVENT_CATALOGUE = {
       `Linked the WhatsApp conversation from ${text(m.phone_hint, "an unknown number")} ` +
       "to this candidate",
   },
+  /*
+    0042 — the auto-reply agent.
+
+    BOTH DIRECTIONS ARE AUDITED, and the "off" half matters as much as the "on"
+    half. Switching it on is the act that begins sending unattended AI messages
+    to real people, and "who turned this on?" must have an answer that is not
+    somebody's memory. Switching it off is the fact that explains a gap in the
+    replies — without it, a week where the agent answered nobody looks like a
+    bug rather than a decision.
+  */
+  "auto_reply.master_switched": {
+    entity: "organization",
+    sensitive: true,
+    label: "Auto-reply master switch",
+    describe: (m) =>
+      m.enabled === true
+        ? "Switched the WhatsApp auto-reply agent ON for the whole organization"
+        : "Switched the WhatsApp auto-reply agent OFF for the whole organization",
+  },
+  "auto_reply.configured": {
+    entity: "organization",
+    label: "Auto-reply agent configured",
+    describe: (m) => {
+      const scope = text(m.scope) === "job" ? "a job's override" : "the organization default";
+      if (m.removed === true) return "Removed a job's auto-reply override";
+
+      const state = m.enabled === true ? "enabled" : "disabled";
+      const timing =
+        text(m.response_timing) === "delayed"
+          ? `, replying after ${num(m.delay_minutes) ?? 0} min`
+          : ", replying immediately";
+
+      return `Set ${scope} for the auto-reply agent (${state}${timing})`;
+    },
+  },
   "candidate.communication_preference_changed": {
     entity: "candidate",
     label: "Candidate contact preference changed",

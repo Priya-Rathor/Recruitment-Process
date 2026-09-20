@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  Bot,
   Check,
   CheckCheck,
   Clock,
@@ -245,6 +246,28 @@ export function Thread({
         </p>
       )}
 
+      {/*
+        0042 — the agent declined, and said why.
+
+        The reason is the agent's internal note, shown to the recruiter and never
+        to the candidate. It is here rather than only on the list row because it
+        is the first thing somebody opening a flagged thread needs: what the
+        agent would not touch, so they know what they are picking up.
+
+        Cleared automatically when they reply — see the reply route.
+      */}
+      {current.needs_human && (
+        <p className="thread__banner is-warning">
+          <TriangleAlert size={15} aria-hidden="true" />
+          <span>
+            <strong>Waiting for a person.</strong>{" "}
+            {current.needs_human_reason ??
+              "The agent didn't answer this one."}{" "}
+            Replying below clears the flag.
+          </span>
+        </p>
+      )}
+
       {unmatched && (
         <div className="thread__banner is-neutral thread__link-block">
           <p style={{ margin: 0 }}>
@@ -310,10 +333,25 @@ function Bubble({
       <p className="bubble__meta">
         {!inbound && (
           <>
-            {/* sent_by NULL is the schema's way of saying an automation sent
-                it — "Automatic" rather than a dash, which would read as
-                missing data rather than as a fact. */}
-            <span>{message.sender_name ?? "Automatic"}</span>
+            {/*
+              WHO SAID THIS, and an auto-reply is NEVER allowed to read as a
+              person. Three distinct cases, three distinct labels:
+
+                a name      — a colleague typed it
+                "Auto-reply" — the AI agent drafted and sent it (0042)
+                "Automatic"  — a configured template fired on a pipeline event
+
+              The label comes from the `auto_replied` column, not from an
+              inference at render time, so there is no path that presents an
+              agent message as anything else. Spec §8: never disguise one.
+            */}
+            {message.auto_replied ? (
+              <span className="bubble__agent">
+                <Bot size={11} aria-hidden="true" /> Auto-reply
+              </span>
+            ) : (
+              <span>{message.sender_name ?? "Automatic"}</span>
+            )}
             <span aria-hidden="true">·</span>
           </>
         )}

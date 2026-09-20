@@ -129,6 +129,7 @@ export async function bumpThread({
   preview,
   messageAt,
   inbound,
+  autoReplied = false,
 }: {
   client: CommsClient;
   conversationId: string;
@@ -136,6 +137,15 @@ export async function bumpThread({
   preview: string;
   messageAt: string;
   inbound: boolean;
+  /**
+   * 0042 — the newest message in this thread was the agent's.
+   *
+   * Denormalised here rather than looked up by the inbox, so a 200-thread list
+   * can render "the AI handled this" without a latest-message query per row.
+   * Written by the statement that already moves the thread, so there is nothing
+   * to drift.
+   */
+  autoReplied?: boolean;
 }): Promise<void> {
   const { error } = await client.rpc("bump_whatsapp_conversation", {
     p_conversation_id: conversationId,
@@ -143,6 +153,7 @@ export async function bumpThread({
     p_preview: preview,
     p_message_at: messageAt,
     p_inbound: inbound,
+    p_auto_replied: autoReplied,
   });
 
   if (error) {

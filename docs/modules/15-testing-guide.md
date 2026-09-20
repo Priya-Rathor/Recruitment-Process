@@ -1034,6 +1034,163 @@ cosmetic, and `/api/messages/conversations/<id>` is the boundary that matters.
 
 ---
 
+## Phase 9 — The auto-reply agent (0042)
+
+The agent is **off by default** and stays off until somebody switches it on, so
+none of this fires by accident. Everything here needs WhatsApp connected, a Meta
+app secret (phase 8), and `OPENAI_API_KEY` set — without the last one the agent
+skips every message and leaves it in the inbox, which is a real state worth
+seeing once.
+
+### 9.1 Prove the schema first
+
+```bash
+./supabase/tests/replay.sh    # 42 migrations + every supabase/VERIFY_*.sql
+```
+
+`VERIFY_0042.sql` proves the seven things no unit test can reach: the master
+switch defaults **off**, only one organization-wide config can exist (two NULL
+`job_id`s do not collide in SQL), timing and delay cannot disagree and cannot
+exceed Meta's 24-hour window, one inbound message can be queued only once,
+neither a config nor a queue row can cross a tenant, `auto_replied` defaults
+false on every row, and `bump_whatsapp_conversation` still has exactly one
+signature.
+
+### 9.2 The master switch really is a master switch
+
+Settings → **Message auto-reply agent**: switch the agent on, set the
+organization default to enabled + Immediate, and save. Then in **Messages**,
+switch **Auto-reply** to **Off**.
+
+Text the business number. **Nothing is answered.** The message just arrives.
+
+```sql
+-- No queue row at all: the switch is checked before anything is written.
+select count(*) from public.auto_reply_queue where status = 'pending';
+```
+
+Switch it back on, text again, and the reply arrives within a few seconds.
+
+Then the harder half — switch it **off while a delayed reply is waiting**:
+set the default to Delayed / 5 minutes, text in, confirm a `pending` row exists,
+switch the master off, and wait for the sweep. The row resolves to `skipped`
+with "Auto-reply was switched off before this reply went out", and **the
+candidate gets nothing**. A queue that trusted its own past would have sent it.
+
+### 9.3 A context-accurate reply, not a template
+
+Pick a candidate with a real application — a stage, a match score, and ideally a
+scheduled interview. From their phone, ask **"what's the status of my
+application?"**
+
+The reply should name their actual stage and, if asked, their actual interview
+time. Then check it was grounded rather than lucky:
+
+```sql
+select body_sent, auto_replied, status
+from public.message_log
+where auto_replied order by created_at desc limit 1;
+```
+
+**Every number in that reply must exist in the candidate's data.** If the model
+invents one — a rounded match score, a date nobody booked — `findUnsupportedNumbers()`
+rejects the whole draft and the candidate gets the holding message instead. To
+see that path deliberately, temporarily point `AI_MODEL` at a weaker model and
+ask something numeric.
+
+### 9.4 The fallback, which is the feature
+
+Ask, from the candidate's phone: **"what's the salary for this role?"**
+
+| Expect | Where |
+| --- | --- |
+| A holding reply: "Thanks for your message — a member of our team will get back to you shortly." | The candidate's phone |
+| The thread flagged **Needs human reply**, amber, sorted to the top of the inbox | /messages |
+| The reason, in the thread banner: "Mentions pay or negotiation…" | The thread header |
+| **No model call was made at all** | The escalation guard runs *before* the model |
+
+```sql
+select needs_human, needs_human_reason from public.whatsapp_conversations
+where id = '<id>';
+```
+
+Repeat with "why was I rejected?", "will you sponsor my visa?", "please delete
+my data" and "I'm struggling, please help me" — all five must escalate.
+
+Then the near-miss that matters just as much: ask **"when is my interview?"**,
+**"did I get shortlisted?"** and **"what should I prepare?"**. All three must be
+*answered*, not escalated. A guard that escalates ordinary status questions
+leaves a permanently flagged inbox, and the feature gets switched off.
+
+### 9.5 The 30-minute human cooldown
+
+Reply to the candidate **by hand** from the inbox. Then have them send another
+message.
+
+**The agent must stay silent.** Check why:
+
+```sql
+select status, detail from public.auto_reply_queue order by created_at desc limit 1;
+-- 'skipped' — "A colleague replied within the last 30 minutes…"
+```
+
+The cooldown reads the same row the reply wrote (`sent_by not null and
+auto_replied = false`), so there is no separate bookkeeping to drift. Replying by
+hand also clears the **Needs human reply** flag — and only a successful send
+clears it, because a refused reply means the candidate still has not heard from
+a person.
+
+To confirm the window really expires rather than latching, backdate the human
+reply and let the next sweep run:
+
+```sql
+update public.message_log set created_at = now() - interval '31 minutes'
+where id = '<the human reply>';
+```
+
+### 9.6 Per-job override beats the org default
+
+Settings → Message auto-reply agent → **Add job override** for one job. Set it
+to **Off** and save, leaving the organization default **On**.
+
+Text in as a candidate on *that* job: **no reply**. Text in as a candidate on
+any other job: answered.
+
+```sql
+select detail from public.auto_reply_queue order by created_at desc limit 1;
+-- nothing queued at all — resolveAutoReply() refused before the insert
+```
+
+This is the rule most likely to be built the other way round: a disabled
+override **stops** the agent rather than falling through to an enabled default.
+Removing the override is the only way back to the default — check the
+precedence table under "What actually applies" agrees before and after, since it
+is computed by the same function the agent runs.
+
+### 9.7 Every auto-reply is visibly labelled
+
+In the thread, an agent message reads **"Auto-reply"** with a bot icon in
+primary tint — never a person's name, never the bare "Automatic" a templated
+send shows. In the list, its row carries a small bot icon. In **Recent
+auto-replies** (the inbox's third tab), an Owner/Admin can scan everything the
+agent has said.
+
+The label comes from `message_log.auto_replied`, not from anything inferred at
+render time, so there is no path that presents an agent message as a human one.
+
+### 9.8 Roles
+
+| Role | Expect |
+| --- | --- |
+| **Viewer** | Sees the auto-reply state in the inbox as text, no switch. `PATCH /api/settings/auto-reply` → **403**. `/settings/auto-reply` shows the restricted panel |
+| **Recruiter** | Same — state visible, switch absent, API 403. Can still reply by hand, which is what suppresses the agent |
+| **Owner/Admin** | Configures everything |
+
+Check the API with `curl` as well as the UI: a hidden switch is cosmetic, and
+`PATCH /api/settings/auto-reply` is the boundary that matters.
+
+---
+
 ## Automated coverage
 
 ```bash
@@ -1043,7 +1200,13 @@ npm run typecheck
 npm run build
 ```
 
-`lib/messaging/messaging.test.ts` (37 tests) covers phase 8's pure half: STOP
+`lib/autoReply/autoReply.test.ts` (34 tests) covers phase 9's pure half:
+precedence including the master switch and the disabled-override rule, the
+escalation guard in BOTH directions (what must escalate and what must not), the
+numeric grounding set that stops the agent inventing a score or a date, and the
+inbox ordering that lifts flagged threads above newer self-answered ones.
+
+`lib/messaging/messaging.test.ts` (41 tests) covers phase 8's pure half: STOP
 detection including the "please stop by the office" near-miss, the 24-hour
 window and the reply-capability rules, Meta payload parsing against real
 payload shapes (plus every shape of junk, without throwing), and signature

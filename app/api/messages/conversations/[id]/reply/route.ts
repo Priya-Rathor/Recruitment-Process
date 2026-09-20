@@ -5,6 +5,7 @@ import { requireCurrentUser, requireRole } from "@/lib/tenant";
 import { getConversation } from "@/lib/messaging/queries";
 import { sendOnChannel } from "@/lib/communications/send";
 import { MAX_WHATSAPP_BODY_LENGTH } from "@/lib/communications/templates";
+import { clearHumanFlag } from "@/lib/autoReply/run";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -170,6 +171,28 @@ export async function POST(
       overrideOptOut: acknowledged,
       origin: request.nextUrl.origin,
     });
+
+    /*
+      A HUMAN ANSWERED, so the "needs a human" flag is cleared.
+
+      ONLY a successful send clears it. A refused reply means the candidate still
+      has not heard from a person, and clearing the flag would remove the only
+      signal that anybody has to. Nothing else clears it either — not the agent,
+      not opening the thread, not the candidate writing again — because the flag
+      means "a person still has to answer this", and only a person answering
+      makes that false.
+
+      The 30-minute cooldown in lib/autoReply/run.ts is driven by this same row:
+      an outbound message with a `sent_by` and `auto_replied = false` IS the
+      record of a human reply, so no separate bookkeeping exists to drift.
+    */
+    if (outcome.delivered) {
+      await clearHumanFlag({
+        client: supabase,
+        organizationId: membership.organization.id,
+        conversationId: id,
+      });
+    }
 
     /*
       200 even for a skipped or failed send, with the outcome in the body.

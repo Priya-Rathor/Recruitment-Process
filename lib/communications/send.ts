@@ -183,6 +183,17 @@ export type SendOnChannelInput = {
   sentBy: string | null;
   /** Only meaningful for a manual send. Requires an explicit confirmation. */
   overrideOptOut?: boolean;
+  /**
+   * 0042 — this message was drafted by the auto-reply agent.
+   *
+   * Recorded on the row so the UI can label it, and so it can never be mistaken
+   * for something a person typed. It changes NOTHING about how the message is
+   * sent: the opt-out gate, the footer and the log are identical, which is the
+   * point of there being one send path. `sentBy` is null for an agent reply, so
+   * it is already treated as automatic in every way that matters — this flag
+   * only distinguishes "the agent wrote this" from "a configured template did".
+   */
+  autoReplied?: boolean;
   /** Request origin, for the unsubscribe link. See lib/communications/optout.ts. */
   origin?: string | null;
   /** Pre-read state, so a `both` send checks once rather than twice. */
@@ -322,6 +333,10 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
         providerMessageId: null,
         sentBy,
         internalRecipientUserId: internal?.userId ?? null,
+        // A skipped auto-reply is still the agent's row. Without this the
+        // oversight view would miss the cases the agent correctly declined to
+        // send, which are exactly the ones an admin wants to see.
+        autoReplied: input.autoReplied === true,
       });
 
       return { channel, status: "skipped", detail: reason, logId, delivered: false };
@@ -355,6 +370,7 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
         providerMessageId: null,
         sentBy,
         internalRecipientUserId: internal?.userId ?? null,
+        autoReplied: input.autoReplied === true,
       });
 
       return { channel, status: "skipped", detail: reason, logId, delivered: false };
@@ -435,6 +451,7 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
       sentBy,
       internalRecipientUserId: internal?.userId ?? null,
       conversationId,
+      autoReplied: input.autoReplied === true,
     });
 
     /*
@@ -454,6 +471,7 @@ export async function sendOnChannel(input: SendOnChannelInput): Promise<SendOutc
         preview: previewOf(body),
         messageAt: new Date().toISOString(),
         inbound: false,
+        autoReplied: input.autoReplied === true,
       });
     }
 
@@ -501,6 +519,7 @@ async function recordMessage({
   providerMessageId,
   sentBy,
   conversationId,
+  autoReplied,
   internalRecipientUserId,
 }: {
   client: CommsClient;
@@ -517,6 +536,8 @@ async function recordMessage({
   sentBy: string | null;
   /** 0041 — the WhatsApp thread this row belongs to, if any. Null for email. */
   conversationId?: string | null;
+  /** 0042 — drafted by the auto-reply agent. */
+  autoReplied?: boolean;
   /**
    * MODULE 25 — set when this row is a message to a COLLEAGUE about the
    * candidate, rather than to the candidate.
@@ -545,6 +566,7 @@ async function recordMessage({
       error_message: errorMessage,
       recipient_hint: recipientHint,
       conversation_id: conversationId ?? null,
+      auto_replied: autoReplied === true,
       internal_recipient_user_id: internalRecipientUserId ?? null,
       sent_by: sentBy,
       sent_at: status === "sent" ? new Date().toISOString() : null,
