@@ -275,45 +275,38 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Brand lockup for dark surfaces. See MarketingWordmark.tsx for why the app's
-  // raster logo cannot be used here. --mkt-mark-size is set per instance.
+  // Brand lockup.
+  //
+  // The header shows the real raster lockup now, so the old trick of hiding the
+  // text half of a mark+text composition is not available — an image cannot
+  // drop half of itself.
+  //
+  // THE OVERFLOW IT PROTECTED AGAINST IS STILL REAL. Below 30rem the lockup,
+  // "Sign in" and "Get started" together are wider than the viewport, and the
+  // overflow pushed the whole page sideways (a 17px horizontal scroll on the
+  // body was exactly this). So both lockups are RENDERED and one is hidden by
+  // CSS — the same approach TopNav uses, and for the same reason: swapping via
+  // a width-measuring hook causes a layout shift on first paint.
+  //
+  // The MARK is what gets kept. It is the recognisable half, both calls to
+  // action stay reachable, and the name is already in the page title and the
+  // footer.
   // ---------------------------------------------------------------------------
-  .mkt-wordmark {
+  .mkt-brand__wide {
     display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
   }
 
-  .mkt-wordmark__text {
-    font-family: var(--font-heading);
-    font-size: calc(var(--mkt-mark-size, 30px) * 0.58);
-    font-weight: var(--weight-bold);
-    letter-spacing: -0.02em;
-    color: var(--mkt-on-dark);
-    white-space: nowrap;
+  .mkt-brand__narrow {
+    display: none;
   }
 
-  /*
-    The second half of the name, in the periwinkle accent — matching the supplied
-    lockup, which sets "Score" in white and "boad" in the accent.
-    7.50:1 on the deep-space ground, so it is a colour change and not a
-    legibility one. It keeps the SAME weight as the first half: this is one word
-    in two colours, not a name plus a qualifier, so lightening it would break
-    the word in half.
-  */
-  .mkt-wordmark__accent {
-    color: var(--color-primary);
-  }
-
-  // Below 30rem the wordmark text, "Sign in" and "Get started" together are
-  // wider than the viewport, and the overflow pushes the whole page sideways —
-  // a 17px horizontal scroll on the body was exactly this. The MARK is what
-  // gets kept: it is the recognisable half of the lockup, and both calls to
-  // action stay reachable, which matters more on a phone than the name does
-  // when it is already in the page title and the footer.
   @media (max-width: 30rem) {
-    .mkt-header .mkt-wordmark__text {
+    .mkt-brand__wide {
       display: none;
+    }
+
+    .mkt-brand__narrow {
+      display: inline-flex;
     }
   }
 

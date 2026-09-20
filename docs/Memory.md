@@ -879,3 +879,41 @@ assets.
 
 `lint` clean · `typecheck` clean · `build` clean · 1880/1880 · brand assets
 backed up to the session scratchpad before overwriting.
+
+**Follow-up, same day — the full lockup is now actually ON the marketing site.**
+
+The supplied lockup was already wired to `variant="full"` (auth pages, apply and
+coding pages). What it was NOT on was the marketing site, which still composed
+the mark plus a TEXT wordmark — so the artwork never appeared there.
+
+Verified the asset before trusting it: `logo.png` peaks at alpha 255 with
+"Score" at pure `#ffffff` and "boad" at `#868fff` — near-identical to the
+theme's periwinkle `#8b9eff`, which is why the lockup sits on the palette
+without adjustment. It only LOOKED washed out in a preview composited on white.
+
+- **Header → `variant="compact"`** at 30px. A size decision, not a preference:
+  the full lockup is 2.72:1 and its strapline is ~5% of the height, so in a 30px
+  sticky header the strapline is 1.5px — invisible, not small.
+- **Footer → `variant="full"`** at 56px, strapline included. The one place on
+  the marketing site with the vertical room. Even there the strapline is ~3px
+  and reads as texture; the sentence beneath carries the message.
+- **`MarketingWordmark.tsx` DELETED** along with `.mkt-wordmark*`. Its whole
+  reason was that the retired raster was painted for light and its dark half
+  vanished on the dark band; the new lockup is light-on-transparent, so the
+  component and its white plate were both solving a problem that no longer
+  exists. Removing a wrapper that just forwards to `<Logo>` also satisfies the
+  "no unnecessary wrappers" rule.
+
+**One thing the deletion nearly lost.** The removed block carried a real fix: below
+30rem the wordmark plus "Sign in" and "Get started" were wider than the
+viewport, and the overflow pushed the whole page sideways — a 17px horizontal
+scroll on `body` was exactly that. The old fix hid the TEXT half, which a raster
+cannot do. Restored the equivalent by rendering BOTH lockups and swapping with
+CSS (`.mkt-brand__wide` / `.mkt-brand__narrow`), keeping the mark on a phone —
+the same approach `TopNav` uses, and for the same stated reason: a
+width-measuring hook causes a layout shift on first paint.
+
+Served `/` confirmed to request all three variants — compact (header wide), mark
+(header narrow), logo (footer) — with `alt="Scoreboad"`.
+
+`lint` clean · `typecheck` clean · `build` clean · 1880/1880.

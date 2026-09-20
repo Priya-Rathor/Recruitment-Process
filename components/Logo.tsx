@@ -16,11 +16,12 @@
 // the auth pages, which have room for a taller logo, get the full one.
 //
 // THESE ASSETS ARE DRAWN FOR A DARK GROUND, which is new. The retired lockup
-// was painted for light surfaces, and that is why MarketingWordmark had to set
-// the wordmark as text and sit the monogram on a white plate — the dark half of
-// the old asset vanished on a dark band. The swirl is light-on-transparent with
-// its own soft glow, so it needs no plate and works on the deep-space ground
-// everywhere. The plate is gone.
+// was painted for light surfaces, and the marketing site therefore had a
+// component of its own that set the name as TEXT beside the monogram on a white
+// plate, because the old asset's dark half vanished on a dark band. The swirl is
+// light-on-transparent with its own soft glow, so it needs neither: that
+// component and its plate are deleted, and the marketing header and footer now
+// render these assets like everywhere else.
 //
 // The compact lockup IS a horizontal crop of the source, which the retired one
 // could not be: the swirl sits left of the wordmark rather than overlapping the

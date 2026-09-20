@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FOOTER_SECTIONS } from "@/lib/marketing/content";
-import { MarketingWordmark } from "./MarketingWordmark";
+import { Logo } from "@/components/Logo";
 
 /**
  * The public site footer.
@@ -19,11 +19,19 @@ export function MarketingFooter() {
       <div className="mkt-shell">
         <div className="mkt-footer__top">
           <div>
-            <MarketingWordmark height={28} />
+            {/*
+              THE FULL LOCKUP, strapline included — the footer is the one place
+              on the marketing site with the vertical room for it. At 56px the
+              strapline renders around 3px, so it reads as a texture under the
+              name rather than as words; the sentence below carries the actual
+              message.
+            */}
+            <Logo variant="full" height={56} priority={false} />
             <p className="mkt-footer__tagline">
-              An AI-assisted recruitment operating system. Jobs, candidates,
-              screening, interviews and analytics in one workspace — with a
-              person making every hiring decision.
+              Smarter hiring, brighter teams. An AI-assisted recruitment
+              operating system — jobs, candidates, screening, interviews and
+              analytics in one workspace, with a person making every hiring
+              decision.
             </p>
           </div>
 
