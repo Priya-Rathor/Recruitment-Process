@@ -8,7 +8,6 @@ import {
   HERO,
   HOME_FAQS,
   HOME_FOOTER_SECTIONS,
-  HOME_NAV_LINKS,
   HUMAN_SIDE,
   PIPELINE_PREVIEW,
   TRUST_CARDS,
@@ -42,20 +41,14 @@ describe("the landing page's internal links", () => {
    * INTERNAL_ROUTES is the inventory of pages that exist. Anything linked that
    * is not in it is a 404 shipped into the shared chrome.
    *
-   * THIS IS THE TEST THAT KEPT THE NAV HONEST. The brief asked for Products,
-   * Solutions, Pricing and Resources in the navbar and eleven footer links
-   * across Company / Resources / Legal. Nine of those pages do not exist, and
-   * this assertion is why they were not shipped as dead links: adding one fails
-   * here until the page behind it is written.
+   * THIS IS THE TEST THAT KEPT THE FOOTER HONEST. The brief asked for eleven
+   * footer links across Company / Resources / Legal; most of those pages do not
+   * exist, and this assertion is why they were not shipped as dead links.
+   *
+   * The NAVBAR's equivalent moved to lib/marketing/navigation.test.ts when the
+   * nav moved to its own module.
    */
   const known = new Set(INTERNAL_ROUTES);
-
-  it("nav links all resolve to a real route", () => {
-    for (const link of HOME_NAV_LINKS) {
-      const path = link.href.split("#")[0] || "/";
-      expect(known.has(path), `nav → ${link.href}`).toBe(true);
-    }
-  });
 
   it("footer links all resolve to a real route", () => {
     for (const section of HOME_FOOTER_SECTIONS) {
@@ -77,7 +70,7 @@ describe("the landing page's internal links", () => {
     */
     const rendered = new Set(["product", "ai", "trust", "faq", "ai-safety", "main"]);
 
-    for (const link of [...HOME_NAV_LINKS, ...HOME_FOOTER_SECTIONS.flatMap((s) => s.links)]) {
+    for (const link of HOME_FOOTER_SECTIONS.flatMap((s) => s.links)) {
       const [, fragment] = link.href.split("#");
       if (!fragment) continue;
       expect(rendered.has(fragment), `${link.href} → #${fragment}`).toBe(true);
@@ -87,7 +80,7 @@ describe("the landing page's internal links", () => {
   it("uses no absolute or off-site href in the shared chrome", () => {
     // A hardcoded https:// link to our own domain breaks on preview deployments
     // and skips the client-side router.
-    for (const link of [...HOME_NAV_LINKS, ...HOME_FOOTER_SECTIONS.flatMap((s) => s.links)]) {
+    for (const link of HOME_FOOTER_SECTIONS.flatMap((s) => s.links)) {
       expect(link.href.startsWith("/"), link.href).toBe(true);
     }
   });

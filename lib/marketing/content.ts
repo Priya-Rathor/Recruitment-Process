@@ -346,25 +346,38 @@ export const END_TO_END_FLOW: { stage: string; detail: string; group: string }[]
   { stage: "Everything is measured and automated", detail: "Analytics over the funnel, automation for the repetition.", group: "operate" },
 ];
 
-/** Role-specific short flows for the how-it-works page. */
-export const ROLE_FLOWS: { role: string; summary: string; steps: string[] }[] = [
+/**
+ * Role-specific short flows for the how-it-works page.
+ *
+ * `anchor` MAKES THESE ADDRESSABLE. They rendered as anonymous cards until the
+ * navbar needed a "Who It's For" menu; rather than invent four /for/* pages to
+ * hang that menu on, the sections that already existed were given ids. The nav
+ * links to `/how-it-works#<anchor>` and `lib/marketing/navigation.test.ts`
+ * asserts every one of those fragments matches an anchor below — so renaming a
+ * role here fails the test instead of silently breaking a menu item.
+ */
+export const ROLE_FLOWS: { role: string; anchor: string; summary: string; steps: string[] }[] = [
   {
     role: "Agency recruiter",
+    anchor: "for-agency-recruiter",
     summary: "Many clients, many roles, and submissions to track.",
     steps: ["Take the requirement", "Search candidates already on file", "Bulk-add new resumes", "Screen and shortlist", "Submit to the client", "Track feedback turnaround"],
   },
   {
     role: "In-house talent team",
+    anchor: "for-in-house-talent-team",
     summary: "Fewer roles, deeper process, more stakeholders.",
     steps: ["Open the role with its stages", "Route inbound applications", "Match and screen", "Coordinate interview panels", "Record structured evaluations", "Hand off to onboarding"],
   },
   {
     role: "Hiring manager",
+    anchor: "for-hiring-manager",
     summary: "You do not want a recruiting tool. You want a decision.",
     steps: ["See only your roles", "Read the shortlist with reasons", "Take the interview with a brief", "Leave structured feedback", "Approve the offer"],
   },
   {
     role: "Candidate",
+    anchor: "for-candidate",
     summary: "They never signed up for this product, and never have to.",
     steps: ["Apply from a public link", "Take a screening call with a disclosure", "Open the coding round from a link — no install, no login", "Receive interview details", "Upload documents on hire"],
   },

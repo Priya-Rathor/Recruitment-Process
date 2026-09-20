@@ -2458,25 +2458,220 @@
     flex-shrink: 0;
   }
 
-  .mkt-nav__links {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
+  /*
+    THE LINK ROW.
+
+    `.mkt-nav__nav` is the positioning context AND is stretched to the bar's
+    full height, which is what lets a mega panel sit at `top: 100%` and land
+    exactly on the bar's lower edge. Anchoring to the <li> instead put the panel
+    two-thirds of the way up the bar, because the list item is only as tall as
+    its text.
+  */
+  .mkt-nav__nav {
+    position: relative;
     // Centred: the brand sits left, the actions right, and the links take the
     // space between rather than being pinned to either.
     margin-inline: auto;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
 
-    a {
-      font-size: var(--text-label);
-      color: var(--mkt-on-dark-muted);
-      text-decoration: none;
-      white-space: nowrap;
-      transition: color var(--transition-fast) var(--ease);
+  .mkt-nav__links {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
 
-      &:hover {
-        color: var(--mkt-on-dark);
+  .mkt-nav__item {
+    display: flex;
+    align-items: center;
+  }
+
+  /*
+    ONE CLASS FOR BOTH A LINK AND A MENU TRIGGER. They are the same object to a
+    reader — a word in the nav row — so they must be pixel-identical, and the
+    surest way to guarantee that is for them to be the same rule. The button
+    resets are what stop a <button> looking like a button here.
+  */
+  .mkt-nav__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: var(--text-label);
+    line-height: 1.2;
+    color: var(--mkt-on-dark-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--transition-fast) var(--ease);
+
+    &:hover,
+    &[aria-expanded="true"] {
+      color: var(--mkt-on-dark);
+    }
+
+    /*
+      THE ACTIVE STATE IS AN UNDERLINE, NOT A COLOUR CHANGE.
+
+      Colour alone fails WCAG 1.4.1 — a reader who cannot separate the accent
+      from the muted grey has no way to tell which section they are in. The
+      2px accent rule is a second, non-colour signal, and it is drawn with a
+      pseudo-element so turning it on never shifts the row by a pixel.
+    */
+    &[data-active] {
+      color: var(--mkt-on-dark);
+      position: relative;
+
+      &::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -0.55rem;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--mkt-accent-on-dark);
       }
     }
+  }
+
+  .mkt-nav__chev {
+    // Nudged down to sit on the text's optical centre rather than its baseline.
+    margin-top: 1px;
+    opacity: 0.7;
+    transition: transform var(--transition-fast) var(--ease);
+  }
+
+  .mkt-nav__trigger[aria-expanded="true"] .mkt-nav__chev {
+    transform: rotate(180deg);
+    opacity: 1;
+  }
+
+  // ---- The mega panel -------------------------------------------------------
+  /*
+    Anchored to the centre of the link row and capped at the viewport, which is
+    what keeps a three-column panel from hanging off the right edge at 960px.
+    The wrapper carries the gap as PADDING rather than a margin: the pointer
+    travelling from the trigger down into the panel crosses that gap, and empty
+    space is not a descendant, so a margin would close the menu mid-journey.
+  */
+  .mkt-mega {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding-top: 0.5rem;
+    z-index: 60;
+  }
+
+  .mkt-mega__panel {
+    display: grid;
+    gap: clamp(1rem, 2vw, 2rem);
+    width: max-content;
+    max-width: calc(100vw - 6rem);
+    padding: 1.25rem;
+    border-radius: var(--mkt-radius);
+    background: rgba(10, 17, 40, 0.96);
+    backdrop-filter: blur(14px) saturate(150%);
+    border: 1px solid var(--mkt-glass-border);
+    box-shadow: var(--mkt-glow-sheet);
+    animation: mkt-mega-in 140ms var(--ease);
+
+    &[data-cols="1"] {
+      grid-template-columns: minmax(0, 20rem);
+    }
+
+    &[data-cols="2"] {
+      grid-template-columns: repeat(2, minmax(0, 17rem));
+    }
+
+    &[data-cols="3"] {
+      grid-template-columns: repeat(3, minmax(0, 16rem));
+    }
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+  }
+
+  @keyframes mkt-mega-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  /*
+    The panel still APPEARS — it simply does not slide. Removing the animation
+    entirely (rather than shortening it) is the correct reading of the
+    preference: the information is not delayed, only the motion is dropped.
+  */
+  @media (prefers-reduced-motion: reduce) {
+    .mkt-mega__panel {
+      animation: none;
+    }
+
+    .mkt-nav__chev,
+    .mkt-sheet__chev {
+      transition: none;
+    }
+  }
+
+  .mkt-mega__title {
+    margin: 0 0 0.5rem;
+    padding-inline: 0.625rem;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .mkt-mega__link {
+    display: block;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--mkt-radius-sm);
+    text-decoration: none;
+    transition:
+      background var(--transition-fast) var(--ease),
+      color var(--transition-fast) var(--ease);
+
+    &:hover {
+      background: var(--mkt-glass-strong);
+    }
+
+    &[data-active] {
+      background: var(--mkt-glass);
+
+      .mkt-mega__label {
+        color: var(--mkt-accent-on-dark);
+      }
+    }
+  }
+
+  .mkt-mega__label {
+    display: block;
+    font-size: var(--text-label);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark);
+  }
+
+  .mkt-mega__desc {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: var(--text-caption);
+    line-height: 1.45;
+    color: var(--mkt-on-dark-muted);
   }
 
   .mkt-nav__actions {
@@ -2529,17 +2724,76 @@
       display: flex;
       flex-direction: column;
     }
+  }
 
-    nav a {
-      padding: 0.75rem 0.5rem;
-      font-size: var(--text-body);
+  // ---- The mobile accordion -------------------------------------------------
+  /*
+    A row is either a link or a section toggle, and they are the same rule for
+    the same reason the desktop ones are: to a thumb they are the same target.
+    48px minimum height is the touch-target floor, not a rounding of 0.75rem.
+  */
+  .mkt-sheet__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.5rem;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: var(--text-body);
+    color: var(--mkt-on-dark);
+    text-align: left;
+    text-decoration: none;
+    border-radius: var(--mkt-radius-sm);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--mkt-glass);
+    }
+  }
+
+  .mkt-sheet__chev {
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: transform var(--transition-fast) var(--ease);
+
+    &[data-open] {
+      transform: rotate(180deg);
+      opacity: 1;
+    }
+  }
+
+  .mkt-sheet__panel {
+    /*
+      Indented and rule-marked rather than merely indented: at a glance the
+      left rule is what tells a reader these four rows belong to the heading
+      above them and not to the next section.
+    */
+    margin: 0 0 0.25rem 0.75rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--mkt-dark-border);
+
+    .mkt-mega__title {
+      margin-top: 0.5rem;
+      padding-inline: 0.5rem;
+    }
+  }
+
+  .mkt-sheet__sublink {
+    display: block;
+    min-height: 2.5rem;
+    padding: 0.5rem;
+    font-size: var(--text-label);
+    color: var(--mkt-on-dark-muted);
+    text-decoration: none;
+    border-radius: var(--mkt-radius-sm);
+
+    &:hover {
+      background: var(--mkt-glass);
       color: var(--mkt-on-dark);
-      text-decoration: none;
-      border-radius: var(--mkt-radius-sm);
-
-      &:hover {
-        background: var(--mkt-glass);
-      }
     }
   }
 
@@ -2556,14 +2810,18 @@
   }
 
   /*
-    THE BREAKPOINT IS 940px, and it is measured rather than chosen: the brand
-    (about 125px), five links at 1.5rem gaps (about 400px), "Sign In" and a
-    "Get Started" button (about 190px) plus the bar's own padding need roughly
-    790px of a 1180px container. It gets tight — links start colliding with the
-    actions — below about 940px, so that is where the burger takes over.
+    THE BREAKPOINT IS 900px, MEASURED RATHER THAN CHOSEN — and it moved down
+    from 940px because the row got narrower, not because 900 is a rounder
+    number. Five flat links at 1.5rem gaps needed about 400px; three menu
+    triggers with chevrons at 1.25rem gaps need about 330px. With the brand
+    (~125px), "Sign In" and the CTA (~180px) and the bar's own padding, the row
+    needs roughly 700px and starts to crowd below about 900px.
+
+    Keeping 940 would have pushed a whole class of small laptops and landscape
+    tablets onto the burger for no reason.
   */
-  @media (max-width: 940px) {
-    .mkt-nav__links,
+  @media (max-width: 900px) {
+    .mkt-nav__nav,
     .mkt-nav__actions {
       display: none;
     }
@@ -2573,7 +2831,7 @@
     }
   }
 
-  @media (min-width: 941px) {
+  @media (min-width: 901px) {
     .mkt-nav__sheet {
       display: none;
     }
@@ -2761,7 +3019,10 @@
     ring behind, but a keyboard user always sees one.
   */
   .mkt-btn:focus-visible,
-  .mkt-nav__links a:focus-visible,
+  .mkt-nav__link:focus-visible,
+  .mkt-mega__link:focus-visible,
+  .mkt-sheet__row:focus-visible,
+  .mkt-sheet__sublink:focus-visible,
   .mkt-nav__signin:focus-visible,
   .mkt-nav__burger:focus-visible,
   .mkt-foot__col a:focus-visible,

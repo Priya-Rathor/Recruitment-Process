@@ -99,7 +99,19 @@ export default function HowItWorksPage() {
 
           <div className="mkt-grid">
             {ROLE_FLOWS.map((flow) => (
-              <div key={flow.role} className="mkt-role">
+              /*
+                `id` and `scroll-margin-top` are what make the navbar's "Who
+                It's For" menu land on the right card. The margin is not
+                cosmetic: the header is sticky, so an un-offset anchor scrolls
+                the heading underneath it and the reader sees the card's second
+                paragraph with no idea what they clicked.
+              */
+              <div
+                key={flow.role}
+                id={flow.anchor}
+                className="mkt-role"
+                style={{ scrollMarginTop: "6rem" }}
+              >
                 <h3>{flow.role}</h3>
                 <p>{flow.summary}</p>
                 <ol>

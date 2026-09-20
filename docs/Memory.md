@@ -1104,3 +1104,91 @@ SoftwareApplication + FAQPage · heading outline is one h1 then h2s.
 
 **Still not verified:** rendered appearance at the eight breakpoints. No browser
 in this environment; unchanged from the previous session's note.
+
+---
+
+## 2026-09-20 — Module 02: navbar, mega menus, navigation IA
+
+**The problem the module posed.** The brief asks for six top-level menus
+(Products, Solutions, Who It's For, Integrations, Resources, Pricing) covering
+~30 destinations, and in the same breath forbids broken links and forbids
+creating empty pages to satisfy the nav. The site has 11 real public URLs. Those
+instructions only conflict if the architecture and the rendering are one thing.
+
+**The resolution: `lib/marketing/navigation.ts`.** Declares the WHOLE long-term
+IA, every item carrying `status: "live" | "planned"`. `liveNavigation()` renders
+only live items and drops a menu with none. A later module turns a page on by
+editing one word, and `navigation.test.ts` fails until the route actually
+resolves. Architecture committed, dead links not shipped.
+
+**Two menus turned out to be real with zero new pages.**
+- Products → the six existing `/product/*` pages (their own H1s became the
+  one-line descriptions, so menu and page agree by construction).
+- Who It's For → the four role cards ALREADY RENDERED on `/how-it-works`. They
+  had no ids, so `ROLE_FLOWS` gained an `anchor` field and the cards gained
+  `id` + `scroll-margin-top: 6rem` (the header is sticky; an un-offset anchor
+  scrolls the heading underneath it). Making existing content addressable, not
+  inventing a page.
+
+Solutions / Integrations / Pricing declared, not rendered — no destinations of
+any kind. Pricing especially: the home FAQ says pricing is not published, so a
+Pricing link would contradict the page it sits on.
+
+**Visual identity untouched, per the brief's MOST IMPORTANT INSTRUCTION.** Same
+sticky floating glass pill, same 3.5rem height, same fill/blur/border, same logo
+swap, same right-hand action pair. Everything new (mega panel, accordion) reuses
+the existing glass tokens.
+
+**Decisions worth keeping:**
+- **Disclosure pattern, not `role="menu"`.** `role="menu"` swallows Tab, demands
+  roving focus, and makes a screen reader announce a site nav as a command menu.
+  `button[aria-expanded]` + a labelled list is what a nav actually is.
+- **Panel mounted only when open.** A CSS-hidden panel puts 11 invisible links
+  in the tab order.
+- **Hover gated on `(hover: hover) and (pointer: fine)`.** On touch, `mouseenter`
+  fires synthetically just before the tap and the tap lands on what moved.
+- **140ms close delay + the gap carried as PADDING on the panel wrapper.** Empty
+  space is not a descendant, so a margin would close the menu mid-diagonal.
+- **Route change handled by compare-and-set DURING RENDER**, not an effect —
+  `react-hooks/set-state-in-effect` rejects the effect version (4th time this
+  rule has bitten in this codebase), and an effect would paint the open menu
+  over the new page for one frame.
+- **Active state is an underline, not a colour change** — colour alone fails
+  WCAG 1.4.1. Drawn with `::after` so it never shifts the row.
+- **Breakpoint moved 940 → 900px**, remeasured: 3 triggers (~330px) are narrower
+  than the 5 flat links (~400px) the old figure was based on.
+- **CTA "Get Started" → "Start free"** — names what the click costs.
+
+**Two bugs the tests caught, both real:**
+1. `/how-it-works` lit up TWO menus at once (Who It's For owns its `#for-*`
+   anchors, Resources owns the page). Fixed the rule: an anchored href links a
+   SECTION and does not claim the page, so only fragment-free hrefs count. That
+   also disposes of the home page for free — every `/#...` is excluded, so `/`
+   matches nothing instead of lighting all three.
+2. "Candidates" as a one-word label — thin anchor text for a site-wide internal
+   link. → "Candidate Experience".
+
+**Deleted `HOME_NAV_LINKS`** (dead once the header moved to `NAVIGATION`); its
+four assertions moved into `navigation.test.ts`. Its `/#trust` destination was
+deliberately carried into Resources as "Security & Trust" so the reorganisation
+did not quietly drop the only nav route to the security copy. `/#product` and
+`/#ai` are now nav-unreferenced — both are covered by deeper real pages.
+
+**Did NOT touch:** `app/sitemap.ts`, `app/robots.ts` (§32), `components/nav/TopNav.tsx`
+— the authenticated app navbar stays a separate component (§24). No schema,
+API, auth or business logic.
+
+**Skipped deliberately:** `SiteNavigationElement` JSON-LD. No search engine
+consumes it; `lib/marketing/seo.ts` already states the house rule against markup
+that signals an SEO plugin rather than a maintained site. The navigation SEO
+here is substantive instead: real `<a href>` (no JS-only handlers), descriptive
+anchor text, one `<nav aria-label="Main">` landmark, server-rendered links.
+
+`lint` clean · `typecheck` clean · `build` clean · 1908/1908 (+16). Verified
+against the running dev server: four `id="for-*"` anchors present, three
+`aria-controls="mkt-mega-*"` triggers present, `aria-label="Main"` landmark
+present, Resources correctly `data-active` on `/how-it-works`, and the mega/
+accordion rules + the 900px breakpoint present in the served CSS.
+
+**Still not verified:** rendered appearance at the eight breakpoints. No browser
+in this environment; unchanged from the previous two sessions' note.

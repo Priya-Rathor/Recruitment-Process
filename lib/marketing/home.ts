@@ -405,28 +405,15 @@ export const HOME_FAQS: { q: string; a: string }[] = [
 // Navigation and footer
 // -----------------------------------------------------------------------------
 
-/**
- * THE BRIEF ASKED FOR MORE NAVIGATION THAN THE SITE HAS PAGES.
- *
- * Requested: Products, Solutions, Pricing, Resources in the navbar; About,
- * Contact, Security, Documentation, FAQ, Blog, Privacy and Terms in the footer.
- * None of those routes exists. The same brief also requires no broken links and
- * no invented functionality, and empty pages created to satisfy a nav are both.
- *
- * So the requested SHAPE is mapped onto real destinations, and the gap is
- * reported rather than papered over. Pricing is the notable omission: the FAQ
- * says pricing is not published yet, so a Pricing link would lead to a page
- * contradicting the answer two sections below it.
- *
- * lib/marketing/home.test.ts asserts every href here resolves to a real route.
- */
-export const HOME_NAV_LINKS: { label: string; href: string }[] = [
-  { label: "Product", href: "/#product" },
-  { label: "How it works", href: "/how-it-works" },
-  { label: "AI", href: "/#ai" },
-  { label: "Trust", href: "/#trust" },
-  { label: "FAQ", href: "/#faq" },
-];
+/*
+  THE NAVBAR'S LINKS USED TO LIVE HERE, as a flat HOME_NAV_LINKS array. They
+  moved to lib/marketing/navigation.ts when the navbar gained mega menus,
+  because the nav now has to express groups, one-line descriptions and a
+  live/planned distinction that a flat list of {label, href} cannot carry.
+
+  The footer's links stayed: a footer IS a flat list, and duplicating it into
+  the navigation module would have created two places to change one link.
+*/
 
 export const HOME_FOOTER_SECTIONS: {
   title: string;
