@@ -36,26 +36,125 @@
   // Local tokens. Derived from the brand tokens, never new colours.
   // ---------------------------------------------------------------------------
   /*
-    FUTURE WORKFORCE. These pointed at two of the retired brand tokens, which
-    the theme replacement DELETED — so every dark marketing section was
-    resolving to an undefined variable and falling back to transparent. That is
-    the failure mode of a local token derived from a global one: it breaks
-    silently, one page away from the file that changed. app/theme.test.ts now
-    fails the build on a dangling token reference for exactly this reason.
+    THE MARKETING SITE'S BANDS ARE FIXED, NOT MODE-DEPENDENT.
 
-    They now derive from the theme's own surfaces, which means the marketing
-    site's "dark section" and the app's ground are the same colour for the first
-    time — the whole product is dark now, so a separately-toned dark band would
-    read as a seam rather than as a section.
+    This is the one decision in this file worth arguing, because it reverses
+    what was here. These tokens used to derive from the APP's surface tokens,
+    which flip under `prefers-color-scheme`. That is right for an application: a
+    recruiter who told their OS they want light should get light.
+
+    It is wrong for a landing page, where the alternation between deep-navy
+    brand bands and bright product bands IS the art direction. Following the OS
+    there would invert the hero, turn the dark closing band into a pale box, and
+    destroy the very contrast that makes the bright dashboard read as bright.
+    The page would be a different design on half the machines that opened it.
+
+    So the public pages carry their own fixed palette, derived from the same
+    brand values the app tokens derive from. The application stays fully
+    mode-aware; only these art-directed pages are pinned.
+
+    EVERY RATIO IN THE COMMENTS BELOW IS COMPUTED, not estimated.
   */
-  --mkt-dark: var(--color-background);      // deep space — the dark section ground
-  --mkt-dark-raised: var(--color-card);     // cards on dark
-  --mkt-dark-border: var(--color-border);
-  --mkt-dark-border-strong: var(--color-border-strong);
-  --mkt-on-dark: var(--color-text);              // 18.69:1 on deep space
-  --mkt-on-dark-muted: var(--color-text-secondary);  //  8.82:1
-  --mkt-on-dark-faint: var(--color-text-muted);      //  6.11:1
-  --mkt-accent-on-dark: var(--color-primary);        //  7.50:1 — periwinkle
+
+  // ---- Deep bands: hero, Human + AI, the closing CTA ----------------------
+  --mkt-dark: #0a1128;             // deep space — the brand ground
+  --mkt-dark-2: #0f1835;           // one step up, for cards on a dark band
+  --mkt-dark-3: #16203f;           // wells and inactive tracks on a dark band
+  --mkt-dark-border: rgba(139, 158, 255, 0.16);
+  --mkt-dark-border-strong: rgba(139, 158, 255, 0.34);
+  --mkt-on-dark: #ffffff;              // 18.69:1 on the ground · 17.47:1 on dark-2
+  --mkt-on-dark-muted: #a6b1d9;        //  8.82:1 · 8.25:1
+  --mkt-on-dark-faint: #8792bc;        //  6.11:1 · 5.71:1
+  /*
+    Links and eyebrows on a dark band use the BRIGHT periwinkle, not the base
+    one: at 9.72:1 against 8.82:1 for muted body copy, an accent actually
+    outreads the text around it. The base periwinkle at 7.50:1 sits below the
+    muted tone, so it read as quieter than the prose it was meant to lift.
+  */
+  --mkt-accent-on-dark: #aab7ff;
+
+  /*
+    ---- Bright bands: the product sections ---------------------------------
+
+    Where the page gets its brightness — and "bright" here is carried by large
+    white surfaces and strong ink, not by saturated colour. The 60/40 split
+    towards light is what makes the deep bands read as deliberate punctuation
+    rather than as a dark theme with light patches.
+  */
+  --mkt-light: #f7f9fc;            // the light band ground
+  --mkt-white: #ffffff;            // cards on it
+  --mkt-light-2: #eef1f8;          // wells, tracks, inactive chips
+  --mkt-light-border: #e7eaf2;
+  --mkt-light-border-strong: #d6dbe9;
+  --mkt-ink: #0b1020;              // 17.95:1 on the light ground
+  --mkt-ink-muted: #5e6678;        //  5.46:1 — AA for body, and genuinely muted
+
+  /*
+    ACCENTS ON A LIGHT BAND ARE FILLS AND ICONS, NEVER TEXT.
+
+    Measured against #f7f9fc: periwinkle 2.36:1, lavender 1.70:1, mint 1.41:1.
+    All three are unreadable as words. So an accent that has to carry TEXT on a
+    bright band uses the darkened step of its own hue, and the raw accent is
+    kept for fills, rules, icon glyphs and glows.
+
+    A white card on the light ground is only 1.05:1, which is why every card
+    here carries a 1px border. On a light band the border does the work the glow
+    does on a dark one.
+  */
+  --mkt-accent: #8b9eff;           // fills, rules, glows
+  --mkt-accent-bright: #aab7ff;    // hover and glow only
+  --mkt-lavender: #c6b8ff;
+  --mkt-mint: #7fe7c4;
+  --mkt-accent-ink: #515f9e;       // 6.03:1 on white — periwinkle AS TEXT
+  --mkt-mint-ink: #3f716e;         // 5.53:1 on white — mint AS TEXT
+  --mkt-lavender-ink: #716d9e;     // 4.79:1 on white — lavender AS TEXT
+
+  /*
+    ON A FILLED ACCENT THE INK IS NAVY, NOT WHITE.
+
+    White on #8b9eff is 2.49:1; on the bright #aab7ff it is 1.92:1. Both fail AA
+    badly, and both are exactly what a primary button reaches for. Navy on the
+    same fill is 7.50:1. The button still reads as bright periwinkle — only the
+    label changes, and it is the difference between a button anyone can read and
+    one that merely looks like it.
+  */
+  --mkt-on-accent: #0a1128;
+
+  // ---- Glass, glow, radius ------------------------------------------------
+  --mkt-glass: rgba(255, 255, 255, 0.055);
+  --mkt-glass-border: rgba(255, 255, 255, 0.13);
+  --mkt-glass-strong: rgba(255, 255, 255, 0.09);
+
+  --mkt-glow-accent: 0 16px 48px -20px rgba(139, 158, 255, 0.55);
+  --mkt-glow-card: 0 1px 2px rgba(11, 16, 32, 0.05), 0 16px 36px -22px rgba(11, 16, 32, 0.15);
+  --mkt-glow-card-hover: 0 2px 4px rgba(11, 16, 32, 0.06), 0 24px 52px -24px rgba(11, 16, 32, 0.22);
+  /*
+    The product visual, lifted off the dark band by a COOL BLOOM rather than a
+    black shadow. A black shadow on a near-black ground is invisible, and
+    cranking it up to compensate is what makes dark UIs look grey and cheap.
+  */
+  --mkt-glow-product:
+    0 0 0 1px rgba(255, 255, 255, 0.10),
+    0 40px 80px -34px rgba(4, 8, 22, 0.85),
+    0 0 90px -28px rgba(139, 158, 255, 0.40);
+
+  /*
+    The navbar's glass lift and the mobile sheet's.
+
+    Tokens rather than literals because app/theme.test.ts asserts that EVERY
+    box-shadow in the codebase is a token, `none`, or an inset accent edge — and
+    that rule is what caught six hard shadows during the theme replacement. Two
+    soft wide shadows are not a hard shadow, but an exception carved for them
+    would be the crack the next one comes through.
+  */
+  --mkt-glow-nav:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 32px -18px rgba(4, 8, 22, 0.85);
+  --mkt-glow-sheet: 0 24px 48px -20px rgba(4, 8, 22, 0.90);
+
+  --mkt-radius-sm: 12px;
+  --mkt-radius: 16px;
+  --mkt-radius-lg: 22px;
 
   // Section rhythm. One scale, so no section invents its own padding.
   --mkt-section-y: clamp(4rem, 9vw, 7.5rem);
@@ -1181,6 +1280,1381 @@
 
     a.mkt-card:hover {
       transform: none;
+    }
+  }
+}
+
+// =============================================================================
+// THE LANDING PAGE
+//
+// Appended rather than placed in a file of its own, because everything here is
+// inside the `.mkt` scope this file establishes and splitting it would mean
+// repeating that nesting in a second place.
+//
+// THE COLOUR RHYTHM IS THE DESIGN. Three deep bands against seven bright ones.
+// Brightness is a relationship rather than a value: the product sections read as
+// luminous because they sit between navy, and a page that was bright everywhere
+// would read as flat.
+// =============================================================================
+.mkt {
+  // ---------------------------------------------------------------------------
+  // The ordinal ramp for the funnel in the product mock. A single hue, light to
+  // deep, so the stages read in order. Declared here rather than inline in the
+  // component for the usual reason: one copy of the palette.
+  // ---------------------------------------------------------------------------
+  --mkt-ramp-0: #a1b2fe;
+  --mkt-ramp-1: #8699fd;
+  --mkt-ramp-2: #6e80f8;
+  --mkt-ramp-3: #5b6ae0;
+  --mkt-ramp-4: #4a55c9;
+
+  // ---------------------------------------------------------------------------
+  // Reveal on scroll
+  //
+  // The transform is small on purpose. A 14px lift reads as the content
+  // settling; 60px reads as a slide, and six of those in a grid is a show.
+  // ---------------------------------------------------------------------------
+  .mkt-reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    will-change: opacity, transform;
+  }
+
+  .mkt-reveal.is-shown {
+    opacity: 1;
+    transform: none;
+    // Dropped once the animation is done: a permanent will-change on dozens of
+    // elements keeps them all on their own compositor layer for nothing.
+    will-change: auto;
+  }
+
+  // ---------------------------------------------------------------------------
+  // BANDS
+  // ---------------------------------------------------------------------------
+  .mkt-band {
+    position: relative;
+    padding-block: clamp(4rem, 8vw, 7rem);
+  }
+
+  .mkt-band--light {
+    background: var(--mkt-light);
+    color: var(--mkt-ink);
+  }
+
+  // Two light bands in a row share one ground: the padding between them is the
+  // rhythm, and a second background would draw a seam across it.
+  .mkt-band--flush {
+    padding-top: 0;
+  }
+
+  .mkt-band--dark {
+    background: var(--mkt-dark);
+    color: var(--mkt-on-dark);
+    overflow: hidden; // the ribbons are larger than the band on purpose
+  }
+
+  .mkt-band--dark h2,
+  .mkt-band--dark h3 {
+    color: var(--mkt-on-dark);
+  }
+
+  .mkt-band--statement {
+    background: var(--mkt-light);
+    padding-block: clamp(3rem, 5vw, 4.5rem);
+    border-block: 1px solid var(--mkt-light-border);
+  }
+
+  .mkt-band--cta {
+    padding-block: clamp(5rem, 9vw, 8rem);
+    text-align: center;
+  }
+
+  // ---- Band headings --------------------------------------------------------
+  .mkt-bandhead {
+    max-width: 44rem;
+    margin-bottom: clamp(2.5rem, 4vw, 3.5rem);
+  }
+
+  .mkt-bandhead h2 {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h2);
+    font-weight: var(--weight-semibold);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    color: var(--mkt-ink);
+    margin: 0.5rem 0 0;
+  }
+
+  .mkt-bandhead--dark h2 {
+    color: var(--mkt-on-dark);
+  }
+
+  // The second clause on its own line, so a two-sentence headline scans in two
+  // beats rather than as one wall of type.
+  .mkt-bandhead__second {
+    display: block;
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .mkt-bandlead {
+    font-size: var(--mkt-lead);
+    line-height: 1.55;
+    color: var(--mkt-ink-muted);
+    margin: 1rem 0 0;
+    max-width: 40rem;
+  }
+
+  .mkt-band--dark .mkt-bandlead,
+  .mkt-band--cta .mkt-bandlead {
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .mkt-band--cta .mkt-bandlead {
+    margin-inline: auto;
+  }
+
+  .mkt-eyebrow--light {
+    color: var(--mkt-accent-ink); // 6.03:1 — the accent AS TEXT needs the dark step
+  }
+
+  // ---------------------------------------------------------------------------
+  // HERO
+  // ---------------------------------------------------------------------------
+  .mkt-hero {
+    position: relative;
+    background: var(--mkt-dark);
+    color: var(--mkt-on-dark);
+    padding-top: clamp(6rem, 11vw, 9rem);
+    padding-bottom: clamp(3rem, 5vw, 4rem);
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  /*
+    THE RIBBONS.
+
+    Three blurred radial shapes, no image and no canvas. Each is a single
+    element with a radial-gradient and a large blur — which the compositor
+    handles on its own layer, so it costs nothing per frame once painted.
+
+    `filter: blur()` rather than a soft gradient alone because the blur is what
+    removes the banding a wide low-opacity gradient shows on an 8-bit display.
+  */
+  .mkt-hero__aura {
+    position: absolute;
+    inset: -20% -10% auto -10%;
+    height: 150%;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .mkt-hero__aura--quiet {
+    opacity: 0.55;
+  }
+
+  .mkt-ribbon {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+  }
+
+  .mkt-ribbon--1 {
+    width: 52%;
+    height: 46%;
+    top: -6%;
+    left: -4%;
+    background: radial-gradient(circle at 40% 40%, rgba(139, 158, 255, 0.42), transparent 66%);
+  }
+
+  .mkt-ribbon--2 {
+    width: 46%;
+    height: 42%;
+    top: 4%;
+    right: -6%;
+    background: radial-gradient(circle at 55% 45%, rgba(198, 184, 255, 0.34), transparent 68%);
+  }
+
+  .mkt-ribbon--3 {
+    width: 40%;
+    height: 34%;
+    top: 34%;
+    left: 30%;
+    background: radial-gradient(circle at 50% 50%, rgba(127, 231, 196, 0.16), transparent 70%);
+  }
+
+  .mkt-hero__inner {
+    position: relative;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .mkt-hero__h1 {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h1);
+    font-weight: var(--weight-bold);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    color: var(--mkt-on-dark);
+    margin: clamp(1.25rem, 2.5vw, 2rem) 0 0;
+    max-width: 22ch;
+  }
+
+  /*
+    The accent half of the headline.
+
+    TWO STOPS ONLY — periwinkle to lavender. A third starts to read as a
+    rainbow, which the brief rules out.
+
+    `background-clip: text` needs a transparent fill, and that is a real
+    accessibility trap: if the gradient fails to paint, the text is invisible
+    rather than merely unstyled. So `color` is set to the bright periwinkle
+    FIRST as the fallback, and the clip overrides it only where supported.
+  */
+  .mkt-hero__accent {
+    display: block;
+    color: var(--mkt-accent-bright);
+  }
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .mkt-hero__accent {
+      background: linear-gradient(100deg, #aab7ff 0%, #c6b8ff 52%, #dcd4ff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+  }
+
+  .mkt-hero__lead {
+    font-size: var(--mkt-lead);
+    line-height: 1.6;
+    color: var(--mkt-on-dark-muted);
+    margin: clamp(1rem, 2vw, 1.5rem) auto 0;
+    max-width: 38rem;
+  }
+
+  .mkt-hero__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: clamp(1.75rem, 3vw, 2.5rem);
+  }
+
+  // ---------------------------------------------------------------------------
+  // BUTTONS — the glass secondary, and a small size for the navbar
+  // ---------------------------------------------------------------------------
+  .mkt-btn--glass {
+    background: var(--mkt-glass);
+    border-color: var(--mkt-glass-border);
+    color: var(--mkt-on-dark);
+    backdrop-filter: blur(10px);
+
+    &:hover {
+      background: var(--mkt-glass-strong);
+      border-color: var(--mkt-dark-border-strong);
+      color: var(--mkt-on-dark);
+    }
+  }
+
+  .mkt-btn--sm {
+    height: 2.375rem;
+    padding-inline: 1rem;
+    font-size: var(--text-label);
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE PRODUCT VISUAL
+  // ---------------------------------------------------------------------------
+  .mkt-product {
+    margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+  }
+
+  /*
+    The frame.
+
+    A cool BLOOM rather than a black shadow: a black shadow on a near-black band
+    is invisible, and turning it up to compensate produces the grey halo that
+    makes dark pages look cheap. `--mkt-glow-product` is a hairline ring, an
+    ambient wash and a periwinkle bloom.
+
+    NO PERSPECTIVE TRANSFORM. The brief allows a very subtle one and rules out
+    overdoing 3D; a rotated screenshot also makes every number in it harder to
+    read and blurs text on non-retina displays. The elevation comes from the
+    glow instead, which costs nothing in legibility.
+  */
+  .mkt-product__frame {
+    background: var(--mkt-light);
+    border-radius: var(--mkt-radius-lg);
+    box-shadow: var(--mkt-glow-product);
+    overflow: hidden;
+  }
+
+  .mkt-product__bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    background: var(--mkt-white);
+    border-bottom: 1px solid var(--mkt-light-border);
+  }
+
+  .mkt-product__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--mkt-light-border-strong);
+  }
+
+  .mkt-product__body {
+    display: grid;
+    grid-template-columns: 172px minmax(0, 1fr);
+    min-height: 380px;
+  }
+
+  .mkt-product__side {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 10px;
+    background: var(--mkt-white);
+    border-right: 1px solid var(--mkt-light-border);
+  }
+
+  .mkt-product__navitem {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    color: var(--mkt-ink-muted);
+
+    &.is-active {
+      background: rgba(139, 158, 255, 0.12);
+      color: var(--mkt-accent-ink);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .mkt-product__navdot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+    flex-shrink: 0;
+  }
+
+  .mkt-product__main {
+    padding: 18px 20px 22px;
+    min-width: 0;
+  }
+
+  .mkt-product__head,
+  .mkt-product__panelhead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 14px;
+  }
+
+  .mkt-product__head h3 {
+    font-family: var(--font-heading);
+    font-size: 17px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+    margin: 0;
+  }
+
+  .mkt-product__panelhead h4 {
+    font-size: 13.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+    margin: 0;
+  }
+
+  .mkt-product__range {
+    font-size: 11.5px;
+    color: var(--mkt-ink-muted);
+  }
+
+  .mkt-product__tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .mkt-product__tile {
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius-sm);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .mkt-product__tilelabel {
+    font-size: 11px;
+    color: var(--mkt-ink-muted);
+  }
+
+  .mkt-product__tilevalue {
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: var(--weight-bold);
+    color: var(--mkt-ink);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // The delta carries an arrow as well as a colour, so direction is never
+  // communicated by colour alone.
+  .mkt-product__delta {
+    font-size: 10.5px;
+    color: var(--mkt-ink-muted);
+
+    &.is-good {
+      color: var(--mkt-mint-ink); // 5.53:1 — mint AS TEXT needs the dark step
+    }
+  }
+
+  .mkt-product__panel {
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius-sm);
+    padding: 14px;
+  }
+
+  .mkt-product__funnel {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .mkt-product__frow {
+    display: grid;
+    grid-template-columns: 86px minmax(0, 1fr) 34px;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  .mkt-product__fstage {
+    color: var(--mkt-ink-muted);
+  }
+
+  .mkt-product__ftrack {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    overflow: hidden;
+  }
+
+  .mkt-product__fbar {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+  }
+
+  .mkt-product__fvalue {
+    text-align: right;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mkt-product__caption {
+    margin-top: 0.875rem;
+    text-align: center;
+    font-size: var(--text-caption);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  // On a light band the caption sits on light.
+  .mkt-band--light .mkt-product__caption {
+    color: var(--mkt-ink-muted);
+  }
+
+  // ---------------------------------------------------------------------------
+  // LIGHT CARDS
+  // ---------------------------------------------------------------------------
+  .mkt-cardgrid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .mkt-cardgrid--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /*
+    A white card on the light ground is 1.05:1, so the BORDER is what defines
+    it. On a light band the border does the job the glow does on a dark one —
+    which is why this card has both a border and only a very soft shadow.
+  */
+  .mkt-lcard {
+    height: 100%;
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    padding: 1.375rem;
+    box-shadow: var(--mkt-glow-card);
+    transition:
+      transform 220ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 220ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 220ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--mkt-glow-card-hover);
+      border-color: var(--mkt-light-border-strong);
+    }
+
+    h3 {
+      font-family: var(--font-heading);
+      font-size: 15.5px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+      margin: 0.875rem 0 0.375rem;
+    }
+
+    p {
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--mkt-ink-muted);
+      margin: 0;
+    }
+  }
+
+  /*
+    The icon well. The accent at full saturation, because this is a GLYPH and
+    not text: periwinkle on light is 2.36:1, which is fine for a 19px line icon
+    beside a heading and unreadable as words.
+  */
+  .mkt-lcard__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: rgba(139, 158, 255, 0.13);
+    color: var(--mkt-accent-ink);
+  }
+
+  .mkt-lcard__icon--mint {
+    background: rgba(127, 231, 196, 0.16);
+    color: var(--mkt-mint-ink);
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE WORKFLOW LINE
+  // ---------------------------------------------------------------------------
+  .mkt-flowline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 1rem;
+    counter-reset: flow;
+  }
+
+  /*
+    The connector.
+
+    Drawn as a pseudo-element on each item rather than as an SVG path, so it
+    follows the real layout at any width — including the moment the grid turns
+    vertical, where the same rule becomes a vertical rule with no second
+    version to maintain.
+
+    It sits BEHIND the number bubble (z-index) and stops at the last item.
+  */
+  .mkt-flowline__item {
+    position: relative;
+    padding-top: 3.25rem;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 1.1875rem;
+      left: 2.375rem;
+      right: -1rem;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        rgba(139, 158, 255, 0.55),
+        rgba(139, 158, 255, 0.14)
+      );
+    }
+
+    &:last-child::before {
+      display: none;
+    }
+
+    h3 {
+      font-family: var(--font-heading);
+      font-size: 15px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+      margin: 0 0 0.3rem;
+    }
+
+    p {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--mkt-ink-muted);
+      margin: 0;
+    }
+  }
+
+  .mkt-flowline__num {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.375rem;
+    height: 2.375rem;
+    border-radius: 50%;
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border-strong);
+    color: var(--mkt-accent-ink);
+    font-family: var(--font-heading);
+    font-size: 12.5px;
+    font-weight: var(--weight-bold);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // ---------------------------------------------------------------------------
+  // HUMAN + AI
+  // ---------------------------------------------------------------------------
+  .mkt-split {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+    position: relative;
+
+    // The seam. A gradient rule down the middle, brightest where the two
+    // columns meet, so it reads as a hand-off rather than as a wall.
+    &::before {
+      content: "";
+      position: absolute;
+      top: 8%;
+      bottom: 8%;
+      left: 50%;
+      width: 1px;
+      background: linear-gradient(
+        180deg,
+        transparent,
+        rgba(139, 158, 255, 0.45) 22%,
+        rgba(127, 231, 196, 0.45) 78%,
+        transparent
+      );
+    }
+  }
+
+  .mkt-split__col {
+    background: var(--mkt-dark-2);
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius);
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+  }
+
+  .mkt-split__label {
+    font-family: var(--font-heading);
+    font-size: 11px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mkt-accent-on-dark);
+    margin: 0 0 1rem;
+  }
+
+  .mkt-split__label--human {
+    color: var(--mkt-mint);
+  }
+
+  .mkt-split__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+
+    li {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding-left: 0.875rem;
+      border-left: 2px solid var(--mkt-dark-border-strong);
+    }
+
+    strong {
+      font-size: 14.5px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-on-dark);
+    }
+
+    span {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE PIPELINE TABLE
+  // ---------------------------------------------------------------------------
+  .mkt-table {
+    margin: 0;
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+    overflow: hidden;
+  }
+
+  // The one place the design system permits a horizontal scroll: five columns
+  // of tabular data cannot collapse into cards without losing the comparison.
+  .mkt-table__scroll {
+    overflow-x: auto;
+  }
+
+  .mkt-table table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 640px;
+  }
+
+  .mkt-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+    padding: 12px 16px;
+    background: var(--mkt-light);
+    border-bottom: 1px solid var(--mkt-light-border);
+    white-space: nowrap;
+  }
+
+  .mkt-table td {
+    font-size: 13.5px;
+    color: var(--mkt-ink-muted);
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--mkt-light-border);
+  }
+
+  .mkt-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .mkt-table__name {
+    color: var(--mkt-ink);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+  }
+
+  .mkt-table__next {
+    color: var(--mkt-accent-ink);
+    white-space: nowrap;
+  }
+
+  .mkt-chip {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    border: 1px solid var(--mkt-light-border);
+    font-size: 11.5px;
+    color: var(--mkt-ink);
+    white-space: nowrap;
+  }
+
+  .mkt-score {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mkt-score__num {
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+    font-variant-numeric: tabular-nums;
+    min-width: 2ch;
+  }
+
+  .mkt-score__track {
+    display: block;
+    width: 56px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    overflow: hidden;
+  }
+
+  .mkt-score__bar {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--mkt-accent);
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE BRAND STATEMENT
+  // ---------------------------------------------------------------------------
+  .mkt-statement {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.5rem 1rem;
+    margin: 0;
+    text-align: center;
+  }
+
+  .mkt-statement__part {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem 1rem;
+  }
+
+  .mkt-statement__word {
+    font-family: var(--font-heading);
+    font-size: clamp(1.375rem, 3.4vw, 2.25rem);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.02em;
+    background: linear-gradient(100deg, #515f9e 0%, #6f68b4 55%, #3f716e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    // The fallback, for the same reason as the hero's accent: a transparent
+    // fill with no gradient behind it is invisible text.
+    color: var(--mkt-accent-ink);
+  }
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .mkt-statement__word {
+      color: transparent;
+    }
+  }
+
+  .mkt-statement__x {
+    font-size: clamp(1rem, 2vw, 1.375rem);
+    color: var(--mkt-accent);
+    opacity: 0.7;
+  }
+
+  // ---------------------------------------------------------------------------
+  // FAQ
+  // ---------------------------------------------------------------------------
+  .mkt-faqlist {
+    max-width: 52rem;
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+    overflow: hidden;
+  }
+
+  .mkt-faqitem {
+    border-bottom: 1px solid var(--mkt-light-border);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &[open] .mkt-faqitem__mark {
+      transform: rotate(180deg);
+    }
+  }
+
+  .mkt-faqitem__q {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.125rem 1.375rem;
+    cursor: pointer;
+    font-family: var(--font-heading);
+    font-size: 15px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+    // Removes the native triangle so the chevron below is the only marker.
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &:hover {
+      background: var(--mkt-light);
+    }
+  }
+
+  // A CSS chevron: two borders rotated. No icon request, and it inherits the
+  // text colour so it cannot fall out of step with the theme.
+  .mkt-faqitem__mark {
+    flex-shrink: 0;
+    width: 9px;
+    height: 9px;
+    border-right: 1.5px solid var(--mkt-accent-ink);
+    border-bottom: 1.5px solid var(--mkt-accent-ink);
+    transform: rotate(45deg);
+    transform-origin: center;
+    transition: transform 200ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    margin-top: -4px;
+  }
+
+  .mkt-faqitem__a {
+    margin: 0;
+    padding: 0 1.375rem 1.25rem;
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--mkt-ink-muted);
+    max-width: 62ch;
+  }
+
+  .mkt-ctablock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+
+    h2 {
+      font-family: var(--font-heading);
+      font-size: var(--mkt-h2);
+      font-weight: var(--weight-semibold);
+      line-height: 1.12;
+      letter-spacing: -0.025em;
+      margin: 0;
+      max-width: 24ch;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // RESPONSIVE
+  //
+  // Every breakpoint below exists because something measurably broke at it, not
+  // to be thorough. The product mock is the fragile one: its sidebar plus four
+  // KPI tiles cannot fit a phone, so the sidebar goes and the tiles halve.
+  // ---------------------------------------------------------------------------
+  @media (max-width: 1100px) {
+    .mkt-cardgrid--four {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mkt-flowline {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      row-gap: 2rem;
+    }
+
+    // The connector must not run off the end of a wrapped row.
+    .mkt-flowline__item:nth-child(3n)::before {
+      display: none;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .mkt-cardgrid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mkt-product__body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mkt-product__side {
+      // Horizontal, and scrollable rather than wrapped: a wrapped nav changes
+      // the mock's height and pushes the tiles off the first screen.
+      flex-direction: row;
+      overflow-x: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--mkt-light-border);
+    }
+
+    .mkt-product__navitem {
+      white-space: nowrap;
+    }
+
+    .mkt-split {
+      grid-template-columns: minmax(0, 1fr);
+
+      // The seam turns horizontal, between the two columns.
+      &::before {
+        top: auto;
+        bottom: auto;
+        left: 12%;
+        right: 12%;
+        width: auto;
+        height: 1px;
+        top: calc(50% - 0.5px);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(139, 158, 255, 0.45) 22%,
+          rgba(127, 231, 196, 0.45) 78%,
+          transparent
+        );
+      }
+    }
+  }
+
+  @media (max-width: 620px) {
+    .mkt-cardgrid,
+    .mkt-cardgrid--four {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mkt-product__tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mkt-flowline {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 1.5rem;
+    }
+
+    // Vertical: the connector becomes a rule down the left, behind the bubbles.
+    .mkt-flowline__item {
+      padding-top: 0;
+      padding-left: 3.25rem;
+      min-height: 2.375rem;
+
+      &::before,
+      &:nth-child(3n)::before {
+        display: block;
+        top: 2.375rem;
+        bottom: -1.5rem;
+        left: 1.1875rem;
+        right: auto;
+        width: 1px;
+        height: auto;
+        background: linear-gradient(
+          180deg,
+          rgba(139, 158, 255, 0.55),
+          rgba(139, 158, 255, 0.14)
+        );
+      }
+
+      &:last-child::before {
+        display: none;
+      }
+    }
+
+    .mkt-hero__ctas .mkt-btn {
+      // Full-width taps on a phone, so neither button is a small target.
+      flex: 1 1 100%;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // REDUCED MOTION
+  //
+  // The reveal is neutralised rather than merely shortened: a reader who asked
+  // for less movement gets none, and — importantly — still gets the content,
+  // because `opacity: 1` is forced rather than left to a transition that no
+  // longer runs.
+  // ---------------------------------------------------------------------------
+  @media (prefers-reduced-motion: reduce) {
+    .mkt-reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+
+    .mkt-lcard:hover {
+      transform: none;
+    }
+
+    .mkt-faqitem__mark {
+      transition: none;
+    }
+  }
+}
+
+// =============================================================================
+// THE FLOATING NAVBAR
+//
+// Replaces the full-width sticky header. A floating rounded container reads as
+// a control sitting ON the page rather than as a browser chrome bar attached to
+// it, which is the difference the brief is asking for.
+//
+// `position: sticky` with a top offset, not `fixed`: sticky keeps the bar in
+// the document flow, so the hero does not need padding to compensate and the
+// bar cannot overlap content when the viewport is short.
+// =============================================================================
+.mkt {
+  .mkt-nav {
+    position: sticky;
+    top: 0.75rem;
+    z-index: 50;
+    padding-inline: var(--mkt-gutter);
+    // The sticky element must not swallow clicks in the gutter beside the bar.
+    pointer-events: none;
+  }
+
+  .mkt-nav__bar {
+    pointer-events: auto;
+    max-width: var(--mkt-max);
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    height: 3.5rem;
+    padding-inline: 1rem 0.75rem;
+    border-radius: 999px;
+    /*
+      THE GLASS. A translucent navy fill plus a backdrop blur.
+
+      The fill is deliberately opaque enough (0.72) to keep the nav legible over
+      the hero's bright ribbons — pure glass over a glow leaves the links
+      floating on a light patch. `backdrop-filter` is the enhancement; the fill
+      alone is already sufficient contrast, so a browser without it loses the
+      blur and nothing else.
+    */
+    background: rgba(10, 17, 40, 0.72);
+    backdrop-filter: blur(14px) saturate(150%);
+    border: 1px solid var(--mkt-glass-border);
+    box-shadow: var(--mkt-glow-nav);
+  }
+
+  .mkt-nav__brand {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+
+  .mkt-nav__links {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    // Centred: the brand sits left, the actions right, and the links take the
+    // space between rather than being pinned to either.
+    margin-inline: auto;
+
+    a {
+      font-size: var(--text-label);
+      color: var(--mkt-on-dark-muted);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color var(--transition-fast) var(--ease);
+
+      &:hover {
+        color: var(--mkt-on-dark);
+      }
+    }
+  }
+
+  .mkt-nav__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+  }
+
+  .mkt-nav__signin {
+    font-size: var(--text-label);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark);
+    text-decoration: none;
+    padding-inline: 0.5rem;
+    white-space: nowrap;
+
+    &:hover {
+      color: var(--mkt-accent-on-dark);
+    }
+  }
+
+  .mkt-nav__burger {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-left: auto;
+    border: 1px solid var(--mkt-glass-border);
+    border-radius: 999px;
+    background: var(--mkt-glass);
+    color: var(--mkt-on-dark);
+    cursor: pointer;
+  }
+
+  // ---- The mobile sheet -----------------------------------------------------
+  .mkt-nav__sheet {
+    pointer-events: auto;
+    max-width: var(--mkt-max);
+    margin: 0.5rem auto 0;
+    padding: 0.75rem;
+    border-radius: var(--mkt-radius);
+    background: rgba(10, 17, 40, 0.96);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--mkt-glass-border);
+    box-shadow: var(--mkt-glow-sheet);
+
+    nav {
+      display: flex;
+      flex-direction: column;
+    }
+
+    nav a {
+      padding: 0.75rem 0.5rem;
+      font-size: var(--text-body);
+      color: var(--mkt-on-dark);
+      text-decoration: none;
+      border-radius: var(--mkt-radius-sm);
+
+      &:hover {
+        background: var(--mkt-glass);
+      }
+    }
+  }
+
+  .mkt-nav__sheetactions {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--mkt-dark-border);
+
+    .mkt-btn {
+      width: 100%;
+    }
+  }
+
+  /*
+    THE BREAKPOINT IS 940px, and it is measured rather than chosen: the brand
+    (about 125px), five links at 1.5rem gaps (about 400px), "Sign In" and a
+    "Get Started" button (about 190px) plus the bar's own padding need roughly
+    790px of a 1180px container. It gets tight — links start colliding with the
+    actions — below about 940px, so that is where the burger takes over.
+  */
+  @media (max-width: 940px) {
+    .mkt-nav__links,
+    .mkt-nav__actions {
+      display: none;
+    }
+
+    .mkt-nav__burger {
+      display: inline-flex;
+    }
+  }
+
+  @media (min-width: 941px) {
+    .mkt-nav__sheet {
+      display: none;
+    }
+  }
+}
+
+// =============================================================================
+// THE FOOTER
+// =============================================================================
+.mkt {
+  .mkt-foot {
+    background: var(--mkt-dark);
+    color: var(--mkt-on-dark-muted);
+    padding-block: clamp(3rem, 6vw, 4.5rem) 2rem;
+    border-top: 1px solid var(--mkt-dark-border);
+  }
+
+  .mkt-foot__top {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+    gap: clamp(1.5rem, 4vw, 3rem);
+  }
+
+  .mkt-foot__brand {
+    max-width: 22rem;
+  }
+
+  .mkt-foot__desc {
+    font-size: var(--text-label);
+    line-height: 1.55;
+    color: var(--mkt-on-dark-muted);
+    margin: 1rem 0 0;
+  }
+
+  .mkt-foot__coltitle {
+    font-family: var(--font-heading);
+    font-size: 11px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark);
+    margin: 0 0 0.875rem;
+  }
+
+  .mkt-foot__col ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .mkt-foot__col a {
+    font-size: var(--text-label);
+    color: var(--mkt-on-dark-muted);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--mkt-accent-on-dark);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  .mkt-foot__bottom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--mkt-dark-border);
+    font-size: var(--text-caption);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .mkt-foot__note {
+    color: var(--mkt-on-dark-faint);
+  }
+
+  @media (max-width: 860px) {
+    .mkt-foot__top {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mkt-foot__brand {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .mkt-foot__top {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 }

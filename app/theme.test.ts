@@ -193,8 +193,15 @@ describe("the retired theme is gone, not overridden", () => {
       invisible on a near-black ground.
     */
     const offenders: string[] = [];
+    /*
+      Any GLOW token, wherever it is namespaced. The app's are --glow-*; the
+      marketing chrome's are --mkt-glow-*, because that scope carries its own
+      fixed palette. Matching the shape rather than the exact prefix means a
+      future namespace does not need this line edited — while a literal still
+      fails, which is the part that matters.
+    */
     const ALLOWED_SHADOW =
-      /box-shadow:\s*(var\(--glow|var\(--focus-ring\)|none|inset [^;]*var\(--)/;
+      /box-shadow:\s*(var\(--[a-z-]*glow|var\(--focus-ring\)|none|inset [^;]*var\(--)/;
 
     for (const [file, source] of SOURCE) {
       if (!file.endsWith(".scss") && !file.endsWith(".css")) continue;

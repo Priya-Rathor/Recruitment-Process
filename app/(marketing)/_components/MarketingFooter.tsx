@@ -1,43 +1,42 @@
 import Link from "next/link";
-import { FOOTER_SECTIONS } from "@/lib/marketing/content";
 import { Logo } from "@/components/Logo";
+import { HOME_FOOTER_SECTIONS } from "@/lib/marketing/home";
 
 /**
  * The public site footer.
  *
- * The legal column is intentionally absent rather than stubbed. Linking
- * "Privacy" and "Terms" to pages that do not exist yet would ship four 404s
- * into the footer of every page — and a privacy link that 404s is worse than no
- * link at all, because a visitor reads it as a policy that was withdrawn.
- * Phase 11 of the module brief adds those pages; the column goes in with them.
+ * THE FULL LOCKUP, strapline included — the footer is the one place on the site
+ * with the vertical room for it. At 52px the strapline renders around 3px and
+ * reads as texture under the name; the description line below carries the
+ * actual message.
+ *
+ * WHY THERE ARE THREE COLUMNS AND NOT FOUR. The brief asked for Product,
+ * Company (About / Contact / Security), Resources (Documentation / FAQ / Blog)
+ * and Legal (Privacy / Terms). Of those eleven links, two exist. Shipping nine
+ * links to pages that do not exist would produce exactly the broken links the
+ * brief forbids, and creating nine placeholder pages so a footer looks full is
+ * the invented functionality it also forbids.
+ *
+ * So the columns carry the destinations that are real, and the shortfall is
+ * reported rather than hidden. When those pages are written, adding them here is
+ * a data change in lib/marketing/home.ts — and lib/marketing/home.test.ts will
+ * fail until each one actually resolves.
  */
 export function MarketingFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mkt-footer">
+    <footer className="mkt-foot">
       <div className="mkt-shell">
-        <div className="mkt-footer__top">
-          <div>
-            {/*
-              THE FULL LOCKUP, strapline included — the footer is the one place
-              on the marketing site with the vertical room for it. At 56px the
-              strapline renders around 3px, so it reads as a texture under the
-              name rather than as words; the sentence below carries the actual
-              message.
-            */}
-            <Logo variant="full" height={56} priority={false} />
-            <p className="mkt-footer__tagline">
-              Smarter hiring, brighter teams. An AI-assisted recruitment
-              operating system — jobs, candidates, screening, interviews and
-              analytics in one workspace, with a person making every hiring
-              decision.
-            </p>
+        <div className="mkt-foot__top">
+          <div className="mkt-foot__brand">
+            <Logo variant="full" height={52} />
+            <p className="mkt-foot__desc">AI-powered recruitment for modern teams.</p>
           </div>
 
-          {FOOTER_SECTIONS.map((section) => (
-            <div key={section.title} className="mkt-footer__col">
-              <h3>{section.title}</h3>
+          {HOME_FOOTER_SECTIONS.map((section) => (
+            <nav key={section.title} aria-label={section.title} className="mkt-foot__col">
+              <h2 className="mkt-foot__coltitle">{section.title}</h2>
               <ul>
                 {section.links.map((link) => (
                   <li key={link.href}>
@@ -45,16 +44,18 @@ export function MarketingFooter() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </nav>
           ))}
         </div>
 
-        <div className="mkt-footer__bottom">
-          <span>© {year} Scoreboad</span>
-          <span>
-            In active development. Pricing is not published yet — talk to us
-            about where it stands for your use case.
-          </span>
+        <div className="mkt-foot__bottom">
+          <span>© {year} Scoreboad. All rights reserved.</span>
+          {/*
+            Said here rather than only in the FAQ. Somebody who scrolled to the
+            footer looking for a pricing page or a company address should find
+            out honestly rather than by clicking a link that goes nowhere.
+          */}
+          <span className="mkt-foot__note">In active development · pricing not yet published</span>
         </div>
       </div>
     </footer>
