@@ -78,6 +78,22 @@ export function buildMetadata({
   noindex = false,
   ogTitle,
 }: PageSeo): Metadata {
+  /*
+    THE ROOT CANONICAL RENDERS WITHOUT A TRAILING SLASH, AND THAT IS NEXT, NOT
+    THIS.
+
+    Module 03 asked for `https://scoreboad.com/`. Passing the absolute URL with
+    the slash was tried and is INERT: Next normalises trailing slashes out of
+    every resolved metadata URL, which is why `og:url` — built from the same
+    "/" a few lines below and never touched — comes out identical. Forcing it
+    would mean bypassing the metadata API for one character.
+
+    It is also the same URL. RFC 3986 6.2.3 makes an empty path equivalent to
+    "/", and Google documents the two as one address. So the relative form
+    stays, because it is what keeps a preview deployment canonicalising to
+    ITSELF rather than declaring production the original of the page being
+    looked at.
+  */
   const url = path === "/" ? "/" : path.replace(/\/+$/, "");
 
   return {

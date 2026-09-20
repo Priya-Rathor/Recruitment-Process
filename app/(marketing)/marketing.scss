@@ -106,6 +106,17 @@
   --mkt-lavender: #c6b8ff;
   --mkt-mint: #7fe7c4;
   --mkt-accent-ink: #515f9e;       // 6.03:1 on white — periwinkle AS TEXT
+  /*
+    The warning hue AS TEXT on a bright card — 5.65:1 on #ffffff, 5.36:1 on the
+    light ground. The raw amber the application uses for its warning edge is a
+    FILL colour; put it on a white tile as 11px type and it is unreadable,
+    which is the same trap the three accent-ink tokens above exist for.
+
+    The first value tried here was #9a6a00, which measures 4.73:1 on white —
+    over the AA line but UNDER it (4.49:1) the moment the same token is reused
+    on the light band. Darkened one step so it holds on both.
+  */
+  --mkt-amber-ink: #8a5f00;
   --mkt-mint-ink: #3f716e;         // 5.53:1 on white — mint AS TEXT
   --mkt-lavender-ink: #716d9e;     // 4.79:1 on white — lavender AS TEXT
 
@@ -318,9 +329,32 @@
     font-weight: var(--weight-semibold);
     text-decoration: none;
     cursor: pointer;
+    /*
+      `transform` joins the transition list so the hover lift below has
+      something to interpolate. Transform and box-shadow only — no width, no
+      padding, nothing that reflows the row the button sits in.
+    */
     transition: background var(--transition-fast), border-color var(--transition-fast),
-      color var(--transition-fast);
+      color var(--transition-fast), transform var(--transition-fast),
+      box-shadow var(--transition-fast);
     white-space: nowrap;
+  }
+
+  /*
+    THE LIFT. 2px, on hover and on keyboard focus alike.
+
+    On focus as well as hover because a keyboard user should get the same
+    affordance a mouse user does; the focus RING is the identification, the lift
+    is the "this is pressable". `:active` drops it back to 0 so the button
+    acknowledges the press.
+  */
+  .mkt-btn:hover,
+  .mkt-btn:focus-visible {
+    transform: translateY(-2px);
+  }
+
+  .mkt-btn:active {
+    transform: translateY(0);
   }
 
   /*
@@ -1559,6 +1593,126 @@
     margin-top: clamp(1.75rem, 3vw, 2.5rem);
   }
 
+  /*
+    The second, quieter lead line. Narrower than the first so the two form a
+    tapering block rather than two paragraphs of the same width, and a step
+    down in both size and colour so the eye reaches the buttons.
+  */
+  .mkt-hero__detail {
+    font-size: var(--text-body-lg);
+    line-height: 1.65;
+    color: var(--mkt-on-dark-faint);
+    margin: 0.75rem auto 0;
+    max-width: 34rem;
+  }
+
+  /*
+    THE LUMINOUS HORIZON.
+
+    A single very wide, very soft wash on the hero's foot. It is the bottom of
+    the background concept AND the transition into the bright section below —
+    without it the navy meets near-white at a hard line, which reads as two
+    pages stacked rather than one page changing key.
+
+    `z-index: 0` against the product visual's `z-index: 1`, so it passes behind
+    the dashboard instead of washing over the numbers.
+  */
+  .mkt-hero__horizon {
+    position: absolute;
+    left: 50%;
+    bottom: -14rem;
+    width: min(120%, 90rem);
+    height: 22rem;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(
+      ellipse 50% 50% at 50% 50%,
+      rgba(139, 158, 255, 0.20),
+      rgba(198, 184, 255, 0.10) 45%,
+      transparent 72%
+    );
+    filter: blur(40px);
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE HERO ENTRANCE
+  //
+  // CSS KEYFRAMES, NOT THE SCROLL REVEAL. `.mkt-reveal` is driven by an
+  // IntersectionObserver, so it needs JavaScript — acceptable for a section the
+  // reader scrolls to, unacceptable for the one that is on screen before
+  // hydration. These run from the stylesheet, so the hero animates with
+  // JavaScript disabled and cannot be left invisible by a hydration failure.
+  //
+  // `animation-fill-mode: both` is what makes a delay work — the element holds
+  // the `from` state until its turn. IT IS ALSO THE LCP TRAP: a transparent
+  // element is not a paint candidate, so every millisecond of delay on the
+  // headline is a millisecond added to Largest Contentful Paint. The H1 and the
+  // badge therefore carry NO delay; only what follows them is staggered.
+  //
+  // Opacity and transform only. Nothing here animates a property that triggers
+  // layout, so the whole choreography runs on the compositor.
+  // ---------------------------------------------------------------------------
+  @keyframes mkt-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+
+  /*
+    The dashboard's own arrival: further, slower, and with a slight scale, so
+    it reads as a panel settling into place rather than as one more line of
+    text sliding up. 0.97 is deliberately small — at 0.9 the frame's text
+    visibly resamples during the animation.
+  */
+  @keyframes mkt-rise {
+    from {
+      opacity: 0;
+      transform: translateY(40px) scale(0.97);
+    }
+  }
+
+  /*
+    THE SIGNAL KEYFRAME CARRIES ITS OWN POSITIONING SHIFT, via `--sx`.
+
+    THE BUG THIS FIXES, caught before it shipped: the two cards are placed by
+    `transform: translateX(±45%)`, and a keyframe that sets `transform` REPLACES
+    that for the whole animation. The first version animated
+    `translateY(10px) scale(0.96)` with no translateX, so each card faded in
+    sitting flush against the frame and then snapped 45% sideways on the last
+    frame. Threading the shift through a custom property keeps one keyframe for
+    both cards and both directions.
+
+    An explicit `to` is required: without it the animation ends at the
+    element's own transform, which is correct — but `fill-mode: both` would
+    then hold the `from` state's missing shift during the delay instead.
+  */
+  @keyframes mkt-signal-in {
+    from {
+      opacity: 0;
+      transform: translateX(var(--sx, 0)) translateY(10px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(var(--sx, 0));
+    }
+  }
+
+  .mkt-enter {
+    animation: mkt-enter 560ms var(--ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+
+  .mkt-rise {
+    // 700ms, inside the brief's 600-900ms window, on an ease-out curve that
+    // spends most of its time decelerating — which is what "settling" is.
+    animation: mkt-rise 700ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    // Promoted for the duration only; `will-change` is not declared here
+    // because the animation itself is enough of a hint and a permanent one on
+    // a large subtree keeps it on its own layer forever.
+    transform-origin: 50% 100%;
+  }
+
   // ---------------------------------------------------------------------------
   // BUTTONS — the glass secondary, and a small size for the navbar
   // ---------------------------------------------------------------------------
@@ -1585,7 +1739,36 @@
   // THE PRODUCT VISUAL
   // ---------------------------------------------------------------------------
   .mkt-product {
+    position: relative;
     margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+    // Above the horizon wash, so the dashboard is lit from behind rather than
+    // veiled by it.
+    z-index: 1;
+  }
+
+  /*
+    THE HALO — a wide periwinkle bloom behind the frame.
+
+    Separate from the frame's own `--mkt-glow-product` shadow because it needs
+    to be much larger and much softer than a box-shadow would sensibly be. A
+    shadow of this radius reads as a grey smudge; a blurred radial gradient at
+    low opacity reads as light.
+
+    Sized in percentages of the frame, so it scales with the product at every
+    breakpoint instead of needing a value per media query.
+  */
+  .mkt-product__halo {
+    position: absolute;
+    inset: 8% -6% -10%;
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(
+      ellipse 55% 50% at 50% 50%,
+      rgba(139, 158, 255, 0.30),
+      rgba(198, 184, 255, 0.12) 50%,
+      transparent 75%
+    );
+    filter: blur(50px);
   }
 
   /*
@@ -1705,6 +1888,12 @@
     margin-bottom: 16px;
   }
 
+  /*
+    THE TILE IS THE APPLICATION'S TILE: a line icon and a label on one row, then
+    the number. The old mock added a coloured delta line underneath, which the
+    real dashboard does not have — so the picture was of a product nobody can
+    open.
+  */
   .mkt-product__tile {
     background: var(--mkt-white);
     border: 1px solid var(--mkt-light-border);
@@ -1712,12 +1901,49 @@
     padding: 12px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 6px;
+  }
+
+  /*
+    The amber left edge on a metric whose non-zero value is bad news. Real
+    behaviour, copied from app/dashboard/KpiTiles.tsx.
+
+    IT IS NOT COLOUR ALONE: the label still reads "Overdue applications", which
+    is the whole message. The amber makes it findable, it does not carry the
+    meaning — and the clock glyph beside it is a third channel.
+  */
+  .mkt-product__tile.is-warn {
+    border-left: 3px solid var(--mkt-amber-ink);
+
+    .mkt-product__tilehead,
+    .mkt-product__tilevalue {
+      color: var(--mkt-amber-ink);
+    }
+  }
+
+  .mkt-product__tilehead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--mkt-ink-muted);
+
+    // The glyph must not be the thing that gives way when the label is too
+    // long — a squashed 15px icon looks like a rendering bug, an ellipsis
+    // looks like a truncated label.
+    svg {
+      flex-shrink: 0;
+    }
   }
 
   .mkt-product__tilelabel {
     font-size: 11px;
-    color: var(--mkt-ink-muted);
+    // Truncated rather than wrapped: "Screenings completed" on two lines makes
+    // one tile taller than its three neighbours, and a ragged tile row is the
+    // detail that makes a product shot look unfinished.
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .mkt-product__tilevalue {
@@ -1727,17 +1953,6 @@
     color: var(--mkt-ink);
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
-  }
-
-  // The delta carries an arrow as well as a colour, so direction is never
-  // communicated by colour alone.
-  .mkt-product__delta {
-    font-size: 10.5px;
-    color: var(--mkt-ink-muted);
-
-    &.is-good {
-      color: var(--mkt-mint-ink); // 5.53:1 — mint AS TEXT needs the dark step
-    }
   }
 
   .mkt-product__panel {
@@ -1756,9 +1971,15 @@
     gap: 9px;
   }
 
+  /*
+    112px for the stage column, up from 86px, because the stage names are now
+    the product's REAL ones and "AI Screening Call" is about 105px at this
+    size. At 86px it wrapped to a second line and made that one row taller than
+    the other four.
+  */
   .mkt-product__frow {
     display: grid;
-    grid-template-columns: 86px minmax(0, 1fr) 34px;
+    grid-template-columns: 112px minmax(0, 1fr) 34px;
     align-items: center;
     gap: 10px;
     font-size: 12px;
@@ -1766,6 +1987,11 @@
 
   .mkt-product__fstage {
     color: var(--mkt-ink-muted);
+    // The belt to the column width's braces: a longer stage name added later
+    // truncates instead of silently breaking the row rhythm again.
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .mkt-product__ftrack {
@@ -1798,6 +2024,118 @@
   // On a light band the caption sits on light.
   .mkt-band--light .mkt-product__caption {
     color: var(--mkt-ink-muted);
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE FLOATING SIGNALS
+  //
+  // Two glass notification cards beside the product visual.
+  //
+  // THEY SIT OUTSIDE THE FRAME AND DISAPPEAR WHEN THERE IS NO ROOM. The shell
+  // is 1180px; a 13.5rem card hanging 45% into the gutter needs about 100px of
+  // clearance a side, which a 1400px viewport has and a 1280px one does not.
+  // Below that they are `display: none` rather than repositioned on top of the
+  // dashboard — covering the product to keep a flourish is the wrong way round,
+  // and the brief asks for them to be hidden or simplified on small screens.
+  //
+  // The whole container is `aria-hidden` in the markup: these restate nothing,
+  // and two invented notifications read aloud mid-hero would be describing UI
+  // that is not on this page.
+  // ---------------------------------------------------------------------------
+  .mkt-product__signals {
+    display: none;
+  }
+
+  @media (min-width: 1400px) {
+    .mkt-product__signals {
+      display: block;
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+  }
+
+  .mkt-signal {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 13.5rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--mkt-radius-sm);
+    background: rgba(15, 24, 53, 0.82);
+    backdrop-filter: blur(14px) saturate(150%);
+    border: 1px solid var(--mkt-glass-border);
+    box-shadow: var(--mkt-glow-sheet);
+    animation: mkt-signal-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /*
+    Positioned against the frame's edges and pushed 45% out into the gutter, so
+    the overlap is a sliver of the frame's border rather than any of its
+    content. Top-left lands over the sidebar's dead space; bottom-right lands
+    past the panel entirely.
+  */
+  .mkt-signal--a {
+    top: 16%;
+    left: 0;
+    --sx: -45%;
+    transform: translateX(-45%);
+  }
+
+  .mkt-signal--b {
+    bottom: 14%;
+    right: 0;
+    --sx: 45%;
+    transform: translateX(45%);
+  }
+
+  .mkt-signal__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+  }
+
+  /*
+    Mint and periwinkle as FILLS behind a glyph, at low alpha, with the bright
+    step of the same hue as the glyph itself. Neither hue is used as text
+    anywhere in this card — that is the rule the accent-ink tokens exist for.
+  */
+  .mkt-signal[data-tone="mint"] .mkt-signal__icon {
+    background: rgba(127, 231, 196, 0.16);
+    color: var(--mkt-mint);
+  }
+
+  .mkt-signal[data-tone="accent"] .mkt-signal__icon {
+    background: rgba(139, 158, 255, 0.18);
+    color: var(--mkt-accent-bright);
+  }
+
+  .mkt-signal__text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+
+    strong {
+      font-size: var(--text-caption);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-on-dark);
+      line-height: 1.3;
+    }
+
+    span {
+      font-size: 11px;
+      color: var(--mkt-on-dark-faint);
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -2342,6 +2680,23 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    // The stage column gives way first: on a phone the BAR is what carries the
+    // shape of the funnel, so it keeps the width and the label truncates.
+    .mkt-product__frow {
+      grid-template-columns: 82px minmax(0, 1fr) 28px;
+      gap: 8px;
+    }
+
+    /*
+      A cheaper blur on phones. Three 70px blurs over a full-height layer is
+      real GPU work on a mid-range device, and it is the hero — the one section
+      whose paint cost lands inside Largest Contentful Paint. The shapes are
+      soft enough at 45px that the difference is invisible at this size.
+    */
+    .mkt-ribbon {
+      filter: blur(45px);
+    }
+
     .mkt-flowline {
       grid-template-columns: minmax(0, 1fr);
       row-gap: 1.5rem;
@@ -2393,6 +2748,40 @@
       opacity: 1;
       transform: none;
       transition: none;
+    }
+
+    /*
+      THE HERO ENTRANCE IS REMOVED OUTRIGHT, not shortened.
+
+      The global reduced-motion block above squashes every animation to 0.01ms,
+      which is NOT sufficient here: these carry `animation-delay` values up to
+      1310ms, and `fill-mode: both` holds the element at `opacity: 0` for the
+      whole delay. A reader who asked for less motion would have watched a
+      blank hero for a second and a third of it. `animation: none` plus an
+      explicit visible state is the only safe form.
+    */
+    .mkt-enter,
+    .mkt-rise,
+    .mkt-signal {
+      animation: none !important;
+      opacity: 1;
+      transform: none;
+    }
+
+    // The two positioned signals keep the transform that PLACES them; only the
+    // one that moves them is dropped.
+    .mkt-signal--a {
+      transform: translateX(-45%);
+    }
+
+    .mkt-signal--b {
+      transform: translateX(45%);
+    }
+
+    .mkt-btn:hover,
+    .mkt-btn:focus-visible,
+    .mkt-btn:active {
+      transform: none;
     }
 
     .mkt-lcard:hover {

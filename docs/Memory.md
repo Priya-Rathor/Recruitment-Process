@@ -1192,3 +1192,94 @@ accordion rules + the 900px breakpoint present in the served CSS.
 
 **Still not verified:** rendered appearance at the eight breakpoints. No browser
 in this environment; unchanged from the previous two sessions' note.
+
+---
+
+## 2026-09-20 — Module 03: homepage hero
+
+Scope was the hero only; nothing below it was touched. Most of the brief was
+already satisfied by the earlier homepage redesign (H1 text, split gradient
+accent, deep-navy band, CSS ribbons, HTML dashboard). The new work was the
+entrance choreography, the product visual's FIDELITY, and two SEO defects.
+
+**The entrance is CSS keyframes, not `<Reveal>`, and the delay order is an LCP
+decision.** `.mkt-enter` / `.mkt-rise` / `mkt-signal-in` with
+`animation-fill-mode: both`. Reveal was wrong here twice over: it is
+scroll-driven and needs JS, so the hero would be blank until hydration on the
+one screen where that is least acceptable; and this is a one-off rise-and-settle,
+not the page's repeating scroll language.
+
+`fill-mode: both` is the LCP trap — Chrome does not treat a transparent element
+as a paint candidate, so every millisecond of `animation-delay` on the headline
+is a millisecond of LCP. **The H1 and badge carry NO delay**; lead 90ms, detail
+150ms, CTAs 210ms, frame 180ms/700ms, tiles 560+45n, funnel 740ms, signals
+1150/1310ms.
+
+**Reduced motion needed its own rule.** The existing global block squashes
+animations to 0.01ms but does NOT zero `animation-delay` — with fill-mode both
+that would have shown a blank hero for 1.31s. `animation: none !important` plus
+an explicit visible state, and the two signal cards keep the transform that
+PLACES them while losing the one that moves them.
+
+**The dashboard mock was a picture of a product nobody can open.** Fixed:
+- tiles → the real `METRIC_LABELS` (New candidates / Screenings completed /
+  Interviews today / Overdue applications) in the real tile shape (icon+label
+  row, then value; the real dashboard has no delta row, the mock had invented
+  ones), with the real amber left-edge on the negative metric.
+- funnel → the real `STAGE_LABELS` in real order. The brief sketched
+  "Applied → Screening → Interview → Evaluation → Hired"; three of those five
+  are not stages in this product (no "Screening" — it's "AI Screening Call"; no
+  "Evaluation" — that's recorded against an application; no bare "Interview").
+- `lib/marketing/home.test.ts` now asserts both against the real constants, so
+  a stage or metric rename breaks the build. That link did not exist before.
+
+**Two SEO defects found and fixed:**
+1. The homepage was overriding its title to "Scoreboad — Find the Right People
+   Faster" — the H1 reused as a title tag, which never says what the product
+   is. Now `SITE_TITLE`.
+2. **The H1's textContent was "Find the Right PeopleFaster with AI".** JSX drops
+   whitespace between an expression and an element, and the accent span's
+   `display: block` hid it visually. One missing word in the most important
+   heading on the site, invisible in the browser. Fixed with an explicit
+   `{" "}`.
+
+**Tried and reverted:** forcing the root canonical to `https://scoreboad.com/`.
+Next normalises trailing slashes out of every resolved metadata URL — proven by
+`og:url`, built from the same "/" and never touched, coming out identical.
+Reverted rather than leave a comment claiming an effect it does not have; the
+two forms are the same URL by RFC 3986 anyway. Recorded in `lib/marketing/seo.ts`.
+
+**New:** `--mkt-amber-ink: #8a5f00` (5.65:1 on white, 5.36:1 on the light band).
+First tried #9a6a00 — 4.73:1 on white but 4.49:1 on the light ground, so it
+would have failed the moment the token was reused one band over.
+
+**Caught before shipping:** the signal keyframe set `transform` without the
+`translateX(±45%)` that POSITIONS each card, so both would have faded in flush
+against the frame and snapped sideways on the last frame. Threaded the shift
+through a `--sx` custom property so one keyframe serves both directions.
+
+Other: funnel stage column 86px → 112px (real stage names are longer;
+"AI Screening Call" wrapped and made one row taller), + ellipsis as a backstop;
+`.mkt-ribbon` blur 70px → 45px at ≤620px (three full-height blurs is real GPU
+work inside LCP); 2px hover/focus lift on `.mkt-btn` with `:active` returning to
+0; `.mkt-hero__horizon` and `.mkt-product__halo` as the luminous horizon and the
+bloom behind the product.
+
+**Deliberately not done:** no logo in the hero (the navbar shows it 40px above —
+§8 says do not repeat it); no `SiteNavigationElement`-style extra JSON-LD; no
+image, so nothing to reserve space for and no CLS contribution; floating signals
+`display: none` below 1400px rather than repositioned over the dashboard.
+
+`lint` clean · `typecheck` clean · `build` clean, `/` still prerendered static ·
+1919/1919 (+11). Verified against the dev server: one h1, textContent exactly
+"Find the Right People Faster with AI", title/description correct, real stage
+names and real metric labels in the DOM, both signals and the horizon present,
+and every new rule in the served CSS including the reduced-motion override.
+Ran a **negative control** on the keyword-stuffing guard (injected "hiring" ×4,
+confirmed it fails, restored).
+
+**Still not verified:** rendered appearance at the eight breakpoints. No browser
+in this environment — unchanged from the previous three sessions. The 320px
+overflow case was checked arithmetically instead (280px shell → 240px main →
+115px tiles → 86px funnel track; every text cell has an ellipsis and every grid
+track a `minmax(0, …)`), not visually.

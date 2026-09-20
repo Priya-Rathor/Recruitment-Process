@@ -37,6 +37,21 @@ export const HERO = {
     "From screening to hiring, Scoreboad helps you build high-performing teams " +
     "with the power of AI.",
   /*
+    THE SECOND LINE IS WHERE THE SEARCH INTENT LIVES, and it is one sentence
+    rather than a paragraph.
+
+    It names the four things a person searching for an AI recruitment platform
+    is actually looking for — screening candidates, managing interviews,
+    evaluating applicants, a connected hiring workflow — in the order the
+    product does them, as a sentence somebody would say out loud. That is the
+    difference between natural copy that ranks and the keyword soup the brief
+    rules out: every noun here is a surface that exists, so the sentence is a
+    description rather than a list of terms.
+  */
+  leadDetail:
+    "Screen candidates, manage interviews, evaluate applicants, and keep your " +
+    "hiring workflow connected from one workspace.",
+  /*
     Kept from the previous homepage, and kept deliberately.
 
     This product has no customers to name, so there is no logo wall and no
@@ -44,7 +59,39 @@ export const HERO = {
     it is the line a founder evaluating a young product wants to see first.
   */
   badge: "In active development · built module by module",
+  /*
+    THE CTA DESTINATIONS ARE DECLARED HERE SO A TEST CAN CHECK THEM.
+
+    "Explore the Platform" wants a /platform page, which does not exist —
+    lib/marketing/navigation.ts declares it as `planned`. /how-it-works IS the
+    platform walkthrough: fifteen stages, every capability, every product page
+    linked from it. So the label ships against the real page rather than
+    against a route created to match a label.
+  */
+  ctaPrimary: { label: "Get Started", href: "/signup" },
+  ctaSecondary: { label: "Explore the Platform", href: "/how-it-works" },
 } as const;
+
+/**
+ * The floating notification cards beside the product visual.
+ *
+ * EVERY ONE OF THESE IS AN EVENT THE PRODUCT ACTUALLY EMITS — the screening
+ * call completing (Module 8), a match score crossing the job's threshold
+ * (lib/matching), and an interview being booked into a real calendar
+ * (Module 11). A "notification" for something the system cannot do would be a
+ * screenshot of a feature that does not exist, which is the same lie as an
+ * invented testimonial, just smaller.
+ *
+ * Decorative in the accessibility sense: the hero's meaning does not depend on
+ * them, they are `aria-hidden`, and they are hidden outright below 1400px
+ * because that is the width at which they stop having room to sit OUTSIDE the
+ * dashboard frame. Overlapping the product to keep a flourish is the wrong
+ * trade.
+ */
+export const HERO_SIGNALS: { title: string; meta: string; icon: string; tone: "mint" | "accent" }[] = [
+  { title: "AI screening complete", meta: "Call summary ready to review", icon: "PhoneCall", tone: "mint" },
+  { title: "Strong match found", meta: "Senior Backend Engineer", icon: "Sparkles", tone: "accent" },
+];
 
 // -----------------------------------------------------------------------------
 // The bright product visual
@@ -64,19 +111,50 @@ export const HERO = {
  */
 export const DASHBOARD = {
   nav: ["Dashboard", "Jobs", "Candidates", "Applications", "Pipeline", "Interviews"],
+  /*
+    THE TILES ARE THE APPLICATION'S REAL KPIs, verbatim.
+
+    They used to be four invented ones ("Total candidates", "Time to hire")
+    with an invented delta line underneath. The real dashboard
+    (app/dashboard/KpiTiles.tsx) has no delta row at all and its labels come
+    from METRIC_LABELS in lib/dashboard/metrics.ts — so the old mock was a
+    picture of a dashboard this product does not have.
+
+    `warn` reproduces the one piece of real tile behaviour worth showing: a
+    metric whose non-zero value is itself bad news gets an amber left edge.
+    That is genuinely what the product does with overdue applications, and it
+    is the detail that says this is a tool for noticing problems rather than a
+    wall of green numbers.
+  */
   tiles: [
-    { label: "Total candidates", value: "248", delta: "+18 this week", good: true },
-    { label: "Interviews", value: "12", delta: "4 awaiting feedback", good: false },
-    { label: "Shortlisted", value: "31", delta: "+6 this week", good: true },
-    { label: "Time to hire", value: "24d", delta: "3d faster", good: true },
+    { label: "New candidates", value: "124", icon: "UserPlus", warn: false },
+    { label: "Screenings completed", value: "38", icon: "PhoneCall", warn: false },
+    { label: "Interviews today", value: "4", icon: "CalendarDays", warn: false },
+    { label: "Overdue applications", value: "3", icon: "Clock", warn: true },
   ],
-  /** The funnel, as shares of the top of the pipeline. */
+  /*
+    THE FUNNEL USES THE REAL STAGE NAMES, from STAGE_LABELS in
+    lib/applications/stages.ts, in the real order.
+
+    The brief sketched "Applied → Screening → Interview → Evaluation → Hired".
+    Three of those five are not stages in this product: there is no "Screening"
+    stage (it is "AI Screening Call"), no "Evaluation" stage (evaluation is
+    recorded against an application, not a stage), and no bare "Interview"
+    (phone, video, written assessment and director round are separate,
+    per-job-configurable stages). Shipping the sketch would have put four
+    invented stage names on the most-read screen on the site, and every one of
+    them would have been wrong on the first day somebody opened the product.
+
+    Counts are illustrative and the component says so; they are shaped like a
+    small team's real month and narrow monotonically, because a funnel that
+    widens is not a funnel.
+  */
   funnel: [
-    { stage: "Applied", value: 248, pct: 100 },
-    { stage: "Screening", value: 126, pct: 51 },
-    { stage: "Shortlisted", value: 31, pct: 13 },
-    { stage: "Interview", value: 12, pct: 5 },
-    { stage: "Offer", value: 4, pct: 2 },
+    { stage: "Applied", value: 124, pct: 100 },
+    { stage: "Shortlisted", value: 46, pct: 37 },
+    { stage: "AI Screening Call", value: 28, pct: 23 },
+    { stage: "Video Interview", value: 9, pct: 7 },
+    { stage: "Hired", value: 2, pct: 2 },
   ],
 } as const;
 

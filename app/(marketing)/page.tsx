@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import {
   SITE_DESCRIPTION,
+  SITE_TITLE,
   buildMetadata,
   faqJsonLd,
   organizationJsonLd,
@@ -19,9 +20,16 @@ import { Faq } from "./_components/home/Faq";
 import { FinalCta } from "./_components/home/FinalCta";
 
 /*
-  ABSOLUTE title, so this one page escapes the "%s · Scoreboad" template: the
-  brief specifies the exact string, and the template would put the brand last
-  on the page where it should be first.
+  ABSOLUTE title, so this one page escapes the "%s · Scoreboad" template, which
+  would put the brand last on the page where it should be first.
+
+  IT IS SITE_TITLE, NOT A SECOND STRING WRITTEN HERE. This page was overriding
+  the title with "Scoreboad — Find the Right People Faster" — the H1 reused as
+  a title tag. That is a worse title for the one page that has to rank for the
+  category: it repeats the headline a searcher can already see in the snippet
+  and never says what the product IS. The canonical title lives in
+  lib/marketing/seo.ts and every other page's brand suffix already comes from
+  the same constant, so there is exactly one place to change it.
 
   Everything else comes from the shared helper, so the canonical, the Open
   Graph block and the Twitter card are built the same way as every other public
@@ -29,11 +37,11 @@ import { FinalCta } from "./_components/home/FinalCta";
 */
 export const metadata: Metadata = {
   ...buildMetadata({
-    title: "Find the Right People Faster",
+    title: "AI-Powered Recruitment Platform",
     description: SITE_DESCRIPTION,
     path: "/",
   }),
-  title: { absolute: "Scoreboad — Find the Right People Faster" },
+  title: { absolute: SITE_TITLE },
 };
 
 /**

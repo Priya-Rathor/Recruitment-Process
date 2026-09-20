@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { STAGE_LABELS } from "@/lib/applications/stages";
+import { METRIC_LABELS } from "@/lib/dashboard/metrics";
 import { CAPABILITY_GROUPS, INTERNAL_ROUTES } from "@/lib/marketing/content";
 import {
   AI_CARDS,
@@ -6,6 +8,7 @@ import {
   BRAND_STATEMENT,
   DASHBOARD,
   HERO,
+  HERO_SIGNALS,
   HOME_FAQS,
   HOME_FOOTER_SECTIONS,
   HUMAN_SIDE,
@@ -102,7 +105,9 @@ const ALL_COPY: string[] = [
   HERO.headlineLead,
   HERO.headlineAccent,
   HERO.lead,
+  HERO.leadDetail,
   HERO.badge,
+  ...HERO_SIGNALS.flatMap((s) => [s.title, s.meta]),
   ...WORKSPACE_CARDS.flatMap((c) => [c.title, c.body]),
   ...AI_CARDS.flatMap((c) => [c.title, c.body]),
   ...TRUST_CARDS.flatMap((c) => [c.title, c.body]),
@@ -203,6 +208,131 @@ describe("the landing page makes no claim the product cannot keep", () => {
     for (const row of PIPELINE_PREVIEW.rows) {
       expect(row.score).toBeGreaterThanOrEqual(0);
       expect(row.score).toBeLessThanOrEqual(100);
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The hero
+// -----------------------------------------------------------------------------
+
+describe("the hero", () => {
+  it("spells the required H1 exactly, across its two spans", () => {
+    /*
+      The headline is split so the accent half can carry the gradient on its
+      own line. That split is a RENDERING detail — a crawler and a screen
+      reader both see one sentence — and this asserts the sentence is still the
+      one the brief specifies after any edit to either half.
+    */
+    expect(`${HERO.headlineLead} ${HERO.headlineAccent}`).toBe(
+      "Find the Right People Faster with AI"
+    );
+  });
+
+  it("sends both CTAs to a page that exists", () => {
+    // "Explore the Platform" wants /platform, which does not exist. This is
+    // what stops the label being shipped against the route it implies.
+    const known = new Set(INTERNAL_ROUTES);
+    for (const cta of [HERO.ctaPrimary, HERO.ctaSecondary]) {
+      expect(known.has(cta.href.split("#")[0] || "/"), `${cta.label} → ${cta.href}`).toBe(
+        true
+      );
+    }
+  });
+
+  it("names the primary action as the brief specifies", () => {
+    expect(HERO.ctaPrimary.label).toBe("Get Started");
+    expect(HERO.ctaSecondary.label).toBe("Explore the Platform");
+  });
+
+  it("keeps the supporting copy to two sentences", () => {
+    // The instruction was "concise" and "not a huge wall of SEO text". Two
+    // lines is the budget; a third would be a paragraph.
+    for (const line of [HERO.lead, HERO.leadDetail]) {
+      expect(line.split(/[.!?](\s|$)/).filter((part) => part.trim()).length).toBeLessThanOrEqual(
+        2
+      );
+    }
+  });
+
+  it("does not repeat a keyword into the supporting copy", () => {
+    /*
+      THE KEYWORD-STUFFING GUARD. The hero is where "AI recruitment" pressure
+      lands hardest, and the failure mode is a sentence that names the same
+      term four times. Counted across the whole hero: "AI" may appear a
+      handful of times because it is the product's substance, but no other
+      content word may repeat more than twice.
+    */
+    const text = [HERO.headlineLead, HERO.headlineAccent, HERO.lead, HERO.leadDetail]
+      .join(" ")
+      .toLowerCase();
+
+    const counts = new Map<string, number>();
+    for (const word of text.match(/[a-z]{4,}/g) ?? []) {
+      counts.set(word, (counts.get(word) ?? 0) + 1);
+    }
+
+    const repeated = [...counts].filter(([, n]) => n > 2);
+    expect(repeated, `over-repeated in the hero: ${JSON.stringify(repeated)}`).toEqual([]);
+  });
+
+  it("resolves every floating signal's icon", () => {
+    for (const signal of HERO_SIGNALS) {
+      expect(ICONS[signal.icon], `${signal.title} → ${signal.icon}`).toBeDefined();
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The product visual is a picture of THIS product
+// -----------------------------------------------------------------------------
+
+describe("the dashboard mock matches the real application", () => {
+  /*
+    THE POINT OF THIS BLOCK. The mock used to carry four invented KPI labels
+    and five invented pipeline stages — "Screening", "Offer", "Time to hire" —
+    none of which exist in the product. Nothing failed, because nothing
+    connected the marketing page to the code it was depicting.
+
+    Now a stage rename or a metric rename breaks the build, which is the only
+    mechanism that keeps a screenshot honest over time.
+  */
+
+  it("labels every KPI tile with a real dashboard metric", () => {
+    const real = new Set(Object.values(METRIC_LABELS));
+    for (const tile of DASHBOARD.tiles) {
+      expect(real.has(tile.label), `"${tile.label}" is not a real dashboard metric`).toBe(
+        true
+      );
+    }
+  });
+
+  it("names every funnel row with a real application stage", () => {
+    const real = new Set(Object.values(STAGE_LABELS));
+    for (const row of DASHBOARD.funnel) {
+      expect(real.has(row.stage), `"${row.stage}" is not a real application stage`).toBe(
+        true
+      );
+    }
+  });
+
+  it("orders the funnel the way the application does", () => {
+    // Applied first, Hired last. A funnel that starts at Shortlisted is a
+    // picture of a different product.
+    expect(DASHBOARD.funnel[0].stage).toBe(STAGE_LABELS.applied);
+    expect(DASHBOARD.funnel[DASHBOARD.funnel.length - 1].stage).toBe(STAGE_LABELS.hired);
+  });
+
+  it("keeps the headline count consistent between the tiles and the funnel", () => {
+    // "New candidates" and the top of the funnel are the same number in the
+    // real dashboard, so a reader comparing the two panels is not shown two
+    // different truths in one screenshot.
+    expect(Number(DASHBOARD.tiles[0].value)).toBe(DASHBOARD.funnel[0].value);
+  });
+
+  it("resolves every tile icon", () => {
+    for (const tile of DASHBOARD.tiles) {
+      expect(ICONS[tile.icon], `${tile.label} → ${tile.icon}`).toBeDefined();
     }
   });
 });
