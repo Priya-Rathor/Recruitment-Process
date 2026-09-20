@@ -6012,3 +6012,390 @@ a {
   color: var(--status-attention-text);
   margin: var(--space-2) 0 0;
 }
+
+// =============================================================================
+// The WhatsApp inbox (/messages).
+//
+// Two panes on a desktop, one column on a phone. The list pane is fixed-width
+// and the thread takes the rest, which is what every mail and chat client does
+// and therefore what nobody has to learn.
+//
+// THE HEIGHT IS THE ONLY INTERESTING PART. Both panes scroll INTERNALLY against
+// a viewport-derived height rather than growing the page, because a chat whose
+// composer is below the fold is a chat you have to scroll to answer — and the
+// composer is the one control on this page that always has to be reachable.
+// 260px is the shell above it: the 60px bar, the section padding and the page
+// header.
+// =============================================================================
+.inbox {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: var(--space-4);
+  align-items: stretch;
+  min-height: 0;
+}
+
+.inbox__list,
+.inbox__thread {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: calc(100vh - 260px);
+  min-height: 420px;
+  // Tighter than the standard 24px card: these panes are lists of rows, and the
+  // padding belongs on the rows so the hover target reaches the pane's edge.
+  padding: var(--space-3);
+}
+
+.inbox__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  position: relative;
+  margin-bottom: var(--space-2);
+
+  .input {
+    padding-left: 32px;
+  }
+}
+
+.inbox__search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.inbox__refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  background: var(--color-card);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+
+  &:hover:not(:disabled) { color: var(--color-text); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.inbox__refresh-spin {
+  animation: inbox-spin 0.9s linear infinite;
+}
+
+@keyframes inbox-spin {
+  to { transform: rotate(360deg); }
+}
+
+.inbox__rows {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+// ---- One conversation -------------------------------------------------------
+.inbox__row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-3);
+  border: none;
+  border-radius: var(--control-radius);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text);
+
+  & + & {
+    border-top: 1px solid var(--color-border);
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+
+  &:hover { background: var(--color-background); }
+
+  // Selected: a tinted fill and a primary left edge. The bar carries the state
+  // on its own, so the fill can stay quiet enough to read text against.
+  &.is-selected {
+    background: #eff6ff;
+    box-shadow: inset 3px 0 0 var(--color-primary);
+  }
+
+  /*
+    UNMATCHED — a neutral grey tint and a dashed edge.
+
+    Deliberately NOT a warning colour. Somebody texting a number we do not
+    recognise has done nothing wrong, and painting it amber would put a row that
+    needs thirty seconds of attention in the same visual class as a failed send.
+  */
+  &.is-unmatched {
+    background: #f8fafc;
+    border-left: 2px dashed var(--color-border);
+
+    &.is-selected { background: #eff6ff; }
+  }
+}
+
+.inbox__row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.inbox__row-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--color-text);
+
+  .is-unread & { font-weight: var(--weight-semibold); }
+}
+
+.inbox__row-channel { color: #25d366; flex-shrink: 0; }
+
+.inbox__row-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox__row-time {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.inbox__row-preview {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  .is-unread & {
+    color: var(--color-text);
+    font-weight: var(--weight-medium);
+  }
+}
+
+.inbox__row-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.inbox__row-number { font-variant-numeric: tabular-nums; }
+
+// The same pill the account menu's notification badge uses, so one unread
+// treatment exists in the product rather than two that nearly match.
+.inbox__row-dot {
+  background-color: var(--color-error);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1.6;
+}
+
+// ---- The thread -------------------------------------------------------------
+.thread {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  gap: var(--space-2);
+}
+
+.thread__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.thread__name {
+  font-size: 16px;
+  font-weight: var(--weight-semibold);
+  margin: 0;
+}
+
+.thread__number {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  margin: 2px 0 0;
+}
+
+.thread__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--color-text);
+  background: var(--color-card);
+
+  &:hover { border-color: var(--color-primary); color: var(--color-primary); }
+}
+
+.thread__banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  padding: var(--space-3);
+  border-radius: var(--control-radius);
+  margin: 0;
+
+  &.is-warning {
+    background: var(--status-attention-bg);
+    color: var(--status-attention-text);
+  }
+
+  &.is-neutral {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+  }
+}
+
+.thread__link-block {
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.thread__messages {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-1);
+}
+
+// ---- Bubbles ----------------------------------------------------------------
+.bubble {
+  max-width: min(78%, 560px);
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+
+  // Inbound: left, neutral. Outbound: right, primary-tinted. The one corner
+  // squared off on each side is what makes the direction readable without
+  // reading the alignment.
+  &.is-inbound {
+    align-self: flex-start;
+    background: var(--color-background);
+    border-bottom-left-radius: 4px;
+  }
+
+  &.is-outbound {
+    align-self: flex-end;
+    background: #eff6ff;
+    border-color: #dbeafe;
+    border-bottom-right-radius: 4px;
+  }
+}
+
+.bubble__body {
+  font-size: 14px;
+  color: var(--color-text);
+  margin: 0;
+  // Preserves the newlines a candidate typed without a <pre>'s font change.
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble__meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin: 6px 0 0;
+}
+
+.bubble__error {
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+// ---- Composer ---------------------------------------------------------------
+.thread__composer {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.thread__composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+
+  .textarea { flex: 1; resize: vertical; }
+}
+
+.thread__composer-note,
+.thread__composer-foot {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
+}
+
+.thread__composer-foot { margin: var(--space-2) 0 0; }
+
+// ---- Mobile -----------------------------------------------------------------
+//
+// One column, and both panes drop their fixed height so the page scrolls
+// normally. A 100vh pane on a phone fights the browser's own collapsing address
+// bar, and the composer ends up under it — the exact problem the desktop height
+// exists to avoid.
+@media (max-width: 900px) {
+  .inbox {
+    grid-template-columns: 1fr;
+  }
+
+  .inbox__list,
+  .inbox__thread {
+    height: auto;
+    min-height: 0;
+  }
+
+  .inbox__rows { max-height: 320px; }
+
+  .bubble { max-width: 88%; }
+}
+
+// The nav-item unread badge. Same pill as .account-menu__badge — one unread
+// treatment in the product, not two that nearly match — but inline rather than
+// pushed to the right, because a bar link is sized to its content.
+.topnav__badge {
+  background-color: var(--color-error);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1.7;
+  margin-left: 2px;
+}
+
+.topnav__drawer-link .topnav__badge { margin-left: auto; }

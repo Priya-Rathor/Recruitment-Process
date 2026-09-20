@@ -424,6 +424,24 @@ export function IntegrationCard({
                 onChange={(event) => setField("messagingTemplateLanguage", event.target.value)}
               />
               {/*
+                The app secret, for INBOUND messages only.
+
+                A password field and optional, because it is only needed when
+                this organization brought its own Meta app — a deployment with
+                one shared app sets WHATSAPP_APP_SECRET in the environment and
+                leaves this blank. Without either, nothing can verify that an
+                incoming webhook really came from Meta, so every candidate reply
+                is rejected and the inbox stays empty. The inbox says so itself
+                rather than leaving it to be discovered.
+              */}
+              <input
+                className="input mb-2"
+                type="password"
+                placeholder="Meta app secret (optional — for receiving replies)"
+                value={field("appSecret")}
+                onChange={(event) => setField("appSecret", event.target.value)}
+              />
+              {/*
                 Said here, before connecting, rather than discovered as a failed
                 send: Meta only allows free-form text to somebody who messaged the
                 business in the last 24 hours. A recruitment pipeline almost never
@@ -435,8 +453,10 @@ export function IntegrationCard({
                 last 24 hours. To message anyone else, get a message template approved in Meta
                 Business Manager and put its name above — your template body is then sent as that
                 template&apos;s single parameter. Opt-out follows WhatsApp&apos;s convention: every
-                automatic message tells the candidate to reply STOP, and a reply is read by a
-                person and recorded on the candidate&apos;s page. There is no inbound webhook yet.
+                automatic message tells the candidate to reply STOP, and a reply now arrives in
+                Messages and sets the opt-out automatically. Receiving replies needs Meta&apos;s
+                webhook pointed at this product and an app secret to verify it with — see the
+                deployment guide; sending works without either.
               </p>
             </>
           )}

@@ -232,11 +232,15 @@ export function formatPhoneForDisplay(digits: string): string {
     return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
   }
 
-  // Everything else: country code, then four-digit groups. Good enough to scan
-  // against a number written on a CV, which is all this is for.
-  const head = digits.slice(0, digits.length % 4 || 4);
-  const rest = digits.slice(head.length).replace(/(\d{4})/g, "$1 ").trim();
-  return `+${head} ${rest}`.trim();
+  /*
+    Everything else: even groups of four, and NO attempt to split off a country
+    code. Working out where the code ends needs a real numbering-plan database,
+    and this project deliberately carries no libphonenumber — so a guess would
+    print "+141 5555 2671" for a US number and look like a fact. Arbitrary
+    grouping reads as what it is: spacing, to make a number scannable against
+    one written on a CV.
+  */
+  return `+${digits.replace(/(\d{4})(?=\d)/g, "$1 ")}`;
 }
 
 /** The thread's title. "Unknown number" is stated, never left blank. */

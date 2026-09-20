@@ -67,7 +67,15 @@ export type MessageStatus =
   | "opened"
   | "failed"
   | "bounced"
-  | "skipped";
+  | "skipped"
+  /**
+   * 0041 — an INBOUND message. Not a delivery state of ours at all.
+   *
+   * In this union because it is a value the status column can hold and every
+   * reader of message_log has to render it; nothing in this file ever writes
+   * it. See the enum's comment in migration 0041 for why it is not 'delivered'.
+   */
+  | "received";
 
 export type OptOutState = {
   emailOptedOut: boolean;

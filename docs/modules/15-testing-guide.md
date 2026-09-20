@@ -901,6 +901,139 @@ All five are recorded as follow-ups in `docs/modules/15-notifications-notes.md`.
 
 ---
 
+## Phase 8 — The inbound webhook and the inbox (0041)
+
+Everything above tests a one-way pipe. This phase tests the half that receives.
+Unlike phases 1–6, **most of this needs a real Meta app** — the whole point is
+that a message arrives from outside.
+
+### 8.1 Apply the migration and prove its guarantees
+
+```bash
+./supabase/tests/replay.sh    # replays all 41 and runs supabase/VERIFY_*.sql
+```
+
+`VERIFY_0041.sql` proves the five things no unit test can reach: one thread per
+number per tenant, inbound message ids deduped (while outbound `'unknown'` ids
+stay allowed), an unmatched message storable but a homeless one not, the unread
+counter and `last_message_at` behaving under out-of-order redelivery, and a
+thread unable to cross a tenant boundary in either direction. Run it against
+your real project too — paste the file into the SQL Editor; it rolls back.
+
+### 8.2 The endpoint refuses what it should, with no Meta account
+
+```bash
+# Wrong verify token → 403. A 503 means WHATSAPP_VERIFY_TOKEN never reached the
+# deployment, which is a different bug with the same symptom (no inbox).
+curl -i "https://<domain>/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=WRONG&hub.challenge=x"
+
+# Unsigned POST → 401. THE important one: anything else means forged candidate
+# messages are being accepted.
+curl -i -X POST https://<domain>/api/webhooks/whatsapp \
+  -H 'content-type: application/json' \
+  -d '{"entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"<your id>"},"messages":[{"from":"919876543210","id":"wamid.TEST","type":"text","timestamp":"1758369600","text":{"body":"hi"}}]}}]}]}'
+```
+
+**Verify nothing was written:**
+
+```sql
+select count(*) from public.message_log where provider_message_id = 'wamid.TEST';
+-- Expect 0. A row here means the signature check is not doing its job.
+```
+
+### 8.3 A real inbound message
+
+Register the callback first — `docs/DEPLOYMENT.md` §6.2, including the
+**subscribe to the `messages` field** step, which is the usual thing people
+miss (the URL verifies, and nothing is ever delivered).
+
+Text the business number from a phone whose number is on a candidate record.
+
+| Expect | Where |
+| --- | --- |
+| The thread appears in **/messages** within ~15s | The inbox polls; it does not hold a socket open |
+| The candidate's name on the row, not "Unknown number" | Matched via `candidates.phone_normalized` — the last 10 digits |
+| A red badge on the **Messages** nav item | Counts threads, not messages |
+| `direction = 'inbound'`, `status = 'received'` | `select direction, status, body_sent from public.message_log order by created_at desc limit 1;` |
+
+Now text from a number **not** on any candidate record: the row appears as
+*Unknown number* with a grey tint and a candidate picker. Confirm **no candidate
+was created** — `select count(*) from public.candidates;` is unchanged.
+
+Link it, and the thread moves onto that candidate's record.
+
+### 8.4 Redelivery does not duplicate
+
+Meta redelivers until it gets a 2xx, so this happens by itself under load. To
+force it, replay the exact same signed body twice (or temporarily make the
+handler return 500 after the insert). The second delivery must leave
+`select count(*) from public.message_log where provider_message_id = '<wamid>'`
+at **1**.
+
+### 8.5 STOP sets the opt-out by itself
+
+Reply **STOP** from the candidate's phone.
+
+```sql
+select whatsapp_opted_out, opted_out_reason
+from public.candidate_communication_preferences where candidate_id = '<id>';
+-- Expect true, 'Replied STOP on WhatsApp.'
+```
+
+The thread's composer is now disabled with a banner, and an automatic send on
+that channel records `skipped`. Then check the near-miss: send **"Please stop by
+the office at 3"** from another candidate and confirm they are **not** opted out
+— matching a substring here would silently switch off a real conversation.
+
+For an UNMATCHED number, the STOP cannot be recorded (there is no candidate to
+record it against). Link the thread afterwards and confirm the opt-out is
+applied at that moment — that deferred application is in the PATCH route.
+
+### 8.6 Delivery and read receipts, finally
+
+Send a templated message to the candidate. Watch the outbound bubble's tick in
+the thread: **Sent** → **Delivered** → **Read** (blue) as Meta reports each.
+
+```sql
+select status from public.message_log where provider_message_id = '<wamid>';
+-- 'sent' → 'delivered' → 'opened'
+```
+
+This is the behaviour migration 0035 recorded as impossible ("`opened` — email
+only; WhatsApp gives us no read signal we trust"). It was only impossible
+because nothing was listening.
+
+### 8.7 The reply uses the same pipeline as everything else
+
+Reply from the inbox and confirm the row it writes is indistinguishable from a
+manual send made anywhere else:
+
+```sql
+select direction, status, sent_by, conversation_id, recipient_hint, error_message
+from public.message_log order by created_at desc limit 1;
+```
+
+`sent_by` is your user id (not null — so no unsubscribe footer is appended),
+`recipient_hint` is masked to the last four digits, and `conversation_id` points
+at the thread. Then check the window: reply to a thread whose last inbound
+message is **more than 24 hours** old with no Meta template configured. The
+composer is disabled with the re-engagement remedy — the same wording
+`sendWhatsApp()` produces on Meta's 131047, so hitting the wall in two places
+does not look like two different problems.
+
+### 8.8 Roles
+
+| Role | Expect |
+| --- | --- |
+| **Viewer** | Reads threads. No composer, and opening a thread does **not** clear its unread count (it is shared across the org — a Viewer browsing must not tell three recruiters a candidate was handled) |
+| **Recruiter** | Sees only threads for candidates on applications assigned to them, plus every unmatched thread. A direct link to another recruiter's thread renders "Conversation not available", and `curl` on it returns **404** |
+| **Owner/Admin** | Everything |
+
+Check the Recruiter case with `curl` as well as in the UI — a hidden row is
+cosmetic, and `/api/messages/conversations/<id>` is the boundary that matters.
+
+---
+
 ## Automated coverage
 
 ```bash
@@ -910,8 +1043,15 @@ npm run typecheck
 npm run build
 ```
 
+`lib/messaging/messaging.test.ts` (37 tests) covers phase 8's pure half: STOP
+detection including the "please stop by the office" near-miss, the 24-hour
+window and the reply-capability rules, Meta payload parsing against real
+payload shapes (plus every shape of junk, without throwing), and signature
+verification — accepted, tampered, wrong-secret, missing, and the fails-closed
+no-secret case.
+
 `lib/communications/communications.test.ts` (51 tests) and
-`optout.test.ts` (9) cover the decision logic behind every phase above:
+`optout.test.ts` (9) cover the decision logic behind phases 1-7:
 timezone-correct rendering, the catalogue↔database agreement, channel resolution,
 the `both`-requires-neither rule, number normalisation refusing to guess, the
 approval distinction, settings clamping, and the unsubscribe token refusing

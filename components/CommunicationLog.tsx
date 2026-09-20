@@ -41,6 +41,13 @@ const STATUS_PRESENTATION: Record<
   { tone: ChipTone; label: string; showsError: boolean }
 > = {
   queued: { tone: "info", label: "Queued", showsError: false },
+  /*
+    0041. An inbound row in a log whose every other row is outbound, so the
+    chip has to carry the DIRECTION rather than a delivery state — "Delivered"
+    here would read as a claim about our sending. Neutral, because a candidate
+    writing to us is not a success or a failure of anything.
+  */
+  received: { tone: "neutral", label: "Received", showsError: false },
   sent: { tone: "info", label: "Sent", showsError: false },
   delivered: { tone: "success", label: "Delivered", showsError: false },
   opened: { tone: "success", label: "Opened", showsError: false },
@@ -103,6 +110,7 @@ function MessageRow({
 
   const presentation = STATUS_PRESENTATION[message.status] ?? STATUS_PRESENTATION.sent;
   const ChannelIcon = message.channel === "whatsapp" ? MessageCircle : Mail;
+  const inbound = message.direction === "inbound";
 
   const heading =
     message.subject?.trim() ||
@@ -166,8 +174,12 @@ function MessageRow({
               rendered as "Automatic" rather than a dash, because a dash reads as
               missing data rather than as a fact.
             */}
-            {message.sender_name ?? "Automatic"}
-            {eventLabel && ` · ${eventLabel}`}
+            {message.direction === "inbound"
+              ? // Their words, not ours. "Automatic" here would attribute a
+                // candidate's own message to this product.
+                "From the candidate"
+              : message.sender_name ?? "Automatic"}
+            {!inbound && eventLabel && ` · ${eventLabel}`}
             {showJob && message.job_title && ` · ${message.job_title}`}
             {message.recipient_hint && ` · ${message.recipient_hint}`}
           </span>
@@ -226,7 +238,7 @@ function MessageRow({
             this row says the candidate was told.
           */}
           <p className="has-text-secondary" style={{ fontSize: 12, marginBottom: 6 }}>
-            Exactly as sent
+            {inbound ? "Exactly as received" : "Exactly as sent"}
           </p>
           <pre
             style={{

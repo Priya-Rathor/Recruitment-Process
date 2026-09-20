@@ -629,6 +629,22 @@ export const EVENT_CATALOGUE = {
     label: "Message template deleted",
     describe: (m) => `Deleted the message template ${text(m.name, "")}`.trim(),
   },
+  /*
+    0041 — an unmatched WhatsApp thread was attributed to a candidate.
+
+    Audited because it is an act of JUDGEMENT about identity, not a data entry.
+    Somebody decided that the person behind an unrecognised number is this
+    candidate, and from that moment the thread joins that candidate's permanent
+    communication history. If the judgement was wrong, this row is what says who
+    made it and when.
+  */
+  "candidate.whatsapp_linked": {
+    entity: "candidate",
+    label: "WhatsApp number linked",
+    describe: (m) =>
+      `Linked the WhatsApp conversation from ${text(m.phone_hint, "an unknown number")} ` +
+      "to this candidate",
+  },
   "candidate.communication_preference_changed": {
     entity: "candidate",
     label: "Candidate contact preference changed",

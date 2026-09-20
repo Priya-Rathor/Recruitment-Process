@@ -8,6 +8,7 @@
 import { getCurrentMembership, getCurrentUser, getUserMemberships, hasRole } from "@/lib/tenant";
 import { isAgencyMode } from "@/lib/organizations/hiringModel";
 import { countUnread } from "@/lib/notifications/queries";
+import { countUnreadConversations } from "@/lib/messaging/queries";
 import { TopNav } from "@/components/nav/TopNav";
 import type { ReactNode } from "react";
 
@@ -20,7 +21,22 @@ export async function AppShell({ children }: { children: ReactNode }) {
 
   // null means the count could not be read — rendered as no badge rather than a
   // confident "0", which would hide exactly the alerts that matter most.
-  const unreadCount = membership ? await countUnread(membership.organization.id) : null;
+  //
+  // Both counts in parallel. They are independent reads and the shell wraps
+  // every page in the product, so serialising them would add a round trip to
+  // every navigation for no reason.
+  const [unreadCount, unreadMessages] = membership
+    ? await Promise.all([
+        countUnread(membership.organization.id),
+        countUnreadConversations({
+          organizationId: membership.organization.id,
+          // Scoped exactly like the inbox itself, so the badge cannot promise a
+          // recruiter threads the inbox will not show them.
+          viewerRole: membership.role,
+          viewerId: membership.user_id,
+        }),
+      ])
+    : [null, null];
 
   return (
     <div className="app-shell">
@@ -37,6 +53,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
             canSwitchOrganization: memberships.length > 1,
             isAdmin: hasRole(membership.role, ["owner", "admin"]),
           }}
+          badges={{ messages: unreadMessages }}
         />
       )}
 

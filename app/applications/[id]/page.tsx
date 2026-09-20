@@ -47,12 +47,13 @@ import {
   listMessageTemplates,
 } from "@/lib/communications/queries";
 import { getChannelAvailability } from "@/lib/communications/channels";
+import { findConversationForCandidate } from "@/lib/messaging/queries";
 import { loadMessageContext } from "@/lib/communications/triggers";
 import { createClient } from "@/lib/supabase/server";
 import { getResponseForApplication } from "@/lib/forms/queries";
 import { FormResponseCard } from "./FormResponseCard";
 import { PRIORITY_LABELS, PRIORITY_TONE, type ApplicationPriority } from "@/lib/applications/validation";
-import { Activity, Layers, Pencil } from "lucide-react";
+import { Activity, Layers, MessageCircle, Pencil } from "lucide-react";
 
 export const metadata = { title: "Application" };
 export const dynamic = "force-dynamic";
@@ -135,6 +136,8 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     // Module 23. Null for anybody who did not arrive through a public form,
     // which is most applications — the card simply does not render.
     formResponse,
+    // 0041 — this candidate's WhatsApp thread, if any.
+    whatsappConversationId,
     customFields,
     customValues,
   ] = await Promise.all([
@@ -156,6 +159,10 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
     getResponseForApplication({
       organizationId: membership.organization.id,
       applicationId: application.id,
+    }),
+    findConversationForCandidate({
+      organizationId: membership.organization.id,
+      candidateId: application.candidate_id,
     }),
     /*
       MODULE 27.
@@ -421,6 +428,23 @@ async function ApplicationDetailContent({ applicationId }: { applicationId: stri
             </span>
           )}
         </div>
+        {/*
+          0041 — out to the shared inbox, and only when a thread exists.
+
+          This log is the compact, per-application summary it has always been;
+          the inbox is the cross-application back-and-forth, which is the view
+          somebody wants when a candidate has replied three times. A link rather
+          than a second thread rendering here — one place owns what a
+          conversation looks like.
+        */}
+        {whatsappConversationId && (
+          <p className="mb-3">
+            <Link className="text-link" href={`/messages?c=${whatsappConversationId}`}>
+              <MessageCircle size={13} aria-hidden="true" /> View full WhatsApp conversation
+            </Link>
+          </p>
+        )}
+
         <CommunicationLog
           messages={messages}
           failed={messagesFailed}

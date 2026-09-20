@@ -24,11 +24,21 @@ export function TopNav({
   isAdmin,
   agencyMode,
   account,
+  badges,
 }: {
   isAdmin: boolean;
   /** False for in-house teams — hides the client-facing links. */
   agencyMode: boolean;
   account: AccountMenuProps;
+  /**
+   * Per-request counts for the items that carry one, keyed by NavItem.badge.
+   *
+   * NULL for a count that could not be READ, and the badge is then hidden
+   * rather than drawn as 0 — the same rule the notifications badge follows. A
+   * confident zero produced by a broken query hides exactly the candidate who
+   * is waiting for an answer.
+   */
+  badges?: { messages: number | null };
 }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -91,6 +101,9 @@ export function TopNav({
                 const active = isActiveHref(pathname, item.href);
                 const Icon = item.icon;
 
+                const count = item.badge ? badges?.[item.badge] ?? null : null;
+                const unread = count !== null && count > 0;
+
                 return (
                   <Link
                     key={item.href}
@@ -100,6 +113,11 @@ export function TopNav({
                   >
                     <Icon size={16} aria-hidden="true" />
                     {item.label}
+                    {unread && (
+                      <span className="topnav__badge" aria-label={`${count} unread`}>
+                        {count > 9 ? "9+" : count}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -144,6 +162,9 @@ export function TopNav({
                 const active = isActiveHref(pathname, item.href);
                 const Icon = item.icon;
 
+                const count = item.badge ? badges?.[item.badge] ?? null : null;
+                const unread = count !== null && count > 0;
+
                 return (
                   <Link
                     key={item.href}
@@ -157,6 +178,11 @@ export function TopNav({
                   >
                     <Icon size={18} aria-hidden="true" />
                     {item.label}
+                    {unread && (
+                      <span className="topnav__badge" aria-label={`${count} unread`}>
+                        {count > 9 ? "9+" : count}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

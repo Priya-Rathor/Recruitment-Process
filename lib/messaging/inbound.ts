@@ -203,11 +203,52 @@ async function findOrOpenConversation({
       .eq("id", thread.id)
       .eq("organization_id", organizationId);
 
-    if (!error) return { id: thread.id, candidateId: matched };
+    if (!error) {
+      /*
+        A STOP sent while we did not know who this was.
+
+        It could not be recorded at the time — the preferences table is keyed by
+        candidate and there was none — so it is applied at the moment the
+        identity becomes known. The PATCH route does the same thing when a human
+        links a thread; both paths exist because a thread can be linked either
+        way, and an opt-out that only survives one of them is an opt-out that
+        gets lost.
+      */
+      await applyDeferredOptOut({ admin, organizationId, conversationId: thread.id, candidateId: matched });
+      return { id: thread.id, candidateId: matched };
+    }
     console.error(`[whatsapp webhook] late candidate link failed: ${formatDbError(error)}`);
   }
 
   return thread;
+}
+
+/** Re-reads a thread for a stop request that predates knowing who sent it. */
+async function applyDeferredOptOut({
+  admin,
+  organizationId,
+  conversationId,
+  candidateId,
+}: {
+  admin: Admin;
+  organizationId: string;
+  conversationId: string;
+  candidateId: string;
+}): Promise<void> {
+  const { data, error } = await admin
+    .from("message_log")
+    .select("body_sent")
+    .eq("organization_id", organizationId)
+    .eq("conversation_id", conversationId)
+    .eq("direction", "inbound")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error || !data) return;
+
+  if ((data as { body_sent: string }[]).some((row) => isOptOutReply(row.body_sent))) {
+    await honourOptOut({ admin, organizationId, candidateId });
+  }
 }
 
 /**

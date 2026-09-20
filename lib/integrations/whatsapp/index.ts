@@ -573,6 +573,27 @@ export async function verifyWebhookSignature({
     return false;
   }
 
+  return matchesSignature({ rawBody, header, secret });
+}
+
+/**
+ * The HMAC comparison itself, with no database behind it.
+ *
+ * Separated from verifyWebhookSignature() so the cryptography can be tested
+ * against known vectors — the secret lookup is plumbing, this is the part that
+ * decides whether a stranger can write into a recruiter's inbox.
+ */
+export async function matchesSignature({
+  rawBody,
+  header,
+  secret,
+}: {
+  rawBody: string;
+  header: string | null;
+  secret: string;
+}): Promise<boolean> {
+  if (!header || !secret) return false;
+
   try {
     const key = await crypto.subtle.importKey(
       "raw",
@@ -590,6 +611,8 @@ export async function verifyWebhookSignature({
     const provided = header.replace(/^sha256=/i, "").trim().toLowerCase();
     if (provided.length !== expected.length) return false;
 
+    // Constant time: never short-circuit on the first differing character, or
+    // the endpoint becomes an oracle for discovering a valid signature.
     let mismatch = 0;
     for (let index = 0; index < expected.length; index += 1) {
       mismatch |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
@@ -599,6 +622,28 @@ export async function verifyWebhookSignature({
     console.error(`[whatsapp webhook] signature check failed: ${formatDbError(error)}`);
     return false;
   }
+}
+
+/**
+ * The GET handshake check.
+ *
+ * Lives here rather than in the route because a Next route file may only export
+ * its HTTP handlers — a helper exported beside them is rejected at build time —
+ * and this is the one line of that handshake worth testing.
+ *
+ * Returns false when no verify token is configured: an unconfigured deployment
+ * must not complete a handshake it cannot later honour with a signature.
+ */
+export function webhookHandshakeMatches(token: string | null): boolean {
+  const expected = webhookVerifyToken();
+  if (!expected || !token) return false;
+  if (token.length !== expected.length) return false;
+
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= expected.charCodeAt(index) ^ token.charCodeAt(index);
+  }
+  return mismatch === 0;
 }
 
 // -----------------------------------------------------------------------------

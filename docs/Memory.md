@@ -462,3 +462,117 @@ the setting, because `redirect_to` is baked into the link. If the signup
 happened on the production origin, editing the host in the address bar works
 (the PKCE verifier cookie lives on that origin); otherwise `npm run dev`. One
 attempt — the code is single-use.
+
+---
+
+## 2026-09-20
+
+**WhatsApp inbox — the inbound half of Module 15.** Built the two-pane
+`/messages` inbox and, underneath it, the webhook this product never had. Until
+today message_log was a one-way pipe: what we said, never what they said back.
+
+**Migration 0041** (`supabase/migrations/0041_whatsapp_inbox.sql`), replays
+clean from empty — 41/41 — with `supabase/VERIFY_0041.sql` proving six schema
+guarantees no unit test can reach. Bundle regenerated.
+
+- `whatsapp_conversations`, keyed on **(organization_id, phone_number)**, not on
+  the candidate. The number is all Meta gives us and all that exists when a
+  stranger texts in; `candidate_id` is an annotation, nullable, filled by the
+  matcher or by a human. Keying on the candidate would have left nowhere to put
+  an unmatched message, which is the case the table mostly exists for.
+- `message_log` **extended, not duplicated**: `direction` (default `outbound`,
+  which is the correct backfill) and `conversation_id`. A second table would
+  have made every "what passed between us and this person" read a UNION that
+  two future authors write differently, one of them forgetting organization_id.
+- **`message_log_has_a_subject` relaxed** to admit a conversation. An unmatched
+  inbound message has no candidate AND no application; the constraint's real
+  invariant — every row is reachable from some page — is unchanged.
+- `'received'` added to `message_status`. Not `'delivered'`: every existing
+  status describes how far something WE sent got, and a green "Delivered" chip
+  on a candidate's own reply reads as a claim about our sending.
+- Idempotency is a **partial unique index**, inbound only. Outbound cannot join
+  it because `sendWhatsApp()` stores the literal `'unknown'` when Meta returns
+  no id — a unique index over outbound would fail the second such send, i.e. a
+  message that had already reached a real person. (That `'unknown'` fallback is
+  still worth fixing; not touched here.)
+- `bump_whatsapp_conversation()` RPC: one statement, because read-count-add-one
+  loses a message when Meta delivers a batch. `last_message_at` only moves
+  forward (`greatest`), so a redelivered old event cannot reorder the inbox.
+  NOT security definer — the org id is a filter, not the authorisation.
+
+**Tenancy from `phone_number_id` — the only place this product resolves a tenant
+from something in a payload.** It is a lookup key into
+`organization_integrations` (a table only we write), not a claim; organization_id
+comes off our row, same shape as the Bolna webhook finding a screening_call by
+the id we generated.
+
+**The body is parsed BEFORE the signature is verified**, and that needs stating
+because it looks wrong. The app secret can be per-organization, and the only
+thing naming the organization is inside the body. Nothing is written and no
+candidate table is read until `verifyWebhookSignature()` returns true; an
+unsigned request costs one indexed SELECT.
+
+**Per-org app secret + env fallback**, rather than env only. Meta's app secret
+belongs to a Meta app: one app per deployment (Tech Provider model) → env; an
+org that brought its own app → its own secret, encrypted beside the access
+token. Env-only would have silently rejected tenant #2's every reply. The verify
+token stays deployment-wide — the GET handshake carries nothing to resolve a
+tenant from, so there is no choice there.
+
+**STOP list deliberately shorter than the industry one.** No CANCEL/END/QUIT:
+all three are plausible replies to "shall I book you in for Thursday?", and an
+opt-out is effectively irreversible by the candidate (the unsubscribe token
+cannot re-subscribe). Whole-message match only — "please stop by the office at
+3" is not an opt-out. Tested both directions.
+
+**Outbound messages join the thread too**, attached in `sendOnChannel()` — the
+one place every send passes through — so an automatic template, a manual
+compose and an inbox reply all land in one timeline without knowing the inbox
+exists. Without it the thread would show the candidate's half and the replies
+typed here, and a recruiter would read "nobody told them" off true rows.
+**Skipped sends deliberately get no conversation_id**: the inbox is what passed
+between us and a person, and "we decided not to say this" belongs in the log.
+
+**The reply route sends nothing.** It resolves the recipient and calls
+`sendOnChannel()`. Two enforcement decisions worth keeping:
+
+- opt-out and role are OURS → enforced server-side (409 + `acknowledge_opt_out`,
+  the same two-step the compose panel uses);
+- the 24-hour window is META's, judged from our own `last_inbound_at` → NOT
+  enforced server-side. A webhook delivery we dropped would make a repliable
+  thread look closed and turn our bug into the recruiter's dead end. The
+  composer greys out as guidance; the adapter surfaces Meta's own answer.
+
+**Replying needs a linked candidate** (409 `unlinked_conversation`). Everything
+`sendOnChannel()` does is anchored to one — whose opt-out to check, whose
+history to file it under. Messaging a number we cannot attribute would mean
+sending to somebody whose opt-out we are structurally unable to honour.
+
+**Recruiter scoping is a SCOPE, not a boundary, and the code says so.** Same
+rule as `getBoard()`, applied in the query; both tables grant SELECT to every
+member. Unmatched threads are shown to recruiters too — nobody owns them, and
+hiding them from the people most likely to recognise the number means they are
+never linked.
+
+- **Nav:** ninth item, back to the width measured as fitting 1440px exactly.
+  Badge counts THREADS, null on a failed read (never a fake 0).
+- **Polling, not Realtime.** 15s, paused on a hidden tab. A websocket would
+  authenticate the browser directly against message_log, whose whole design is
+  that no browser writes it; polling a scoped route reuses the boundary that
+  exists.
+- **Delivery/read receipts now real.** Meta's status callbacks map
+  sent→delivered→read(`opened`), ranked so out-of-order arrivals cannot move a
+  message backwards. 0035's "`opened` — email only; WhatsApp gives us no read
+  signal we trust" was only true because nothing was listening.
+
+`lint` clean · `typecheck` clean · `build` clean · 1826/1826 (+37) · migrations
+41/41 · VERIFY_0040 and VERIFY_0041 both pass.
+
+**Not done, deliberately:** text messages only (an image/location is counted and
+logged, not stored as a blank bubble); no inbound for email; re-linking a
+already-linked thread is refused rather than offered (it would move the record
+of what was said onto a different person).
+
+**Noticed, not changed:** `lib/notifications/queries.ts` contains a byte that
+makes `grep`/`file` treat it as binary (`grep -a` works). Harmless to the build;
+confusing to search.

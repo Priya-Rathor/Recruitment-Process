@@ -312,6 +312,9 @@ async function runConnect({
         // says plainly what is lost without one.
         messagingTemplate: text("messagingTemplate") || undefined,
         messagingTemplateLanguage: text("messagingTemplateLanguage") || undefined,
+        // Inbound only. Blank falls back to the deployment-wide
+        // WHATSAPP_APP_SECRET — see WhatsAppCredentials for which model is which.
+        appSecret: text("appSecret") || undefined,
         connectedBy: userId,
       });
       return result.ok

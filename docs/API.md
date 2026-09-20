@@ -154,6 +154,25 @@ Viewer.
 | `/api/notifications/reminders` | POST | recruiter+ |
 | `/api/notifications/ai-action` | POST | recruiter+ |
 | `/api/messages` | POST | recruiter+ |
+| `/api/messages/conversations` | GET | member |
+| `/api/messages/conversations/[id]` | GET, PATCH | member / recruiter+ |
+| `/api/messages/conversations/[id]/reply` | POST | recruiter+ |
+
+The three conversation routes are the WhatsApp inbox (`/messages`). Two rules
+worth stating because neither is visible in the table:
+
+- **The Recruiter scope is a scope, not a boundary.** A Recruiter sees threads
+  for candidates on applications assigned to them, applied in the query exactly
+  as the pipeline board applies it. `whatsapp_conversations` and `message_log`
+  both grant SELECT to every member of the organization, so the ORGANIZATION is
+  the security boundary. `GET`/`PATCH` on a thread outside the scope return
+  **404**, not 403, so a guessed id cannot confirm that a thread exists.
+- **`/reply` sends nothing itself.** It resolves the recipient and calls
+  `sendOnChannel()` — the single outbound path — so the opt-out gate, the log
+  row, the masked recipient and Meta's 24-hour window behave identically to a
+  templated send. An unlinked thread is refused with `409 unlinked_conversation`
+  and an opted-out candidate with `409 opted_out`, which the UI turns into an
+  explicit confirmation before re-submitting with `acknowledge_opt_out`.
 
 ### Forms & onboarding
 | Route | Methods | Role |
@@ -179,6 +198,7 @@ Viewer.
 | Route | Methods | Auth |
 | --- | --- | --- |
 | `/api/webhooks/bolna` | POST | **HMAC signature, fails closed** |
+| `/api/webhooks/whatsapp` | GET, POST | **public. GET = Meta's verify-token handshake; POST = `X-Hub-Signature-256`, fails closed** |
 | `/auth/callback` | GET | Supabase OAuth exchange |
 
 ---
@@ -192,7 +212,7 @@ Viewer.
 | **Bolna AI** | Voice screening calls | **Per organization**, AES-GCM encrypted | Disconnected by default; hard attempt cap; consent disclosure not disableable. |
 | **Google Calendar** | Interview invites | Env OAuth client + per-org encrypted refresh token | Unconfigured → interviews still schedule, no invites sent, settings page says so. |
 | **Email (Resend-compatible)** | Internal + candidate email | Per-org encrypted key, `EMAIL_API_URL` override | Send recorded as "not sent" with a reason; nothing else fails. |
-| **WhatsApp (Meta Cloud API)** | Candidate messaging | Per-org encrypted token + phone id | Same as email. Refused loudly for internal staff (no phone column on `users`; falling back to the candidate's number would misdeliver). |
+| **WhatsApp (Meta Cloud API)** | Candidate messaging, **and inbound replies** | Per-org encrypted token + phone id; inbound needs `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET` (or a per-org app secret) | Same as email. Refused loudly for internal staff (no phone column on `users`; falling back to the candidate's number would misdeliver). **Inbound fails closed and silently-shaped**: with no app secret every reply is rejected and the inbox stays empty while sending still works, so `/messages` and the integration card both say so on the page. |
 | **n8n** | Orchestration | `N8N_WEBHOOK_URL` | Monitored only. Automations execute in-process, not through n8n. |
 
 ---
@@ -216,3 +236,33 @@ Viewer.
 delivery-id check, so a captured valid request can be replayed indefinitely.
 Impact is bounded (it only re-writes the same outcome onto the same call), but
 it is a gap. See `docs/SECURITY.md` finding **S-05**.
+
+### `/api/webhooks/whatsapp` (0041)
+
+Same four properties, plus the differences Meta forces:
+
+1. **Signature** — HMAC-SHA256 over the raw bytes against the Meta app secret,
+   constant-time compare, `401` on any mismatch. No secret ⇒ nothing is ever
+   accepted. Forging here is not spam: it is putting words in a candidate's
+   mouth, and a forged `STOP` would switch off a real candidate's messages.
+2. **Tenancy from our record** — `value.metadata.phone_number_id` is a lookup
+   key into `organization_integrations`, a table only we write;
+   `organization_id` comes off that row. The integration must be `connected`.
+3. **Bounded effect** — writes `message_log`, `whatsapp_conversations` and the
+   WhatsApp opt-out flag. It cannot create a candidate, move a stage or start an
+   automation. A number matching no candidate stays unmatched for a human to
+   link; nothing is invented from a bare phone number.
+4. **Idempotent** — a partial unique index on
+   `(organization_id, provider_message_id) where direction = 'inbound'` makes a
+   redelivery a no-op at the database rather than at the handler, and status
+   callbacks only ever move a message forward (`sent → delivered → opened`), so
+   they are order-independent too. This is what lets the route return `500` and
+   invite a retry when a write genuinely fails.
+
+**The body is parsed before the signature is checked**, because the secret may
+be per organization and the only thing naming the organization is inside the
+body. Nothing is written, and no candidate data is read, until verification
+passes; an unsigned request costs one indexed SELECT against our own
+integrations table.
+
+Unlike Bolna, replay is **not** a gap here — see point 4.

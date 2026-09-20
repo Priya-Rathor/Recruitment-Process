@@ -20,8 +20,9 @@
 // complaint. So it has a confirmation and the copy says what it is for.
 // =============================================================================
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MailX, MessageCircleOff } from "lucide-react";
+import { MailX, MessageCircle, MessageCircleOff } from "lucide-react";
 import { FormError } from "@/components/states";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { CommunicationLog } from "@/components/CommunicationLog";
@@ -36,6 +37,7 @@ export function CommunicationCard({
   messagesFailed,
   timeZone,
   canManage,
+  conversationId = null,
 }: {
   candidateId: string;
   candidateName: string;
@@ -45,6 +47,13 @@ export function CommunicationCard({
   timeZone: string;
   /** Owner/Admin/Recruiter. The API enforces it independently. */
   canManage: boolean;
+  /**
+   * 0041 — this candidate's WhatsApp thread, when one exists.
+   *
+   * Null means there is none, and the link is not rendered. An always-visible
+   * link to an empty inbox would be a promise the page cannot keep.
+   */
+  conversationId?: string | null;
 }) {
   const router = useRouter();
 
@@ -92,6 +101,21 @@ export function CommunicationCard({
           <h2 className="title is-5 mb-1">Communications</h2>
           <p className="has-text-secondary" style={{ fontSize: 13, margin: 0 }}>
             Every message sent to {candidateName}, across all their applications.
+            {/*
+              The link OUT rather than a second thread view here. This card is
+              the compact summary — newest first, one line each, both channels —
+              and the inbox is where a back-and-forth is actually readable. Two
+              renderings of the same rows is how "Delivered" comes to mean two
+              different things.
+            */}
+            {conversationId && (
+              <>
+                {" "}
+                <Link className="text-link" href={`/messages?c=${conversationId}`}>
+                  <MessageCircle size={13} aria-hidden="true" /> View full WhatsApp conversation
+                </Link>
+              </>
+            )}
           </p>
         </div>
       </div>

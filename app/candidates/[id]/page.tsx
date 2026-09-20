@@ -24,6 +24,7 @@ import {
   getCommunicationPreferences,
   listCandidateMessages,
 } from "@/lib/communications/queries";
+import { findConversationForCandidate } from "@/lib/messaging/queries";
 
 export const metadata = { title: "Candidate" };
 export const dynamic = "force-dynamic";
@@ -71,6 +72,9 @@ async function CandidateDetailContent({
     // the record of what we told them with it.
     { messages, failed: messagesFailed },
     communicationPreferences,
+    // 0041 — the WhatsApp thread, if there is one. Decides whether the card
+    // offers "View full conversation" at all.
+    whatsappConversationId,
     customFields,
     customValues,
   ] = await Promise.all([
@@ -101,6 +105,7 @@ async function CandidateDetailContent({
     getLatestParsedResume({ organizationId: membership.organization.id, candidateId }),
     listCandidateMessages({ organizationId: membership.organization.id, candidateId }),
     getCommunicationPreferences({ organizationId: membership.organization.id, candidateId }),
+    findConversationForCandidate({ organizationId: membership.organization.id, candidateId }),
     // MODULE 27.
     activeDefinitions(membership.organization.id, "candidate"),
     valuesForEntity(membership.organization.id, "candidate", candidateId),
@@ -376,6 +381,7 @@ async function CandidateDetailContent({
         // emailing me" on a call is heard by the recruiter on that call. The API
         // enforces it independently of this flag.
         canManage={canEdit}
+        conversationId={whatsappConversationId}
       />
 
       <ResumesCard

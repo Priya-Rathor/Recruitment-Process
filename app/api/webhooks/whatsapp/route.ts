@@ -3,6 +3,7 @@ import {
   findOrganizationByPhoneNumberId,
   parseWebhookPayload,
   verifyWebhookSignature,
+  webhookHandshakeMatches,
   webhookVerifyToken,
 } from "@/lib/integrations/whatsapp";
 import { applyStatusUpdate, recordInboundMessage } from "@/lib/messaging/inbound";
@@ -75,13 +76,15 @@ export async function GET(request: NextRequest) {
   const token = params.get("hub.verify_token");
   const challenge = params.get("hub.challenge");
 
-  const expected = webhookVerifyToken();
-  if (!expected) {
+  // Checked separately from the comparison so an UNCONFIGURED deployment says
+  // 503 (a real, fixable state an operator should see in their logs) rather
+  // than 403, which would read as "Meta sent the wrong token".
+  if (!webhookVerifyToken()) {
     console.error("[whatsapp webhook] WHATSAPP_VERIFY_TOKEN is not set; refusing the handshake.");
     return NextResponse.json({ error: "Webhooks are not configured." }, { status: 503 });
   }
 
-  if (mode !== "subscribe" || !token || !challenge || !constantTimeEquals(token, expected)) {
+  if (mode !== "subscribe" || !challenge || !webhookHandshakeMatches(token)) {
     // Deliberately vague and identical for every reason, so the endpoint cannot
     // be used to test guesses at the token.
     return NextResponse.json({ error: "Verification failed." }, { status: 403 });
@@ -201,14 +204,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ received: true, handled, duplicates });
-}
-
-/** Constant time, so the handshake cannot be used to guess the token. */
-function constantTimeEquals(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    mismatch |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return mismatch === 0;
 }

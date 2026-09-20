@@ -26,6 +26,7 @@ import {
   type LucideIcon,
   Kanban,
   LayoutGrid,
+  MessageCircle,
   Settings,
   UserCheck,
   Users,
@@ -35,6 +36,15 @@ export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  /**
+   * Which count, if any, this item badges.
+   *
+   * A key rather than a number, because NAV_GROUPS is a static module-level
+   * constant and a count is per-request. The shell resolves it and TopNav looks
+   * it up — so adding a badge to an item is one field here, not a new prop
+   * threaded through the bar and the drawer.
+   */
+  badge?: "messages";
   /** Owner/Admin only. Hidden entirely for other roles, never shown-and-refused. */
   adminOnly?: boolean;
   /**
@@ -54,6 +64,24 @@ export const NAV_GROUPS: NavItem[][] = [
   ],
   [
     { href: "/pipeline", label: "Pipeline", icon: Kanban },
+    /*
+      The WhatsApp inbox.
+
+      In THIS group rather than the first, because it belongs with the parts of
+      the job that involve other humans — it sits beside Interviews for the same
+      reason Interviews sits there.
+
+      WIDTH, which this bar has a history with. The measurements in the block
+      below were taken at nine items fitting 1440px exactly; two moved into the
+      account menu to make room for Onboarding, leaving eight (nine in agency
+      mode). This is the ninth — back to the width that was measured as fitting,
+      and "Messages" is a shorter label than either item that left. The badge
+      adds ~18px on top of that and only when something is unread. If a tenth
+      item is ever proposed, re-measure before assuming it fits; the bar hides
+      its own overflow scrollbar, so exceeding it does not look like a bug, it
+      looks like a bar with nothing after Clients.
+    */
+    { href: "/messages", label: "Messages", icon: MessageCircle, badge: "messages" },
     /**
      * Module 19. Next to Pipeline, because it IS the next step of the same
      * lifecycle: a hire moves off the board and onto this list.

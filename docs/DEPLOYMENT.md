@@ -83,8 +83,15 @@ variable nobody sets.
 ### Feature-gated
 `OPENAI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, `BOLNA_WEBHOOK_SECRET`,
 `BOLNA_BASE_URL`, `BOLNA_CATALOG_PATHS`, `GOOGLE_CLIENT_ID`,
-`GOOGLE_CLIENT_SECRET`, `EMAIL_API_URL`, `WHATSAPP_API_URL`, `APP_URL`,
-`N8N_WEBHOOK_URL`.
+`GOOGLE_CLIENT_SECRET`, `EMAIL_API_URL`, `WHATSAPP_API_URL`,
+`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `APP_URL`, `N8N_WEBHOOK_URL`.
+
+`WHATSAPP_VERIFY_TOKEN` and `WHATSAPP_APP_SECRET` gate **receiving** WhatsApp
+replies, not sending them — see §6.2. They share `CRON_SECRET`'s failure shape:
+the deployment looks entirely healthy, sending works, and the Messages inbox is
+simply always empty. `/messages` states it on the page for exactly that reason,
+but check it at deploy time rather than waiting for a recruiter to ask why no
+candidate ever replies.
 
 ### `FIXED` 2026-09-12 — all six are now documented
 `CRON_SECRET`, `AI_MODEL`, `AI_BASE_URL`, `BOLNA_CATALOG_PATHS` and the
@@ -198,6 +205,69 @@ either way; the code is consumed on first use.
 
 **Verify:** sign up with a throwaway address on the deployed site, confirm the
 emailed link's host is the production domain, and land on `/onboarding`.
+
+---
+
+## 6.2 WhatsApp inbound webhook — registering the callback
+
+Only needed to **receive** messages. Sending works with nothing in this section;
+the inbox, the automatic STOP handling and WhatsApp delivery/read receipts do
+not.
+
+**Endpoint:** `https://<domain>/api/webhooks/whatsapp`
+
+One URL for the whole deployment. It is public and unauthenticated by necessity
+— Meta calls it directly and holds no session — and is protected the same way
+the Bolna webhook is: an HMAC signature over the raw body, compared in constant
+time, with the tenant resolved from **our** `organization_integrations` row
+rather than from anything in the payload.
+
+### Steps
+
+1. **Set both environment variables** *before* registering the callback, and
+   redeploy. Meta verifies the URL the moment you save it, and an unset
+   `WHATSAPP_VERIFY_TOKEN` answers the handshake with a 503.
+   - `WHATSAPP_VERIFY_TOKEN` — any string you choose.
+   - `WHATSAPP_APP_SECRET` — Meta app → **Settings → Basic → App Secret**
+     (32 hex characters).
+2. **Meta App Dashboard → WhatsApp → Configuration → Webhook → Edit:**
+   - Callback URL: `https://<domain>/api/webhooks/whatsapp`
+   - Verify token: the same string as `WHATSAPP_VERIFY_TOKEN`
+   - Save. Meta issues a `GET` with `hub.challenge`; a correct setup echoes it
+     back as plain text and the dialog closes.
+3. **Subscribe to the `messages` field** on the same screen. Without it the URL
+   verifies and nothing is ever delivered — the single most common way this ends
+   up half-configured.
+4. **Verify end to end:** text the business number from a phone. The thread
+   appears in `/messages` within ~15 seconds (the inbox polls; it does not hold a
+   socket open).
+
+### Multi-tenant deployments
+
+`WHATSAPP_APP_SECRET` assumes **one Meta app for the deployment** — the Tech
+Provider model, where customers' numbers are onboarded onto your app. An
+organization that brings its **own** Meta app signs its events with its own
+secret, which no single environment variable can cover, so that value is stored
+per organization instead: **Settings → Integrations → WhatsApp → Meta app
+secret**, encrypted like every other credential, and it takes precedence over
+the environment for that tenant. The verify token stays deployment-wide either
+way: the handshake carries nothing that identifies a tenant.
+
+### Checks
+
+| Command | Expected |
+| --- | --- |
+| `curl -i "https://<domain>/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=WRONG&hub.challenge=x"` | **403** — and **503** means `WHATSAPP_VERIFY_TOKEN` never reached the deployment |
+| `curl -i -X POST https://<domain>/api/webhooks/whatsapp -d '{"entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"<your id>"},"messages":[{"from":"919876543210","id":"wamid.X","type":"text","timestamp":"1758369600","text":{"body":"hi"}}]}}]}]'` | **401** — unsigned. Anything else is a serious finding: it means forged candidate messages are being accepted |
+
+### Rollback
+
+The webhook is additive and independent of sending. To stop receiving without a
+deploy, remove the callback URL in Meta's dashboard, or unset
+`WHATSAPP_APP_SECRET` — inbound then fails closed and every other WhatsApp
+feature keeps working. Migration 0041 is additive (a new table, new nullable
+columns, one relaxed CHECK) and older application code runs against it
+unchanged, so the code can roll back without touching the schema.
 
 ---
 

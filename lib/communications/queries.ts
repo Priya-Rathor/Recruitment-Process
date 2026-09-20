@@ -65,6 +65,13 @@ export type MessageLogEntry = {
   application_id: string | null;
   candidate_id: string;
   channel: "email" | "whatsapp";
+  /**
+   * 0041. Every row was outbound before the inbound webhook existed, and the
+   * column defaults accordingly — but the candidate-level rollup is keyed on
+   * candidate_id, so it now picks up what the candidate SENT as well as what we
+   * sent them. Without this the log would label their own words "Automatic".
+   */
+  direction: "outbound" | "inbound";
   template_id: string | null;
   event_key: string | null;
   subject: string | null;
@@ -82,8 +89,8 @@ export type MessageLogEntry = {
 };
 
 const LOG_COLUMNS =
-  "id, application_id, candidate_id, channel, template_id, event_key, subject, body_sent, " +
-  "status, error_message, recipient_hint, sent_by, sent_at, created_at";
+  "id, application_id, candidate_id, channel, direction, template_id, event_key, subject, " +
+  "body_sent, status, error_message, recipient_hint, sent_by, sent_at, created_at";
 
 type LogRow = Omit<MessageLogEntry, "sender_name" | "job_title"> & {
   sender: { name: string | null; email: string } | null;
@@ -96,6 +103,7 @@ function flattenLog(row: LogRow): MessageLogEntry {
     application_id: row.application_id,
     candidate_id: row.candidate_id,
     channel: row.channel,
+    direction: row.direction,
     template_id: row.template_id,
     event_key: row.event_key,
     subject: row.subject,
