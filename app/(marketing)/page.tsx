@@ -1,4 +1,12 @@
 import type { Metadata } from "next";
+import {
+  SITE_DESCRIPTION,
+  buildMetadata,
+  faqJsonLd,
+  organizationJsonLd,
+  softwareJsonLd,
+} from "@/lib/marketing/seo";
+import { HOME_FAQS } from "@/lib/marketing/home";
 import { Hero } from "./_components/home/Hero";
 import { Workspace } from "./_components/home/Workspace";
 import { HiringWorkflow } from "./_components/home/HiringWorkflow";
@@ -10,21 +18,22 @@ import { TrustSection } from "./_components/home/TrustSection";
 import { Faq } from "./_components/home/Faq";
 import { FinalCta } from "./_components/home/FinalCta";
 
+/*
+  ABSOLUTE title, so this one page escapes the "%s · Scoreboad" template: the
+  brief specifies the exact string, and the template would put the brand last
+  on the page where it should be first.
+
+  Everything else comes from the shared helper, so the canonical, the Open
+  Graph block and the Twitter card are built the same way as every other public
+  page rather than by hand here.
+*/
 export const metadata: Metadata = {
-  title: "Find the Right People Faster",
-  description:
-    "Scoreboad is an AI-powered recruitment platform that helps teams screen, " +
-    "evaluate, interview, and manage candidates from one connected workspace.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: "Scoreboad — Find the Right People Faster",
-    description:
-      "Scoreboad is an AI-powered recruitment platform that helps teams screen, " +
-      "evaluate, interview, and manage candidates from one connected workspace.",
-    url: "/",
-    siteName: "Scoreboad",
-    type: "website",
-  },
+  ...buildMetadata({
+    title: "Find the Right People Faster",
+    description: SITE_DESCRIPTION,
+    path: "/",
+  }),
+  title: { absolute: "Scoreboad — Find the Right People Faster" },
 };
 
 /**
@@ -65,6 +74,30 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <>
+      {/*
+        STRUCTURED DATA, and every block describes something this page actually
+        renders.
+
+        The FAQ block is built from HOME_FAQS — the same array the FAQ section
+        below displays — so the markup and the page cannot disagree. Structured
+        data claiming questions a visitor cannot see is what a manual action is
+        issued for, and it happens because the two are usually written in
+        different files.
+
+        No `offers` and no `aggregateRating`: pricing is not published and there
+        are no reviews. Both can be added the day those things are true.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify([
+            organizationJsonLd(),
+            softwareJsonLd(),
+            faqJsonLd(HOME_FAQS),
+          ]),
+        }}
+      />
+
       <Hero />
       <Workspace />
       <HiringWorkflow />

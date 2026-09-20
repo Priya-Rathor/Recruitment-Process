@@ -1,5 +1,5 @@
 import { AI_SIDE, HUMAN_SIDE } from "@/lib/marketing/home";
-import { Reveal } from "./Reveal";
+import { Reveal } from "@/components/marketing/Reveal";
 
 /**
  * "AI does the work. You make the decisions."

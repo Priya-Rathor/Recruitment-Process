@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/marketing/seo";
 import Link from "next/link";
 import {
   END_TO_END_FLOW,
@@ -7,12 +8,15 @@ import {
   getGroup,
 } from "@/lib/marketing/content";
 
-export const metadata: Metadata = {
+// Built by the shared helper, which is what gives this page the Open Graph and
+// Twitter blocks it previously had no reason to be missing — it simply had not
+// been written out by hand here.
+export const metadata: Metadata = buildMetadata({
   title: "How it works",
   description:
     "The full hiring flow, from a client requirement to a collected onboarding document — and exactly where AI assists and where a person decides.",
-  alternates: { canonical: "/how-it-works" },
-};
+  path: "/how-it-works",
+});
 
 /**
  * The how-it-works page.

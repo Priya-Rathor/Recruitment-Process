@@ -1,5 +1,7 @@
 import { WORKFLOW_STEPS } from "@/lib/marketing/home";
-import { Reveal } from "./Reveal";
+import { Section } from "@/components/marketing/Section";
+import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { Reveal } from "@/components/marketing/Reveal";
 
 /**
  * "From application to hire" — six steps.
@@ -16,16 +18,12 @@ import { Reveal } from "./Reveal";
  */
 export function HiringWorkflow() {
   return (
-    <section className="mkt-band mkt-band--light mkt-band--flush">
-      <div className="mkt-shell">
-        <div className="mkt-bandhead">
-          <p className="mkt-eyebrow mkt-eyebrow--light">The flow</p>
-          <h2>From application to hire.</h2>
-          <p className="mkt-bandlead">
-            One path through the process, with every stage writing to the same
-            records.
-          </p>
-        </div>
+    <Section tone="light" flush>
+      <SectionHeading
+        eyebrow="The flow"
+        title="From application to hire."
+        lead="One path through the process, with every stage writing to the same records."
+      />
 
         <ol className="mkt-flowline">
           {WORKFLOW_STEPS.map((step, index) => (
@@ -37,8 +35,7 @@ export function HiringWorkflow() {
               <p>{step.body}</p>
             </Reveal>
           ))}
-        </ol>
-      </div>
-    </section>
+      </ol>
+    </Section>
   );
 }

@@ -441,35 +441,15 @@ export const FAQS: { q: string; a: string }[] = [
   },
 ];
 
-/** Footer columns. Every internal href is asserted to resolve by the test. */
-export const FOOTER_SECTIONS: { title: string; links: { label: string; href: string }[] }[] = [
-  {
-    title: "Product",
-    links: CAPABILITY_GROUPS.map((g) => ({ label: g.tab, href: `/product/${g.slug}` })),
-  },
-  {
-    title: "Learn",
-    links: [
-      { label: "How it works", href: "/how-it-works" },
-      { label: "AI safety model", href: "/how-it-works#ai-safety" },
-    ],
-  },
-  {
-    title: "Get started",
-    links: [
-      { label: "Sign in", href: "/login" },
-      { label: "Create an account", href: "/signup" },
-    ],
-  },
-];
+/*
+  The header nav and footer columns MOVED to lib/marketing/home.ts as
+  HOME_NAV_LINKS / HOME_FOOTER_SECTIONS when the landing page was redesigned.
 
-/** Header nav. Kept short — six product links live in a dropdown-free footer. */
-export const NAV_LINKS: { label: string; href: string }[] = [
-  { label: "Product", href: "/#product" },
-  { label: "How it works", href: "/how-it-works" },
-  { label: "Trust", href: "/#trust" },
-  { label: "FAQ", href: "/#faq" },
-];
+  Removed rather than left in place: both were exported, both were unused by any
+  component afterwards, and a second set of nav constants sitting beside the
+  live ones is how a future edit lands in the wrong file and appears to do
+  nothing. Their link-integrity assertions moved to home.test.ts with them.
+*/
 
 /** Lookup used by the product route's generateStaticParams and page. */
 export function getGroup(slug: string): CapabilityGroup | undefined {

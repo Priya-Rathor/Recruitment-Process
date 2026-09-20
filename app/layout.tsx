@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/marketing/seo";
 import { Space_Grotesk, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.scss";
 
@@ -40,15 +41,32 @@ const grotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
+  /*
+    The origin every relative metadata URL resolves against.
+
+    Without it, `alternates: { canonical: "/" }` on the landing page emits a
+    bare "/" — which is not a canonical URL, and which Next warns about at build
+    time. Overridable by env so a preview deployment canonicalises to itself
+    rather than telling a crawler that production is the original.
+  */
+  metadataBase: new URL(SITE_URL),
   // A template, so every page appends the product name instead of each one
   // spelling it out. New pages only need their own title.
   title: {
-    default: "Scoreboad — Smarter Hiring. Brighter Teams.",
-    template: "%s · Scoreboad",
+    /*
+      The DEFAULT, used by any page that does not set its own — which today is
+      every page inside the application. The landing page overrides it with an
+      absolute title; the other public pages set a short title and take the
+      template.
+
+      Sourced from lib/marketing/seo.ts so there is one copy: the same constants
+      feed buildMetadata(), the sitemap and the JSON-LD, and a brand line that
+      exists in four places is a brand line that will disagree in four places.
+    */
+    default: SITE_TITLE,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    "Smarter hiring, brighter teams: AI-assisted sourcing, screening, interviews and " +
-    "scheduling in one workspace.",
+  description: SITE_DESCRIPTION,
   /*
     THE FAVICON IS FILE-BASED, not declared here.
 
@@ -60,7 +78,7 @@ export const metadata: Metadata = {
 
     `applicationName` is here only so an installed PWA's name matches the brand.
   */
-  applicationName: "Scoreboad",
+  applicationName: SITE_NAME,
 };
 
 // DEEP SPACE, so the browser's OWN chrome takes the theme — the address bar on

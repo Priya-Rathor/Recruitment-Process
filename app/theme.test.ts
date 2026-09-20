@@ -201,14 +201,44 @@ describe("the retired theme is gone, not overridden", () => {
       fails, which is the part that matters.
     */
     const ALLOWED_SHADOW =
-      /box-shadow:\s*(var\(--[a-z-]*glow|var\(--focus-ring\)|none|inset [^;]*var\(--)/;
+      /box-shadow:\s*(var\(--[a-z-]*(glow|focus-ring)|none|inset [^;]*var\(--)/;
+
+    /*
+      Comments are skipped, and that is not a loophole — it is the difference
+      between checking the CSS and checking the prose ABOUT the CSS. This test
+      twice reported its own explanatory comments as offenders, because those
+      sentences contain the word it greps for. Left alone, the pressure is to
+      delete the explanation to make the test pass, which is the wrong thing to
+      optimise.
+
+      Block-comment STATE, not a line prefix: a first attempt matched lines
+      beginning with `//`, `/*` or `*`, and missed a line inside a block comment
+      that happened to begin with a backtick. Tracking the state is the only
+      version that is actually right.
+    */
 
     for (const [file, source] of SOURCE) {
       if (!file.endsWith(".scss") && !file.endsWith(".css")) continue;
+
+      let inBlockComment = false;
+
       source.split("\n").forEach((line, index) => {
+        const trimmed = line.trim();
+
+        // Opens and closes can share a line, so closing is checked first.
+        if (inBlockComment) {
+          if (trimmed.includes("*/")) inBlockComment = false;
+          return;
+        }
+        if (trimmed.startsWith("/*") && !trimmed.includes("*/")) {
+          inBlockComment = true;
+          return;
+        }
+        if (trimmed.startsWith("//") || trimmed.startsWith("/*")) return;
+
         if (!line.includes("box-shadow:")) return;
         if (ALLOWED_SHADOW.test(line)) return;
-        offenders.push(`${file}:${index + 1}  ${line.trim()}`);
+        offenders.push(`${file}:${index + 1}  ${trimmed}`);
       });
     }
 

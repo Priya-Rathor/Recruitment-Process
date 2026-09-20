@@ -86,6 +86,25 @@ const PUBLIC_PATHS = [
   "/",
   "/product",
   "/how-it-works",
+  /*
+    THE CRAWLER FILES, and they were a REAL BUG rather than a precaution.
+
+    `app/robots.ts` and `app/sitemap.ts` generate /robots.txt and /sitemap.xml,
+    and both are routes like any other — so deny-by-default caught them and
+    served Googlebot a 307 to /login. Neither file was readable by anything
+    that was not signed in, which is every crawler there is. Verified by
+    `curl /robots.txt` returning the login redirect.
+
+    The proxy matcher excludes favicon.ico and image extensions, but not .txt
+    or .xml, so the exclusion had to be here.
+
+    SAFE AS PREFIX ENTRIES because matches() frees an entry and anything
+    beneath it: "/robots.txt" frees exactly "/robots.txt" and a "/robots.txt/…"
+    subtree that does not exist. Neither string is a prefix of a private route —
+    publicPaths.test.ts pins that.
+  */
+  "/robots.txt",
+  "/sitemap.xml",
 ];
 
 /**

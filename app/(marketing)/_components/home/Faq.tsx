@@ -1,4 +1,6 @@
 import { HOME_FAQS } from "@/lib/marketing/home";
+import { Section } from "@/components/marketing/Section";
+import { SectionHeading } from "@/components/marketing/SectionHeading";
 
 /**
  * The FAQ.
@@ -14,12 +16,8 @@ import { HOME_FAQS } from "@/lib/marketing/home";
  */
 export function Faq() {
   return (
-    <section className="mkt-band mkt-band--light" id="faq">
-      <div className="mkt-shell">
-        <div className="mkt-bandhead">
-          <p className="mkt-eyebrow mkt-eyebrow--light">Questions</p>
-          <h2>Frequently asked questions.</h2>
-        </div>
+    <Section tone="light" id="faq">
+      <SectionHeading eyebrow="Questions" title="Frequently asked questions." />
 
         <div className="mkt-faqlist">
           {HOME_FAQS.map((faq) => (
@@ -36,8 +34,7 @@ export function Faq() {
               <p className="mkt-faqitem__a">{faq.a}</p>
             </details>
           ))}
-        </div>
       </div>
-    </section>
+    </Section>
   );
 }

@@ -1,7 +1,16 @@
 "use client";
 
 // =============================================================================
-// Scroll-in reveal.
+// THE ANIMATION SYSTEM — scroll-in reveal, and a stagger for groups.
+//
+// MOVED HERE FROM THE HOME FOLDER because it is foundation rather than one
+// page's helper: every marketing page built after this uses the same two
+// primitives, and a second copy living beside a second page is how two pages
+// come to fade at different speeds.
+//
+// ONE ANIMATION LANGUAGE, and these are it: opacity 0 -> 1 with a 14px lift,
+// 520ms, on the shared easing curve. Everything else on the site is a CSS
+// hover transition. There is deliberately no third mechanism.
 //
 // ONE OBSERVER PER ELEMENT, unobserved the moment it fires. The alternative —
 // a scroll listener recomputing offsets — runs on the main thread during the
@@ -77,6 +86,52 @@ export function Reveal({
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
     >
       {children}
+    </Tag>
+  );
+}
+
+
+/**
+ * A group whose children reveal in sequence.
+ *
+ * WHY THIS EXISTS RATHER THAN A `delay` ON EACH CHILD. Staggering by hand means
+ * every call site computing `index * 60`, and the moment a grid's order changes
+ * the delays are wrong in a way nobody notices — the animation still runs, just
+ * out of step. Here the sequence is a property of the group.
+ *
+ * THE STAGGER IS CAPPED. Eight cards at 60ms is 420ms of waiting for the last
+ * one, which is already at the edge of feeling slow; a twelve-item grid at the
+ * same step would take three-quarters of a second to finish arriving. Past the
+ * cap the remaining children share the final delay, so a long list still lands
+ * promptly.
+ */
+export function Stagger({
+  children,
+  step = 60,
+  /** Beyond this many children the delay stops growing. */
+  max = 6,
+  className = "",
+  as = "div",
+}: {
+  children: ReactNode[];
+  step?: number;
+  max?: number;
+  className?: string;
+  as?: "div" | "ul" | "ol";
+}) {
+  const Tag = as;
+
+  return (
+    <Tag className={className}>
+      {children.map((child, index) => (
+        <Reveal
+          key={index}
+          delay={Math.min(index, max) * step}
+          as={as === "div" ? "div" : "li"}
+        >
+          {child}
+        </Reveal>
+      ))}
     </Tag>
   );
 }

@@ -1,4 +1,6 @@
 import { PIPELINE_PREVIEW } from "@/lib/marketing/home";
+import { Section } from "@/components/marketing/Section";
+import { SectionHeading } from "@/components/marketing/SectionHeading";
 
 /**
  * "See your hiring pipeline at a glance." — the second product view.
@@ -17,16 +19,12 @@ import { PIPELINE_PREVIEW } from "@/lib/marketing/home";
  */
 export function PipelinePreview() {
   return (
-    <section className="mkt-band mkt-band--light mkt-band--flush">
-      <div className="mkt-shell">
-        <div className="mkt-bandhead">
-          <p className="mkt-eyebrow mkt-eyebrow--light">The pipeline</p>
-          <h2>See your hiring pipeline at a glance.</h2>
-          <p className="mkt-bandlead">
-            Every candidate, their stage, their match against the role, and the one
-            thing waiting to happen next.
-          </p>
-        </div>
+    <Section tone="light" flush>
+      <SectionHeading
+        eyebrow="The pipeline"
+        title="See your hiring pipeline at a glance."
+        lead="Every candidate, their stage, their match against the role, and the one thing waiting to happen next."
+      />
 
         <figure className="mkt-table">
           <div className="mkt-table__scroll">
@@ -75,8 +73,7 @@ export function PipelinePreview() {
           <figcaption className="mkt-product__caption">
             Example data, shown to illustrate the interface.
           </figcaption>
-        </figure>
-      </div>
-    </section>
+      </figure>
+    </Section>
   );
 }

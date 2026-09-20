@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/marketing/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CAPABILITY_GROUPS, getGroup } from "@/lib/marketing/content";
@@ -33,17 +34,14 @@ export async function generateMetadata({
   const group = getGroup(slug);
   if (!group) return {};
 
-  return {
-    // The root layout's template appends "· Scoreboad".
+  // The root layout's template appends "· Scoreboad" to the title; the helper
+  // builds the canonical, the Open Graph block and the Twitter card from the
+  // same three values, so the six product pages cannot drift from each other.
+  return buildMetadata({
     title: group.tab,
     description: group.summary,
-    alternates: { canonical: `/product/${group.slug}` },
-    openGraph: {
-      title: `${group.tab} · Scoreboad`,
-      description: group.summary,
-      type: "website",
-    },
-  };
+    path: `/product/${group.slug}`,
+  });
 }
 
 export default async function ProductPage({

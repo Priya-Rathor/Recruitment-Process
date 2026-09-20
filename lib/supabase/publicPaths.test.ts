@@ -144,4 +144,31 @@ describe("isPublicPath", () => {
       expect(isPublicPath("/PRODUCT/source")).toBe(false);
     });
   });
+  describe("the crawler files are reachable without a session", () => {
+    /*
+      A REGRESSION PIN FOR A REAL BUG, not a hypothetical.
+
+      app/robots.ts and app/sitemap.ts generate /robots.txt and /sitemap.xml,
+      and they are routes like any other — so deny-by-default caught them and
+      served every crawler a 307 to /login. The SEO foundation was complete and
+      completely unreadable, and nothing failed: the files existed, the build
+      passed, and `curl` was the only way to find out.
+
+      It is the worst shape of bug this allowlist can produce, because the
+      symptom is silence. Pinned here so it cannot come back.
+    */
+    it("serves robots.txt and sitemap.xml to an anonymous crawler", () => {
+      expect(isPublicPath("/robots.txt")).toBe(true);
+      expect(isPublicPath("/sitemap.xml")).toBe(true);
+    });
+
+    it("does not free anything else by adding them", () => {
+      // matches() frees an entry AND its subtree, so these are checked the
+      // same way every other prefix entry in this file is.
+      expect(isPublicPath("/robots")).toBe(false);
+      expect(isPublicPath("/sitemap")).toBe(false);
+      expect(isPublicPath("/robots.txt.private")).toBe(false);
+    });
+  });
+
 });

@@ -152,6 +152,20 @@
     0 12px 32px -18px rgba(4, 8, 22, 0.85);
   --mkt-glow-sheet: 0 24px 48px -20px rgba(4, 8, 22, 0.90);
 
+  /*
+    FOCUS RINGS. Two rings: an inner spacer in the surface colour, then the
+    accent — so the ring reads on a card, a dark band and a glass surface alike.
+
+    Tokens rather than a repeated declaration, for the reason every other
+    shadow here is a token: app/theme.test.ts asserts that every box-shadow in
+    the codebase is one. Written inline they were also the only multi-LINE
+    declarations in the file, which the line-based check reported as bare
+    `box-shadow:` — a good reminder that the rule is easier to keep than to
+    argue with.
+  */
+  --mkt-focus-ring: 0 0 0 2px var(--mkt-dark), 0 0 0 4px var(--mkt-accent-bright);
+  --mkt-focus-ring-light: 0 0 0 2px var(--mkt-white), 0 0 0 4px var(--mkt-accent-ink);
+
   --mkt-radius-sm: 12px;
   --mkt-radius: 16px;
   --mkt-radius-lg: 22px;
@@ -2655,6 +2669,317 @@
   @media (max-width: 480px) {
     .mkt-foot__top {
       grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}
+
+// =============================================================================
+// MODULE 01 — the shared foundation the component layer renders into.
+//
+// Everything below backs a component in components/marketing/. Nothing here is
+// speculative: a style with no component and no caller is dead CSS that the
+// next person has to decide whether they may delete.
+// =============================================================================
+.mkt {
+  // ---------------------------------------------------------------------------
+  // TYPOGRAPHY SCALE
+  //
+  // Named by ROLE, not by size. The fluid --mkt-h1/h2/h3 values already existed
+  // for headings; these fill in the body end of the scale so a new page has a
+  // named size to reach for instead of picking a px value that is one off the
+  // one beside it.
+  //
+  // The app's own scale (--text-body and friends in globals.scss) is FIXED,
+  // because a dense data table must not reflow with the viewport. The marketing
+  // scale is fluid, because a landing page headline should. Two scales on
+  // purpose, and this is the one for public pages.
+  // ---------------------------------------------------------------------------
+  --mkt-display: clamp(2.75rem, 7vw, 4.75rem);  // reserved for a future hero
+  --mkt-body-lg: clamp(1rem, 1.2vw, 1.125rem);
+  --mkt-body: 0.9375rem;    // 15px
+  --mkt-small: 0.875rem;    // 14px
+  --mkt-caption: 0.75rem;   // 12px
+  --mkt-button: 0.875rem;
+
+  --mkt-leading-tight: 1.12;   // display and headings
+  --mkt-leading-snug: 1.35;    // subheadings, card titles
+  --mkt-leading-normal: 1.6;   // body copy
+
+  // ---------------------------------------------------------------------------
+  // SPACING SCALE
+  //
+  // The section rhythm was already one value (--mkt-section-y). These are the
+  // INTERNAL steps, so a card's padding and a grid's gap come from the same
+  // ladder rather than being chosen per component.
+  // ---------------------------------------------------------------------------
+  --mkt-space-1: 0.25rem;
+  --mkt-space-2: 0.5rem;
+  --mkt-space-3: 0.75rem;
+  --mkt-space-4: 1rem;
+  --mkt-space-6: 1.5rem;
+  --mkt-space-8: 2rem;
+  --mkt-space-12: 3rem;
+  --mkt-space-16: 4rem;
+
+  // ---------------------------------------------------------------------------
+  // BUTTONS — the tertiary variant
+  //
+  // Text-style, for the third action in a group. It keeps the button's height
+  // and padding so it aligns on a row with the other two: a bare <a> beside two
+  // buttons sits on a different baseline and looks like a mistake.
+  // ---------------------------------------------------------------------------
+  .mkt-btn--text {
+    background: transparent;
+    border-color: transparent;
+    color: var(--mkt-accent-ink);
+    padding-inline: 0.75rem;
+
+    &:hover {
+      background: rgba(139, 158, 255, 0.10);
+      color: var(--mkt-accent-ink);
+    }
+  }
+
+  // On a dark band the tertiary takes the bright periwinkle, which outreads
+  // muted body copy at 9.72:1.
+  .mkt-band--dark .mkt-btn--text,
+  .mkt-hero .mkt-btn--text {
+    color: var(--mkt-accent-on-dark);
+
+    &:hover {
+      background: var(--mkt-glass);
+      color: var(--mkt-on-dark);
+    }
+  }
+
+  /*
+    FOCUS, on every marketing control.
+
+    A two-ring shape so it reads on a light card, a dark band and a glass
+    surface alike — the inner ring is the surface colour, the outer the accent.
+    `:focus-visible` rather than `:focus`, so a mouse click does not leave a
+    ring behind, but a keyboard user always sees one.
+  */
+  .mkt-btn:focus-visible,
+  .mkt-nav__links a:focus-visible,
+  .mkt-nav__signin:focus-visible,
+  .mkt-nav__burger:focus-visible,
+  .mkt-foot__col a:focus-visible,
+  .mkt-faqitem__q:focus-visible,
+  .mkt-crumbs a:focus-visible {
+    outline: none;
+    box-shadow: var(--mkt-focus-ring);
+  }
+
+  .mkt-band--light :focus-visible,
+  .mkt-band--statement :focus-visible {
+    box-shadow: var(--mkt-focus-ring-light);
+  }
+
+  // ---------------------------------------------------------------------------
+  // CARDS — the dark, glass and interactive variants
+  // ---------------------------------------------------------------------------
+  .mkt-lcard--dark {
+    background: var(--mkt-dark-2);
+    border-color: var(--mkt-dark-border);
+    box-shadow: none;
+
+    h3 {
+      color: var(--mkt-on-dark);
+    }
+
+    p {
+      color: var(--mkt-on-dark-muted);
+    }
+
+    &:hover {
+      border-color: var(--mkt-dark-border-strong);
+      box-shadow: var(--mkt-glow-accent);
+    }
+  }
+
+  /*
+    GLASS. Used sparingly and only over something worth seeing through — the
+    hero's ribbons, a dark band's gradient. Over a flat surface it is just a
+    slightly wrong grey, which is how glass ends up looking cheap.
+  */
+  .mkt-lcard--glass {
+    background: var(--mkt-glass);
+    border-color: var(--mkt-glass-border);
+    backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: none;
+
+    h3 {
+      color: var(--mkt-on-dark);
+    }
+
+    p {
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  // Only a card that actually navigates gets the lift. A static card that
+  // rises under the cursor is promising a click it does not accept.
+  .mkt-lcard--interactive {
+    cursor: pointer;
+  }
+
+  .mkt-lcard:not(.mkt-lcard--interactive):hover {
+    transform: none;
+  }
+
+  // ---- The metric card ------------------------------------------------------
+  .mkt-metric {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mkt-space-1);
+    padding: var(--mkt-space-6);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+  }
+
+  .mkt-metric__value {
+    font-family: var(--font-heading);
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    font-weight: var(--weight-bold);
+    line-height: var(--mkt-leading-tight);
+    color: var(--mkt-ink);
+    // So a row of figures does not jitter as their widths differ.
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mkt-metric__label {
+    font-size: var(--mkt-small);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink);
+  }
+
+  .mkt-metric__note {
+    font-size: var(--mkt-caption);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink-muted);
+  }
+
+  .mkt-band--dark .mkt-metric {
+    background: var(--mkt-dark-2);
+    border-color: var(--mkt-dark-border);
+    box-shadow: none;
+
+    .mkt-metric__value,
+    .mkt-metric__label {
+      color: var(--mkt-on-dark);
+    }
+
+    .mkt-metric__note {
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // GRADIENT TEXT
+  //
+  // THE SOLID COLOUR IS SET FIRST AND THE CLIP ONLY INSIDE @supports. A
+  // transparent fill with no gradient behind it is INVISIBLE text, not
+  // unstyled text — which is what makes this worth a component rather than a
+  // utility class somebody copies without the guard.
+  // ---------------------------------------------------------------------------
+  .mkt-gradient {
+    color: var(--mkt-accent-bright);
+  }
+
+  .mkt-gradient--block {
+    display: block;
+  }
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .mkt-gradient {
+      background: linear-gradient(100deg, #aab7ff 0%, #c6b8ff 52%, #dcd4ff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    // On a light band the same phrase needs the darkened pair, or it is a pale
+    // smear on white.
+    .mkt-band--light .mkt-gradient,
+    .mkt-band--statement .mkt-gradient {
+      background: linear-gradient(100deg, #515f9e 0%, #6f68b4 55%, #3f716e 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+  }
+
+  .mkt-band--light .mkt-gradient,
+  .mkt-band--statement .mkt-gradient {
+    color: var(--mkt-accent-ink);
+  }
+
+  // ---------------------------------------------------------------------------
+  // BADGE
+  // ---------------------------------------------------------------------------
+  .mkt-pill--accent {
+    border-color: var(--mkt-dark-border-strong);
+    color: var(--mkt-accent-on-dark);
+  }
+
+  // ---------------------------------------------------------------------------
+  // BREADCRUMBS
+  // ---------------------------------------------------------------------------
+  .mkt-crumbs {
+    margin-bottom: var(--mkt-space-6);
+
+    ol {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--mkt-space-2);
+      font-size: var(--mkt-caption);
+    }
+
+    li {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--mkt-space-2);
+    }
+
+    a {
+      color: var(--mkt-ink-muted);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--mkt-accent-ink);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+    }
+
+    // The current page. Not a link, and marked with aria-current in the markup.
+    [aria-current="page"] {
+      color: var(--mkt-ink);
+      font-weight: var(--weight-medium);
+    }
+  }
+
+  .mkt-crumbs__sep {
+    color: var(--mkt-light-border-strong);
+  }
+
+  .mkt-band--dark .mkt-crumbs {
+    a {
+      color: var(--mkt-on-dark-muted);
+
+      &:hover {
+        color: var(--mkt-accent-on-dark);
+      }
+    }
+
+    [aria-current="page"] {
+      color: var(--mkt-on-dark);
     }
   }
 }

@@ -3,9 +3,6 @@ import {
   CAPABILITY_GROUPS,
   END_TO_END_FLOW,
   FAQS,
-  FOOTER_SECTIONS,
-  INTERNAL_ROUTES,
-  NAV_LINKS,
   ROLE_FLOWS,
   STATS,
   TRUST_POINTS,
@@ -104,61 +101,11 @@ describe("capability groups", () => {
   });
 });
 
-describe("internal links", () => {
-  /**
-   * Every internal href on the site must resolve to a route that exists.
-   *
-   * INTERNAL_ROUTES is the inventory of real pages. Anything linked that is not
-   * in it is a 404 shipped into a shared header or footer, which means it
-   * appears on every page rather than one.
-   */
-  const known = new Set(INTERNAL_ROUTES);
-
-  it("footer links all resolve", () => {
-    for (const section of FOOTER_SECTIONS) {
-      for (const link of section.links) {
-        // Strip the fragment: /how-it-works#ai-safety resolves to a real page,
-        // and the anchor is checked separately below.
-        const path = link.href.split("#")[0];
-        expect(known.has(path), `footer → ${link.href}`).toBe(true);
-      }
-    }
-  });
-
-  it("nav links all resolve", () => {
-    for (const link of NAV_LINKS) {
-      const path = link.href.split("#")[0] || "/";
-      expect(known.has(path), `nav → ${link.href}`).toBe(true);
-    }
-  });
-
-  it("only uses fragments that a page actually renders", () => {
-    // The ids below are set on real sections in page.tsx and how-it-works.
-    const renderedIds = new Set(["product", "trust", "faq", "ai-safety", "main"]);
-    const hrefs = [...NAV_LINKS, ...FOOTER_SECTIONS.flatMap((s) => s.links)];
-
-    for (const link of hrefs) {
-      const [, fragment] = link.href.split("#");
-      if (!fragment) continue;
-      expect(renderedIds.has(fragment), `${link.href} → #${fragment}`).toBe(true);
-    }
-  });
-
-  it("has a product link for every capability group", () => {
-    // The footer's Product column is generated from the groups, so this guards
-    // the inverse: a group that never becomes a link is an orphan page.
-    const productLinks = FOOTER_SECTIONS.find((s) => s.title === "Product")?.links ?? [];
-    expect(productLinks).toHaveLength(CAPABILITY_GROUPS.length);
-  });
-
-  it("uses no absolute or off-site hrefs in the shared chrome", () => {
-    // A hardcoded https:// link to our own domain breaks on preview
-    // deployments and skips the client-side router.
-    for (const link of [...NAV_LINKS, ...FOOTER_SECTIONS.flatMap((s) => s.links)]) {
-      expect(link.href.startsWith("/")).toBe(true);
-    }
-  });
-});
+/*
+  The "internal links" suite moved to lib/marketing/home.test.ts along with the
+  nav and footer constants it asserted on. It is not weaker for moving: it now
+  runs against the constants the shared chrome actually renders.
+*/
 
 describe("stats", () => {
   it("shows three figures, matching the three-column band", () => {
