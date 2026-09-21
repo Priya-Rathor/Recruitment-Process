@@ -2158,6 +2158,386 @@
   }
 
   // ===========================================================================
+  // THE HIRING PIPELINE
+  //
+  // A sticky board with one candidate crossing it. Everything is driven by two
+  // attributes on `.pl__board` — `data-beat` (where the story is) and
+  // `data-focus` (which column the reader pressed) — plus one custom property,
+  // `--col`, that positions the travelling card.
+  // ===========================================================================
+  .pl {
+    position: relative;
+    // The low end of the brief's 200-260vh. Six beats at ~33vh each, and the
+    // page already carries two longer scroll tracks above this one.
+    height: 200vh;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  .pl__runway {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1px;
+    pointer-events: none;
+  }
+
+  .pl__mark {
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 1px;
+
+    @for $i from 0 through 5 {
+      &[data-mark="#{$i}"] {
+        top: percentage(calc($i / 6));
+      }
+    }
+  }
+
+  .pl__pin {
+    position: sticky;
+    top: 5rem;
+  }
+
+  /*
+    THE BOARD. A bright product surface on the deep band — the same contrast
+    the hero uses, and the right frame for the one visual on this page where
+    something actually moves.
+
+    `--gap` is declared here because BOTH the column grid and the traveller's
+    overlay read it. They must agree to the pixel or the card lands between
+    two columns.
+  */
+  .pl__board {
+    --gap: 0.625rem;
+
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid var(--mkt-light-border-strong);
+    border-radius: var(--mkt-radius-lg);
+    background: var(--mkt-light);
+    padding: clamp(0.875rem, 2vw, 1.25rem);
+    box-shadow: var(--mkt-glow-product);
+  }
+
+  .pl__glow {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      20rem 20rem at var(--mx, 24%) var(--my, 8%),
+      rgba(139, 158, 255, 0.14),
+      transparent 70%
+    );
+  }
+
+  .pl__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.875rem;
+  }
+
+  .pl__job {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 15px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .pl__jobmeta {
+    margin: 1px 0 0;
+    font-size: var(--text-caption);
+    color: var(--mkt-ink-muted);
+  }
+
+  /*
+    The counts on this board are invented. That is fine for a product shot and
+    not fine unstated, so the label sits in the board's own chrome rather than
+    in small print underneath it.
+  */
+  .pl__demo {
+    flex-shrink: 0;
+    padding: 1px 0.4375rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-light-border-strong);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  // ---- The columns ----------------------------------------------------------
+  .pl__cols {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--gap);
+  }
+
+  .pl-col {
+    min-width: 0;
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    padding: 0.5rem;
+    transition:
+      opacity 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    /*
+      DIMMED, NOT HIDDEN — 0.45. Focusing one stage must not make the other
+      five unreadable; the point of the board is that you can see the whole
+      pipeline at once, and a focus mode that destroys that would argue
+      against the section it is in.
+    */
+    &[data-state="dim"] {
+      opacity: 0.45;
+    }
+
+    &[data-state="focus"] {
+      border-color: var(--color-primary);
+      box-shadow: var(--mkt-glow-card);
+    }
+
+    &:hover {
+      border-color: var(--mkt-light-border-strong);
+    }
+  }
+
+  .pl-col__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.375rem;
+    width: 100%;
+    min-height: 1.75rem;
+    padding: 0.125rem 0.1875rem;
+    border: 0;
+    border-radius: var(--mkt-radius-sm);
+    background: none;
+    font-family: var(--font-body);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--mkt-light);
+    }
+  }
+
+  .pl-col__name {
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.03em;
+    color: var(--mkt-ink);
+    // The real stage names are long — "AI Screening Call" in a sixth of a
+    // board. Two lines, then ellipsis, rather than a column that is taller
+    // than its neighbours.
+    line-height: 1.25;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .pl-col__count {
+    flex-shrink: 0;
+    font-family: var(--font-heading);
+    font-size: 12px;
+    font-weight: var(--weight-bold);
+    color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pl-col__sla {
+    margin: 0.125rem 0 0.5rem;
+    padding-inline: 0.1875rem;
+    font-size: 9.5px;
+    color: var(--mkt-ink-muted);
+  }
+
+  .pl-col__cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    // Holds the tallest column's worth, so the board does not resize as the
+    // story advances.
+    min-height: 9.5rem;
+  }
+
+  /*
+    The slot the traveller lands in. Invisible, but it occupies exactly the
+    card's height so the column below it does not jump when the card arrives.
+  */
+  .pl-slot {
+    height: 4.25rem;
+  }
+
+  .pl-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0.4375rem 0.5rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-light-border);
+    // The SLA state shows as a left edge as well as a word — two signals.
+    border-left-width: 3px;
+    background: var(--mkt-light);
+
+    &[data-sla="ok"] { border-left-color: var(--mkt-light-border-strong); }
+    &[data-sla="at_risk"] { border-left-color: var(--mkt-amber-ink); }
+    &[data-sla="breached"] { border-left-color: var(--color-error, #b4232c); }
+  }
+
+  .pl-mini__name {
+    font-size: 11.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .pl-mini__role {
+    font-size: 10px;
+    color: var(--mkt-ink-muted);
+  }
+
+  .pl-mini__sla {
+    margin-top: 2px;
+    font-size: 9.5px;
+    color: var(--mkt-ink-muted);
+  }
+
+  .pl-mini[data-sla="at_risk"] .pl-mini__sla { color: var(--mkt-amber-ink); }
+  .pl-mini[data-sla="breached"] .pl-mini__sla {
+    color: var(--color-error, #b4232c);
+    font-weight: var(--weight-semibold);
+  }
+
+  // ---- THE TRAVELLER --------------------------------------------------------
+  /*
+    An overlay grid with the SAME six tracks and the SAME gap as the board, so
+    one column of the overlay is exactly one column of the board. The card
+    sits in track 1 and is translated right by whole columns.
+
+    `100% + var(--gap)` is the move: 100% of the card's own width is one track,
+    because the card fills its cell. Get the gap wrong here and the card drifts
+    further out of line with every column it crosses — which is why `--gap` is
+    declared once on the board and read by both grids.
+  */
+  .pl__overlay {
+    position: absolute;
+    top: 0;
+    left: clamp(0.875rem, 2vw, 1.25rem);
+    right: clamp(0.875rem, 2vw, 1.25rem);
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--gap);
+    pointer-events: none;
+    z-index: 2;
+    // Clear of the board header, the column header and the SLA line.
+    margin-top: calc(clamp(0.875rem, 2vw, 1.25rem) + 4.4rem);
+  }
+
+  .pl__traveller {
+    grid-column: 1;
+    transform: translateX(calc(var(--col, 0) * (100% + var(--gap))));
+    transition: transform 720ms cubic-bezier(0.65, 0, 0.35, 1);
+
+    // The card shrinks to board scale without a second set of card styles.
+    .cw-card {
+      padding: 0.5rem;
+      box-shadow: var(--mkt-glow-card-hover);
+    }
+
+    .cw-card__avatar { width: 1.5rem; height: 1.5rem; font-size: 9.5px; }
+    .cw-card__who strong { font-size: 11.5px; }
+    .cw-card__who span { font-size: 10px; }
+    .cw-card__chips { margin-top: 0.375rem; gap: 0.25rem; }
+    .cw-card__chip { padding: 1px 0.375rem; }
+    .cw-card__chip dt { font-size: 8.5px; }
+    .cw-card__chip dd { font-size: 10px; }
+  }
+
+  .pl__exits {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    margin: 0.875rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--mkt-light-border);
+    font-size: 11.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink-muted);
+  }
+
+  .pl__exitnote {
+    font-weight: var(--weight-regular);
+    font-size: 11px;
+    opacity: 0.85;
+  }
+
+  // ---- The beat rail --------------------------------------------------------
+  .pl__story {
+    margin-top: 1.25rem;
+  }
+
+  .pl-beats {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1.25rem;
+    margin: 0 0 0.875rem;
+    padding: 0;
+  }
+
+  .pl-beats__item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4375rem;
+    font-size: var(--text-caption);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition:
+      opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-state="off"] { opacity: 0.4; color: var(--mkt-on-dark-muted); }
+    &[data-state="done"] { opacity: 0.72; color: var(--mkt-on-dark-muted); }
+    &[data-state="on"] {
+      opacity: 1;
+      color: var(--mkt-on-dark);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .pl-beats__num {
+    font-family: var(--font-heading);
+    font-weight: var(--weight-bold);
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .pl__copy {
+    // A floor, so the board above does not shift as captions of different
+    // lengths swap in under it.
+    min-height: 4.5rem;
+  }
+
+  .pl__copytext {
+    margin: 0;
+    max-width: 54rem;
+    font-size: var(--text-body-lg);
+    line-height: 1.65;
+    color: var(--mkt-on-dark-muted);
+    animation: mkt-enter 340ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  // ===========================================================================
   // THE CANDIDATE WORKSPACE
   //
   // NOT A THIRD STICKY TRACK. The two sections above are scroll-driven; this
@@ -4928,6 +5308,84 @@
     would mean a phone reader scrolling 260vh to see six paragraphs.
   */
   /*
+    ===========================================================================
+    THE PIPELINE ON A SMALL SCREEN — vertical, and genuinely redesigned
+    ===========================================================================
+
+    Six columns do not become six narrow columns; they become six ROWS, and
+    the candidate travels DOWN instead of across. That is the brief's mobile
+    pipeline, and it is also the only honest option: a horizontally scrolling
+    board on a phone hides most of the pipeline behind a gesture, which is the
+    opposite of what the section claims.
+
+    The traveller's overlay is the part that has to change shape. Its grid
+    turns into six rows, and the transform swaps from translateX to
+    translateY — same one card, same one custom property, same single
+    transition.
+  */
+  @media (max-width: 900px) {
+    .pl {
+      // Still a scroll story, but the beats are shorter: a vertical board is
+      // read top to bottom anyway, so less runway is needed per beat.
+      height: 170vh;
+    }
+
+    .pl__cols {
+      grid-template-columns: minmax(0, 1fr);
+      grid-auto-rows: minmax(0, auto);
+    }
+
+    .pl-col__cards {
+      min-height: 0;
+      // Cards sit side by side within a row rather than stacking, so a stage
+      // with three people does not become three screens tall.
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+
+    .pl-mini {
+      flex: 1 1 8.5rem;
+    }
+
+    .pl-col__name {
+      -webkit-line-clamp: 1;
+    }
+
+    /*
+      The overlay becomes a single column of six rows, and the card moves down
+      it. `--row-h` is the measured height of one collapsed row plus the gap;
+      it is a fixed value rather than a computed one because the rows have a
+      fixed structure here (header, sla line, one row of cards).
+    */
+    .pl__overlay {
+      --row-h: 9.25rem;
+
+      left: clamp(0.875rem, 2vw, 1.25rem);
+      right: clamp(0.875rem, 2vw, 1.25rem);
+      grid-template-columns: minmax(0, 1fr);
+      margin-top: calc(clamp(0.875rem, 2vw, 1.25rem) + 4.4rem);
+    }
+
+    .pl__traveller {
+      transform: translateY(calc(var(--col, 0) * var(--row-h)));
+    }
+
+    .pl-slot {
+      // On a row, the slot is the width of one card rather than a full stack.
+      height: 3.5rem;
+      flex: 1 1 8.5rem;
+    }
+
+    .pl__glow {
+      background: radial-gradient(16rem 16rem at 24% 6%, rgba(139, 158, 255, 0.10), transparent 70%);
+    }
+
+    .pl__copy {
+      min-height: 6rem;
+    }
+  }
+
+  /*
     THE CANDIDATE WORKSPACE ON A SMALL SCREEN.
 
     One column: the card and its timeline first, then the views. The tab row
@@ -5431,6 +5889,32 @@
       Everything gated on a stage is forced open, because those things were
       hidden by animation rather than merely moved by it.
     */
+    /*
+      THE PIPELINE ARRIVES COMPLETE.
+
+      The traveller stops travelling — it is placed at its beat, not animated
+      to it — and the columns stop transitioning. The board is fully readable
+      either way: every column, every count, every SLA badge and the exits are
+      all rendered regardless of beat, so nothing here was ever revealed BY
+      the animation.
+    */
+    .pl__traveller {
+      transition: none;
+    }
+
+    .pl-col,
+    .pl-beats__item {
+      transition: none;
+    }
+
+    .pl__copytext {
+      animation: none;
+    }
+
+    .pl__glow {
+      display: none;
+    }
+
     /*
       The candidate workspace has nothing scroll-linked to disable — it was
       never scroll-driven — so this is just the view-swap fade and the two
@@ -6131,6 +6615,7 @@
   .ai-callout:focus-visible,
   .vi-callout:focus-visible,
   .cw-tab:focus-visible,
+  .pl-col__head:focus-visible,
   .mkt-nav__link:focus-visible,
   .mkt-mega__link:focus-visible,
   .mkt-sheet__row:focus-visible,

@@ -1727,3 +1727,75 @@ hidden, all six views' content present in crawlable HTML, no email/phone.
 sticky treatment here reads as relief or as inconsistency — that is a judgement
 only scrolling the assembled page can make, and it is the open question to
 settle before Module 09 adds another big animation.
+
+---
+
+## 2026-09-21 — Module 09: hiring pipeline
+
+**THE CORRECTION THIS SECTION IS BUILT ON: there is no drag-and-drop**, and the
+product's reason is better than the feature. `app/pipeline/PipelineBoard.tsx`:
+*"Button-based stage moves rather than drag-and-drop … a dropdown is
+keyboard-accessible, works on a phone, and cannot fire from a mis-drag. Moving
+someone through a hiring pipeline should be deliberate."* §11 said not to imply
+dragging if it does not exist; animating one would have advertised the single
+interaction the product deliberately refused. A test bans any positive drag
+claim and requires the correction to be stated.
+
+**Other findings from §2:**
+- 8 real stages; FOUR are per-job configurable, so a board shows six. The
+  caption says so rather than letting six look like the whole product.
+- **No Offer stage.** The brief's flow ended "Review → Offer → Hired"; an offer
+  is an automation ACTION (`send_offer_letter`). Test bans an Offer column.
+- Terminal outcomes are **exit counts, not columns** — the real board's own
+  decision: "otherwise the board fills with finished work and stops being a
+  work queue."
+- Real SLA aging: `DEFAULT_SLA_DAYS` (2/3/3/5/7/7/7), statuses ok/at_risk/
+  breached, `AT_RISK_THRESHOLD = 0.75`. A test checks every column's target
+  against `DEFAULT_SLA_DAYS`, so §13's bottleneck beat is truthful.
+- `move_to_stage`, `start_screening_call`, `notify_recruiter` are real
+  automation actions, so §12's automatic transition is genuine.
+
+**The card genuinely travels.** ONE `<CandidateCard>` in an overlay grid with
+the same six tracks and the same `--gap` as the board; advancing a beat changes
+`--col` and it translates `--col * (100% + gap)` — 100% of its own width being
+exactly one track. Transform only, no library, same DOM node in Applied and in
+Hired. Rendering it inside whichever column owned it would unmount/remount:
+identical screenshot, no animation. `--gap` is declared once on the board and
+read by both grids — get it wrong and the card drifts further out of line with
+every column it crosses.
+
+**Two controls that do not fight.** Scroll drives the beat; clicking a column
+header focuses it. Orthogonal, so a click is never undone by the next pixel of
+scroll — the exact collision that made me drop scroll control in Module 08.
+
+**Mobile is genuinely redesigned, not shrunk.** Six columns become six ROWS and
+the card travels DOWN: the overlay grid turns single-column and the transform
+swaps to `translateY(--col * --row-h)`. Same card, same property, same
+transition. Cards sit side by side within a row so a busy stage is not three
+screens tall.
+
+**Sticky, at 200vh** — the low end of the brief's range. Scroll-as-transport is
+more justified here than anywhere else on the page (you scroll, the candidate
+advances), and this is a third distinct composition: full-width board with the
+rail beneath, versus the centred panel (06) and the two pinned columns (07).
+
+**`PipelinePreview` deleted**, along with `PIPELINE_PREVIEW`. It was the
+redundant third product shot flagged during Module 05; this is the module that
+owns the area, so it is the module that resolves it. Net page sections
+unchanged.
+
+**A comment I had to correct:** I wrote that `aria-pressed` was the styling
+hook for column focus. It is not — the dimming is on the parent via
+`data-state`. The guarantee I claimed is real (both derive from one `focus`
+value) but the mechanism was described wrong, so the comment was fixed rather
+than left to mislead the next reader.
+
+`lint` clean · `typecheck` clean · `build` clean · 1974/1974 (+12). Verified on
+the dev server: exactly ONE traveller element, six columns with real stage
+names, counts narrowing 124→2, real SLA targets rendered, exits as counts, six
+`aria-pressed` toggles, all six beat captions in crawlable HTML.
+
+**Still not verified:** the breakpoints and the travel animation, visually —
+including whether `--row-h: 9.25rem` on mobile actually matches the collapsed
+row height. That value is the one number in this module I could not compute
+from source, and it is the first thing to check in a browser.

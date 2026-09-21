@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { STAGE_LABELS } from "@/lib/applications/stages";
+import { PIPELINE_STAGES, STAGE_LABELS } from "@/lib/applications/stages";
+import { DEFAULT_SLA_DAYS } from "@/lib/pipeline/sla";
 import {
   RESUME_SCORE_MAX,
   ROUND_SCORE_MAX,
@@ -28,7 +29,12 @@ import {
   SOLUTION_HEAD,
   HOME_FOOTER_SECTIONS,
   HUMAN_SIDE,
-  PIPELINE_PREVIEW,
+  PIPELINE_BEATS,
+  PIPELINE_CALLOUTS,
+  PIPELINE_CARDS,
+  PIPELINE_COLUMNS,
+  PIPELINE_EXITS,
+  PIPELINE_HEAD,
   CANDIDATE_CALLOUTS,
   CANDIDATE_HEAD,
   CANDIDATE_STAGES,
@@ -146,6 +152,10 @@ const ALL_COPY: string[] = [
   ...AI_CALLOUTS.flatMap((c) => [c.title, c.body]),
   ...VOICE_CALLOUTS.flatMap((c) => [c.title, c.body]),
   ...CANDIDATE_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  ...PIPELINE_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  PIPELINE_HEAD.title,
+  PIPELINE_HEAD.lead,
+  ...PIPELINE_BEATS.map((b) => b.copy),
   CANDIDATE_HEAD.title,
   CANDIDATE_HEAD.lead,
   ...CANDIDATE_STAGES.map((v) => v.copy),
@@ -249,11 +259,7 @@ describe("the landing page makes no claim the product cannot keep", () => {
     }
     expect(pcts[0]).toBe(100);
 
-    // Match scores are percentages.
-    for (const row of PIPELINE_PREVIEW.rows) {
-      expect(row.score).toBeGreaterThanOrEqual(0);
-      expect(row.score).toBeLessThanOrEqual(100);
-    }
+    // The pipeline board's counts narrow too — see the pipeline block below.
   });
 });
 
@@ -932,6 +938,145 @@ describe("the candidate workspace shows the real record", () => {
   it("numbers six views", () => {
     expect(CANDIDATE_STAGES.map((s) => s.num)).toEqual(["01", "02", "03", "04", "05", "06"]);
     expect(CANDIDATE_CALLOUTS).toHaveLength(4);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The hiring pipeline
+// -----------------------------------------------------------------------------
+
+describe("the pipeline board is this product's board", () => {
+  it("names only real stages, in the real order", () => {
+    const order = PIPELINE_STAGES as readonly string[];
+    const labels = PIPELINE_COLUMNS.map((c) => c.label);
+
+    for (const label of labels) {
+      expect(Object.values(STAGE_LABELS), `"${label}" is not a real stage`).toContain(label);
+    }
+
+    // And in pipeline order — a board with Hired before Shortlisted would be a
+    // picture of a different process.
+    const positions = PIPELINE_COLUMNS.map((c) =>
+      order.indexOf(Object.entries(STAGE_LABELS).find(([, v]) => v === c.label)![0])
+    );
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  });
+
+  it("has no Offer column, because there is no Offer stage", () => {
+    /*
+      The brief's flow ended "Review → Offer → Hired". In this product an offer
+      is an automation ACTION (`send_offer_letter`), not a pipeline stage —
+      inventing the column would put a stage on the marketing page that a
+      recruiter would then go looking for on the board.
+    */
+    for (const column of PIPELINE_COLUMNS) {
+      expect(/offer|review/i.test(column.label), `"${column.label}"`).toBe(false);
+    }
+  });
+
+  it("gives terminal outcomes counts and not columns", () => {
+    // What the real board does, and for a stated reason: "otherwise the board
+    // fills with finished work and stops being a work queue."
+    const labels = PIPELINE_COLUMNS.map((c) => c.label.toLowerCase());
+    expect(labels).not.toContain("rejected");
+    expect(labels).not.toContain("withdrawn");
+    expect(PIPELINE_EXITS.map((e) => e.label)).toEqual(["rejected", "withdrawn"]);
+  });
+
+  it("uses the product's real SLA targets", () => {
+    /*
+      DEFAULT_SLA_DAYS is the source. A board showing a 14-day target on
+      Applied would be describing an SLA the product does not ship, and the
+      whole aging beat rests on these numbers meaning something.
+    */
+    for (const column of PIPELINE_COLUMNS) {
+      const stage = Object.entries(STAGE_LABELS).find(([, v]) => v === column.label)![0];
+      const real = DEFAULT_SLA_DAYS[stage as keyof typeof DEFAULT_SLA_DAYS];
+      if (column.targetDays === null) {
+        // Terminal stages are not aged; sla.ts returns null for them.
+        expect(real, `${column.label} should not be aged`).toBe(0);
+      } else {
+        expect(column.targetDays, `${column.label} target`).toBe(real);
+      }
+    }
+  });
+
+  it("narrows from stage to stage", () => {
+    // A funnel that widens is not a funnel. Hired is last and smallest.
+    const counts = PIPELINE_COLUMNS.map((c) => c.count);
+    for (let i = 1; i < counts.length; i += 1) {
+      expect(counts[i], `${PIPELINE_COLUMNS[i].label} exceeds the stage before it`).toBeLessThanOrEqual(
+        counts[i - 1]
+      );
+    }
+    expect(counts[0]).toBe(DASHBOARD.funnel[0].value);
+  });
+
+  it("uses only the real SLA status vocabulary", () => {
+    // ok / at_risk / breached, from SlaStatus. Not "late", not "red".
+    for (const card of PIPELINE_CARDS) {
+      expect(["ok", "at_risk", "breached"]).toContain(card.sla);
+    }
+  });
+
+  it("labels every SLA state in words, never by colour alone", () => {
+    for (const card of PIPELINE_CARDS) {
+      expect(card.slaLabel.length, card.name).toBeGreaterThan(0);
+      if (card.sla === "breached") expect(card.slaLabel).toMatch(/over/i);
+    }
+  });
+
+  it("never claims candidates are dragged", () => {
+    /*
+      THE CORRECTION THIS SECTION IS BUILT ON. app/pipeline/PipelineBoard.tsx
+      uses a menu, deliberately: "a dropdown is keyboard-accessible, works on a
+      phone, and cannot fire from a mis-drag." Animating a drag would advertise
+      the one interaction the product chose not to have.
+    */
+    const copy = [
+      PIPELINE_HEAD.title,
+      PIPELINE_HEAD.lead,
+      ...PIPELINE_BEATS.map((b) => b.copy),
+      ...PIPELINE_CALLOUTS.flatMap((c) => [c.title, c.body]),
+    ].join(" ");
+
+    // No positive claim: nobody drags anything anywhere in this product.
+    // (A blanket ban on the word "drag" was tried and was wrong — it fires on
+    // "mis-drag" inside the sentence explaining why there is no dragging.)
+    expect(/\bdrag(s|ging|ged)?\s+(a|the|any|candidates?|cards?)\b/i.test(copy), copy).toBe(
+      false
+    );
+
+    // And the correction is stated rather than merely implied by absence.
+    expect(copy).toMatch(/no drag and drop/i);
+  });
+
+  it("walks the traveller forward through every column", () => {
+    // Six beats, six columns, strictly advancing — the card must not go
+    // backwards or skip, or the movement stops describing a process.
+    expect(PIPELINE_BEATS.map((b) => b.at)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(PIPELINE_BEATS).toHaveLength(PIPELINE_COLUMNS.length);
+  });
+
+  it("ends on a stage a person set", () => {
+    const last = PIPELINE_BEATS.at(-1)!;
+    expect(PIPELINE_COLUMNS[last.at].label).toBe(STAGE_LABELS.hired);
+    // And the move beat before it credits a person, not the system.
+    expect(PIPELINE_BEATS[4].copy).toMatch(/a person moves the card/i);
+  });
+
+  it("places every other card in a real column", () => {
+    for (const card of PIPELINE_CARDS) {
+      expect(card.at).toBeGreaterThanOrEqual(0);
+      expect(card.at).toBeLessThan(PIPELINE_COLUMNS.length);
+    }
+  });
+
+  it("sends every callout to a page that exists", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    for (const card of PIPELINE_CALLOUTS) {
+      expect(known.has(card.href.split("#")[0] || "/"), card.href).toBe(true);
+    }
   });
 });
 

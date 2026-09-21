@@ -17,7 +17,7 @@ import { AiFeatures } from "./_components/home/AiFeatures";
 import { VoiceInterview } from "./_components/home/VoiceInterview";
 import { HumanAi } from "./_components/home/HumanAi";
 import { CandidateWorkspace } from "./_components/home/CandidateWorkspace";
-import { PipelinePreview } from "./_components/home/PipelinePreview";
+import { HiringPipeline } from "./_components/home/HiringPipeline";
 import { BrandStatement } from "./_components/home/BrandStatement";
 import { TrustSection } from "./_components/home/TrustSection";
 import { Faq } from "./_components/home/Faq";
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
  *   7. AI screening calls                 the first conversation, demonstrated
  *   8. AI does the work, you decide       the objection, answered
  *   9. Candidate workspace                one candidate, six real views
- *  10. The pipeline at a glance           the product again, in use
+ *  10. Hiring pipeline                    a board one candidate crosses
  *  11. People x Intelligence x Opportunity  a beat
  *  12. Built for modern hiring teams      why trust it with candidate data
  *  13. FAQ                                the awkward questions
@@ -81,8 +81,9 @@ export const metadata: Metadata = {
  * same six pieces of copy as captions. Nothing was cut; the grid that showed
  * nothing became the screen that shows it.
  *
- * THE COLOUR RHYTHM IS DELIBERATE: five deep bands (hero, the solution, the
- * screening call, Human + AI, the closing CTA) against eight bright ones.
+ * THE COLOUR RHYTHM IS DELIBERATE: six deep bands (hero, the solution, the
+ * screening call, Human + AI, the pipeline, the closing CTA) against seven
+ * bright ones.
  * The screening-call band and Human + AI are adjacent AND both deep, which is
  * intended: the call story ends on a recruiter reading the report, and Human +
  * AI is the argument for why it ends there. They read as one movement. That holds the 30/70 split,
@@ -139,7 +140,7 @@ export default function HomePage() {
       <VoiceInterview />
       <HumanAi />
       <CandidateWorkspace />
-      <PipelinePreview />
+      <HiringPipeline />
       <BrandStatement />
       <TrustSection />
       <Faq />

@@ -158,22 +158,13 @@ export const DASHBOARD = {
   ],
 } as const;
 
-/**
- * The second product view — a candidate table.
- *
- * Columns are the ones the real Applications list carries, and "Next action" is
- * genuinely computed in the product (lib/evaluation/nextAction.ts) rather than
- * invented for the picture.
- */
-export const PIPELINE_PREVIEW = {
-  columns: ["Candidate", "Role", "Stage", "Match", "Next action"],
-  rows: [
-    { name: "A. Sharma", role: "Senior Backend Engineer", stage: "Interview", score: 91, next: "Collect feedback" },
-    { name: "M. Iyer", role: "Senior Backend Engineer", stage: "Screening", score: 84, next: "Review call summary" },
-    { name: "R. Nair", role: "Product Designer", stage: "Shortlisted", score: 78, next: "Schedule round 1" },
-    { name: "S. Bose", role: "Data Analyst", stage: "Applied", score: 66, next: "Screen resume" },
-  ],
-} as const;
+/*
+  PIPELINE_PREVIEW LIVED HERE — a static candidate table under the heading
+  "See your hiring pipeline at a glance". Module 09 replaces that section with
+  a board a candidate actually moves across, so the table and its data are
+  gone rather than left as a third product shot saying the same thing.
+*/
+
 
 // -----------------------------------------------------------------------------
 // The problem, and the turn into the solution
@@ -927,6 +918,199 @@ export const CANDIDATE_CALLOUTS: (HomeCard & { href: string })[] = [
       "edited after the fact, by anyone.",
     icon: "Activity",
     href: "/how-it-works",
+  },
+];
+
+// -----------------------------------------------------------------------------
+// The hiring pipeline — a board a candidate crosses
+// -----------------------------------------------------------------------------
+
+/**
+ * SIX COLUMNS, AND SIX IS ITSELF A PRODUCT FACT.
+ *
+ * `PIPELINE_STAGES` has eight: applied, shortlisted, ai_screening_call,
+ * phone_interview, video_interview, written_assessment, director_round, hired.
+ * FOUR of them are configurable per job (CONFIGURABLE_STAGES) — a board shows
+ * only the ones that job has switched on. This one has Phone Interview and
+ * Written Assessment off, which is why it has six columns and not eight, and
+ * the caption says so rather than leaving it looking like the whole product.
+ *
+ * THERE IS NO "OFFER" STAGE, so there is no Offer column. The brief's flow
+ * ended "…Review → Offer → Hired"; in this product an offer is an automation
+ * ACTION (`send_offer_letter`) and onboarding is its own module. Inventing the
+ * column would have put a stage on the marketing page that a recruiter opening
+ * the board would then go looking for.
+ *
+ * Counts are synthetic and the board says so.
+ */
+export const PIPELINE_COLUMNS: {
+  key: string;
+  /** The real STAGE_LABELS value. */
+  label: string;
+  count: number;
+  /** Real SLA target from DEFAULT_SLA_DAYS, in days. null for terminal. */
+  targetDays: number | null;
+}[] = [
+  { key: "applied", label: "Applied", count: 124, targetDays: 2 },
+  { key: "shortlisted", label: "Shortlisted", count: 46, targetDays: 3 },
+  { key: "ai_screening_call", label: "AI Screening Call", count: 28, targetDays: 3 },
+  { key: "video_interview", label: "Video Interview", count: 9, targetDays: 7 },
+  { key: "director_round", label: "Director Round", count: 4, targetDays: 7 },
+  { key: "hired", label: "Hired", count: 2, targetDays: null },
+];
+
+/**
+ * The exits.
+ *
+ * Rejected and withdrawn are shown as COUNTS rather than as columns, which is
+ * what the real board does — app/pipeline/PipelineBoard.tsx: "otherwise the
+ * board fills with finished work and stops being a work queue." It is a small
+ * decision that says a lot about the product, and it costs one line to show.
+ */
+export const PIPELINE_EXITS: { label: string; count: number }[] = [
+  { label: "rejected", count: 31 },
+  { label: "withdrawn", count: 6 },
+];
+
+/**
+ * The six beats of the scroll story.
+ *
+ * `at` is the column the travelling candidate occupies at that beat. The card
+ * is rendered once and translated, so it genuinely crosses the board rather
+ * than being destroyed and recreated somewhere else.
+ */
+export const PIPELINE_BEATS: {
+  key: string;
+  num: string;
+  label: string;
+  /** Index into PIPELINE_COLUMNS. */
+  at: number;
+  copy: string;
+}[] = [
+  {
+    key: "enter",
+    num: "01",
+    label: "Applied",
+    at: 0,
+    copy:
+      "Every application lands in the same first column, however it arrived — " +
+      "career page, bulk upload, referral or added by hand.",
+  },
+  {
+    key: "shortlist",
+    num: "02",
+    label: "Shortlisted",
+    at: 1,
+    copy:
+      "A resume that clears the job's passing mark moves to Shortlisted. One that " +
+      "does not is flagged rather than deleted, and the flag can be cleared.",
+  },
+  {
+    key: "screen",
+    num: "03",
+    label: "Screening",
+    at: 2,
+    copy:
+      "An automation can start the screening call when someone reaches this " +
+      "stage. `move_to_stage` and `start_screening_call` are real actions — the " +
+      "board moves on its own only where you have said it should.",
+  },
+  {
+    key: "age",
+    num: "04",
+    label: "Aging",
+    at: 3,
+    copy:
+      "Every card is aged against its stage's target — two days in Applied, three " +
+      "in Shortlisted, a week in the interview rounds. Past three quarters of the " +
+      "target a card is at risk; past the target it has breached.",
+  },
+  {
+    key: "move",
+    num: "05",
+    label: "Moved",
+    at: 4,
+    copy:
+      "A person moves the card, from a menu on the card itself. There is no drag " +
+      "and drop, deliberately: a dropdown works with a keyboard and on a phone, " +
+      "and it cannot fire from a mis-drag.",
+  },
+  {
+    key: "hired",
+    num: "06",
+    label: "Hired",
+    at: 5,
+    copy:
+      "Hired is a stage; rejected and withdrawn are exits, counted at the foot of " +
+      "the board rather than given columns. A board full of finished work stops " +
+      "being a work queue.",
+  },
+];
+
+/**
+ * The other cards on the board. SYNTHETIC.
+ *
+ * `sla` uses the real SlaStatus vocabulary — ok / at_risk / breached — so the
+ * badges say what the product's badges say. The breached one sits in Director
+ * Round, which is where a real board's oldest work collects.
+ */
+export const PIPELINE_CARDS: {
+  id: string;
+  name: string;
+  role: string;
+  at: number;
+  sla: "ok" | "at_risk" | "breached";
+  slaLabel: string;
+}[] = [
+  { id: "iyer", name: "M. Iyer", role: "Platform Engineer", at: 1, sla: "ok", slaLabel: "1 day in stage" },
+  { id: "reddy", name: "K. Reddy", role: "Backend Engineer", at: 2, sla: "at_risk", slaLabel: "Day 3 of 3" },
+  { id: "bose", name: "S. Bose", role: "Data Analyst", at: 3, sla: "ok", slaLabel: "2 days in stage" },
+  { id: "nair", name: "R. Nair", role: "Product Designer", at: 4, sla: "breached", slaLabel: "4 days over" },
+  { id: "das", name: "P. Das", role: "Backend Engineer", at: 4, sla: "breached", slaLabel: "6 days over" },
+];
+
+export const PIPELINE_HEAD = {
+  eyebrow: "Hiring pipeline",
+  title: "See every candidate move from application to decision.",
+  lead:
+    "One board per job, with every application on it and every card aged " +
+    "against the target you set for its stage — so what has stalled is visible " +
+    "before somebody asks.",
+} as const;
+
+/** The job the board belongs to. Consistent with the rest of the page. */
+export const PIPELINE_JOB = {
+  title: "Senior Backend Engineer",
+  meta: "213 active · 2 hired",
+} as const;
+
+export const PIPELINE_CALLOUTS: (HomeCard & { href: string })[] = [
+  {
+    title: "Stage SLAs",
+    // lib/pipeline/sla.ts — per-stage targets, at-risk at 75%, breached past it.
+    body:
+      "A target per stage, with a card marked at risk at three quarters of it " +
+      "and breached past it. Defaults apply until you change them.",
+    icon: "Gauge",
+    href: "/product/decide",
+  },
+  {
+    title: "Deliberate moves",
+    // app/pipeline/PipelineBoard.tsx — a menu, not drag and drop.
+    body:
+      "Stage changes come from a menu on the card, so they work with a keyboard, " +
+      "work on a phone, and cannot happen by accident.",
+    icon: "Workflow",
+    href: "/product/operate",
+  },
+  {
+    title: "Automations you set",
+    // lib/automations — move_to_stage, start_screening_call, notify_recruiter.
+    body:
+      "Rules can move a card, start a screening call or notify a recruiter — and " +
+      "an approval step where the action is one you would want to see first.",
+    icon: "Zap",
+    href: "/product/operate",
   },
 ];
 
