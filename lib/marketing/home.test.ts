@@ -35,6 +35,8 @@ import {
   PIPELINE_COLUMNS,
   PIPELINE_EXITS,
   PIPELINE_HEAD,
+  pipelineBreachesAt,
+  pipelineCountAt,
   CANDIDATE_CALLOUTS,
   CANDIDATE_HEAD,
   CANDIDATE_STAGES,
@@ -1001,15 +1003,60 @@ describe("the pipeline board is this product's board", () => {
     }
   });
 
-  it("narrows from stage to stage", () => {
-    // A funnel that widens is not a funnel. Hired is last and smallest.
-    const counts = PIPELINE_COLUMNS.map((c) => c.count);
-    for (let i = 1; i < counts.length; i += 1) {
-      expect(counts[i], `${PIPELINE_COLUMNS[i].label} exceeds the stage before it`).toBeLessThanOrEqual(
-        counts[i - 1]
-      );
+  it("narrows from stage to stage, at every beat", () => {
+    /*
+      A funnel that widens is not a funnel — and the counts MOVE now, because
+      the travelling candidate is counted into whichever column holds them. So
+      the invariant has to hold at all six beats, not just in the base array:
+      the +1 lands on a different column each time, and a badly chosen base
+      would make one beat's board read 46, 47 across two stages.
+    */
+    for (let beat = 0; beat < PIPELINE_BEATS.length; beat += 1) {
+      const counts = PIPELINE_COLUMNS.map((_, index) => pipelineCountAt(index, beat));
+      for (let i = 1; i < counts.length; i += 1) {
+        expect(
+          counts[i],
+          `beat ${beat}: ${PIPELINE_COLUMNS[i].label} (${counts[i]}) exceeds ${PIPELINE_COLUMNS[i - 1].label} (${counts[i - 1]})`
+        ).toBeLessThanOrEqual(counts[i - 1]);
+      }
     }
-    expect(counts[0]).toBe(DASHBOARD.funnel[0].value);
+
+    // At the first beat the candidate is in Applied, so the board's top
+    // number is the hero's funnel top. One company across the whole page.
+    expect(pipelineCountAt(0, 0)).toBe(DASHBOARD.funnel[0].value);
+  });
+
+  it("moves exactly one candidate between columns per beat", () => {
+    // The source must lose the person the destination gains. A board where
+    // both went up would be showing a duplicate rather than a move.
+    for (let beat = 1; beat < PIPELINE_BEATS.length; beat += 1) {
+      const before = PIPELINE_COLUMNS.map((_, i) => pipelineCountAt(i, beat - 1));
+      const after = PIPELINE_COLUMNS.map((_, i) => pipelineCountAt(i, beat));
+      const delta = after.map((n, i) => n - before[i]);
+
+      expect(delta.filter((d) => d === -1), `beat ${beat}`).toHaveLength(1);
+      expect(delta.filter((d) => d === 1), `beat ${beat}`).toHaveLength(1);
+      expect(delta.reduce((a, b) => a + b, 0)).toBe(0);
+    }
+  });
+
+  it("counts breaches rather than claiming to detect bottlenecks", () => {
+    /*
+      §13's caution. The product does not have a bottleneck detector; it ages
+      every card against its stage target and marks the late ones `breached`.
+      The column indicator is a total of those, so it must agree with the
+      cards on the board exactly.
+    */
+    for (let index = 0; index < PIPELINE_COLUMNS.length; index += 1) {
+      const expected = PIPELINE_CARDS.filter(
+        (c) => c.at === index && c.sla === "breached"
+      ).length;
+      expect(pipelineBreachesAt(index), PIPELINE_COLUMNS[index].label).toBe(expected);
+    }
+
+    // And there must be at least one, or the aging beat has nothing to show.
+    const total = PIPELINE_COLUMNS.reduce((sum, _, i) => sum + pipelineBreachesAt(i), 0);
+    expect(total).toBeGreaterThan(0);
   });
 
   it("uses only the real SLA status vocabulary", () => {

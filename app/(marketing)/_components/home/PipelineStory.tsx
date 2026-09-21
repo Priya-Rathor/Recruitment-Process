@@ -49,6 +49,8 @@ import {
   PIPELINE_COLUMNS,
   PIPELINE_EXITS,
   PIPELINE_JOB,
+  pipelineBreachesAt,
+  pipelineCountAt,
 } from "@/lib/marketing/home";
 import { CandidateCard } from "./CandidateCard";
 
@@ -172,7 +174,19 @@ export function PipelineStory() {
                   onClick={() => setFocus((current) => (current === index ? null : index))}
                 >
                   <span className="pl-col__name">{column.label}</span>
-                  <span className="pl-col__count">{column.count}</span>
+                  {/*
+                    LIVE. The travelling candidate is counted into whichever
+                    column holds them, so a move decrements the source and
+                    increments the destination — which is what a real board
+                    does, and what stops the card reading as a duplicate
+                    sliding over a static picture.
+
+                    `aria-live` is deliberately NOT set: six counters
+                    announcing themselves on every scroll beat would be
+                    unusable. The beat caption below the board narrates the
+                    same change once, in a sentence.
+                  */}
+                  <span className="pl-col__count">{pipelineCountAt(index, beat)}</span>
                 </button>
 
                 {/*
@@ -185,6 +199,24 @@ export function PipelineStory() {
                     ? "No target — terminal stage"
                     : `${column.targetDays}-day target`}
                 </p>
+
+                {/*
+                  THE BOTTLENECK MOMENT, and it is a count rather than a claim.
+
+                  lib/pipeline/sla.ts already marks a card `breached` past its
+                  stage target; this only totals them. That distinction is the
+                  whole of §13's caution — the product does not "detect
+                  bottlenecks", it ages every card against a target you set,
+                  and a column with two breaches is what that looks like.
+
+                  Appears from the aging beat onward so it lands as a moment
+                  rather than sitting there from the first frame.
+                */}
+                {beat >= 3 && pipelineBreachesAt(index) > 0 && (
+                  <p className="pl-col__breach">
+                    {pipelineBreachesAt(index)} past target
+                  </p>
+                )}
 
                 <ul className="pl-col__cards">
                   {/*
@@ -233,6 +265,19 @@ export function PipelineStory() {
               />
             </div>
           </div>
+
+          {/*
+            ---- The move confirmation ---------------------------------------
+
+            "Stage changed" is the REAL activity event label from
+            lib/activity/events.ts, and the log records who did it — so the
+            confirmation names a person rather than saying the board moved
+            someone by itself. Shown only on the beat where the move happens.
+          */}
+          <p className="pl__toast" data-shown={beat === 4} aria-hidden={beat !== 4}>
+            <span className="pl__toastdot" aria-hidden="true" />
+            Stage changed to Director Round · R. Menon
+          </p>
 
           {/* ---- The exits ------------------------------------------------ */}
           <p className="pl__exits">

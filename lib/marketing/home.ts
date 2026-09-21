@@ -947,17 +947,55 @@ export const PIPELINE_COLUMNS: {
   key: string;
   /** The real STAGE_LABELS value. */
   label: string;
+  /**
+   * EXCLUDING THE TRAVELLING CANDIDATE, who is counted into whichever column
+   * currently holds them — see pipelineCountAt(). Storing the base this way is
+   * what lets a stage move decrement one column and increment the next, which
+   * is the behaviour a real board has and the thing that makes the movement
+   * read as a move rather than as a duplicate.
+   */
   count: number;
   /** Real SLA target from DEFAULT_SLA_DAYS, in days. null for terminal. */
   targetDays: number | null;
 }[] = [
-  { key: "applied", label: "Applied", count: 124, targetDays: 2 },
+  { key: "applied", label: "Applied", count: 123, targetDays: 2 },
   { key: "shortlisted", label: "Shortlisted", count: 46, targetDays: 3 },
   { key: "ai_screening_call", label: "AI Screening Call", count: 28, targetDays: 3 },
   { key: "video_interview", label: "Video Interview", count: 9, targetDays: 7 },
   { key: "director_round", label: "Director Round", count: 4, targetDays: 7 },
-  { key: "hired", label: "Hired", count: 2, targetDays: null },
+  { key: "hired", label: "Hired", count: 1, targetDays: null },
 ];
+
+/**
+ * What a column's counter reads at a given beat.
+ *
+ * The travelling candidate is a real occupant of exactly one column at a time,
+ * so the source loses them and the destination gains them. A board where the
+ * numbers never moved would be showing a card sliding over the top of a static
+ * picture.
+ *
+ * Exported so the test can assert the invariant that matters — the funnel
+ * never widens, at ANY beat — rather than only checking the base array.
+ */
+export function pipelineCountAt(columnIndex: number, beat: number): number {
+  const base = PIPELINE_COLUMNS[columnIndex].count;
+  const travellerAt = PIPELINE_BEATS[beat]?.at;
+  return base + (travellerAt === columnIndex ? 1 : 0);
+}
+
+/**
+ * How many cards in a column have breached their stage target.
+ *
+ * REAL: `lib/pipeline/sla.ts` assesses every card against its stage's target
+ * and returns `breached` past it. The board can therefore say "2 breaching
+ * their target" on a column without claiming a bottleneck-detection feature
+ * that does not exist — it is counting a status the product already computes.
+ */
+export function pipelineBreachesAt(columnIndex: number): number {
+  return PIPELINE_CARDS.filter(
+    (card) => card.at === columnIndex && card.sla === "breached"
+  ).length;
+}
 
 /**
  * The exits.

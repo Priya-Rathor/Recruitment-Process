@@ -1799,3 +1799,54 @@ names, counts narrowing 124→2, real SLA targets rendered, exits as counts, six
 including whether `--row-h: 9.25rem` on mobile actually matches the collapsed
 row height. That value is the one number in this module I could not compute
 from source, and it is the first thing to check in a browser.
+
+## 2026-09-21 (later) — Module 09 completion pass
+
+The Module 09 prompt was re-sent unchanged. The work was already committed and
+green, so rather than rebuild it I audited my own delivery against the brief
+and closed the four things I had skimped:
+
+**§11 — counts now move.** `PIPELINE_COLUMNS.count` is the base EXCLUDING the
+travelling candidate, and `pipelineCountAt(col, beat)` adds them to whichever
+column holds them. A move therefore decrements the source and increments the
+destination, which is what makes the card read as a move rather than a
+duplicate sliding over a static picture. Two tests: the funnel must not widen
+**at any of the six beats** (the +1 lands on a different column each time, so
+the base has to be chosen for all six), and each beat must show exactly one
+−1 and one +1 summing to zero.
+
+**§13 — the bottleneck moment, as a count not a claim.**
+`pipelineBreachesAt(col)` totals cards the SLA model already marks `breached`.
+The product does NOT have bottleneck detection; it ages cards against a target
+you set. The indicator says "2 past target" — red ink AND the words, on the one
+line whose job is to be noticed. A test pins the total against the card list.
+
+**§8/§20/§24 — connectors, and a signal on the one the candidate is crossing.**
+A 1px rule in each gap via `.pl-col + .pl-col::before`, reaching left so the
+connector belongs to the column it points at — which is what lets hovering a
+stage brighten its own incoming line. `::after` is the travelling dot, and a
+`@for` emits five `[data-beat=i] .pl-col:nth-child(i+1)` rules so **exactly one
+connector is animating at any moment** rather than five pulsing forever. On
+mobile both pseudo-elements re-aim vertically and the keyframe swaps to
+translateY.
+
+**CSS rather than SVG, deliberately, and the reasoning is the same as the
+waveform's:** SVG earns its keep where a path is a curve (the AI section's
+three converging lines). These are straight segments inside a `var(--gap)` that
+changes with the viewport — an SVG would need its viewBox recomputed at every
+breakpoint to stay aligned with the grid, where a pseudo-element in the gap is
+aligned by construction.
+
+**§11/§12 — the confirmation** reads "Stage changed to Director Round · R.
+Menon". "Stage changed" is the real activity event label, and it names a person
+rather than implying the board moved someone itself. `visibility` as well as
+opacity so the board never grows a line when the beat arrives.
+
+Counters deliberately have no `aria-live`: six announcing on every scroll beat
+would be unusable, and the beat caption already narrates the change once in a
+sentence.
+
+`lint` clean · `typecheck` clean · `build` clean · 1976/1976 (+2). Verified:
+beat-0 board reads 124/46/28/9/4/1 (Applied matching the hero's funnel top),
+breach lines absent until the aging beat, toast present but hidden, one
+traveller element, all five signal selectors compiled.

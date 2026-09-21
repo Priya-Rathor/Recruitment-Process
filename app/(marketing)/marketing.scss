@@ -2359,6 +2359,124 @@
     color: var(--mkt-ink-muted);
   }
 
+  /*
+    The breach count. Red ink AND the words "past target" — the number alone
+    in a tint would be exactly the colour-only signal this site bans, on the
+    one line whose entire job is to be noticed.
+  */
+  .pl-col__breach {
+    margin: -0.25rem 0 0.5rem;
+    padding-inline: 0.1875rem;
+    font-size: 9.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--color-error, #b4232c);
+    animation: mkt-enter 300ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  /*
+    ---- THE CONNECTORS -------------------------------------------------------
+
+    A 1px rule in each gap, at the column header's height, with a dot that
+    travels it on the beat the candidate crosses.
+
+    CSS, NOT SVG, AND THAT IS A CHOICE. The brief asks for animated SVG paths;
+    SVG earns its keep where a path is actually a curve (the three converging
+    lines in the AI section are SVG for exactly that reason). These are five
+    straight horizontal segments that have to sit in a `var(--gap)` that
+    changes with the viewport, and an SVG would need its viewBox recomputed at
+    every breakpoint to stay aligned with the grid. A pseudo-element in the gap
+    is aligned by construction.
+
+    Drawn on `::before` of each column except the last, reaching LEFT into the
+    gap before it — so the connector belongs to the column it points at and
+    hovering that column can brighten its own incoming line.
+  */
+  .pl-col + .pl-col::before {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    left: calc(-1 * var(--gap) - 1px);
+    width: var(--gap);
+    height: 1px;
+    background: var(--mkt-light-border-strong);
+    transition: background 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  // The column needs to be a positioning context for its own connector.
+  .pl-col {
+    position: relative;
+  }
+
+  // §20: hovering a stage brings its incoming connection up.
+  .pl-col:hover::before,
+  .pl-col[data-state="focus"]::before {
+    background: var(--color-primary);
+  }
+
+  /*
+    THE SIGNAL. One dot, on the connector the candidate is crossing at this
+    beat — not five dots pulsing forever. `data-beat` on the board selects the
+    single connector that is live, so at any moment exactly one thing on this
+    board is moving other than the card itself.
+  */
+  .pl-col + .pl-col::after {
+    content: "";
+    position: absolute;
+    top: calc(1rem - 2px);
+    left: calc(-1 * var(--gap) - 1px);
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--color-primary);
+    opacity: 0;
+  }
+
+  @keyframes pl-signal {
+    0% { opacity: 0; transform: translateX(0); }
+    25% { opacity: 1; }
+    75% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(var(--gap)); }
+  }
+
+  @for $i from 1 through 5 {
+    .pl__board[data-beat="#{$i}"] .pl-col:nth-child(#{$i + 1})::after {
+      animation: pl-signal 620ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) 2;
+    }
+  }
+
+  /*
+    ---- The move confirmation ------------------------------------------------
+
+    `visibility` as well as opacity, so it is out of the way when hidden but
+    its height is always reserved — the board must not grow by a line when the
+    move beat arrives.
+  */
+  .pl__toast {
+    display: flex;
+    align-items: center;
+    gap: 0.4375rem;
+    margin: 0.75rem 0 0;
+    min-height: 1.25rem;
+    font-size: 11.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+
+  .pl__toastdot {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--color-primary);
+  }
+
   .pl-col__cards {
     list-style: none;
     margin: 0;
@@ -5352,6 +5470,30 @@
     }
 
     /*
+      The connectors rotate with the board. A row's incoming line now comes
+      from ABOVE, so it is a vertical rule in the gap above it and the signal
+      travels down it — the same two pseudo-elements, re-aimed.
+    */
+    .pl-col + .pl-col::before {
+      top: calc(-1 * var(--gap) - 1px);
+      left: 1.25rem;
+      width: 1px;
+      height: var(--gap);
+    }
+
+    .pl-col + .pl-col::after {
+      top: calc(-1 * var(--gap) - 1px);
+      left: calc(1.25rem - 2px);
+    }
+
+    @keyframes pl-signal {
+      0% { opacity: 0; transform: translateY(0); }
+      25% { opacity: 1; }
+      75% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(var(--gap)); }
+    }
+
+    /*
       The overlay becomes a single column of six rows, and the card moves down
       it. `--row-h` is the measured height of one collapsed row plus the gap;
       it is a fixed value rather than a computed one because the rows have a
@@ -5900,6 +6042,22 @@
     */
     .pl__traveller {
       transition: none;
+    }
+
+    // The connector stays DRAWN — it is the picture of the pipeline's shape —
+    // but nothing travels along it.
+    .pl-col + .pl-col::after {
+      animation: none !important;
+      display: none;
+    }
+
+    .pl-col + .pl-col::before,
+    .pl__toast {
+      transition: none;
+    }
+
+    .pl-col__breach {
+      animation: none;
     }
 
     .pl-col,
