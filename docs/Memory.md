@@ -1850,3 +1850,76 @@ sentence.
 beat-0 board reads 124/46/28/9/4/1 (Applied matching the hero's funnel top),
 breach lines absent until the aging beat, toast present but hidden, one
 traveller element, all five signal selectors compiled.
+
+---
+
+## 2026-09-21 — Module 10: candidate applications + forms
+
+**`lib/forms/submit.ts` overturned the brief's story, and that is the section.**
+The obvious animation — fill a form, AI reads the resume, a profile appears —
+is a different and worse product than this one. The real order, from that
+file's own header:
+
+1. **The answers are saved FIRST**, before storage, before the model, before
+   the candidate insert. "A downstream failure loses a link, never a
+   submission."
+2. **AI failure is not submission failure.** Candidate and application are
+   created from the TYPED answers. "Telling somebody their application failed
+   because our model was busy would be absurd."
+3. **An existing candidate is never overwritten** — not by the parse, not by
+   the form. "A public form is an unauthenticated claim about a record a human
+   established." The parse queues in `resume_parse_results` with
+   `reviewed_at` null.
+
+So the six beats are apply → resume → **saved** → **created** → parsed →
+**proposed**, and the section ends on a proposal awaiting review rather than on
+a profile the model rewrote. A test pins the order AND the two inequalities
+(saved < parsed, created < parsed), because reverting to the obvious story
+would be an easy and invisible edit.
+
+That ending also connects straight back to Module 08's Resume view, which
+already shows "Proposed change · Notice period 60 → 30 days".
+
+**Fields are DEFAULT_APPLICATION_FIELDS**, six of thirteen, with the real
+labels and the real required flags (email and resume are PROTECTED_FIELD_KEYS,
+enforced by migration 0033). Tests check both against the constant.
+
+**Other real facts used:** custom questions can be added to any form but a
+custom FILE upload cannot (`CUSTOM_FIELD_TYPES` excludes `file_upload` — "a
+form that collects someone's documents and drops them is worse than one that
+never offered"); the public endpoint is rate-limited; matching runs on
+normalised email and phone.
+
+**THE FORM CANNOT SUBMIT, BY CONSTRUCTION.** No `action`, no `onSubmit`, no
+fetch, no Supabase anywhere in the file's import graph; inputs `readOnly`,
+button `disabled`. Not "we remembered not to wire it up" — there is nothing
+that could reach a backend. Real `<label for>`/`<input id>` pairs though: a
+form drawn out of divs is not a demonstration of a form.
+
+**Email is `@example.invalid`** — RFC 2606 reserved, can never be registered,
+so it cannot ever belong to a real person the way a plausible @example.com
+eventually might. Test pins it.
+
+**No progress percentage.** The bar is indeterminate (62% → 100% as CSS
+widths) and the text says "Processing" then "Filed". There is no work behind
+it, so a number would be inventing one; a test bans `\d+%` from the copy.
+
+Composition: a three-column split (form | flow lane | Scoreboad) — a fourth
+distinct layout after the centred panel (06), two pinned columns (07),
+full-width board (09). Sticky at **180vh**, the shortest track on the page.
+
+Mobile: the split stacks, the lane's three rules turn vertical with the signal
+keyframe swapped to translateY, nothing is pinned or gated, and the six
+captions render as a numbered list via `counter-increment`.
+
+`lint` clean · `typecheck` clean · `build` clean · 1984/1984 (+8). Verified:
+one `<form>` with no action, zero fetch, 6 bound labels, 6 record rows in
+crawlable HTML, `@example.invalid` present, no `@gmail/@example.com`, no
+percentage string anywhere in the section's DOM.
+
+Note: React 19 SSRs `readOnly` as `readOnly=""` (camelCase). HTML attribute
+matching is case-insensitive so it IS the readonly attribute — a case-sensitive
+grep for `readonly` returns zero and is not evidence of a problem.
+
+**Page state:** 16 h2s, six deep bands against eight bright, four scroll tracks
+(220 + 260 + 200 + 180 = 860vh). Still unverified visually at any breakpoint.

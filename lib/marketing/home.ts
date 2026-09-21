@@ -1153,6 +1153,436 @@ export const PIPELINE_CALLOUTS: (HomeCard & { href: string })[] = [
 ];
 
 // -----------------------------------------------------------------------------
+// Candidate applications — the public form, and what happens after Submit
+// -----------------------------------------------------------------------------
+
+/**
+ * THE FIELDS ARE THE PRODUCT'S FIELDS, from DEFAULT_APPLICATION_FIELDS in
+ * lib/forms/fields.ts — every job's form is auto-created with exactly these
+ * thirteen, in this order. Six are shown here; the caption says how many there
+ * are rather than letting six look like the whole form.
+ *
+ * `email` and `resume` are marked required because they genuinely are:
+ * PROTECTED_FIELD_KEYS, enforced by migration 0033, and a form cannot be saved
+ * without them. Email is what duplicate matching runs on.
+ */
+export const APPLY_FIELDS: {
+  label: string;
+  value: string;
+  type: string;
+  required?: boolean;
+  /** The beat at which this field fills in. */
+  at: number;
+}[] = [
+  { label: "First name", value: "A.", type: "text", required: true, at: 0 },
+  { label: "Last name", value: "Sharma", type: "text", required: true, at: 0 },
+  { label: "Email address", value: "a.sharma@example.invalid", type: "email", required: true, at: 0 },
+  { label: "Current job title", value: "Backend Engineer", type: "text", at: 0 },
+  { label: "Total years of experience", value: "7", type: "number", at: 0 },
+  { label: "Notice period (days)", value: "30", type: "number", at: 0 },
+];
+
+/**
+ * The six beats, and their order is `lib/forms/submit.ts`'s order rather than
+ * the obvious one.
+ *
+ * The obvious story — fill a form, AI reads the resume, a profile appears — is
+ * not what this product does, and the difference is the most interesting thing
+ * in the module. Three rules from that file's header, quoted in substance:
+ *
+ *   1. The answers are saved FIRST, before storage, before the model, before
+ *      the candidate insert. "A downstream failure loses a link, never a
+ *      submission."
+ *   2. AI failure is not submission failure. The candidate and application are
+ *      created from the TYPED answers; an unparsed resume is simply filed.
+ *   3. An existing candidate is never overwritten — not by the parsed resume
+ *      and not by the typed answers. "A public form is an unauthenticated
+ *      claim about a record a human established."
+ *
+ * So the story ends on a PROPOSAL queued for a recruiter, not on a profile the
+ * model rewrote. That is also what connects it to the candidate workspace
+ * band, whose Resume view already shows a proposed change awaiting approval.
+ */
+export const APPLY_BEATS: {
+  key: string;
+  num: string;
+  label: string;
+  copy: string;
+}[] = [
+  {
+    key: "apply",
+    num: "01",
+    label: "Apply",
+    copy:
+      "Every job gets its own application form, created with the same thirteen " +
+      "fields and shared as a link. No account, no login — a candidate opens it " +
+      "and types.",
+  },
+  {
+    key: "resume",
+    num: "02",
+    label: "Resume",
+    copy:
+      "A resume is required, and it is the only file the form accepts. Custom " +
+      "questions can be added to any form; a custom FILE upload cannot, because " +
+      "a form that collects someone's documents and drops them is worse than one " +
+      "that never offered.",
+  },
+  {
+    key: "saved",
+    num: "03",
+    label: "Saved",
+    copy:
+      "The answers are written down before anything that can fail — before the " +
+      "file is stored, before a model is called. Someone has typed for five " +
+      "minutes on a phone; a failure after this point loses a link, never their " +
+      "submission.",
+  },
+  {
+    key: "created",
+    num: "04",
+    label: "Created",
+    copy:
+      "The candidate and the application are created from what they typed, and " +
+      "matched against everyone already on file by normalised email and phone. " +
+      "This happens whether or not the resume could be read.",
+  },
+  {
+    key: "parsed",
+    num: "05",
+    label: "Parsed",
+    copy:
+      "Then the resume is parsed. A scanned PDF with no text layer, a provider " +
+      "outage, a rate limit — all normal, and none of them fail the application. " +
+      "The file is simply filed unparsed.",
+  },
+  {
+    key: "proposed",
+    num: "06",
+    label: "Proposed",
+    copy:
+      "What the parse found is queued as a proposal, not written to the record. " +
+      "An existing candidate is never overwritten — not by the model, and not by " +
+      "the form either. A recruiter decides what lands.",
+  },
+];
+
+/**
+ * The right-hand side: what exists inside Scoreboad at each beat.
+ *
+ * `state` drives the tone. "pending" is genuinely pending — these rows appear
+ * in the order the submission pipeline creates them.
+ */
+export const APPLY_RECORDS: {
+  label: string;
+  value: string;
+  at: number;
+  state?: "good" | "warn";
+}[] = [
+  { label: "Form response", value: "Saved — 6 answers", at: 2, state: "good" },
+  { label: "Resume file", value: "sharma-backend.pdf · filed", at: 2, state: "good" },
+  { label: "Candidate", value: "New record — no duplicate found", at: 3, state: "good" },
+  { label: "Application", value: "Senior Backend Engineer · Applied", at: 3, state: "good" },
+  { label: "Resume parse", value: "Skills, 3 roles, education", at: 4, state: "good" },
+  { label: "Proposed change", value: "Awaiting review — nothing written yet", at: 5, state: "warn" },
+];
+
+export const APPLY_HEAD = {
+  eyebrow: "Candidate applications",
+  title: "Make it easy for candidates to enter your hiring workflow.",
+  lead:
+    "Every job gets a shareable application form. What a candidate types is " +
+    "saved before anything else happens, becomes a real candidate record, and " +
+    "what the resume adds to it waits for a person to approve.",
+} as const;
+
+export const APPLY_CALLOUTS: (HomeCard & { href: string })[] = [
+  {
+    title: "A form for every job",
+    // DEFAULT_APPLICATION_FIELDS — 13 fields, auto-created per job.
+    body:
+      "Thirteen fields by default, from name and email through to notice period, " +
+      "with your own questions added on top.",
+    icon: "ClipboardCheck",
+    href: "/product/source",
+  },
+  {
+    title: "A link, not a login",
+    // app/apply/[token] — signed token, rate-limited, no account required.
+    body:
+      "Share one link. Candidates never make an account, and the public endpoint " +
+      "is rate-limited rather than left open.",
+    icon: "KeyRound",
+    href: "/how-it-works",
+  },
+  {
+    title: "Answers become the record",
+    // CANDIDATE_COLUMN_BY_KEY — answers map to candidate columns directly.
+    body:
+      "Typed answers map straight onto candidate fields, and the person is " +
+      "matched against everyone on file by normalised email and phone.",
+    icon: "Users",
+    href: "/product/understand",
+  },
+  {
+    title: "Nothing lands unreviewed",
+    // submit.ts rule 3 — proposals queue in resume_parse_results.
+    body:
+      "What the resume adds is queued as a proposal. An existing candidate is " +
+      "never overwritten by a form or by a model.",
+    icon: "ShieldCheck",
+    href: "/product/decide",
+  },
+];
+
+// -----------------------------------------------------------------------------
+// Recruitment automation — one rule, running
+// -----------------------------------------------------------------------------
+
+/**
+ * THE GRAPH IS ONE REAL RULE, and every node in it is a real part of the
+ * engine. Verified against lib/automations before any of this was written:
+ *
+ *   trigger      TRIGGER_LABELS.screening_call_completed —
+ *                "A screening call completes". TRIGGER_MODES marks it
+ *                `service`: Bolna's webhook, so nobody is signed in.
+ *   conditions   CONDITION_FIELDS — interest_level, screening_consent_confirmed.
+ *   approval     approvals.ts — `requires_approval` parks the run at
+ *                `awaiting_approval` with the actions SNAPSHOTTED, and the
+ *                proposal expires after seven days.
+ *   wait         lib/workflow/delay.ts — delay_minutes, 1 minute to 30 days,
+ *                with a basis of `after` / `before_scheduled_call` /
+ *                `before_interview`.
+ *   actions      ACTION_LABELS.move_to_stage, .send_candidate_email.
+ *
+ * THE APPROVAL IS NOT DECORATION AND IT IS NOT MID-RUN. A rule that requires
+ * approval does not act at all — it proposes, and the whole run waits. Putting
+ * the gate anywhere else in this graph would misdescribe the engine, and it is
+ * also the single best answer to "does this thing email my candidates by
+ * itself".
+ */
+export const FLOW_NODES: {
+  key: string;
+  kind: "trigger" | "condition" | "approval" | "wait" | "action" | "candidate";
+  label: string;
+  /** The one-line detail shown when the node is opened. */
+  detail: string;
+  /** Beat at which the node joins the graph. */
+  at: number;
+}[] = [
+  {
+    key: "trigger",
+    kind: "trigger",
+    label: "A screening call completes",
+    detail:
+      "Fires when the voice provider reports a finished call. Nobody is signed " +
+      "in for this one, so the engine runs it with a service client and only " +
+      "the actions it can perform itself are available.",
+    at: 0,
+  },
+  {
+    key: "conditions",
+    kind: "condition",
+    label: "Interest is High · consent confirmed",
+    detail:
+      "Conditions are read off the application at the moment the trigger " +
+      "arrives. A rule that does not match simply does not run — it is not an " +
+      "error and nothing is logged against the candidate.",
+    at: 1,
+  },
+  {
+    key: "approval",
+    kind: "approval",
+    label: "Waiting for a recruiter",
+    detail:
+      "This rule requires approval, so it does not act — it proposes. The run " +
+      "parks and the actions are snapshotted, so what somebody approves is " +
+      "exactly what they read, even if the rule is edited in between. A " +
+      "proposal nobody answers expires after seven days, and lapsing is " +
+      "recorded separately from being rejected.",
+    at: 2,
+  },
+  {
+    key: "wait",
+    kind: "wait",
+    label: "Wait 30 minutes",
+    detail:
+      "A wait is a whole number of minutes, from one minute to thirty days, " +
+      "measured either from the other actions or from a scheduled call or " +
+      "interview. A pending wait is cancelled if the application changes stage " +
+      "— the reason for it has gone.",
+    at: 3,
+  },
+  {
+    key: "move",
+    kind: "action",
+    label: "Move to Video Interview",
+    detail:
+      "The stage change is recorded against the application with the rule as " +
+      "its actor, so the activity log shows what moved this person and why.",
+    at: 4,
+  },
+  {
+    key: "email",
+    kind: "action",
+    label: "Email the candidate a stage update",
+    detail:
+      "Sent from an approved template. Email is disconnected until somebody " +
+      "connects it, and the candidate's opt-out is checked before anything " +
+      "leaves.",
+    at: 4,
+  },
+  {
+    key: "candidate",
+    kind: "candidate",
+    label: "A. Sharma · Video Interview",
+    detail:
+      "The same candidate the rest of this page follows. The card's stage is " +
+      "what the rule changed; everything else on the record is untouched.",
+    at: 5,
+  },
+];
+
+/**
+ * The seven beats.
+ *
+ * Beat 6 has no new node — it is the finished graph, which is what §6's last
+ * stage asks for and also the only moment a reader sees the whole rule at once.
+ */
+export const FLOW_BEATS: { key: string; num: string; label: string; copy: string }[] = [
+  {
+    key: "trigger",
+    num: "01",
+    label: "Trigger",
+    copy:
+      "Nine things can start a rule, and this is one of them: a screening call " +
+      "finishing. The voice provider calls back, so there is no signed-in user " +
+      "behind it — the engine knows that and limits itself to what it can do " +
+      "on its own.",
+  },
+  {
+    key: "conditions",
+    num: "02",
+    label: "Conditions",
+    copy:
+      "Conditions are checked against the application as it stands. A rule that " +
+      "does not match does not run, and that is a non-event — nothing is logged " +
+      "against the candidate and nothing is retried.",
+  },
+  {
+    key: "approval",
+    num: "03",
+    label: "Proposal",
+    copy:
+      "This rule requires approval, so it does not act. It proposes, and the " +
+      "run stops here. Nothing has been sent, nothing has moved, and nothing " +
+      "will until a person says so.",
+  },
+  {
+    key: "approved",
+    num: "04",
+    label: "Approved",
+    copy:
+      "A recruiter reads the proposal and approves it. What they approve is a " +
+      "snapshot taken when it was raised — editing the rule in the meantime " +
+      "cannot change what their click authorises. Left unanswered, a proposal " +
+      "lapses after seven days rather than firing late.",
+  },
+  {
+    key: "wait",
+    num: "05",
+    label: "Wait",
+    copy:
+      "Then the wait runs, on a scheduler rather than a timer in somebody's " +
+      "browser. If the application changes stage while it is pending, the wait " +
+      "is cancelled — the thing it was waiting for has already happened.",
+  },
+  {
+    key: "actions",
+    num: "06",
+    label: "Actions",
+    copy:
+      "The stage moves and the candidate gets a templated update. Both are " +
+      "recorded against the application with the rule named as the actor, so " +
+      "the history says what changed this and why.",
+  },
+  {
+    key: "done",
+    num: "07",
+    label: "Complete",
+    copy:
+      "One rule, end to end: an event nobody was present for, a gate a person " +
+      "had to open, and two actions recorded under the rule's name. Automation " +
+      "that keeps the process moving without deciding anything.",
+  },
+];
+
+/**
+ * The run log. Timestamps are synthetic and the panel says so; the STATUSES
+ * are the engine's own — a run is proposed, approved, waiting, done.
+ */
+export const FLOW_LOG: { at: number; time: string; text: string; tone?: "good" | "warn" }[] = [
+  { at: 0, time: "09:41", text: "Screening call completed" },
+  { at: 1, time: "09:41", text: "Rule matched — 2 conditions" },
+  { at: 2, time: "09:41", text: "Awaiting approval — actions snapshotted", tone: "warn" },
+  { at: 3, time: "09:52", text: "Approved by R. Menon", tone: "good" },
+  { at: 4, time: "10:22", text: "Wait finished — 30 minutes" },
+  { at: 5, time: "10:22", text: "Stage changed to Video Interview", tone: "good" },
+  { at: 5, time: "10:22", text: "Candidate email sent", tone: "good" },
+];
+
+export const FLOW_HEAD = {
+  eyebrow: "Recruitment automation",
+  title: "Keep hiring moving, even between conversations.",
+  lead:
+    "Rules run on the events your process already produces — a call finishing, " +
+    "an application entering a stage, a week going by. They can move a " +
+    "candidate, start a call or send a templated update, and the ones that " +
+    "matter wait for a person first.",
+} as const;
+
+export const FLOW_CALLOUTS: (HomeCard & { href: string })[] = [
+  {
+    title: "Nine real triggers",
+    // TRIGGERS in lib/automations/catalog.ts — all nine are wired.
+    body:
+      "From an application being created to one sitting in a stage too long. " +
+      "Each one says where it is dispatched from, so you can tell whether your " +
+      "rule will actually fire.",
+    icon: "Zap",
+    href: "/product/operate",
+  },
+  {
+    title: "Approval before action",
+    // approvals.ts — snapshotted actions, seven-day expiry.
+    body:
+      "A rule can be made to propose rather than act. The actions are frozen " +
+      "when the proposal is raised, so approving it cannot authorise something " +
+      "you did not read.",
+    icon: "ShieldCheck",
+    href: "/how-it-works#ai-safety",
+  },
+  {
+    title: "Waits that get cancelled",
+    // lib/workflow/delay.ts — 1 min to 30 days, cancelled on stage change.
+    body:
+      "A minute to thirty days, measured from the actions or from a booked " +
+      "call. If the candidate moves on while a wait is pending, it is dropped.",
+    icon: "CalendarCheck",
+    href: "/product/decide",
+  },
+  {
+    title: "One clock, not many",
+    // A single scheduled sweep drains every time-based rule.
+    body:
+      "Every time-based rule drains from one scheduled sweep. No timers in a " +
+      "browser tab, and no second clock to disagree with the first.",
+    icon: "Activity",
+    href: "/product/operate",
+  },
+];
+
+// -----------------------------------------------------------------------------
 // From application to hire
 // -----------------------------------------------------------------------------
 

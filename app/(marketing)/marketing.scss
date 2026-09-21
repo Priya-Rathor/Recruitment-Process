@@ -2158,6 +2158,815 @@
   }
 
   // ===========================================================================
+  // RECRUITMENT AUTOMATION — the workflow graph
+  // ===========================================================================
+  .fl {
+    position: relative;
+    height: 200vh;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  .fl__runway {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1px;
+    pointer-events: none;
+  }
+
+  .fl__mark {
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 1px;
+
+    @for $i from 0 through 6 {
+      &[data-mark="#{$i}"] { top: calc(#{$i} * 100% / 7); }
+    }
+  }
+
+  .fl__pin { position: sticky; top: 5rem; }
+
+  .fl__stage {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius-lg);
+    background: var(--mkt-dark-2);
+    padding: clamp(1rem, 2vw, 1.5rem);
+    box-shadow: var(--mkt-glow-sheet);
+  }
+
+  .fl__glow {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      22rem 22rem at var(--mx, 30%) var(--my, 8%),
+      rgba(170, 183, 255, 0.14),
+      transparent 70%
+    );
+  }
+
+  .fl__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: clamp(1rem, 2.5vw, 2rem);
+    align-items: start;
+  }
+
+  .fl__rule {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0 0 0.875rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--mkt-dark-border);
+    font-size: 13px;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark);
+  }
+
+  .fl__rulename {
+    padding: 1px 0.4375rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---- The graph ------------------------------------------------------------
+  .fl-nodes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /*
+    THE CONNECTOR IS THE ROW'S OWN. A 1px rule above each node but the first,
+    drawn with a pseudo-element so the graph has no separate connector elements
+    to keep in step with the nodes they join.
+  */
+  .fl-node {
+    position: relative;
+    padding-top: 1.125rem;
+
+    &:first-child { padding-top: 0; }
+
+    &:not(:first-child)::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 1.125rem;
+      width: 1px;
+      height: 1.125rem;
+      background: var(--mkt-dark-border-strong);
+      transition: background 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+
+    &[data-joined="true"]:not(:first-child)::before {
+      background: linear-gradient(180deg, var(--mkt-accent), var(--mkt-lavender));
+    }
+
+    // The travelling signal, on the one connector carrying the run right now.
+    &:not(:first-child)::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: calc(1.125rem - 2px);
+      width: 5px;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--mkt-accent-bright);
+      box-shadow: var(--mkt-glow-accent);
+      opacity: 0;
+    }
+
+    &[data-live="true"]:not(:first-child)::after {
+      animation: fl-signal 720ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) 2;
+    }
+  }
+
+  @keyframes fl-signal {
+    0% { opacity: 0; transform: translateY(0); }
+    22% { opacity: 1; }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(1.125rem); }
+  }
+
+  .fl-node__btn {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) 1rem;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-dark-3);
+    font-family: var(--font-body);
+    text-align: left;
+    cursor: pointer;
+    // Not-yet-joined nodes are dimmed, never hidden — the shape of the rule is
+    // the thing being explained, and a reader landing mid-section must see it.
+    opacity: 0.38;
+    transition:
+      opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      background 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover { border-color: var(--mkt-dark-border-strong); }
+  }
+
+  .fl-node[data-joined="true"] .fl-node__btn { opacity: 1; }
+
+  /*
+    THE APPROVAL NODE IS THE ONE THAT LOOKS DIFFERENT, and deliberately: it is
+    the only gate in the graph, and a reader skimming should be able to find
+    the place a person has to act without reading every node.
+  */
+  .fl-node[data-kind="approval"][data-joined="true"] .fl-node__btn {
+    border-color: rgba(127, 231, 196, 0.45);
+    background: rgba(127, 231, 196, 0.07);
+  }
+
+  .fl-node[data-kind="candidate"][data-joined="true"] .fl-node__btn {
+    border-color: var(--color-primary);
+  }
+
+  .fl-node__kind {
+    font-size: 9.5px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .fl-node[data-kind="approval"] .fl-node__kind { color: var(--mkt-mint); }
+  .fl-node[data-kind="trigger"] .fl-node__kind { color: var(--mkt-accent-on-dark); }
+  .fl-node[data-kind="wait"] .fl-node__kind { color: var(--mkt-lavender); }
+
+  .fl-node__label {
+    font-size: 12.5px;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark);
+    line-height: 1.3;
+  }
+
+  .fl-node__chev {
+    justify-self: end;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-right: 1.5px solid var(--mkt-on-dark-faint);
+    border-bottom: 1.5px solid var(--mkt-on-dark-faint);
+    transform: rotate(45deg);
+    transition: transform 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .fl-node__btn[aria-expanded="true"] .fl-node__chev {
+    transform: rotate(-135deg);
+  }
+
+  .fl-node__detail {
+    margin: 0.4375rem 0 0 1.125rem;
+    padding: 0.625rem 0.75rem;
+    border-left: 2px solid var(--mkt-dark-border-strong);
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--mkt-on-dark-muted);
+    animation: mkt-enter 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  // ---- The run log ----------------------------------------------------------
+  .fl__log {
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius);
+    background: rgba(10, 17, 40, 0.5);
+    padding: 0.875rem;
+  }
+
+  .fl__loghead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .fl__logdemo {
+    padding: 1px 0.375rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .fl-log {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4375rem;
+    // Holds all seven, so the panel does not grow as the run proceeds.
+    min-height: 11.5rem;
+  }
+
+  .fl-log__row {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: baseline;
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 380ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 380ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] { opacity: 1; transform: none; }
+  }
+
+  .fl-log__time {
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .fl-log__text {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .fl-log__row[data-tone="good"] .fl-log__text { color: var(--mkt-mint); }
+  .fl-log__row[data-tone="warn"] .fl-log__text { color: var(--mkt-lavender); }
+
+  .fl__note {
+    margin: 0.875rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--mkt-dark-border);
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark);
+    opacity: 0;
+    transition: opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] { opacity: 1; }
+  }
+
+  // ---- The beat rail --------------------------------------------------------
+  .fl__story { margin-top: 1.25rem; }
+
+  .fl-beats {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1.125rem;
+    margin: 0 0 0.875rem;
+    padding: 0;
+  }
+
+  .fl-beats__item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4375rem;
+    font-size: var(--text-caption);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-state="off"] { opacity: 0.4; color: var(--mkt-on-dark-muted); }
+    &[data-state="done"] { opacity: 0.72; color: var(--mkt-on-dark-muted); }
+    &[data-state="on"] {
+      opacity: 1;
+      color: var(--mkt-on-dark);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .fl-beats__num {
+    font-family: var(--font-heading);
+    font-weight: var(--weight-bold);
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .fl__copy { min-height: 5rem; }
+
+  .fl__copytext {
+    margin: 0;
+    max-width: 54rem;
+    font-size: var(--text-body-lg);
+    line-height: 1.65;
+    color: var(--mkt-on-dark-muted);
+    animation: mkt-enter 340ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  .fl-callouts { margin-top: clamp(2rem, 4vw, 3rem); }
+
+  .fl__cta {
+    display: flex;
+    justify-content: center;
+    margin-top: clamp(1.75rem, 3vw, 2.5rem);
+  }
+
+  /*
+    THE MAGNETIC WRAPPER. The pull is written to two custom properties by the
+    component; this is the only place that reads them. `display: inline-block`
+    so the wrapper is exactly the button's box and the pull is measured from
+    the control the reader is aiming at.
+  */
+  .mkt-magnetic {
+    display: inline-block;
+    transform: translate(var(--pull-x, 0px), var(--pull-y, 0px));
+    transition: transform 220ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  // ===========================================================================
+  // CANDIDATE APPLICATIONS — the split
+  //
+  // Candidate side left, Scoreboad right, three rules carrying data between
+  // them. One attribute drives everything: `data-beat` on `.ap__split`.
+  // ===========================================================================
+  .ap {
+    position: relative;
+    // The shortest of the page's scroll tracks. Six beats, and the split is
+    // legible from the first frame — the scroll reveals an ORDER, not the
+    // content, so it does not need room to breathe the way the pipeline does.
+    height: 180vh;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  .ap__runway {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1px;
+    pointer-events: none;
+  }
+
+  .ap__mark {
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 1px;
+
+    @for $i from 0 through 5 {
+      &[data-mark="#{$i}"] { top: calc(#{$i} * 100% / 6); }
+    }
+  }
+
+  .ap__pin {
+    position: sticky;
+    top: 5rem;
+  }
+
+  /*
+    THE SPLIT. Two panels and a flow lane between them, sized so the lane is
+    wide enough for the rules to read as a journey rather than as a seam.
+  */
+  .ap__split {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.5rem minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0;
+    padding: clamp(0.875rem, 2vw, 1.25rem);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius-lg);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-product-light);
+  }
+
+  .ap__glow {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      22rem 22rem at var(--mx, 20%) var(--my, 10%),
+      rgba(139, 158, 255, 0.12),
+      transparent 70%
+    );
+  }
+
+  .ap-form,
+  .ap-in {
+    min-width: 0;
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-light-border);
+    background: var(--mkt-light);
+    padding: clamp(0.875rem, 1.6vw, 1.125rem);
+  }
+
+  .ap-form__eyebrow {
+    margin: 0;
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .ap-form__title {
+    margin: 0.25rem 0 0;
+    font-family: var(--font-heading);
+    font-size: 14.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .ap-form__note {
+    margin: 1px 0 0;
+    font-size: 11px;
+    color: var(--mkt-ink-muted);
+  }
+
+  .ap-form__head,
+  .ap-in__head {
+    padding-bottom: 0.625rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--mkt-light-border);
+  }
+
+  // ---- The fields -----------------------------------------------------------
+  .ap-form__body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .ap-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    label {
+      font-size: 10px;
+      font-weight: var(--weight-medium);
+      color: var(--mkt-ink-muted);
+    }
+
+    /*
+      A REAL INPUT, read-only. Styled as the product's own field rather than
+      as a text line, because a form drawn out of <div>s is not a
+      demonstration of a form — and a label bound with `for`/`id` is the part
+      that actually matters here.
+    */
+    input {
+      width: 100%;
+      min-width: 0;
+      height: 1.875rem;
+      padding-inline: 0.5rem;
+      border: 1px solid var(--mkt-light-border-strong);
+      border-radius: var(--mkt-radius-sm);
+      background: var(--mkt-white);
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--mkt-ink);
+      text-overflow: ellipsis;
+      transition: border-color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+
+    // Filled reads as complete — a mint edge AND a value in the box, never
+    // the colour on its own.
+    &[data-filled="true"] input {
+      border-color: rgba(127, 231, 196, 0.75);
+    }
+  }
+
+  .ap-field__req {
+    font-weight: var(--weight-regular);
+    color: var(--mkt-ink-muted);
+    opacity: 0.8;
+  }
+
+  // ---- The resume row -------------------------------------------------------
+  .ap-file {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 0.25rem;
+    padding: 0.5rem 0.625rem;
+    border: 1px dashed var(--mkt-light-border-strong);
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-white);
+    transition: border-color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-state="done"] {
+      border-style: solid;
+      border-color: rgba(127, 231, 196, 0.75);
+    }
+  }
+
+  .ap-file__label {
+    font-size: 10px;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink-muted);
+  }
+
+  .ap-file__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .ap-file__name {
+    font-size: 12px;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ap-file__state {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    color: var(--mkt-ink-muted);
+  }
+
+  .ap-file[data-state="done"] .ap-file__state { color: var(--mkt-mint-ink); }
+
+  /*
+    An INDETERMINATE bar. It fills while processing and completes when filed —
+    it never displays a percentage, because there is no work behind it to
+    measure and a number would be inventing one.
+  */
+  .ap-file__bar {
+    height: 3px;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    overflow: hidden;
+  }
+
+  .ap-file__fill {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: var(--color-primary);
+    transition: width 620ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .ap-file[data-state="busy"] .ap-file__fill { width: 62%; }
+  .ap-file[data-state="done"] .ap-file__fill {
+    width: 100%;
+    background: var(--mkt-mint);
+  }
+
+  .ap-form__submit {
+    grid-column: 1 / -1;
+    margin-top: 0.375rem;
+    height: 2.25rem;
+    border: 1px solid transparent;
+    border-radius: var(--control-radius);
+    background: var(--color-primary);
+    // Navy on periwinkle — 7.50:1. Never white.
+    color: var(--mkt-on-accent);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: var(--weight-semibold);
+    // Disabled, and it LOOKS ordinary rather than greyed: it is a picture of a
+    // button in a form that narrates itself, not a control the reader has
+    // failed to satisfy.
+    opacity: 1;
+    cursor: default;
+  }
+
+  .ap-form__demo {
+    margin: 0.625rem 0 0;
+    font-size: 10.5px;
+    line-height: 1.45;
+    color: var(--mkt-ink-muted);
+  }
+
+  // ---- The flow lane --------------------------------------------------------
+  .ap-flow {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1.25rem;
+    padding-inline: 0.5rem;
+  }
+
+  .ap-flow__line {
+    position: relative;
+    height: 1px;
+    border-radius: 1px;
+    background: var(--mkt-light-border-strong);
+    transition: background 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-on="true"] {
+      background: linear-gradient(90deg, var(--color-primary), var(--mkt-lavender));
+    }
+
+    // The travelling signal, only on a line that is carrying something.
+    &::after {
+      content: "";
+      position: absolute;
+      top: -2px;
+      left: 0;
+      width: 5px;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--color-primary);
+      opacity: 0;
+    }
+
+    &[data-on="true"]::after {
+      animation: ap-signal 900ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) 2;
+    }
+  }
+
+  @keyframes ap-signal {
+    0% { opacity: 0; transform: translateX(0); }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(3.5rem); }
+  }
+
+  // ---- The Scoreboad side ---------------------------------------------------
+  .ap-in__rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4375rem;
+    // Holds all six, so the panel does not grow as rows arrive.
+    min-height: 13.5rem;
+  }
+
+  .ap-rec {
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] { opacity: 1; transform: none; }
+  }
+
+  .ap-rec__tick {
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-top: 2px;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-light-border-strong);
+    background: var(--mkt-white);
+  }
+
+  .ap-rec[data-state="good"][data-shown="true"] .ap-rec__tick {
+    border-color: var(--mkt-mint);
+    background: var(--mkt-mint);
+  }
+
+  .ap-rec[data-state="warn"][data-shown="true"] .ap-rec__tick {
+    border-color: var(--mkt-amber-ink);
+    background: transparent;
+  }
+
+  .ap-rec__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    strong {
+      font-size: 12px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    span {
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  .ap-rec[data-state="warn"] .ap-rec__text span { color: var(--mkt-amber-ink); }
+
+  .ap-in__note {
+    margin: 0.875rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--mkt-light-border);
+    font-size: 11.5px;
+    line-height: 1.5;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink);
+    opacity: 0;
+    transition: opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] { opacity: 1; }
+  }
+
+  // ---- The beat rail --------------------------------------------------------
+  .ap__story { margin-top: 1.25rem; }
+
+  .ap-beats {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1.25rem;
+    margin: 0 0 0.875rem;
+    padding: 0;
+  }
+
+  .ap-beats__item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4375rem;
+    font-size: var(--text-caption);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-state="off"] { opacity: 0.4; color: var(--mkt-ink-muted); }
+    &[data-state="done"] { opacity: 0.72; color: var(--mkt-ink-muted); }
+    &[data-state="on"] {
+      opacity: 1;
+      color: var(--mkt-ink);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .ap-beats__num {
+    font-family: var(--font-heading);
+    font-weight: var(--weight-bold);
+    color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
+  }
+
+  .ap__copy { min-height: 5rem; }
+
+  .ap__copytext {
+    margin: 0;
+    max-width: 54rem;
+    font-size: var(--text-body-lg);
+    line-height: 1.65;
+    color: var(--mkt-ink-muted);
+    animation: mkt-enter 340ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  // ===========================================================================
   // THE HIRING PIPELINE
   //
   // A sticky board with one candidate crossing it. Everything is driven by two
@@ -2188,7 +2997,7 @@
 
     @for $i from 0 through 5 {
       &[data-mark="#{$i}"] {
-        top: percentage(calc($i / 6));
+        top: calc(#{$i} * 100% / 6);
       }
     }
   }
@@ -3096,7 +3905,7 @@
 
     @for $i from 0 through 5 {
       &[data-mark="#{$i}"] {
-        top: percentage(calc($i / 6));
+        top: calc(#{$i} * 100% / 6);
       }
     }
   }
@@ -3682,7 +4491,7 @@
 
     @for $i from 0 through 4 {
       &[data-mark="#{$i}"] {
-        top: percentage(calc($i / 5)) ;
+        top: calc(#{$i} * 100% / 5);
       }
     }
   }
@@ -5427,6 +6236,200 @@
   */
   /*
     ===========================================================================
+    THE WORKFLOW GRAPH ON A SMALL SCREEN
+    ===========================================================================
+
+    The graph is ALREADY vertical, which is the brief's mobile layout — so
+    the only change is that the log moves below it instead of beside it, and
+    the pinning goes. A tap opens a node's detail exactly as a click does,
+    because the detail was always inline rather than in a side panel.
+  */
+  @media (max-width: 900px) {
+    .fl { height: auto; }
+
+    .fl__runway { display: none; }
+
+    .fl__pin { position: static; }
+
+    .fl__grid { grid-template-columns: minmax(0, 1fr); }
+
+    // Nothing is gated when nothing is pinned: the whole rule and the whole
+    // log are shown, and the seven captions read as a numbered list.
+    .fl-node__btn { opacity: 1; }
+
+    .fl-node:not(:first-child)::before {
+      background: linear-gradient(180deg, var(--mkt-accent), var(--mkt-lavender));
+    }
+
+    .fl-node:not(:first-child)::after { display: none; }
+
+    .fl-log__row,
+    .fl__note {
+      opacity: 1;
+      transform: none;
+    }
+
+    .fl-log { min-height: 0; }
+
+    .fl-beats { display: none; }
+
+    .fl__story { counter-reset: flstage; }
+
+    .fl__copy {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .fl__copytext[hidden] {
+      display: block !important;
+      animation: none;
+    }
+
+    .fl__copytext {
+      counter-increment: flstage;
+      position: relative;
+      padding-left: 2rem;
+      font-size: var(--text-body);
+
+      &::before {
+        content: "0" counter(flstage);
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-family: var(--font-heading);
+        font-size: var(--text-caption);
+        font-weight: var(--weight-bold);
+        color: var(--mkt-accent-on-dark);
+      }
+    }
+
+    .fl__glow {
+      background: radial-gradient(16rem 16rem at 30% 5%, rgba(170, 183, 255, 0.10), transparent 70%);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .fl-node__btn {
+      // The kind chip moves above the label: 4.5rem plus "Email the candidate
+      // a stage update" does not fit 375px on one row.
+      grid-template-columns: minmax(0, 1fr) 1rem;
+      row-gap: 2px;
+      padding-block: 0.625rem;
+    }
+
+    .fl-node__kind { grid-column: 1; }
+    .fl-node__label { grid-column: 1; }
+    .fl-node__chev { grid-row: 1 / span 2; grid-column: 2; }
+  }
+
+  /*
+    ===========================================================================
+    THE APPLICATION SPLIT ON A SMALL SCREEN
+    ===========================================================================
+
+    The split stacks: the form, then the flow turned vertical, then Scoreboad.
+    The scroll story stays, because the point of the section is an ORDER and
+    stacking preserves it — a reader scrolls the form, then watches the right
+    side fill. What goes is the pinning, which at this width would hold a tall
+    two-panel stack still while the reader tried to reach the caption.
+  */
+  @media (max-width: 900px) {
+    .ap {
+      height: auto;
+    }
+
+    .ap__runway {
+      display: none;
+    }
+
+    .ap__pin {
+      position: static;
+    }
+
+    .ap__split {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    // The lane turns into three short vertical rules between the panels.
+    .ap-flow {
+      flex-direction: row;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 0.875rem 0;
+    }
+
+    .ap-flow__line {
+      width: 1px;
+      height: 1.75rem;
+
+      &[data-on="true"] {
+        background: linear-gradient(180deg, var(--color-primary), var(--mkt-lavender));
+      }
+
+      &::after { left: -2px; top: 0; }
+    }
+
+    @keyframes ap-signal {
+      0% { opacity: 0; transform: translateY(0); }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(1.75rem); }
+    }
+
+    // Nothing is pinned, so nothing is gated — every row and every beat's copy
+    // is shown, and the section reads as a plain sequence.
+    .ap-rec,
+    .ap-in__note {
+      opacity: 1;
+      transform: none;
+    }
+
+    .ap-in__rows { min-height: 0; }
+
+    .ap__copy { min-height: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .ap__copytext[hidden] {
+      display: block !important;
+      animation: none;
+    }
+
+    .ap__copytext {
+      font-size: var(--text-body);
+      padding-left: 2rem;
+      position: relative;
+      counter-increment: apstage;
+
+      &::before {
+        content: "0" counter(apstage);
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-family: var(--font-heading);
+        font-size: var(--text-caption);
+        font-weight: var(--weight-bold);
+        color: var(--mkt-accent-ink);
+      }
+    }
+
+    .ap__story { counter-reset: apstage; }
+
+    .ap-beats { display: none; }
+
+    .ap__glow {
+      background: radial-gradient(16rem 16rem at 20% 6%, rgba(139, 158, 255, 0.10), transparent 70%);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .ap-form__body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /*
+    ===========================================================================
     THE PIPELINE ON A SMALL SCREEN — vertical, and genuinely redesigned
     ===========================================================================
 
@@ -6040,6 +7043,81 @@
       all rendered regardless of beat, so nothing here was ever revealed BY
       the animation.
     */
+    /*
+      THE WORKFLOW ARRIVES BUILT. Every node joined, every log line present,
+      no signal travelling a connector, no magnetism on the CTA. The graph was
+      only ever DIMMED rather than hidden, so nothing is lost.
+    */
+    .fl-node__btn { opacity: 1; transition: none; }
+
+    .fl-node:not(:first-child)::before {
+      background: linear-gradient(180deg, var(--mkt-accent), var(--mkt-lavender));
+      transition: none;
+    }
+
+    .fl-node:not(:first-child)::after {
+      animation: none !important;
+      display: none;
+    }
+
+    .fl-log__row,
+    .fl__note {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+
+    .fl__copytext,
+    .fl-node__detail {
+      animation: none;
+    }
+
+    .fl-node__chev,
+    .fl-beats__item {
+      transition: none;
+    }
+
+    .fl__glow { display: none; }
+
+    .mkt-magnetic {
+      transform: none;
+      transition: none;
+    }
+
+    /*
+      THE APPLICATION ARRIVES COMPLETE. Every field filled, the file filed,
+      every record row shown, no signal travelling the lane. Nothing here was
+      revealed BY the animation — the beats reveal an ORDER, and the order is
+      still stated in the six captions.
+    */
+    .ap-rec,
+    .ap-in__note {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+
+    .ap-flow__line::after {
+      animation: none !important;
+      display: none;
+    }
+
+    .ap-field input,
+    .ap-file,
+    .ap-file__fill,
+    .ap-flow__line,
+    .ap-beats__item {
+      transition: none;
+    }
+
+    .ap__copytext {
+      animation: none;
+    }
+
+    .ap__glow {
+      display: none;
+    }
+
     .pl__traveller {
       transition: none;
     }
@@ -6774,6 +7852,7 @@
   .vi-callout:focus-visible,
   .cw-tab:focus-visible,
   .pl-col__head:focus-visible,
+  .fl-node__btn:focus-visible,
   .mkt-nav__link:focus-visible,
   .mkt-mega__link:focus-visible,
   .mkt-sheet__row:focus-visible,

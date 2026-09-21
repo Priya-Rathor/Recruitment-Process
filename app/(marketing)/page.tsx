@@ -18,6 +18,8 @@ import { VoiceInterview } from "./_components/home/VoiceInterview";
 import { HumanAi } from "./_components/home/HumanAi";
 import { CandidateWorkspace } from "./_components/home/CandidateWorkspace";
 import { HiringPipeline } from "./_components/home/HiringPipeline";
+import { CandidateApplications } from "./_components/home/CandidateApplications";
+import { RecruitmentAutomation } from "./_components/home/RecruitmentAutomation";
 import { BrandStatement } from "./_components/home/BrandStatement";
 import { TrustSection } from "./_components/home/TrustSection";
 import { Faq } from "./_components/home/Faq";
@@ -67,10 +69,12 @@ export const metadata: Metadata = {
  *   8. AI does the work, you decide       the objection, answered
  *   9. Candidate workspace                one candidate, six real views
  *  10. Hiring pipeline                    a board one candidate crosses
- *  11. People x Intelligence x Opportunity  a beat
- *  12. Built for modern hiring teams      why trust it with candidate data
- *  13. FAQ                                the awkward questions
- *  14. Build your next team               the ask
+ *  11. Candidate applications             how a candidate gets in at all
+ *  12. Recruitment automation             one rule, running, with a gate
+ *  13. People x Intelligence x Opportunity  a beat
+ *  14. Built for modern hiring teams      why trust it with candidate data
+ *  15. FAQ                                the awkward questions
+ *  16. Build your next team               the ask
  *
  * STEPS 2 AND 3 WERE THE MISSING FIRST HALF OF THE ARGUMENT. The page used to
  * open with the hero's promise and go straight to a list of capabilities — the
@@ -141,6 +145,8 @@ export default function HomePage() {
       <HumanAi />
       <CandidateWorkspace />
       <HiringPipeline />
+      <CandidateApplications />
+      <RecruitmentAutomation />
       <BrandStatement />
       <TrustSection />
       <Faq />

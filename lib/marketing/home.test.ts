@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PIPELINE_STAGES, STAGE_LABELS } from "@/lib/applications/stages";
 import { DEFAULT_SLA_DAYS } from "@/lib/pipeline/sla";
+import { DEFAULT_APPLICATION_FIELDS } from "@/lib/forms/fields";
 import {
   RESUME_SCORE_MAX,
   ROUND_SCORE_MAX,
@@ -37,6 +38,11 @@ import {
   PIPELINE_HEAD,
   pipelineBreachesAt,
   pipelineCountAt,
+  APPLY_BEATS,
+  APPLY_CALLOUTS,
+  APPLY_FIELDS,
+  APPLY_HEAD,
+  APPLY_RECORDS,
   CANDIDATE_CALLOUTS,
   CANDIDATE_HEAD,
   CANDIDATE_STAGES,
@@ -155,6 +161,10 @@ const ALL_COPY: string[] = [
   ...VOICE_CALLOUTS.flatMap((c) => [c.title, c.body]),
   ...CANDIDATE_CALLOUTS.flatMap((c) => [c.title, c.body]),
   ...PIPELINE_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  ...APPLY_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  APPLY_HEAD.title,
+  APPLY_HEAD.lead,
+  ...APPLY_BEATS.map((b) => b.copy),
   PIPELINE_HEAD.title,
   PIPELINE_HEAD.lead,
   ...PIPELINE_BEATS.map((b) => b.copy),
@@ -1124,6 +1134,103 @@ describe("the pipeline board is this product's board", () => {
     for (const card of PIPELINE_CALLOUTS) {
       expect(known.has(card.href.split("#")[0] || "/"), card.href).toBe(true);
     }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Candidate applications
+// -----------------------------------------------------------------------------
+
+describe("the application form is the product's form", () => {
+  it("shows only real default fields, with the real labels", () => {
+    /*
+      DEFAULT_APPLICATION_FIELDS is what every job's form is created with.
+      A field invented for the picture would be one a customer then goes
+      looking for in the form builder.
+    */
+    const real = new Set(DEFAULT_APPLICATION_FIELDS.map((f) => f.label));
+    for (const field of APPLY_FIELDS) {
+      expect(real.has(field.label), `"${field.label}" is not a default field`).toBe(true);
+    }
+  });
+
+  it("marks required exactly what the product requires", () => {
+    const required = new Set(
+      DEFAULT_APPLICATION_FIELDS.filter((f) => f.required).map((f) => f.label)
+    );
+    for (const field of APPLY_FIELDS) {
+      expect(Boolean(field.required), field.label).toBe(required.has(field.label));
+    }
+  });
+
+  it("uses an unroutable example address", () => {
+    /*
+      `.invalid` is reserved by RFC 2606 and can never be registered, so the
+      address on this page cannot ever belong to a real person — which a
+      plausible-looking @gmail or @example.com eventually might.
+    */
+    const email = APPLY_FIELDS.find((f) => f.type === "email")!;
+    expect(email.value).toMatch(/@example\.invalid$/);
+  });
+
+  it("tells the submission story in the order the code does it", () => {
+    /*
+      THE POINT OF THE WHOLE SECTION. lib/forms/submit.ts saves the answers
+      FIRST, creates the candidate from the TYPED answers, parses the resume
+      after, and queues what it found as a proposal. The obvious story — form,
+      AI, profile — is a different and worse product, and this is what stops
+      an edit quietly reverting to it.
+    */
+    expect(APPLY_BEATS.map((b) => b.key)).toEqual([
+      "apply",
+      "resume",
+      "saved",
+      "created",
+      "parsed",
+      "proposed",
+    ]);
+
+    const saved = APPLY_BEATS.findIndex((b) => b.key === "saved");
+    const parsed = APPLY_BEATS.findIndex((b) => b.key === "parsed");
+    const created = APPLY_BEATS.findIndex((b) => b.key === "created");
+    expect(saved, "answers are saved before the model runs").toBeLessThan(parsed);
+    expect(created, "the candidate is created from typed answers, before the parse").toBeLessThan(
+      parsed
+    );
+  });
+
+  it("ends on a proposal, never on an overwritten record", () => {
+    const last = APPLY_BEATS.at(-1)!;
+    expect(last.key).toBe("proposed");
+    expect(last.copy).toMatch(/never overwritten/i);
+
+    const final = APPLY_RECORDS.at(-1)!;
+    expect(final.label).toBe("Proposed change");
+    expect(final.value).toMatch(/nothing written yet/i);
+  });
+
+  it("reveals every record row in beat order", () => {
+    const beats = APPLY_RECORDS.map((r) => r.at);
+    expect([...beats].sort((a, b) => a - b)).toEqual(beats);
+    expect(Math.max(...beats)).toBeLessThan(APPLY_BEATS.length);
+  });
+
+  it("never states a progress percentage", () => {
+    /*
+      There is no work behind the upload bar, so a number would be inventing
+      one. The component says "Processing" and then "Filed"; this guards the
+      copy that surrounds it.
+    */
+    const copy = [APPLY_HEAD.lead, ...APPLY_BEATS.map((b) => b.copy)].join(" ");
+    expect(/\b\d+\s?%/.test(copy), copy).toBe(false);
+  });
+
+  it("sends every callout to a page that exists", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    for (const card of APPLY_CALLOUTS) {
+      expect(known.has(card.href.split("#")[0] || "/"), card.href).toBe(true);
+    }
+    expect(APPLY_CALLOUTS).toHaveLength(4);
   });
 });
 
