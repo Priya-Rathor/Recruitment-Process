@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { PIPELINE_STAGES, STAGE_LABELS } from "@/lib/applications/stages";
 import { DEFAULT_SLA_DAYS } from "@/lib/pipeline/sla";
 import { DEFAULT_APPLICATION_FIELDS } from "@/lib/forms/fields";
+import { ACTION_LABELS, TRIGGER_LABELS } from "@/lib/automations/catalog";
+import { MAX_DELAY_MINUTES, MIN_DELAY_MINUTES } from "@/lib/workflow/delay";
 import {
   RESUME_SCORE_MAX,
   ROUND_SCORE_MAX,
@@ -39,6 +41,11 @@ import {
   pipelineBreachesAt,
   pipelineCountAt,
   APPLY_BEATS,
+  FLOW_BEATS,
+  FLOW_CALLOUTS,
+  FLOW_HEAD,
+  FLOW_LOG,
+  FLOW_NODES,
   APPLY_CALLOUTS,
   APPLY_FIELDS,
   APPLY_HEAD,
@@ -165,6 +172,10 @@ const ALL_COPY: string[] = [
   APPLY_HEAD.title,
   APPLY_HEAD.lead,
   ...APPLY_BEATS.map((b) => b.copy),
+  ...FLOW_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  FLOW_HEAD.title,
+  FLOW_HEAD.lead,
+  ...FLOW_BEATS.map((b) => b.copy),
   PIPELINE_HEAD.title,
   PIPELINE_HEAD.lead,
   ...PIPELINE_BEATS.map((b) => b.copy),
@@ -1231,6 +1242,102 @@ describe("the application form is the product's form", () => {
       expect(known.has(card.href.split("#")[0] || "/"), card.href).toBe(true);
     }
     expect(APPLY_CALLOUTS).toHaveLength(4);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Recruitment automation
+// -----------------------------------------------------------------------------
+
+describe("the workflow graph is a real rule", () => {
+  it("starts from a real trigger", () => {
+    /*
+      Nine triggers exist and all nine are wired. The graph's first node must
+      be one of them, stated the way the product states it — a trigger
+      invented for the picture is a rule a customer cannot build.
+    */
+    const trigger = FLOW_NODES[0];
+    expect(trigger.kind).toBe("trigger");
+    expect(Object.values(TRIGGER_LABELS)).toContain(trigger.label);
+  });
+
+  it("uses only real action labels", () => {
+    const real = new Set(Object.values(ACTION_LABELS));
+    for (const node of FLOW_NODES.filter((n) => n.kind === "action")) {
+      expect(real.has(node.label), `"${node.label}" is not a real action`).toBe(true);
+    }
+  });
+
+  it("puts the approval before every action, because the engine does", () => {
+    /*
+      THE ASSERTION THAT MATTERS MOST HERE.
+
+      approvals.ts: a rule marked `requires_approval` "does not act. It
+      proposes: the run parks at `awaiting_approval`". The gate is therefore
+      before EVERYTHING, not beside one action. A graph that drew it later
+      would describe a different engine and would quietly imply the other
+      actions run ungated.
+    */
+    const approval = FLOW_NODES.findIndex((n) => n.kind === "approval");
+    expect(approval).toBeGreaterThan(-1);
+
+    FLOW_NODES.forEach((node, index) => {
+      if (node.kind !== "action") return;
+      expect(index, `"${node.label}" must come after the approval`).toBeGreaterThan(approval);
+    });
+  });
+
+  it("states a wait the product can actually store", () => {
+    // delay.ts: a whole number of minutes, at least one, at most thirty days.
+    const wait = FLOW_NODES.find((n) => n.kind === "wait")!;
+    const minutes = Number(wait.label.match(/(\d+)\s*minute/i)?.[1]);
+    expect(Number.isInteger(minutes)).toBe(true);
+    expect(minutes).toBeGreaterThanOrEqual(MIN_DELAY_MINUTES);
+    expect(minutes).toBeLessThanOrEqual(MAX_DELAY_MINUTES);
+  });
+
+  it("describes the expiry rather than leaving the proposal open forever", () => {
+    // Seven days, and lapsing is recorded separately from rejection.
+    const approval = FLOW_NODES.find((n) => n.kind === "approval")!;
+    expect(approval.detail).toMatch(/seven days/i);
+  });
+
+  it("never claims the rule decides anything", () => {
+    const copy = [
+      FLOW_HEAD.title,
+      FLOW_HEAD.lead,
+      ...FLOW_BEATS.map((b) => b.copy),
+      ...FLOW_NODES.map((n) => n.detail),
+      ...FLOW_CALLOUTS.flatMap((c) => [c.title, c.body]),
+    ].join(" ");
+
+    expect(/\b(hires|rejects|decides)\s+(the\s+)?candidate/i.test(copy), copy).toBe(false);
+    // And the last beat must say what it does instead.
+    expect(FLOW_BEATS.at(-1)!.copy).toMatch(/without deciding anything/i);
+  });
+
+  it("builds every node in beat order and finishes on the finished graph", () => {
+    const ats = FLOW_NODES.map((n) => n.at);
+    expect([...ats].sort((a, b) => a - b)).toEqual(ats);
+    // The last beat adds nothing — it is the whole rule, seen at once.
+    expect(Math.max(...ats)).toBeLessThan(FLOW_BEATS.length - 1);
+  });
+
+  it("logs in beat order and ends on the actions", () => {
+    const ats = FLOW_LOG.map((e) => e.at);
+    expect([...ats].sort((a, b) => a - b)).toEqual(ats);
+    expect(FLOW_LOG.at(-1)!.text).toMatch(/email|stage/i);
+    // An approval line must name a person; an automation that approved itself
+    // would be the one thing this section promises does not happen.
+    expect(FLOW_LOG.some((e) => /approved by \w/i.test(e.text))).toBe(true);
+  });
+
+  it("sends every callout to a page that exists", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    for (const card of FLOW_CALLOUTS) {
+      expect(known.has(card.href.split("#")[0] || "/"), card.href).toBe(true);
+    }
+    expect(FLOW_CALLOUTS).toHaveLength(4);
   });
 });
 
