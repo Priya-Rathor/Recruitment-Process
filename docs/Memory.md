@@ -1661,3 +1661,69 @@ at 0/16.7/33.3/50/66.7/83.3%.
 **Still not verified:** the eight breakpoints and the scroll choreography,
 visually. No browser. Two sticky stories now run back to back (Modules 06 and
 07) — whether that is one beat too many is a judgement only scrolling can make.
+
+---
+
+## 2026-09-21 — Module 08: candidate workspace / candidate journey
+
+**Deliberate deviation, reported: this is NOT a third sticky scroll story.**
+§7 asked for a 220–300vh sticky section with copy left and a pinned workspace
+right — which is, to the pixel, the composition of Module 07 directly above it,
+itself the second of these. Built as specified the reader would meet the same
+two-column pinned panel three times running, and the homepage would carry
+~700vh of scroll track before the pipeline module.
+
+What made 06 and 07 work was: one candidate visibly travelling, a surface that
+transforms, and a stage indicator. None of that needs scroll as the transport.
+So the READER drives this one — six real views as a tablist, a timeline that
+fills, one card carrying its state across all six. Reversible: the
+sentinel+sticky machinery would drop in around `<CandidateJourney>` unchanged.
+
+**The six views are the product's own screens**, read before any copy:
+Profile (`app/candidates/[id]` Profile card fields), Resumes (`ResumesCard`),
+Screening (`screening-report`), Interviews, Evaluation (`EvaluationPanel`),
+Activity (`activity/` Timeline). The brief's sixth stage was "Review" — not a
+screen here; reviewing IS the evaluation panel, and what survives it is the
+activity log.
+
+**The timeline is the audit log's own vocabulary.** Every entry is a real
+`label` from `lib/activity/events.ts`: Applied · Resume parsed · Parsed fields
+reviewed · Match calculated · Screening report reviewed · Interview scheduled ·
+Interview feedback submitted · Stage changed. A test pins the whole set, since
+that is the first thing that would rot if someone "tidied up" the wording.
+
+**`CandidateCard` is a separate prop-driven server component** (§20) — knows
+nothing about stages, timelines or selection, so Module 09 can drop it into a
+pipeline column without inheriting any of this. The journey is its CHIPS
+changing (Applied → +Resume parsed → +Match 91/100 → +Rounds 1 of 2 → +Verdict
+→ +History 8 events) while the card itself never unmounts. A card destroyed and
+rebuilt per stage would screenshot identically and mean nothing.
+
+**No email or phone**, though the real Profile card shows both — a
+plausible-looking address or number on a public page has a real chance of
+belonging to somebody. Test asserts neither appears.
+
+**Bug caught by the theme test:** the timeline's reached-state ring was written
+as `box-shadow: 0 0 0 3px` — zero blur, zero offset, so a ring and not a shadow.
+The test flagged it anyway and was right to: "but mine isn't really a shadow" is
+exactly the argument that lets the next hard drop-shadow through. Replaced with
+`outline` + `outline-color`, which says what it is, needs no token, and is
+transitionable.
+
+Consistency held: match score 91/100 here, in the AI story and in the platform
+showcase — one candidate across four sections. Verdict attributed to a named
+recruiter, and a test asserts the journey ends on Activity, not on a score.
+
+Mobile: one column at 900px (never sticky, so nothing to unpin); tab row wraps
+rather than scrolling — six short labels make two tidy rows at 390px and a
+scroller would hide half the journey behind a gesture nobody knows to make. At
+620px the timeline actor moves under its label.
+
+`lint` clean · `typecheck` clean · `build` clean · 1962/1962 (+9). Verified on
+the dev server: one h1, six panels with zero dangling `aria-controls`, five
+hidden, all six views' content present in crawlable HTML, no email/phone.
+
+**Still not verified:** the breakpoints, visually. And whether dropping the
+sticky treatment here reads as relief or as inconsistency — that is a judgement
+only scrolling the assembled page can make, and it is the open question to
+settle before Module 09 adds another big animation.

@@ -29,6 +29,11 @@ import {
   HOME_FOOTER_SECTIONS,
   HUMAN_SIDE,
   PIPELINE_PREVIEW,
+  CANDIDATE_CALLOUTS,
+  CANDIDATE_HEAD,
+  CANDIDATE_STAGES,
+  CANDIDATE_TIMELINE,
+  CANDIDATE_VIEWS,
   TRUST_CARDS,
   VOICE_CALLOUTS,
   VOICE_HEAD,
@@ -140,6 +145,10 @@ const ALL_COPY: string[] = [
   PLATFORM_HEAD.lead,
   ...AI_CALLOUTS.flatMap((c) => [c.title, c.body]),
   ...VOICE_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  ...CANDIDATE_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  CANDIDATE_HEAD.title,
+  CANDIDATE_HEAD.lead,
+  ...CANDIDATE_STAGES.map((v) => v.copy),
   VOICE_HEAD.title,
   VOICE_HEAD.lead,
   ...VOICE_STAGES.map((v) => v.copy),
@@ -817,6 +826,112 @@ describe("the voice story describes the screening call this product has", () => 
       expect(known.has(href.split("#")[0] || "/"), href).toBe(true);
     }
     expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The candidate workspace
+// -----------------------------------------------------------------------------
+
+describe("the candidate workspace shows the real record", () => {
+  it("gives every stage a view to render", () => {
+    // The tabs and the panels come from two structures; a stage with no entry
+    // in CANDIDATE_VIEWS would render a tab that opens onto nothing.
+    for (const stage of CANDIDATE_STAGES) {
+      expect(CANDIDATE_VIEWS[stage.key], `no view for "${stage.key}"`).toBeDefined();
+      expect(CANDIDATE_VIEWS[stage.key].rows.length).toBeGreaterThan(0);
+    }
+    expect(Object.keys(CANDIDATE_VIEWS).sort()).toEqual(
+      CANDIDATE_STAGES.map((s) => s.key).sort()
+    );
+  });
+
+  it("anchors every timeline entry to a real view", () => {
+    // An entry pointing at a stage that does not exist would never light up.
+    const keys = new Set(CANDIDATE_STAGES.map((s) => s.key));
+    for (const entry of CANDIDATE_TIMELINE) {
+      expect(keys.has(entry.at), `"${entry.label}" → ${entry.at}`).toBe(true);
+    }
+  });
+
+  it("uses only event names the activity log actually writes", () => {
+    /*
+      THE ASSERTION THAT KEEPS THE TIMELINE HONEST.
+
+      Every label here is a real `label` from lib/activity/events.ts — the
+      audit log's own vocabulary. It is what lets the section show a
+      candidate's history without inventing a single entry, and it is the
+      first thing that would rot if somebody "tidied up" the wording.
+    */
+    const real = new Set([
+      "Applied",
+      "Resume parsed",
+      "Parsed fields reviewed",
+      "Match calculated",
+      "Screening report reviewed",
+      "Interview scheduled",
+      "Interview feedback submitted",
+      "Stage changed",
+    ]);
+    for (const entry of CANDIDATE_TIMELINE) {
+      expect(real.has(entry.label), `"${entry.label}" is not a real activity event`).toBe(
+        true
+      );
+    }
+  });
+
+  it("runs the timeline in the order the views do", () => {
+    // The history must read top to bottom in the same order the tabs advance,
+    // or an entry lights up before the one above it.
+    const order = CANDIDATE_STAGES.map((s) => s.key);
+    const positions = CANDIDATE_TIMELINE.map((e) => order.indexOf(e.at));
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  });
+
+  it("ends on a person, not on a score", () => {
+    /*
+      §22, and the rule the whole site follows. The last view is the activity
+      log and the verdict is attributed to a named recruiter; if the journey
+      ever ends on the match score, the page is claiming the model decides.
+    */
+    expect(CANDIDATE_STAGES.at(-1)?.key).toBe("activity");
+    const verdict = CANDIDATE_VIEWS.evaluation.rows.at(-1)!;
+    expect(verdict.label).toBe("Verdict");
+    expect(verdict.value).toMatch(/set by /i);
+  });
+
+  it("states no contact details, invented or otherwise", () => {
+    /*
+      The Profile card in the product shows email and phone. This one does
+      not, and that is deliberate rather than an oversight: a plausible-looking
+      address or number on a public page has a real chance of belonging to
+      somebody, and there is no version of it that is worth the risk.
+    */
+    const text = Object.values(CANDIDATE_VIEWS)
+      .flatMap((view) => view.rows.map((r) => `${r.label} ${r.value}`))
+      .join(" ");
+    expect(/@|\b\+?\d[\d ()-]{7,}\b/.test(text), "no email or phone on a public page").toBe(
+      false
+    );
+  });
+
+  it("keeps the match score consistent with the rest of the page", () => {
+    // 91/100 in the AI story, the platform showcase and here. One candidate.
+    expect(CANDIDATE_VIEWS.evaluation.rows[0].value).toBe("91 / 100");
+  });
+
+  it("sends every callout to a page that exists, with no repeats", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    const hrefs = CANDIDATE_CALLOUTS.map((c) => c.href);
+    for (const href of hrefs) {
+      expect(known.has(href.split("#")[0] || "/"), href).toBe(true);
+    }
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+
+  it("numbers six views", () => {
+    expect(CANDIDATE_STAGES.map((s) => s.num)).toEqual(["01", "02", "03", "04", "05", "06"]);
+    expect(CANDIDATE_CALLOUTS).toHaveLength(4);
   });
 });
 

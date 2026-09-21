@@ -16,6 +16,7 @@ import { HiringWorkflow } from "./_components/home/HiringWorkflow";
 import { AiFeatures } from "./_components/home/AiFeatures";
 import { VoiceInterview } from "./_components/home/VoiceInterview";
 import { HumanAi } from "./_components/home/HumanAi";
+import { CandidateWorkspace } from "./_components/home/CandidateWorkspace";
 import { PipelinePreview } from "./_components/home/PipelinePreview";
 import { BrandStatement } from "./_components/home/BrandStatement";
 import { TrustSection } from "./_components/home/TrustSection";
@@ -64,11 +65,12 @@ export const metadata: Metadata = {
  *   6. AI-powered recruitment             how screening actually works
  *   7. AI screening calls                 the first conversation, demonstrated
  *   8. AI does the work, you decide       the objection, answered
- *   9. The pipeline at a glance           the product again, in use
- *  10. People x Intelligence x Opportunity  a beat
- *  11. Built for modern hiring teams      why trust it with candidate data
- *  12. FAQ                                the awkward questions
- *  13. Build your next team               the ask
+ *   9. Candidate workspace                one candidate, six real views
+ *  10. The pipeline at a glance           the product again, in use
+ *  11. People x Intelligence x Opportunity  a beat
+ *  12. Built for modern hiring teams      why trust it with candidate data
+ *  13. FAQ                                the awkward questions
+ *  14. Build your next team               the ask
  *
  * STEPS 2 AND 3 WERE THE MISSING FIRST HALF OF THE ARGUMENT. The page used to
  * open with the hero's promise and go straight to a list of capabilities — the
@@ -136,6 +138,7 @@ export default function HomePage() {
       <AiFeatures />
       <VoiceInterview />
       <HumanAi />
+      <CandidateWorkspace />
       <PipelinePreview />
       <BrandStatement />
       <TrustSection />

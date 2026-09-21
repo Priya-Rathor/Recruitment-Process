@@ -690,6 +690,247 @@ export const VOICE_CALLOUTS: (HomeCard & { href: string })[] = [
 ];
 
 // -----------------------------------------------------------------------------
+// The candidate workspace — one candidate, six views
+// -----------------------------------------------------------------------------
+
+/**
+ * THE SIX VIEWS ARE THE PRODUCT'S OWN.
+ *
+ * Read off the real screens before any of this copy was written:
+ *
+ *   Profile     app/candidates/[id] — the Profile card's own fields
+ *   Resumes     app/candidates/[id]/ResumesCard
+ *   Screening   app/applications/[id]/screening-report
+ *   Interviews  app/applications/[id] — the Interviews section
+ *   Evaluation  app/applications/[id]/EvaluationPanel
+ *   Activity    app/candidates/[id]/activity — Timeline
+ *
+ * The brief's sixth stage was "Review". That is not a separate screen in this
+ * product: reviewing IS the evaluation panel, and what survives the review is
+ * the activity timeline. So the sixth view is Activity, and the evaluation view
+ * carries the verdict — which keeps the journey ending on a person rather than
+ * on a score, the thing §22 asks for.
+ */
+export const CANDIDATE_STAGES: {
+  key: string;
+  num: string;
+  label: string;
+  /** The left-hand explanation for this view. */
+  copy: string;
+}[] = [
+  {
+    key: "profile",
+    num: "01",
+    label: "Profile",
+    copy:
+      "One record per person, not one per application. Contact details, current " +
+      "role, experience, expected salary and notice period live here — and stay " +
+      "here when the same person applies for a second job.",
+  },
+  {
+    key: "resume",
+    num: "02",
+    label: "Resume",
+    copy:
+      "Resumes are parsed into structured fields, and the proposed values are " +
+      "shown as a diff against what is already on the record. A person applies " +
+      "them; nothing is written to a candidate by a model alone.",
+  },
+  {
+    key: "screening",
+    num: "03",
+    label: "Screening",
+    copy:
+      "The screening call's report lands on the application: interest, notice, " +
+      "expected pay, whether the location works. What the AI said is kept beside " +
+      "what a recruiter corrected it to.",
+  },
+  {
+    key: "interviews",
+    num: "04",
+    label: "Interviews",
+    copy:
+      "Rounds, their mode and their outcome, with structured feedback captured " +
+      "per interviewer — so two people's opinions can actually be compared " +
+      "rather than read.",
+  },
+  {
+    key: "evaluation",
+    num: "05",
+    label: "Evaluation",
+    copy:
+      "Every signal on one panel: the resume match, the screening result and the " +
+      "interview feedback, with the strengths and concerns each contributed. The " +
+      "verdict is a person's.",
+  },
+  {
+    key: "activity",
+    num: "06",
+    label: "Activity",
+    copy:
+      "An append-only record of what happened and who did it. Every line below " +
+      "is a real event type this product writes — it is the audit log, not a " +
+      "marketing summary of one.",
+  },
+];
+
+/**
+ * The protagonist. SYNTHETIC, and the same person the hero, the platform
+ * showcase and the screening-call story already follow — so the homepage reads
+ * as one candidate moving through one product rather than four demos.
+ *
+ * Fields are exactly the Profile card's: app/candidates/[id]/page.tsx renders
+ * Email, Phone, Location, Current company, Current role, Total experience,
+ * Expected salary, Notice period and Added. Email and phone are omitted here
+ * rather than invented — a fake address on a public page is a small lie with a
+ * real chance of belonging to somebody.
+ */
+export const CANDIDATE_PROFILE = {
+  name: "A. Sharma",
+  role: "Backend Engineer",
+  fields: [
+    { label: "Current role", value: "Backend Engineer" },
+    { label: "Current company", value: "Northwind Labs" },
+    { label: "Location", value: "Pune, IN" },
+    { label: "Total experience", value: "7 years" },
+    { label: "Expected salary", value: "Not stated" },
+    { label: "Notice period", value: "30 days" },
+  ],
+} as const;
+
+/**
+ * What each view shows. One shape, six fills — the panel morphs rather than
+ * being six different panels.
+ *
+ * `rows` are label/value pairs; `note` is the one line of context the real
+ * screen carries under them.
+ */
+export const CANDIDATE_VIEWS: Record<
+  string,
+  { rows: { label: string; value: string; tone?: "good" | "warn" }[]; note: string }
+> = {
+  profile: {
+    rows: CANDIDATE_PROFILE.fields.map((field) => ({ ...field })),
+    note: "Two applications on file. The record is the person, not the application.",
+  },
+  resume: {
+    rows: [
+      { label: "Resume", value: "sharma-backend.pdf · parsed" },
+      { label: "Skills found", value: "Go · PostgreSQL · Kafka · AWS" },
+      { label: "Experience", value: "3 roles extracted" },
+      { label: "Proposed change", value: "Notice period 60 → 30 days", tone: "warn" },
+    ],
+    note: "Parsed fields are proposed as a diff. A person applies them.",
+  },
+  screening: {
+    rows: [
+      { label: "Call", value: "Completed · 4m 51s" },
+      { label: "Interest level", value: "High", tone: "good" },
+      { label: "Location accepted", value: "Accepted", tone: "good" },
+      { label: "Expected CTC", value: "Flagged uncertain", tone: "warn" },
+    ],
+    note: "Report reviewed by R. Menon. The AI's original answers are kept alongside.",
+  },
+  interviews: {
+    rows: [
+      { label: "Round 1", value: "Video · Completed", tone: "good" },
+      { label: "Feedback", value: "2 of 2 submitted", tone: "good" },
+      { label: "Round 2", value: "Director Round · Scheduled" },
+      { label: "Brief", value: "Generated from the resume and round 1" },
+    ],
+    note: "Feedback is captured in a fixed shape, so two interviewers can be compared.",
+  },
+  evaluation: {
+    rows: [
+      { label: "Resume match", value: "91 / 100", tone: "good" },
+      { label: "Screening", value: "High interest, notice confirmed", tone: "good" },
+      { label: "Interview", value: "Strong on systems, light on Kubernetes", tone: "warn" },
+      { label: "Verdict", value: "Needs Review — set by R. Menon" },
+    ],
+    note: "Three sources on one panel. The verdict is recorded against a person.",
+  },
+  activity: {
+    rows: [
+      { label: "Applied", value: "12 days ago" },
+      { label: "Resume parsed", value: "12 days ago" },
+      { label: "Parsed fields reviewed", value: "11 days ago" },
+      { label: "Screening report reviewed", value: "6 days ago" },
+    ],
+    note: "Append-only. Every entry names who did it and cannot be edited afterwards.",
+  },
+};
+
+/**
+ * The timeline down the side of the workspace.
+ *
+ * EVERY LABEL IS A REAL EVENT TYPE from lib/activity/events.ts — "Resume
+ * parsed", "Parsed fields reviewed", "Match calculated", "Screening report
+ * reviewed", "Interview feedback submitted", "Stage changed". They are what
+ * the audit log actually writes, which is why they can be shown as a
+ * candidate's history without inventing a single one.
+ *
+ * `at` is the view that highlights it.
+ */
+export const CANDIDATE_TIMELINE: { at: string; label: string; by: string }[] = [
+  { at: "profile", label: "Applied", by: "Career page" },
+  { at: "resume", label: "Resume parsed", by: "AI" },
+  { at: "resume", label: "Parsed fields reviewed", by: "R. Menon" },
+  { at: "screening", label: "Match calculated", by: "Code + AI" },
+  { at: "screening", label: "Screening report reviewed", by: "R. Menon" },
+  { at: "interviews", label: "Interview scheduled", by: "R. Menon" },
+  { at: "interviews", label: "Interview feedback submitted", by: "2 interviewers" },
+  { at: "evaluation", label: "Stage changed", by: "R. Menon" },
+];
+
+export const CANDIDATE_HEAD = {
+  eyebrow: "Candidate workspace",
+  title: "Everything about a candidate, in one place.",
+  lead:
+    "One record per person, carrying every application they hold — the parsed " +
+    "resume, the screening report, each interview round and the evaluation that " +
+    "draws on all three. One candidate, one complete picture.",
+} as const;
+
+export const CANDIDATE_CALLOUTS: (HomeCard & { href: string })[] = [
+  {
+    title: "Candidate profiles",
+    // Module 4 — one record per person, deduplicated on contact details.
+    body:
+      "One record per person, deduplicated on contact details, carrying every " +
+      "application they have ever held with you.",
+    icon: "Users",
+    href: "/product/source",
+  },
+  {
+    title: "Resume intelligence",
+    // lib/ai/parseResume.ts, applied through a review diff.
+    body:
+      "Resumes parsed into fields and proposed as a diff, so what changes on a " +
+      "record is always something a person approved.",
+    icon: "FileSearch",
+    href: "/product/understand",
+  },
+  {
+    title: "Candidate evaluation",
+    // app/applications/[id]/EvaluationPanel — match, screening, feedback.
+    body:
+      "Match score, screening result and interview feedback on one panel, with " +
+      "the strengths and concerns each one contributed.",
+    icon: "Gauge",
+    href: "/product/decide",
+  },
+  {
+    title: "Activity history",
+    // lib/activity — append-only, actor-attributed.
+    body:
+      "An append-only log of every change, naming who made it. It cannot be " +
+      "edited after the fact, by anyone.",
+    icon: "Activity",
+    href: "/how-it-works",
+  },
+];
+
+// -----------------------------------------------------------------------------
 // From application to hire
 // -----------------------------------------------------------------------------
 

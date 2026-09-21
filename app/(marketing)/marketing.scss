@@ -2158,6 +2158,416 @@
   }
 
   // ===========================================================================
+  // THE CANDIDATE WORKSPACE
+  //
+  // NOT A THIRD STICKY TRACK. The two sections above are scroll-driven; this
+  // one is driven by the reader, so there is no runway, no sticky viewport and
+  // no 250vh of scroll. What carries the journey instead is the card on the
+  // left, whose chips change as the views advance — the same object, visible
+  // the whole time, accumulating a match score and a verdict it did not have
+  // at the first view.
+  // ===========================================================================
+  .cw {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    margin-top: clamp(2rem, 4vw, 3rem);
+    padding: clamp(1rem, 2.5vw, 1.75rem);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius-lg);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-product-light);
+  }
+
+  /*
+    The cursor's light. Defaults keep it top-right so the panel is lit before a
+    pointer arrives and on every touch device, where the component never writes
+    the properties at all.
+  */
+  .cw__glow {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      22rem 22rem at var(--mx, 82%) var(--my, 6%),
+      rgba(139, 158, 255, 0.13),
+      transparent 70%
+    );
+  }
+
+  .cw__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+    gap: clamp(1rem, 2.5vw, 1.75rem);
+    align-items: start;
+  }
+
+  .cw__side {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  // ---- The candidate card ---------------------------------------------------
+  /*
+    A REUSABLE OBJECT. Styled entirely from its own class so the hiring-pipeline
+    module can drop <CandidateCard> into a stage column without inheriting a
+    single rule from this section.
+  */
+  .cw-card {
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-light);
+    padding: 0.875rem;
+    transition:
+      border-color 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-active] {
+      border-color: var(--color-primary);
+      box-shadow: var(--mkt-glow-card);
+    }
+  }
+
+  .cw-card__head {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .cw-card__avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+    // Navy on periwinkle — 7.50:1. White here is 2.49:1.
+    color: var(--mkt-on-accent);
+    font-family: var(--font-heading);
+    font-size: 12.5px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.02em;
+  }
+
+  .cw-card__who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    strong {
+      font-family: var(--font-heading);
+      font-size: 14.5px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    span {
+      font-size: 12px;
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  .cw-card__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0.75rem 0 0;
+  }
+
+  /*
+    A chip is a label AND a value — "Verdict: Needs Review", never a bare
+    coloured pill. The tint ranks them; the words carry them.
+  */
+  .cw-card__chip {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3125rem;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-light-border-strong);
+    background: var(--mkt-white);
+
+    dt {
+      font-size: 10px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--mkt-ink-muted);
+    }
+
+    dd {
+      margin: 0;
+      font-size: 11.5px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    &[data-tone="good"] dd { color: var(--mkt-mint-ink); }   // 5.53:1 on white
+    &[data-tone="warn"] dd { color: var(--mkt-amber-ink); }  // 5.65:1 on white
+  }
+
+  // ---- The timeline ---------------------------------------------------------
+  .cw__timeline {
+    border-top: 1px solid var(--mkt-light-border);
+    padding-top: 0.875rem;
+  }
+
+  .cw__timelinehead {
+    margin: 0 0 0.625rem;
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .cw-time {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /*
+    THE RAIL IS DRAWN BY THE ROWS THEMSELVES — a 1px pseudo-element running
+    from each dot to the next, rather than one absolutely-positioned line that
+    would need its height recomputing whenever an entry is added.
+  */
+  .cw-time__row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding-bottom: 0.625rem;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0.28125rem;
+      top: 0.75rem;
+      bottom: 0;
+      width: 1px;
+      background: var(--mkt-light-border-strong);
+    }
+
+    &:last-child {
+      padding-bottom: 0;
+
+      &::before {
+        display: none;
+      }
+    }
+  }
+
+  /*
+    AN OUTLINE, NOT A BOX-SHADOW.
+
+    The reached-state ring was first written as `box-shadow: 0 0 0 3px` —
+    zero blur, zero offset, which is a RING and not a shadow at all. The theme
+    test caught it anyway, and rightly: the rule is that every box-shadow is a
+    token, and "but mine is not really a shadow" is exactly the argument that
+    would let the next hard drop-shadow through.
+
+    `outline` says what this is, needs no token for a one-off 3px tint, and
+    follows the border radius in every browser this site targets. It is also
+    transitionable on `outline-color`, which is what the reached state needs.
+  */
+  .cw-time__dot {
+    width: 0.4375rem;
+    height: 0.4375rem;
+    margin-top: 0.3125rem;
+    border-radius: 999px;
+    background: var(--mkt-light-border-strong);
+    outline: 3px solid transparent;
+    transition:
+      background 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      outline-color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .cw-time__label {
+    font-size: 12px;
+    color: var(--mkt-ink-muted);
+    transition: color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .cw-time__by {
+    font-size: 10.5px;
+    color: var(--mkt-ink-muted);
+    opacity: 0.75;
+    white-space: nowrap;
+  }
+
+  /*
+    REACHED ENTRIES GET THREE CHANGES — a filled dot, a glow, and ink that goes
+    from muted to full. An entry that had only changed colour would be carrying
+    "this has happened" on hue alone.
+  */
+  .cw-time__row[data-on="true"] {
+    .cw-time__dot {
+      background: var(--color-primary);
+      outline-color: var(--color-primary-tint);
+    }
+
+    .cw-time__label {
+      color: var(--mkt-ink);
+      font-weight: var(--weight-medium);
+    }
+  }
+
+  // ---- The six views --------------------------------------------------------
+  .cw__main {
+    min-width: 0;
+  }
+
+  .cw-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.875rem;
+    border-bottom: 1px solid var(--mkt-light-border);
+  }
+
+  .cw-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    position: relative;
+    min-height: 2.25rem;
+    padding: 0 0.6875rem;
+    border: 0;
+    border-radius: var(--mkt-radius-sm);
+    background: none;
+    font-family: var(--font-body);
+    font-size: var(--text-label);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink-muted);
+    cursor: pointer;
+    transition:
+      background var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover {
+      color: var(--mkt-ink);
+      background: var(--mkt-light);
+    }
+
+    /*
+      THE ACTIVE TAB: a tint, a weight change AND an underline. `aria-selected`
+      is the hook, so what a screen reader is told and what a reader sees are
+      one fact. The underline is a pseudo-element so turning it on never moves
+      the row by a pixel.
+    */
+    &[aria-selected="true"] {
+      background: var(--color-primary-tint);
+      color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
+      font-weight: var(--weight-semibold);
+
+      &::after {
+        content: "";
+        position: absolute;
+        left: 0.5rem;
+        right: 0.5rem;
+        bottom: -0.75rem;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--color-primary);
+      }
+    }
+  }
+
+  .cw-tab__num {
+    font-family: var(--font-heading);
+    font-size: 10.5px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.04em;
+    opacity: 0.8;
+  }
+
+  /*
+    The panel. A minimum height so switching views cannot resize the card —
+    the six differ by a row's worth of content, and a workspace that jumps
+    under the reader's own click is the worst kind of shift.
+  */
+  .cw-view {
+    min-height: 13rem;
+
+    &:not([hidden]) {
+      animation: mkt-enter 300ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+    }
+
+    &:focus-visible {
+      outline: none;
+      border-radius: var(--mkt-radius-sm);
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  .cw-view__rows {
+    margin: 0;
+  }
+
+  .cw-view__row {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--mkt-light-border);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    dt {
+      font-size: 12px;
+      color: var(--mkt-ink-muted);
+    }
+
+    dd {
+      margin: 0;
+      font-size: 13px;
+      font-weight: var(--weight-medium);
+      color: var(--mkt-ink);
+
+      &[data-tone="good"] { color: var(--mkt-mint-ink); }
+      &[data-tone="warn"] { color: var(--mkt-amber-ink); }
+    }
+  }
+
+  .cw-view__note {
+    margin: 0.875rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--mkt-light-border);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--mkt-ink-muted);
+  }
+
+  .cw__copy {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--mkt-light-border);
+  }
+
+  .cw__copytext {
+    margin: 0;
+    max-width: 52rem;
+    font-size: var(--text-body-lg);
+    line-height: 1.65;
+    color: var(--mkt-ink-muted);
+    animation: mkt-enter 300ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  .cw-callouts {
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  // ===========================================================================
   // THE AI SCREENING CALL — the voice story
   //
   // Two columns, both pinned: the stage's explanation on the left, the call
@@ -4517,6 +4927,48 @@
     order, top to bottom, they simply are not gated on scroll. Gating them
     would mean a phone reader scrolling 260vh to see six paragraphs.
   */
+  /*
+    THE CANDIDATE WORKSPACE ON A SMALL SCREEN.
+
+    One column: the card and its timeline first, then the views. The tab row
+    wraps rather than scrolling — six short labels at 390px make two tidy rows,
+    and a scroller would hide half the journey behind a gesture nobody knows to
+    make. The section was never sticky, so nothing has to be unpinned.
+  */
+  @media (max-width: 900px) {
+    .cw__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cw-view {
+      min-height: 0;
+    }
+
+    // No cursor, so only the fixed ambient wash.
+    .cw__glow {
+      background: radial-gradient(18rem 18rem at 82% 4%, rgba(139, 158, 255, 0.10), transparent 70%);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .cw-view__row {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1px;
+    }
+
+    .cw-time__row {
+      // The actor moves under the label: "Interview feedback submitted" plus
+      // "2 interviewers" on one line does not fit 375px.
+      grid-template-columns: 1rem minmax(0, 1fr);
+      row-gap: 0;
+    }
+
+    .cw-time__by {
+      grid-column: 2;
+      white-space: normal;
+    }
+  }
+
   @media (max-width: 900px) {
     .vi-story {
       height: auto;
@@ -4979,6 +5431,23 @@
       Everything gated on a stage is forced open, because those things were
       hidden by animation rather than merely moved by it.
     */
+    /*
+      The candidate workspace has nothing scroll-linked to disable — it was
+      never scroll-driven — so this is just the view-swap fade and the two
+      hover transitions.
+    */
+    .cw-view:not([hidden]),
+    .cw__copytext {
+      animation: none;
+    }
+
+    .cw-card,
+    .cw-time__dot,
+    .cw-time__label,
+    .cw-tab {
+      transition: none;
+    }
+
     .vi-wave__scroll {
       animation: none !important;
     }
@@ -5661,6 +6130,7 @@
   .ai-cand:focus-visible,
   .ai-callout:focus-visible,
   .vi-callout:focus-visible,
+  .cw-tab:focus-visible,
   .mkt-nav__link:focus-visible,
   .mkt-mega__link:focus-visible,
   .mkt-sheet__row:focus-visible,
