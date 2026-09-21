@@ -1923,3 +1923,74 @@ grep for `readonly` returns zero and is not evidence of a problem.
 
 **Page state:** 16 h2s, six deep bands against eight bright, four scroll tracks
 (220 + 260 + 200 + 180 = 860vh). Still unverified visually at any breakpoint.
+
+---
+
+## 2026-09-21 — Module 11: recruitment automation
+
+**The engine gave the section two details that do all the work**, both read
+before any copy:
+
+`lib/automations/approvals.ts` — a rule marked `requires_approval` **does not
+act, it proposes**; the run parks at `awaiting_approval` with its actions
+**SNAPSHOTTED**: *"if the rule is edited between proposal and decision,
+executing its CURRENT actions would mean their click authorised something they
+never read."* It expires at seven days, and expiry is its own status —
+*"'we let it lapse' and 'we said no' are different facts about somebody's
+application."*
+
+`lib/workflow/delay.ts` — a wait is 1 minute to 30 days with a real basis
+(`after` / `before_scheduled_call` / `before_interview`), cancelled if the
+application changes stage, and a `before_*` wait with no anchor returns null:
+*"never 'fire now'. Firing now would send a 'you'll be getting a call shortly'
+message to somebody with no call booked."*
+
+**THE APPROVAL NODE IS STRUCTURAL, AND A TEST ENFORCES IT.** The gate sits
+before EVERY action because that is where the engine puts it. Drawing it beside
+one action would describe a different engine and imply the others run ungated.
+The test asserts every `kind: "action"` node comes after the approval node.
+
+Other verified facts used: nine triggers, all wired, with real
+`TRIGGER_LABELS`; `screening_call_completed` is `service` mode — Bolna's
+webhook, nobody signed in, so the engine limits itself to what it can do alone;
+an action nested after a wait cannot need a session.
+
+**`label` vs `action` on a node.** First version's test compared the display
+label to `ACTION_LABELS` and failed on "Move to Video Interview" — the real
+label is "Move to a stage". Rather than loosen the test, the data now carries
+BOTH: `label` is the configured form (what a built rule reads like on screen),
+`action` names the catalog entry, and the test checks `action`. Asserting on
+the display label would either ban configuration from the picture or let an
+invented action through under a plausible name.
+
+**Two real bugs, both mine, both caught by the build:**
+1. **Client boundary.** `MagneticCta` is `"use client"` and I passed it
+   `icon={ArrowRight}` — a FUNCTION — from a server component. Production build:
+   *"Functions cannot be passed directly to Client Components."* Every magnetic
+   CTA is a forward action, so the arrow is now imported inside the client file
+   as a fixed default and the boundary problem is gone.
+2. **Deprecated Sass global.** `percentage()` is removed in Dart Sass 3, and I
+   had used it in all FIVE sentinel blocks (Modules 06/07/09/10/11). Replaced
+   with `calc(#{$i} * 100% / N)`, which Sass folds at compile time to the same
+   exact percentages. **Project code now emits zero Sass warnings** — the only
+   remaining ones are Bulma's own.
+
+**MagneticCta** is a new reusable client wrapper: 4px pull, written to two
+custom properties on the node rather than to React state (a pointermove that
+re-rendered would be a re-render per frame for a decoration). Gated on a real
+pointer and on reduced motion. Presentational wrapper only — no role, no focus,
+so the link inside keeps all its semantics.
+
+Composition: vertical graph left, run log right, detail inline UNDER each node
+(§26 wants a tap to open it there, and one behaviour that works on both beats
+two that each work on one). Scroll advances the run; clicking a node opens its
+detail — independent state, so a click survives the next pixel of scroll.
+
+`lint` clean · `typecheck` clean · `build` clean · 1993/1993 (+9). Verified:
+one h1, seven detail panels with zero dangling `aria-controls`, node kinds
+Trigger/Condition/Approval/Wait/Action/Action/Candidate, 7 log rows, magnetic
+CTA → /product/operate, sentinels at 0/14.29/28.57/42.86/57.14/71.43/85.71%.
+
+**Page state:** 17 h2s, seven deep bands against eight bright, FIVE scroll
+tracks (220+260+200+180+200 = 1060vh). Still unverified visually. This is the
+fourth module where I have flagged the compounding scroll length.

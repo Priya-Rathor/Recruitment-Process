@@ -1261,10 +1261,21 @@ describe("the workflow graph is a real rule", () => {
     expect(Object.values(TRIGGER_LABELS)).toContain(trigger.label);
   });
 
-  it("uses only real action labels", () => {
+  it("builds every action node from a real action", () => {
+    /*
+      A node's `label` is the CONFIGURED form — "Move to Video Interview" —
+      because that is how a built rule reads on screen. `action` names the
+      catalog entry it came from, and that is what gets checked. Asserting on
+      the display label instead would either ban configuration from the
+      picture or let an invented action through under a plausible name.
+    */
     const real = new Set(Object.values(ACTION_LABELS));
-    for (const node of FLOW_NODES.filter((n) => n.kind === "action")) {
-      expect(real.has(node.label), `"${node.label}" is not a real action`).toBe(true);
+    const actions = FLOW_NODES.filter((n) => n.kind === "action");
+    expect(actions.length).toBeGreaterThan(0);
+
+    for (const node of actions) {
+      expect(node.action, `"${node.label}" must name the action it came from`).toBeDefined();
+      expect(real.has(node.action!), `"${node.action}" is not in ACTION_LABELS`).toBe(true);
     }
   });
 

@@ -1367,6 +1367,16 @@ export const FLOW_NODES: {
   label: string;
   /** The one-line detail shown when the node is opened. */
   detail: string;
+  /**
+   * For an action node, the real ACTION_LABELS value it is an instance of.
+   *
+   * `label` is the CONFIGURED form — "Move to Video Interview" — because that
+   * is what a built rule reads like on screen. `action` is the generic action
+   * it was built from, and a test checks it against the catalog. Without this
+   * the two could drift: a display label nobody can find in the action list
+   * would look real and not be.
+   */
+  action?: string;
   /** Beat at which the node joins the graph. */
   at: number;
 }[] = [
@@ -1417,6 +1427,7 @@ export const FLOW_NODES: {
     key: "move",
     kind: "action",
     label: "Move to Video Interview",
+    action: "Move to a stage",
     detail:
       "The stage change is recorded against the application with the rule as " +
       "its actor, so the activity log shows what moved this person and why.",
@@ -1426,6 +1437,7 @@ export const FLOW_NODES: {
     key: "email",
     kind: "action",
     label: "Email the candidate a stage update",
+    action: "Email the candidate a stage update",
     detail:
       "Sent from an approved template. Email is disconnected until somebody " +
       "connects it, and the candidate's opt-out is checked before anything " +
