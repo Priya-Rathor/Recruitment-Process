@@ -3,6 +3,7 @@ import { PIPELINE_STAGES, STAGE_LABELS } from "@/lib/applications/stages";
 import { DEFAULT_SLA_DAYS } from "@/lib/pipeline/sla";
 import { DEFAULT_APPLICATION_FIELDS } from "@/lib/forms/fields";
 import { ACTION_LABELS, TRIGGER_LABELS } from "@/lib/automations/catalog";
+import { PROVIDER_DESCRIPTORS } from "@/lib/settings/integrations";
 import { MAX_DELAY_MINUTES, MIN_DELAY_MINUTES } from "@/lib/workflow/delay";
 import {
   RESUME_SCORE_MAX,
@@ -42,6 +43,17 @@ import {
   pipelineCountAt,
   APPLY_BEATS,
   FLOW_BEATS,
+  ANALYTICS_BEATS,
+  ANALYTICS_CALLOUTS,
+  ANALYTICS_CLOSING,
+  ANALYTICS_FUNNEL,
+  ANALYTICS_HEAD,
+  ANALYTICS_KPIS,
+  ANALYTICS_SOURCES,
+  ANALYTICS_STAGE_DAYS,
+  INTEGRATIONS,
+  INTEGRATIONS_CALLOUTS,
+  INTEGRATIONS_HEAD,
   FLOW_CALLOUTS,
   FLOW_HEAD,
   FLOW_LOG,
@@ -176,6 +188,14 @@ const ALL_COPY: string[] = [
   FLOW_HEAD.title,
   FLOW_HEAD.lead,
   ...FLOW_BEATS.map((b) => b.copy),
+  ...INTEGRATIONS_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  INTEGRATIONS_HEAD.title,
+  INTEGRATIONS_HEAD.lead,
+  ...ANALYTICS_CALLOUTS.flatMap((c) => [c.title, c.body]),
+  ANALYTICS_HEAD.title,
+  ANALYTICS_HEAD.lead,
+  ...ANALYTICS_BEATS.map((b) => b.copy),
+  ANALYTICS_CLOSING,
   PIPELINE_HEAD.title,
   PIPELINE_HEAD.lead,
   ...PIPELINE_BEATS.map((b) => b.copy),
@@ -1349,6 +1369,207 @@ describe("the workflow graph is a real rule", () => {
       expect(known.has(card.href.split("#")[0] || "/"), card.href).toBe(true);
     }
     expect(FLOW_CALLOUTS).toHaveLength(4);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Integrations
+// -----------------------------------------------------------------------------
+
+describe("every integration shown is one a customer can actually connect", () => {
+  it("shows exactly the customer-facing providers, and all of them", () => {
+    /*
+      PROVIDER_DESCRIPTORS is the set a customer can see and configure. Both
+      directions matter: an extra entry here is an integration that does not
+      exist, and a missing one is a real connection the site forgot to mention.
+    */
+    const real = new Set(Object.keys(PROVIDER_DESCRIPTORS));
+    const shown = new Set(INTEGRATIONS.map((item) => item.key));
+    expect(shown).toEqual(real);
+  });
+
+  it("never mentions n8n, which is retired", () => {
+    /*
+      THE ONE A LOGO WALL WOULD HAVE GOT WRONG. lib/integrations/n8n still
+      exists, so it looks live from the filesystem — but
+      `CustomerFacingProvider` is `Exclude<Provider, "n8n">`, its action is in
+      RETIRED_ACTIONS, and it has no descriptor. Nobody can connect it.
+    */
+    const copy = [
+      INTEGRATIONS_HEAD.lead,
+      ...INTEGRATIONS.flatMap((i) => [i.label, i.description, ...i.impact]),
+      ...INTEGRATIONS_CALLOUTS.flatMap((c) => [c.title, c.body]),
+    ].join(" ");
+    expect(/n8n|zapier|make\.com/i.test(copy), copy).toBe(false);
+  });
+
+  it("gives no integration a node Google Meet would need", () => {
+    /*
+      Meet links are a capability OF the calendar integration — "Creates
+      interview invites and Meet links" — not a separate connection. A Meet
+      node would double-count one OAuth grant and imply a second setup step.
+    */
+    expect(INTEGRATIONS.some((i) => /meet/i.test(i.label))).toBe(false);
+    const calendar = INTEGRATIONS.find((i) => i.key === "calendar")!;
+    expect(calendar.impact.join(" ")).toMatch(/Meet links/);
+  });
+
+  it("copies each label and description from the product verbatim", () => {
+    for (const item of INTEGRATIONS) {
+      const real = PROVIDER_DESCRIPTORS[item.key as keyof typeof PROVIDER_DESCRIPTORS];
+      expect(item.label, item.key).toBe(real.label);
+      expect(item.description, item.key).toBe(real.description);
+      expect(item.impact, item.key).toEqual(real.featureImpact);
+    }
+  });
+
+  it("describes each connect style the way the product implements it", () => {
+    // Calendar is the only OAuth one. Saying "API key" there would send an
+    // admin looking for a key that does not exist.
+    for (const item of INTEGRATIONS) {
+      const real = PROVIDER_DESCRIPTORS[item.key as keyof typeof PROVIDER_DESCRIPTORS];
+      const saysOauth = /sign-in|sign in|oauth/i.test(item.connect);
+      expect(saysOauth, `${item.label}: "${item.connect}"`).toBe(real.connectStyle === "oauth");
+    }
+  });
+
+  it("uses only categories the settings page uses", () => {
+    // Three real groups, not five invented to make the network look bigger.
+    const real = new Set(["Calling & scheduling", "Communication", "AI & automation"]);
+    for (const item of INTEGRATIONS) {
+      expect(real.has(item.category), `"${item.category}"`).toBe(true);
+    }
+  });
+
+  it("gives every node a distinct place in the network", () => {
+    const cells = INTEGRATIONS.map((i) => i.cell);
+    expect(new Set(cells).size, "two nodes would stack on one cell").toBe(cells.length);
+  });
+
+  it("claims no universal integration support", () => {
+    const copy = `${INTEGRATIONS_HEAD.title} ${INTEGRATIONS_HEAD.lead}`;
+    expect(/any tool|every tool|thousands|\b\d{2,}\+? integrations/i.test(copy), copy).toBe(false);
+  });
+
+  it("sends every callout to a page that exists", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    for (const card of INTEGRATIONS_CALLOUTS) {
+      expect(known.has(card.href.split("#")[0] || "/"), card.href).toBe(true);
+    }
+    expect(INTEGRATIONS_CALLOUTS).toHaveLength(4);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Analytics
+// -----------------------------------------------------------------------------
+
+describe("the analytics surface reports what the product reports", () => {
+  it("uses the funnel's real stage names, narrowing", () => {
+    const real = new Set(Object.values(STAGE_LABELS));
+    for (const row of ANALYTICS_FUNNEL) {
+      expect(real.has(row.label), `"${row.label}" is not a real stage`).toBe(true);
+    }
+    const counts = ANALYTICS_FUNNEL.map((r) => r.value);
+    for (let i = 1; i < counts.length; i += 1) {
+      expect(counts[i]).toBeLessThanOrEqual(counts[i - 1]);
+    }
+    // One company across the whole page.
+    expect(counts[0]).toBe(DASHBOARD.funnel[0].value);
+  });
+
+  it("leaves a stage with no completed visits blank", () => {
+    /*
+      THE DETAIL WORTH PROTECTING. The real chart's own subtitle says it:
+      "Median days, from closed stage visits only. A stage nobody has left yet
+      shows no figure." Reproducing that GAP is the point — filling it with a
+      zero would invent a measurement, and zero days in a stage is a very
+      different claim from no data.
+    */
+    const blank = ANALYTICS_STAGE_DAYS.filter((row) => row.value === null);
+    expect(blank.length, "one stage must show no figure").toBeGreaterThan(0);
+    // And it must be the last one — a gap in the middle would be a different,
+    // stranger claim.
+    expect(ANALYTICS_STAGE_DAYS.at(-1)!.value).toBeNull();
+  });
+
+  it("shows raw counts where a rate would be unsupported", () => {
+    /*
+      "A source with too few candidates shows its raw counts instead of a
+      percentage." A marketing page that printed 0% for a source with four
+      candidates would be doing exactly what the product refuses to do.
+    */
+    const unrated = ANALYTICS_SOURCES.filter((s) => s.pct === null);
+    expect(unrated.length, "one source must be unrated").toBeGreaterThan(0);
+    for (const source of unrated) {
+      expect(source.raw, `${source.label} needs its raw counts`).toMatch(/\d+ of \d+/);
+    }
+    // Every rate that IS shown must be a real percentage.
+    for (const source of ANALYTICS_SOURCES) {
+      if (source.pct === null) continue;
+      expect(source.pct).toBeGreaterThanOrEqual(0);
+      expect(source.pct).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it("labels the KPI tiles the way the analytics page does", () => {
+    const real = new Set([
+      "Applications",
+      "Hired",
+      "Median time to hire",
+      "Screening completion",
+      "Calls attempted",
+      "Answer rate",
+      "Completion rate",
+    ]);
+    for (const kpi of ANALYTICS_KPIS) {
+      expect(real.has(kpi.label), `"${kpi.label}" is not a KPI on the analytics page`).toBe(
+        true
+      );
+    }
+  });
+
+  it("makes no predictive or comparative claim", () => {
+    /*
+      §10's explicit list. This product's analytics counts what happened; it
+      does not score candidates, predict outcomes or benchmark anybody.
+    */
+    const copy = [
+      ANALYTICS_HEAD.title,
+      ANALYTICS_HEAD.lead,
+      ...ANALYTICS_BEATS.map((b) => b.copy),
+      ...ANALYTICS_CALLOUTS.flatMap((c) => [c.title, c.body]),
+      ANALYTICS_CLOSING,
+    ].join(" ");
+
+    expect(
+      /\bpredict|\bforecast|\blikel(y|ihood) to succeed|\bbenchmark|\bindustry average|\bwho will\b/i.test(
+        copy
+      ),
+      copy
+    ).toBe(false);
+  });
+
+  it("ends on a person rather than on a number", () => {
+    const last = ANALYTICS_BEATS.at(-1)!;
+    expect(last.key).toBe("decision");
+    expect(last.copy).toMatch(/does not rank|decide/i);
+  });
+
+  it("closes without the homepage's final ask", () => {
+    // §23: the closing CTA belongs to a later module. This ends on a sentence.
+    expect(ANALYTICS_CLOSING).toMatch(/activity to insight/i);
+    expect(/sign up|get started|start free|book a demo/i.test(ANALYTICS_CLOSING)).toBe(false);
+  });
+
+  it("sends every callout to a page that exists, with no repeats", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    const hrefs = ANALYTICS_CALLOUTS.map((c) => c.href);
+    for (const href of hrefs) {
+      expect(known.has(href.split("#")[0] || "/"), href).toBe(true);
+    }
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    expect(ANALYTICS_CALLOUTS).toHaveLength(3);
   });
 });
 

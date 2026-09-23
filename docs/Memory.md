@@ -1994,3 +1994,138 @@ CTA → /product/operate, sentinels at 0/14.29/28.57/42.86/57.14/71.43/85.71%.
 **Page state:** 17 h2s, seven deep bands against eight bright, FIVE scroll
 tracks (220+260+200+180+200 = 1060vh). Still unverified visually. This is the
 fourth module where I have flagged the compounding scroll length.
+
+---
+
+## 2026-09-21 — Module 12: integrations
+
+**Every integration verified against `PROVIDER_DESCRIPTORS`**
+(lib/settings/integrations.ts). Five, and exactly five: Google Calendar
+(OAuth), Bolna AI, AI provider, Email, WhatsApp Business. Labels, descriptions
+and `featureImpact` are copied verbatim, and a test asserts all three match the
+constant — plus that the SET matches both ways, so an extra entry is an
+invented integration and a missing one is a real connection left unmentioned.
+
+**Two things a logo wall would have got wrong:**
+
+1. **n8n is retired.** `lib/integrations/n8n` still exists, so it looks live
+   from the filesystem — but `CustomerFacingProvider` is literally
+   `Exclude<Provider, "n8n">`, its action is in `RETIRED_ACTIONS`, and it has
+   no descriptor. Nobody can connect it. A test bans the string.
+2. **Google Meet is not a separate integration.** Meet links are a capability
+   OF the calendar connection ("Creates interview invites and Meet links"). A
+   Meet node would double-count one OAuth grant and imply a second setup step.
+   Test bans a Meet node and requires Meet to appear in Calendar's impact.
+
+**`featureImpact` is the section's best idea and it came from the product.** It
+is what the settings page shows before you disconnect something — "Interview
+invites — interviews still schedule here, but nobody is invited". That answers
+§10's "why does this integration matter?" far better than a logo, and it is
+already written.
+
+**Categories are the settings page's three**, not five invented to make the
+network look bigger. Test pins them.
+
+**NO STICKY TRACK — the fourth deviation on this point, and the reason is now
+arithmetic.** §11 asked for another 180–240vh. The page already carries five
+such tracks totalling ~1060vh, and the thing being built here is five lines.
+The network BUILDS ON ENTRY instead: `<Reveal>` adds `.is-shown`, and the
+stylesheet draws each wire and node off a per-index delay. That is §12's
+progressive build using the primitive the site already has, at zero added page
+height. Reader time goes into selection instead, which is the right trade — a
+network's interesting question is "what is that one for?", and that is a click.
+
+**Geometry without measurement:** a 3×3 grid holds hub and nodes; one SVG lies
+over it with `preserveAspectRatio="none"` and a 0–100 viewBox, so its
+coordinates map linearly onto the same box. No resize observer, and the lines
+cannot drift out of step with the nodes because both are positioned by one
+element. `vector-effect: non-scaling-stroke` keeps a 1px line 1px under the
+non-uniform stretch — without it the horizontal spokes render visibly fatter
+than the vertical one.
+
+**The detail panel is the accessible equivalent of the diagram.** One panel
+below the network (same behaviour under a tap and a click, never covers what it
+describes), always in the DOM so `aria-controls` resolves, and its DEFAULT
+state lists all five integrations as text — so the network's content survives
+without lines, without colour and without a pointer.
+
+Mobile at 860px: the radial becomes a vertical chain with Scoreboad as the
+anchor, and **the SVG is removed** — its lines describe an arrangement that no
+longer exists, and a diagram contradicting the layout under it is worse than
+none. CSS connectors take over.
+
+**No logos**, and not only because the brief says so: two of the five are
+generic by nature ("Email", "AI provider" — a provider you choose), and the
+other three belong to companies whose marks this site has no licence to print.
+
+`lint` clean · `typecheck` clean · `build` clean · 2002/2002 (+9). Verified:
+5 nodes with the right labels, 5 wires, zero "n8n", no Meet node, all five in
+the accessible fallback list, CTA → /how-it-works (no /integrations page
+exists).
+
+**Page state:** 18 h2s, seven deep bands against nine bright, five scroll
+tracks (~1060vh, unchanged by this module).
+
+---
+
+## 2026-09-21 — Module 13: analytics & hiring intelligence
+
+**THE MARKETING PAGE RENDERS THE PRODUCT'S ACTUAL CHART COMPONENTS.**
+`KpiTile`, `FunnelChart`, `BarChart` and `OrbitalMeter` are imported straight
+from `app/analytics/charts.tsx` — it turned out they have **no `"use client"`
+and no imports at all**: pure presentational components that merely live under
+`app/`. So the funnel on the homepage IS the product's concentric-orbit funnel
+(10 `<circle>` elements in the served HTML), not a lookalike. If somebody
+changes how the product draws a funnel, this page changes with it.
+
+**The price is a token bridge, and it is the interesting part.** Those
+components style themselves with the APPLICATION's tokens, which are dark by
+default and flip on `prefers-color-scheme`. The marketing palette is
+deliberately pinned — the page's light/dark bands are art direction, not a
+preference — so a visitor with a dark OS would have got dark-mode ramps and
+light-grey secondary text on a white marketing card. `.an-surface` re-declares
+the ~16 app tokens those components read, at their LIGHT values, copied from
+globals.scss rather than invented. Reusable for any later module that wants to
+show a real app component on a marketing band.
+
+**No chart library and no Motion in package.json** (bulma, lucide-react, sass) —
+so §25's "reuse Recharts/Framer if installed" resolves to: neither is, and
+`charts.tsx` says why. "No charting library: a dependency would be more code
+than these four forms."
+
+**The three chart subtitles ARE the section's argument**, copied verbatim:
+- "Each step counts applications that ever reached it, not those sitting there
+  now."
+- "Median days, from closed stage visits only. A stage nobody has left yet
+  shows no figure."
+- "A source with too few candidates shows its raw counts instead of a
+  percentage."
+
+A product that refuses to print a percentage it cannot support is the whole
+case for trusting its analytics, and it was already written down. Three tests
+protect the consequences: one stage must show **no figure** (an em dash, not a
+zero — zero days in a stage is a very different claim from no data), one source
+must show **raw counts** rather than a rate, and the copy may not contain
+predict / forecast / benchmark / "who will".
+
+**Real filters exist** (DATE_RANGES 7d/30d/90d/12m, job, client, recruiter) but
+are shown as a PICTURE — spans, `aria-hidden`, not focusable. A control on a
+marketing page that looks like it filters and does not is worse than none. Same
+rule as the pipeline's stage menu and the voice section's verdict buttons.
+
+Scroll track is **160vh, the shortest on the page** and below §5's suggested
+range: the dashboard is fully readable from the first frame, so the four beats
+change EMPHASIS rather than revealing content, and emphasis does not need two
+screens to land.
+
+Composition: activity stream left, dashboard right, human note across the foot
+— a sixth distinct layout. Events carry a fixed ±1.4deg tilt (two alternating
+values, no randomness to hydrate wrong) that squares up when they sort.
+
+`lint` clean · `typecheck` clean · `build` clean · 2010/2010 (+8). Verified:
+one h1, 19 h2s, real KPI labels, all three subtitles present, em dash for the
+blank stage, "0 of 4" for the unrated source, funnel and meters drawn as SVG,
+token bridge in the served CSS.
+
+**Page state:** 19 h2s, seven deep bands against ten bright, six scroll tracks
+(220+260+200+180+200+160 = 1220vh).

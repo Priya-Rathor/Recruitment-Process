@@ -2158,6 +2158,688 @@
   }
 
   // ===========================================================================
+  // ANALYTICS — activity becoming insight
+  // ===========================================================================
+  .an {
+    position: relative;
+    // The shortest track on the page. The dashboard is fully readable from the
+    // first frame, so the beats change emphasis rather than revealing content
+    // — and emphasis does not need two screens of scroll to land.
+    height: 160vh;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  .an__runway {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1px;
+    pointer-events: none;
+  }
+
+  .an__mark {
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 1px;
+
+    @for $i from 0 through 3 {
+      &[data-mark="#{$i}"] { top: calc(#{$i} * 100% / 4); }
+    }
+  }
+
+  .an__pin { position: sticky; top: 5rem; }
+
+  .an__stage {
+    display: grid;
+    grid-template-columns: minmax(0, 0.58fr) minmax(0, 1.42fr);
+    gap: clamp(1rem, 2.5vw, 1.75rem);
+    align-items: start;
+  }
+
+  // ---- The activity stream --------------------------------------------------
+  .an-stream {
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-light);
+    padding: 0.875rem;
+  }
+
+  .an-stream__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .an-stream__demo {
+    padding: 1px 0.375rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-light-border-strong);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--mkt-ink-muted);
+  }
+
+  .an-stream__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .an-group + .an-group { margin-top: 0.5rem; }
+
+  /*
+    THE GROUP HEADING IS THE SORT, MADE READABLE. Before the second beat the
+    events are loose and the heading is hidden from assistive tech as well as
+    from view; after it, the grouping is a real heading above a real list. The
+    animation shows the sort happening; the markup states the result.
+  */
+  .an-group__name {
+    margin: 0 0 0.25rem;
+    font-size: 9.5px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
+    opacity: 0;
+    transition: opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .an-stream__list[data-grouped="true"] .an-group__name { opacity: 1; }
+
+  .an-group__items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3125rem;
+  }
+
+  .an-event {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-white);
+    transition: transform 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    // Loose before the sort: a small fixed tilt, two values alternating, so
+    // the pile reads as unsorted without any randomness to hydrate wrong.
+    &[data-tilt="0"] { transform: rotate(-1.4deg); }
+    &[data-tilt="1"] { transform: rotate(1.1deg); }
+
+    strong {
+      font-size: 11.5px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+      line-height: 1.25;
+    }
+
+    span {
+      font-size: 10px;
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  // Sorted: everything squares up.
+  .an-stream__list[data-grouped="true"] .an-event[data-tilt] { transform: none; }
+
+  // ---- The dashboard surface ------------------------------------------------
+  /*
+    ===========================================================================
+    THE TOKEN BRIDGE
+    ===========================================================================
+
+    Everything inside `.an-surface` is an ACTUAL component from
+    app/analytics/charts.tsx, and those components style themselves with the
+    APPLICATION's design tokens. Those tokens are dark by default and flip on
+    `prefers-color-scheme`; the marketing palette is deliberately pinned,
+    because this page's light and dark bands are art direction rather than a
+    preference.
+
+    Without this rule a visitor whose OS is set to dark would get dark-mode
+    chart colours — pale periwinkle ramps, light-grey secondary text — on a
+    white marketing card. So the app tokens those components read are
+    re-declared here at their LIGHT values, unconditionally.
+
+    EVERY VALUE BELOW IS COPIED FROM app/globals.scss's light block. They are
+    not new colours: they are the palette the product itself uses in light
+    mode, which is the only palette that can honestly be called a screenshot
+    of it.
+  */
+  .an-surface {
+    --color-primary: #515f9e;
+    --color-text: #0b1020;
+    --color-text-secondary: #4d5678;
+    --color-card: #ffffff;
+    --color-border: #e7eaf2;
+    --color-success: #3f716e;
+    --color-warning: #8a5a00;
+    --color-error: #b4304a;
+
+    --chart-1: #4a5ad6;
+    --chart-track: rgba(81, 95, 158, 0.10);
+    --chart-grid: rgba(81, 95, 158, 0.12);
+    --chart-axis: rgba(81, 95, 158, 0.26);
+
+    // The ordinal ramp reverses on white: MORE is DARKER.
+    --ramp-0: #c3ccff;
+    --ramp-1: #a3b0fb;
+    --ramp-2: #8393f2;
+    --ramp-3: #6577dd;
+    --ramp-4: #4e5fc1;
+    --ramp-5: #3a48a1;
+
+    position: relative;
+    border: 1px solid var(--mkt-light-border-strong);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-white);
+    padding: clamp(0.875rem, 2vw, 1.25rem);
+    box-shadow: var(--mkt-glow-product-light);
+    // Dimmed, never hidden: the dashboard is the section's content and must be
+    // readable to somebody who lands here or has animation off.
+    opacity: 0.55;
+    transition: opacity 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-lit="true"] { opacity: 1; }
+
+    // The app's card primitive, neutralised: these components render Bulma's
+    // `.card`, and inside this surface they are already on one.
+    .card {
+      background: transparent;
+      border: 1px solid var(--mkt-light-border);
+      border-radius: var(--mkt-radius-sm);
+      box-shadow: none;
+      padding: 0.625rem 0.75rem;
+    }
+
+    .has-text-secondary { color: var(--color-text-secondary); }
+  }
+
+  .an-surface__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.875rem;
+    border-bottom: 1px solid var(--mkt-light-border);
+  }
+
+  .an-surface__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 14px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .an-surface__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3125rem;
+  }
+
+  /*
+    A PICTURE OF THE FILTERS, not filters. Spans, and the group is
+    `aria-hidden` — a control on a marketing page that looks like it filters
+    and does not is worse than no control. The real page's filters are date
+    range, job, client and recruiter; these are three of them.
+  */
+  .an-chip {
+    padding: 0.1875rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-light-border-strong);
+    font-size: 10.5px;
+    color: var(--mkt-ink-muted);
+
+    &.is-on {
+      background: var(--color-primary-tint);
+      border-color: transparent;
+      color: var(--mkt-accent-ink);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .an-surface__kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .an-surface__charts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .an-card {
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-light);
+    padding: 0.75rem;
+  }
+
+  .an-card--wide { grid-column: 1 / -1; }
+
+  .an-card__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  /*
+    THE SUBTITLES ARE THE PRODUCT'S OWN, and they are the section's substance
+    rather than caption text — each one says what a figure does not mean.
+  */
+  .an-card__sub {
+    margin: 2px 0 0.625rem;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--mkt-ink-muted);
+  }
+
+  .an-meters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-around;
+  }
+
+  // ---- The person at the end ------------------------------------------------
+  .an-human {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--mkt-light-border);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-white);
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity 460ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 460ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-shown="true"] { opacity: 1; transform: none; }
+  }
+
+  .an-human__chain {
+    flex-shrink: 0;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-top: 0.3125rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+  }
+
+  .an-human__text {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--mkt-ink-muted);
+
+    strong { color: var(--mkt-ink); }
+  }
+
+  // ---- The beat rail --------------------------------------------------------
+  .an__story { margin-top: 1.25rem; }
+
+  .an-beats {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1.25rem;
+    margin: 0 0 0.875rem;
+    padding: 0;
+  }
+
+  .an-beats__item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4375rem;
+    font-size: var(--text-caption);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-state="off"] { opacity: 0.4; color: var(--mkt-ink-muted); }
+    &[data-state="done"] { opacity: 0.72; color: var(--mkt-ink-muted); }
+    &[data-state="on"] {
+      opacity: 1;
+      color: var(--mkt-ink);
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .an-beats__num {
+    font-family: var(--font-heading);
+    font-weight: var(--weight-bold);
+    color: var(--mkt-accent-ink);
+  }
+
+  .an__copy { min-height: 5rem; }
+
+  .an__copytext {
+    margin: 0;
+    max-width: 54rem;
+    font-size: var(--text-body-lg);
+    line-height: 1.65;
+    color: var(--mkt-ink-muted);
+    animation: mkt-enter 340ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+
+  .an-callouts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  .an-close {
+    margin: clamp(1.5rem, 3vw, 2rem) 0 0;
+    text-align: center;
+    font-size: var(--text-body-lg);
+    color: var(--mkt-ink-muted);
+  }
+
+  .an-close__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.375rem;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
+    text-decoration: none;
+    // An underline that draws on hover, rather than one that disappears — the
+    // link is identifiable by weight and colour before any pointer arrives.
+    border-bottom: 1px solid transparent;
+    transition: border-color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover { border-bottom-color: currentcolor; }
+
+    svg { transition: transform var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+    &:hover svg { transform: translateX(3px); }
+  }
+
+  // ===========================================================================
+  // INTEGRATIONS — the network
+  //
+  // A 3x3 grid holding the hub and five nodes, with one SVG stretched over it
+  // in a 0-100 coordinate space. Both are positioned by the same box, so the
+  // lines cannot drift out of step with the nodes at any width.
+  // ===========================================================================
+  .ig-wrap { margin-top: clamp(2rem, 4vw, 3rem); }
+
+  .ig-net {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: clamp(0.75rem, 2vw, 1.25rem);
+    // Wider than tall: five nodes around a centre want horizontal room, and a
+    // square would waste the page's width and push the detail panel off screen.
+    aspect-ratio: 1.55;
+    max-height: 30rem;
+    margin-inline: auto;
+    max-width: 52rem;
+  }
+
+  .ig-net__wires {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /*
+    THE CONNECTIONS DRAW THEMSELVES when the section lands. 200 comfortably
+    exceeds the longest line in a 100x100 box, so one dash value serves all
+    five and each gets its turn from an inline delay.
+  */
+  .ig-wire {
+    stroke: var(--mkt-light-border-strong);
+    stroke-width: 1;
+    // Keeps a 1px line 1px even though the SVG is stretched non-uniformly —
+    // without it the horizontal spokes would be visibly fatter than the
+    // vertical one.
+    vector-effect: non-scaling-stroke;
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    transition:
+      stroke-dashoffset 900ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      stroke 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .mkt-reveal.is-shown .ig-wire { stroke-dashoffset: 0; }
+
+  .ig-wire[data-live="true"] {
+    stroke: var(--color-primary);
+    stroke-width: 1.5;
+  }
+
+  // ---- The hub --------------------------------------------------------------
+  .ig-hub {
+    grid-column: 2;
+    grid-row: 2;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0.75rem;
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--color-primary);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card-hover);
+    text-align: center;
+  }
+
+  .ig-hub__mark { display: inline-flex; }
+
+  .ig-hub__name {
+    font-family: var(--font-heading);
+    font-size: 14px;
+    font-weight: var(--weight-bold);
+    color: var(--mkt-ink);
+  }
+
+  .ig-hub__sub {
+    font-size: 10.5px;
+    color: var(--mkt-ink-muted);
+  }
+
+  // ---- The nodes ------------------------------------------------------------
+  .ig-node {
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: center;
+    // 2.75rem is the touch-target floor, not a rounding of the padding.
+    min-height: 2.75rem;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+    font-family: var(--font-body);
+    text-align: left;
+    cursor: pointer;
+    // The build: nodes arrive with their own connection.
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity 460ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      transform 460ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover {
+      border-color: var(--mkt-light-border-strong);
+      box-shadow: var(--mkt-glow-card-hover);
+    }
+
+    // Selected: a border, a glow and a tinted well — three signals, plus
+    // `aria-expanded` for anyone who cannot see any of them.
+    &[data-open="true"] {
+      border-color: var(--color-primary);
+      box-shadow: var(--mkt-glow-accent);
+
+      .ig-node__icon {
+        background: var(--color-primary);
+        color: var(--mkt-on-accent);  // navy on periwinkle, 7.50:1
+      }
+    }
+  }
+
+  .mkt-reveal.is-shown .ig-node { opacity: 1; transform: none; }
+
+  .ig-node[data-cell="top"] { grid-column: 2; grid-row: 1; justify-self: center; }
+  .ig-node[data-cell="left"] { grid-column: 1; grid-row: 2; justify-self: start; }
+  .ig-node[data-cell="right"] { grid-column: 3; grid-row: 2; justify-self: end; }
+  .ig-node[data-cell="bottom-left"] { grid-column: 1; grid-row: 3; justify-self: center; }
+  .ig-node[data-cell="bottom-right"] { grid-column: 3; grid-row: 3; justify-self: center; }
+
+  .ig-node__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.875rem;
+    height: 1.875rem;
+    border-radius: var(--mkt-radius-sm);
+    background: var(--color-primary-tint);
+    color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
+    transition:
+      background 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .ig-node__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    strong {
+      font-size: 12px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+      line-height: 1.25;
+    }
+
+    span {
+      font-size: 10px;
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  // ---- The detail panel -----------------------------------------------------
+  .ig-detail {
+    max-width: 52rem;
+    margin: clamp(1.25rem, 3vw, 2rem) auto 0;
+    padding: 1rem 1.125rem;
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+    // A floor, so selecting a node with two impact lines does not resize the
+    // page under the reader who just clicked it.
+    min-height: 11rem;
+  }
+
+  .ig-detail__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.375rem;
+
+    strong {
+      font-family: var(--font-heading);
+      font-size: 15px;
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+  }
+
+  .ig-detail__chip {
+    padding: 1px 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-light-border-strong);
+    font-size: 10.5px;
+    color: var(--mkt-ink-muted);
+  }
+
+  .ig-detail__desc {
+    margin: 0 0 0.875rem;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--mkt-ink-muted);
+  }
+
+  .ig-detail__label {
+    margin: 0 0 0.375rem;
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .ig-detail__impact {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3125rem;
+
+    li {
+      position: relative;
+      padding-left: 0.875rem;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--mkt-ink);
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.5rem;
+        width: 4px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--color-primary);
+      }
+    }
+  }
+
+  .ig__cta {
+    display: flex;
+    justify-content: center;
+    margin-top: clamp(1.75rem, 3vw, 2.5rem);
+  }
+
+  // ===========================================================================
   // RECRUITMENT AUTOMATION — the workflow graph
   // ===========================================================================
   .fl {
@@ -6236,6 +6918,130 @@
   */
   /*
     ===========================================================================
+    ANALYTICS ON A SMALL SCREEN
+    ===========================================================================
+
+    The two columns stack and the pinning goes: the activity stream first,
+    then the dashboard, then the human note — which is §17's order exactly.
+    The KPI row halves and the charts go single-column so every label stays
+    readable rather than being shrunk into one.
+
+    No horizontal scroll container is needed: the product's charts are all
+    label-and-value rows or SVG that scales, none of them a wide table.
+  */
+  @media (max-width: 1000px) {
+    .an { height: auto; }
+    .an__runway { display: none; }
+    .an__pin { position: static; }
+    .an__stage { grid-template-columns: minmax(0, 1fr); }
+
+    // Nothing is pinned, so nothing is gated.
+    .an-surface { opacity: 1; }
+    .an-human { opacity: 1; transform: none; }
+    .an-stream__list .an-group__name { opacity: 1; }
+    .an-event[data-tilt] { transform: none; }
+
+    .an-surface__charts { grid-template-columns: minmax(0, 1fr); }
+
+    .an-beats { display: none; }
+
+    .an__story { counter-reset: anstage; }
+
+    .an__copy {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .an__copytext[hidden] { display: block !important; animation: none; }
+
+    .an__copytext {
+      counter-increment: anstage;
+      position: relative;
+      padding-left: 2rem;
+      font-size: var(--text-body);
+
+      &::before {
+        content: "0" counter(anstage);
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-family: var(--font-heading);
+        font-size: var(--text-caption);
+        font-weight: var(--weight-bold);
+        color: var(--mkt-accent-ink);
+      }
+    }
+  }
+
+  @media (max-width: 720px) {
+    .an-surface__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .an-callouts { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /*
+    ===========================================================================
+    THE INTEGRATION NETWORK ON A SMALL SCREEN
+    ===========================================================================
+
+    A radial network does not shrink — five nodes around a centre at 390px is
+    five unreadable chips. It becomes a vertical chain instead, with Scoreboad
+    at the top as the anchor and each connection hanging off it, which is the
+    layout §22 asks for and the only one that reads.
+
+    THE SVG GOES. Its lines describe a radial arrangement that no longer
+    exists, and a diagram that contradicts the layout under it is worse than no
+    diagram. CSS connectors take over — one per node, drawn by the node itself.
+  */
+  @media (max-width: 860px) {
+    .ig-net {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      aspect-ratio: auto;
+      max-height: none;
+    }
+
+    .ig-net__wires { display: none; }
+
+    .ig-hub {
+      order: -1;
+      margin-bottom: 0.25rem;
+    }
+
+    .ig-node {
+      position: relative;
+      justify-self: stretch;
+      width: 100%;
+      margin-top: 1.5rem;
+
+      // The connector, drawn upward from each node to the one above it.
+      &::before {
+        content: "";
+        position: absolute;
+        top: -1.5rem;
+        left: 1.5rem;
+        width: 1px;
+        height: 1.5rem;
+        background: var(--mkt-light-border-strong);
+      }
+
+      &[data-open="true"]::before { background: var(--color-primary); }
+    }
+
+    // Every node is in one column now, so the grid placement is meaningless.
+    .ig-node[data-cell] {
+      grid-column: auto;
+      grid-row: auto;
+      justify-self: stretch;
+    }
+
+    .ig-detail { min-height: 0; }
+  }
+
+  /*
+    ===========================================================================
     THE WORKFLOW GRAPH ON A SMALL SCREEN
     ===========================================================================
 
@@ -7043,6 +7849,51 @@
       all rendered regardless of beat, so nothing here was ever revealed BY
       the animation.
     */
+    /*
+      THE ANALYTICS SURFACE ARRIVES LIT AND SORTED. The events square up, the
+      group headings show, the dashboard is at full opacity and the human note
+      is in place. Nothing here was revealed BY the animation — the dashboard
+      was only ever dimmed — so the section is complete either way.
+    */
+    .an-surface,
+    .an-human,
+    .an-group__name {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+
+    .an-event[data-tilt] {
+      transform: none;
+      transition: none;
+    }
+
+    .an__copytext { animation: none; }
+
+    .an-beats__item,
+    .an-close__link,
+    .an-close__link svg {
+      transition: none;
+    }
+
+    /*
+      THE NETWORK ARRIVES CONNECTED. Every line drawn, every node in place,
+      nothing travelling. The nodes were hidden by the build animation rather
+      than merely moved by it, so both properties have to be forced — and the
+      detail panel's default state already lists all five in text, which is
+      what a reader gets either way.
+    */
+    .ig-wire {
+      stroke-dashoffset: 0;
+      transition: none;
+    }
+
+    .ig-node {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+
     /*
       THE WORKFLOW ARRIVES BUILT. Every node joined, every log line present,
       no signal travelling a connector, no magnetism on the CTA. The graph was
@@ -7853,6 +8704,8 @@
   .cw-tab:focus-visible,
   .pl-col__head:focus-visible,
   .fl-node__btn:focus-visible,
+  .ig-node:focus-visible,
+  .an-close__link:focus-visible,
   .mkt-nav__link:focus-visible,
   .mkt-mega__link:focus-visible,
   .mkt-sheet__row:focus-visible,

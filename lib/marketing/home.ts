@@ -1595,6 +1595,337 @@ export const FLOW_CALLOUTS: (HomeCard & { href: string })[] = [
 ];
 
 // -----------------------------------------------------------------------------
+// Integrations — five, verified one at a time
+// -----------------------------------------------------------------------------
+
+/**
+ * EVERY NODE HERE WAS CHECKED AGAINST PROVIDER_DESCRIPTORS in
+ * lib/settings/integrations.ts. Labels, descriptions and connect styles are
+ * that file's, verbatim; `impact` is its `featureImpact` — the product's own
+ * answer to "what stops working without this", which is a far better reason
+ * for an integration to exist on a marketing page than a logo is.
+ *
+ * TWO THINGS ARE DELIBERATELY ABSENT.
+ *
+ *   n8n. There is an adapter for it in lib/integrations/n8n, and it is
+ *   RETIRED: `CustomerFacingProvider` is literally `Exclude<Provider, "n8n">`,
+ *   its automation action is in RETIRED_ACTIONS, and it has no descriptor. A
+ *   customer cannot see or connect it, so it is not an integration this site
+ *   may advertise.
+ *
+ *   Google Meet as its own node. Meet links are a capability OF the calendar
+ *   integration — "Creates interview invites and Meet links" — not a separate
+ *   connection. Giving it a node would double-count one OAuth grant and imply
+ *   a second thing to set up.
+ *
+ * THE CATEGORIES ARE THE SETTINGS PAGE'S CATEGORIES, not new ones invented to
+ * make five things look like a platform.
+ */
+export const INTEGRATIONS: {
+  key: string;
+  label: string;
+  category: string;
+  description: string;
+  /** "oauth" or "api_key" — how credentials are actually supplied. */
+  connect: string;
+  /** What stops working without it. From featureImpact. */
+  impact: string[];
+  icon: string;
+  /** Which quadrant of the network it sits in. */
+  cell: "top" | "left" | "right" | "bottom-left" | "bottom-right";
+}[] = [
+  {
+    key: "calendar",
+    label: "Google Calendar",
+    category: "Calling & scheduling",
+    description: "Creates interview invites and Meet links.",
+    connect: "Connected with Google sign-in",
+    impact: [
+      "Interview invites — interviews still schedule here, but nobody is invited",
+      "Google Meet links on video interviews",
+    ],
+    icon: "CalendarCheck",
+    cell: "top",
+  },
+  {
+    key: "bolna",
+    label: "Bolna AI",
+    category: "Calling & scheduling",
+    description: "Places automated screening calls to candidates.",
+    connect: "Connected with an API key",
+    impact: [
+      "AI screening calls, manual and automated",
+      "Screening reports, which are built from call transcripts",
+    ],
+    icon: "PhoneCall",
+    cell: "left",
+  },
+  {
+    key: "llm",
+    label: "AI provider",
+    category: "AI & automation",
+    description: "Powers resume parsing, matching, summaries and drafting.",
+    connect: "Connected with an API key",
+    impact: [
+      "Resume parsing, match scoring, screening reports and every AI draft",
+      "Every manual workflow keeps working without it",
+    ],
+    icon: "Zap",
+    cell: "right",
+  },
+  {
+    key: "email",
+    label: "Email",
+    category: "Communication",
+    description: "Delivers notifications and reminders outside the app.",
+    connect: "Connected with an API key",
+    impact: [
+      "External email notifications — in-app notifications are unaffected",
+      "Interview and feedback reminders by email",
+    ],
+    icon: "MessagesSquare",
+    cell: "bottom-left",
+  },
+  {
+    key: "whatsapp",
+    label: "WhatsApp Business",
+    category: "Communication",
+    description: "Sends candidate messages over WhatsApp, alongside email.",
+    connect: "Connected with an API key",
+    impact: [
+      "The WhatsApp half of any message template — the email half is unaffected",
+      "Nothing else: templates, triggers and the communication log all keep working",
+    ],
+    icon: "MessagesSquare",
+    cell: "bottom-right",
+  },
+];
+
+export const INTEGRATIONS_HEAD = {
+  eyebrow: "Integrations",
+  title: "Connect the tools your hiring workflow already uses.",
+  lead:
+    "Five connections, and every one of them is off until you turn it on. Each " +
+    "says plainly what stops working if you disconnect it — because the honest " +
+    "answer is usually less than you would expect.",
+} as const;
+
+/**
+ * The four points under the network.
+ *
+ * These are architecture facts rather than benefits, and that is the point:
+ * "disconnected by default" and "credentials you cannot read back" are the
+ * things a buyer actually wants to know about a connection to their calendar.
+ */
+export const INTEGRATIONS_CALLOUTS: (HomeCard & { href: string })[] = [
+  {
+    title: "Off until you connect it",
+    // Every adapter is disconnected by default; nothing contacts anyone
+    // before somebody explicitly enables it.
+    body:
+      "Nothing reaches a candidate until an integration is connected on " +
+      "purpose. A fresh workspace sends nothing to anyone.",
+    icon: "ShieldCheck",
+    href: "/how-it-works#ai-safety",
+  },
+  {
+    title: "Credentials you cannot read back",
+    // lib/integrations/crypto.ts — AES-GCM, plus a column-level REVOKE.
+    body:
+      "Keys are encrypted before they are stored and the column is revoked, so " +
+      "they cannot be read back out — not through the app, and not by a query.",
+    icon: "KeyRound",
+    href: "/how-it-works",
+  },
+  {
+    title: "It tells you what breaks",
+    // featureImpact, shown before disconnecting.
+    body:
+      "Before you disconnect anything, the product lists exactly which features " +
+      "stop and which carry on regardless.",
+    icon: "ClipboardCheck",
+    href: "/product/operate",
+  },
+  {
+    title: "The manual path still works",
+    // The AI provider's own featureImpact says it outright.
+    body:
+      "Every integration is assistance, not a dependency. Without the AI " +
+      "provider connected, every manual workflow keeps working.",
+    icon: "UserCheck",
+    href: "/product/understand",
+  },
+];
+
+// -----------------------------------------------------------------------------
+// Analytics — activity becoming insight
+// -----------------------------------------------------------------------------
+
+/**
+ * THE NUMBERS ARE SYNTHETIC; THE SHAPE OF THEM IS NOT.
+ *
+ * Everything here mirrors app/analytics/page.tsx: the same KPI labels, the
+ * same chart titles, and — most importantly — the same SUBTITLES, which are
+ * the product's own precision statements about what each figure does and does
+ * not mean. Those three sentences are the section's substance:
+ *
+ *   "Each step counts applications that ever reached it, not those sitting
+ *    there now."
+ *   "Median days, from closed stage visits only. A stage nobody has left yet
+ *    shows no figure."
+ *   "A source with too few candidates shows its raw counts instead of a
+ *    percentage."
+ *
+ * A product that refuses to print a percentage it cannot support is the whole
+ * argument for trusting its analytics, and it is already written down.
+ *
+ * The marketing section renders the REAL chart components from
+ * app/analytics/charts.tsx rather than reimplementing them — see
+ * AnalyticsShowcase.
+ */
+
+/** The raw events, before anything is counted. Synthetic, and labelled so. */
+export const ANALYTICS_EVENTS: { label: string; meta: string; group: string }[] = [
+  { label: "Application received", meta: "Senior Backend Engineer", group: "Applications" },
+  { label: "Resume parsed", meta: "A. Sharma", group: "Applications" },
+  { label: "Screening call completed", meta: "4m 51s", group: "Screening" },
+  { label: "Screening report reviewed", meta: "R. Menon", group: "Screening" },
+  { label: "Interview scheduled", meta: "Video · round 1", group: "Interviews" },
+  { label: "Interview feedback submitted", meta: "2 interviewers", group: "Interviews" },
+  { label: "Evaluation recorded", meta: "Needs Review", group: "Evaluation" },
+  { label: "Stage changed", meta: "Director Round", group: "Evaluation" },
+];
+
+/** The four groups the events sort into. Matches the analytics page's sections. */
+export const ANALYTICS_GROUPS = ["Applications", "Screening", "Interviews", "Evaluation"];
+
+/** KPI tiles. Labels are app/analytics/page.tsx's, verbatim. */
+export const ANALYTICS_KPIS: { label: string; value: string; hint?: string }[] = [
+  { label: "Applications", value: "124" },
+  { label: "Hired", value: "2" },
+  { label: "Median time to hire", value: "24d" },
+  { label: "Screening completion", value: "68%" },
+];
+
+/**
+ * The funnel. `FunnelChart` renders these as concentric orbits from a shared
+ * twelve o'clock start — see the reasoning in app/analytics/charts.tsx.
+ *
+ * Stage labels are real STAGE_LABELS values and the counts narrow, because a
+ * funnel step counts everyone who EVER reached it.
+ */
+export const ANALYTICS_FUNNEL: { label: string; value: number; pct: number }[] = [
+  { label: "Applied", value: 124, pct: 100 },
+  { label: "Shortlisted", value: 46, pct: 37 },
+  { label: "AI Screening Call", value: 28, pct: 23 },
+  { label: "Video Interview", value: 9, pct: 7 },
+  { label: "Hired", value: 2, pct: 2 },
+];
+
+/**
+ * Time in stage. Median days per stage — and Director Round deliberately has
+ * NO figure, because the product shows none for a stage nobody has left yet.
+ * Reproducing that gap is more honest than filling it in.
+ */
+export const ANALYTICS_STAGE_DAYS: { label: string; value: number | null }[] = [
+  { label: "Applied", value: 2 },
+  { label: "Shortlisted", value: 4 },
+  { label: "AI Screening Call", value: 3 },
+  { label: "Video Interview", value: 6 },
+  { label: "Director Round", value: null },
+];
+
+/**
+ * Hire rate by source — and the last one shows RAW COUNTS rather than a
+ * percentage, because the product refuses to compute a rate from too small a
+ * sample. That refusal is the single most trustworthy thing on the analytics
+ * page and it costs one row to show.
+ */
+export const ANALYTICS_SOURCES: { label: string; pct: number | null; raw: string }[] = [
+  { label: "Career page", pct: 4, raw: "3 of 74" },
+  { label: "Referral", pct: 11, raw: "2 of 18" },
+  { label: "Agency database", pct: null, raw: "0 of 4" },
+];
+
+export const ANALYTICS_BEATS: { key: string; num: string; label: string; copy: string }[] = [
+  {
+    key: "activity",
+    num: "01",
+    label: "Activity",
+    copy:
+      "Every step already leaves a record — an application arriving, a call " +
+      "finishing, feedback going in, a stage changing. Nobody has to fill in a " +
+      "spreadsheet for any of this to exist.",
+  },
+  {
+    key: "structure",
+    num: "02",
+    label: "Structure",
+    copy:
+      "Those events are already structured, because each one was written by the " +
+      "screen that produced it. Grouping them is counting, not guessing — there " +
+      "is no parsing step between what happened and what is reported.",
+  },
+  {
+    key: "analytics",
+    num: "03",
+    label: "Analytics",
+    copy:
+      "Which is what makes the figures defensible. The funnel counts everyone " +
+      "who ever reached a step rather than who is sitting there now, time in " +
+      "stage uses only visits that have ended, and a source with too few " +
+      "candidates shows its raw counts instead of a rate.",
+  },
+  {
+    key: "decision",
+    num: "04",
+    label: "Decision",
+    copy:
+      "And then a person reads it. Analytics here tells you where the process " +
+      "is slow and which sources are worth the effort. It does not rank your " +
+      "candidates, and it does not decide anything.",
+  },
+];
+
+export const ANALYTICS_HEAD = {
+  eyebrow: "Analytics",
+  title: "Turn hiring activity into clear, actionable insight.",
+  lead:
+    "See what is happening across your hiring workflow and understand where it " +
+    "slows down — built from the records your team already creates, and honest " +
+    "about what the numbers can and cannot tell you.",
+} as const;
+
+export const ANALYTICS_CLOSING = "From activity to insight, your hiring workflow stays connected.";
+
+export const ANALYTICS_CALLOUTS: (HomeCard & { href: string })[] = [
+  {
+    title: "Recruitment analytics",
+    body:
+      "Applications, hires, median time to hire and screening completion, " +
+      "filtered by date range, job, client or recruiter.",
+    icon: "Gauge",
+    href: "/product/operate",
+  },
+  {
+    title: "Hiring workflow visibility",
+    body:
+      "Median days in each stage, counted from visits that have actually " +
+      "ended — so a slow step shows up as a number rather than a feeling.",
+    icon: "Activity",
+    href: "/product/decide",
+  },
+  {
+    title: "Candidate pipeline insights",
+    body:
+      "Where applications come from, how far each source gets, and what the " +
+      "funnel loses between one step and the next.",
+    icon: "Workflow",
+    href: "/product/source",
+  },
+];
+
+// -----------------------------------------------------------------------------
 // From application to hire
 // -----------------------------------------------------------------------------
 
