@@ -11,7 +11,7 @@ import {
   STATUS_LABELS,
 } from "@/lib/evaluation/verdict";
 import { METRIC_LABELS } from "@/lib/dashboard/metrics";
-import { CAPABILITY_GROUPS, INTERNAL_ROUTES } from "@/lib/marketing/content";
+import { CAPABILITY_GROUPS, INTERNAL_ROUTES, ROLE_FLOWS } from "@/lib/marketing/content";
 import {
   AI_CALLOUTS,
   AI_STORY_CANDIDATES,
@@ -44,6 +44,8 @@ import {
   APPLY_BEATS,
   FLOW_BEATS,
   ANALYTICS_BEATS,
+  PERSONA_HEAD,
+  PERSONA_VIEWS,
   ANALYTICS_CALLOUTS,
   ANALYTICS_CLOSING,
   ANALYTICS_FUNNEL,
@@ -213,6 +215,9 @@ const ALL_COPY: string[] = [
   ...AI_SIDE.flatMap((s) => [s.title, s.body]),
   ...HUMAN_SIDE.flatMap((s) => [s.title, s.body]),
   ...HOME_FAQS.flatMap((f) => [f.q, f.a]),
+  PERSONA_HEAD.title,
+  PERSONA_HEAD.lead,
+  ...PERSONA_VIEWS.map((p) => p.note),
 ];
 
 /** The FAQ's own strings, so the certification check can treat them as pairs. */
@@ -1570,6 +1575,110 @@ describe("the analytics surface reports what the product reports", () => {
     }
     expect(new Set(hrefs).size).toBe(hrefs.length);
     expect(ANALYTICS_CALLOUTS).toHaveLength(3);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Who it's for
+// -----------------------------------------------------------------------------
+
+describe("the personas are the ones the product and the site already have", () => {
+  it("matches ROLE_FLOWS exactly, one panel per role", () => {
+    /*
+      THE CONTINUITY ASSERTION. ROLE_FLOWS renders on /how-it-works AND is the
+      four items in the navbar's "Who It's For" menu. A homepage section
+      naming a different set — five personas including HR teams and startups,
+      as the brief suggested — would contradict the site's own navigation.
+
+      Names, summaries and steps are READ from ROLE_FLOWS by the component
+      rather than copied, so this checks the one thing that could drift: the
+      set of anchors.
+    */
+    expect(new Set(PERSONA_VIEWS.map((p) => p.anchor))).toEqual(
+      new Set(ROLE_FLOWS.map((f) => f.anchor))
+    );
+  });
+
+  it("lights only real product surfaces", () => {
+    // The rail is DASHBOARD.nav, the application's real top-level navigation.
+    // A surface that is not on it would light nothing and look broken.
+    const real = new Set<string>(DASHBOARD.nav);
+    for (const persona of PERSONA_VIEWS) {
+      for (const surface of persona.surfaces) {
+        expect(real.has(surface), `${persona.tab} → "${surface}"`).toBe(true);
+      }
+    }
+  });
+
+  it("gives the candidate no surfaces at all", () => {
+    /*
+      The section's sharpest true statement. A candidate never signs in, so no
+      part of this workspace is theirs — and the panel says so rather than
+      lighting something to avoid an awkward blank.
+    */
+    const candidate = PERSONA_VIEWS.find((p) => p.anchor === "for-candidate")!;
+    expect(candidate.surfaces).toEqual([]);
+    expect(candidate.note).toMatch(/never (opens|signs)/i);
+  });
+
+  it("does not claim a hiring-manager role exists", () => {
+    /*
+      org_role is owner | admin | recruiter | viewer. There is no
+      hiring-manager role, and saying otherwise would send an admin looking
+      for one in the team settings.
+    */
+    const manager = PERSONA_VIEWS.find((p) => p.anchor === "for-hiring-manager")!;
+    expect(manager.note).toMatch(/no hiring-manager role/i);
+
+    const copy = PERSONA_VIEWS.map((p) => p.note).join(" ");
+    expect(/\bhiring[- ]manager (role|permission|account)s? (is|are) (available|supported)/i.test(copy)).toBe(
+      false
+    );
+  });
+
+  it("invents no persona the product does not distinguish", () => {
+    /*
+      "HR teams" and "startups" are market segments, not product modes —
+      nothing in the codebase behaves differently for either. The one
+      structural split is agency vs in-house, and the agency persona names it.
+    */
+    const labels = PERSONA_VIEWS.map((p) => p.tab.toLowerCase()).join(" ");
+    expect(/startup|hr team|enterprise|smb/i.test(labels), labels).toBe(false);
+
+    const agency = PERSONA_VIEWS.find((p) => p.anchor === "for-agency-recruiter")!;
+    expect(agency.note).toMatch(/agency mode/i);
+  });
+
+  it("sends every persona link to a page that exists", () => {
+    const known = new Set(INTERNAL_ROUTES);
+    for (const persona of PERSONA_VIEWS) {
+      expect(persona.links.length, persona.tab).toBeGreaterThanOrEqual(3);
+      for (const link of persona.links) {
+        expect(known.has(link.href.split("#")[0] || "/"), link.href).toBe(true);
+        // Descriptive anchor text, per §15 — never "click here" or "learn more".
+        expect(/^(click here|learn more|read more|here)$/i.test(link.label), link.label).toBe(
+          false
+        );
+      }
+    }
+  });
+
+  it("points each persona at its own /how-it-works anchor", () => {
+    // The fragment the navbar menu uses. Same person, same destination,
+    // whichever way a reader arrives.
+    for (const persona of PERSONA_VIEWS) {
+      const hrefs = persona.links.map((l) => l.href);
+      expect(hrefs, persona.tab).toContain(`/how-it-works#${persona.anchor}`);
+    }
+  });
+
+  it("makes no claim about company size or customers", () => {
+    const copy = [PERSONA_HEAD.title, PERSONA_HEAD.lead, ...PERSONA_VIEWS.map((p) => p.note)].join(
+      " "
+    );
+    expect(/trusted by|customers|teams like yours|\d+\+? companies/i.test(copy), copy).toBe(
+      false
+    );
   });
 });
 

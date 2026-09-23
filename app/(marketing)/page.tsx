@@ -22,6 +22,7 @@ import { CandidateApplications } from "./_components/home/CandidateApplications"
 import { RecruitmentAutomation } from "./_components/home/RecruitmentAutomation";
 import { Integrations } from "./_components/home/Integrations";
 import { Analytics } from "./_components/home/Analytics";
+import { WhoItsFor } from "./_components/home/WhoItsFor";
 import { BrandStatement } from "./_components/home/BrandStatement";
 import { TrustSection } from "./_components/home/TrustSection";
 import { Faq } from "./_components/home/Faq";
@@ -75,10 +76,11 @@ export const metadata: Metadata = {
  *  12. Recruitment automation             one rule, running, with a gate
  *  13. Integrations                       five connections, each one off by default
  *  14. Analytics                          the product's own charts, on the marketing page
- *  15. People x Intelligence x Opportunity  a beat
- *  16. Built for modern hiring teams      why trust it with candidate data
- *  17. FAQ                                the awkward questions
- *  18. Build your next team               the ask
+ *  15. Who it's for                       four perspectives, one nav rail
+ *  16. People x Intelligence x Opportunity  a beat
+ *  17. Built for modern hiring teams      why trust it with candidate data
+ *  18. FAQ                                the awkward questions
+ *  19. Build your next team               the ask
  *
  * STEPS 2 AND 3 WERE THE MISSING FIRST HALF OF THE ARGUMENT. The page used to
  * open with the hero's promise and go straight to a list of capabilities — the
@@ -153,6 +155,7 @@ export default function HomePage() {
       <RecruitmentAutomation />
       <Integrations />
       <Analytics />
+      <WhoItsFor />
       <BrandStatement />
       <TrustSection />
       <Faq />

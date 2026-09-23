@@ -2129,3 +2129,65 @@ token bridge in the served CSS.
 
 **Page state:** 19 h2s, seven deep bands against ten bright, six scroll tracks
 (220+260+200+180+200+160 = 1220vh).
+
+---
+
+## 2026-09-23 — Module 14: who it's for
+
+**FOUR PERSONAS, NOT THE FIVE ASKED FOR — and the reason is the site's own
+navigation.** The brief wanted Recruiters, Hiring Managers, HR Teams, Startups
+and Agencies. Checked against the product:
+
+- **`org_role` is `owner | admin | recruiter | viewer`. There is NO
+  hiring-manager role.** A hiring manager participates through interviews and
+  structured feedback — real, but not a mode of the product. Saying otherwise
+  sends an admin looking for a role in team settings that does not exist.
+- **"HR teams" and "startups" are market segments, not product distinctions.**
+  Nothing in the codebase behaves differently for either.
+- **The ONE structural split is agency vs in-house.**
+  `lib/organizations/hiringModel.ts`: *"One product, two buyers."* An agency
+  has clients, submissions and feedback SLAs; for an in-house team "every
+  client-facing surface is a permanently empty page."
+
+So the four are **`ROLE_FLOWS`** — which already exist, were written from
+docs/00-overview.md, already render on /how-it-works, and are **already the
+four items in the navbar's "Who It's For" menu** (the anchors I added in
+Module 02). Five different personas here would have contradicted the site's own
+nav. `role`, `summary` and `steps` are READ from ROLE_FLOWS by the component
+rather than copied, so homepage, /how-it-works and navbar cannot drift; a test
+asserts the anchor sets match.
+
+**The central visual is the product's own nav rail** — `DASHBOARD.nav`, the
+real six top-level surfaces — with the ones a persona actually opens lit and
+the rest dimmed to 0.45. Nothing is added or removed between personas, which
+is the section's claim made literal: same product, different weighting.
+
+**The candidate's rail lights NOTHING**, and that is the sharpest true thing in
+the section. A candidate never signs in, so no part of the workspace is theirs.
+Required no design — only the discipline not to light something to avoid an
+awkward blank. A test asserts `surfaces` is empty.
+
+**No scroll track** (§7 asked for 180–260vh). §5 and §9 describe a SELECTOR,
+and scroll-as-transport would overrule the reader's choice on the next pixel —
+the exact collision the candidate-workspace section was built to avoid. Fourth
+deliberate instance; the page already carries six tracks.
+
+**Two mistakes of my own this module:**
+1. A `str.replace` targeted `ANALYTICS_CLOSING,` and hit the occurrence in the
+   **import list** instead of the one in `ALL_COPY`, injecting expressions into
+   an import statement. The repair script then died on a later assert *before*
+   `write_text`, so the "undo" never landed and the file stayed broken through
+   a second run — worth remembering: a Python patch script with several asserts
+   writes nothing if a late one fails.
+2. The rail's "None of it. They never sign in." line was conditionally
+   RENDERED, so it was absent from crawlable HTML until somebody selected that
+   tab — the same mistake Module 07 made with its correction line. Now always
+   rendered, `hidden` when the rail is non-empty.
+
+`lint` clean · `typecheck` clean · `build` clean · 2018/2018 (+8). Verified:
+one h1, 20 h2s, four panels with zero dangling `aria-controls`, four persona
+h3s from ROLE_FLOWS, 12 links all to real routes, the rail line present and
+hidden by default.
+
+**Page state:** 20 h2s, eight deep bands against ten bright, six scroll tracks
+(~1220vh, unchanged by this module).

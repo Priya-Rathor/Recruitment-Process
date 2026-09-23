@@ -1926,6 +1926,125 @@ export const ANALYTICS_CALLOUTS: (HomeCard & { href: string })[] = [
 ];
 
 // -----------------------------------------------------------------------------
+// Who it's for — four perspectives, one product
+// -----------------------------------------------------------------------------
+
+/**
+ * FOUR PERSONAS, NOT FIVE, AND THEY ARE THE ONES THE SITE ALREADY HAS.
+ *
+ * The brief asked for Recruiters, Hiring Managers, HR Teams, Startups and
+ * Agencies. Checked against the product, that list does not survive:
+ *
+ *   * THE PRODUCT'S ROLES are owner, admin, recruiter and viewer. There is no
+ *     hiring-manager role. A hiring manager participates through interviews
+ *     and structured feedback, which is a real workflow — but it is not a
+ *     separate mode of the product, and describing it as one would send an
+ *     admin looking for a role that does not exist.
+ *   * "HR TEAMS" AND "STARTUPS" ARE MARKET SEGMENTS, not product distinctions.
+ *     Nothing in the codebase behaves differently for either. The brief itself
+ *     says not to invent a differentiated workflow where none exists.
+ *   * THE ONE STRUCTURAL SPLIT IS AGENCY VS IN-HOUSE. lib/organizations/
+ *     hiringModel.ts: "One product, two buyers." An agency has clients,
+ *     submissions and feedback SLAs; an in-house team has none of that, and
+ *     every client-facing surface is a permanently empty page for them.
+ *
+ * So the four are ROLE_FLOWS — which already exist, were written from the
+ * product overview, already render on /how-it-works, and are already the four
+ * items in the navbar's "Who It's For" menu. Five different personas here
+ * would have contradicted the site's own navigation.
+ *
+ * `role`, `summary` and `steps` are NOT duplicated: the component reads them
+ * from ROLE_FLOWS, so the homepage, /how-it-works and the navbar cannot drift.
+ * This adds only what is specific to the section.
+ */
+export const PERSONA_VIEWS: {
+  /** Matches a ROLE_FLOWS anchor, which is also the /how-it-works fragment. */
+  anchor: string;
+  /** Short label for the selector. */
+  tab: string;
+  /**
+   * Which of DASHBOARD.nav this person actually opens. The workspace lights
+   * these and dims the rest — the same product, seen from where they stand.
+   */
+  surfaces: string[];
+  /** One line on what the product does differently for them, if anything. */
+  note: string;
+  links: { label: string; href: string }[];
+}[] = [
+  {
+    anchor: "for-agency-recruiter",
+    tab: "Agency recruiters",
+    surfaces: ["Jobs", "Candidates", "Applications", "Pipeline", "Interviews"],
+    note:
+      "The one setting that genuinely changes the product. In agency mode there " +
+      "are client companies, submissions to them, and a measured feedback " +
+      "turnaround; an in-house workspace has none of those surfaces at all.",
+    links: [
+      { label: "Jobs and candidates", href: "/product/source" },
+      { label: "Client submissions and offers", href: "/product/close" },
+      { label: "The full hiring flow", href: "/how-it-works#for-agency-recruiter" },
+    ],
+  },
+  {
+    anchor: "for-in-house-talent-team",
+    tab: "In-house teams",
+    surfaces: ["Dashboard", "Jobs", "Candidates", "Applications", "Pipeline", "Interviews"],
+    note:
+      "Fewer roles and more people to satisfy on each one. Everything client- " +
+      "facing is switched off, so the workspace is the pipeline, the panels and " +
+      "the records they write to.",
+    links: [
+      { label: "The hiring pipeline", href: "/product/decide" },
+      { label: "Resume screening", href: "/product/understand" },
+      { label: "The full hiring flow", href: "/how-it-works#for-in-house-talent-team" },
+    ],
+  },
+  {
+    anchor: "for-hiring-manager",
+    tab: "Hiring managers",
+    surfaces: ["Interviews"],
+    note:
+      "There is no hiring-manager role in the product, and that is the point: a " +
+      "hiring manager does not administer anything. They take an interview with " +
+      "a brief and leave feedback in a fixed shape, so two opinions can be " +
+      "compared rather than merely read.",
+    links: [
+      { label: "Interviews and evaluation", href: "/product/decide" },
+      { label: "Where AI stops and a person decides", href: "/how-it-works#ai-safety" },
+      { label: "What a hiring manager sees", href: "/how-it-works#for-hiring-manager" },
+    ],
+  },
+  {
+    anchor: "for-candidate",
+    tab: "Candidates",
+    /*
+      DELIBERATELY EMPTY, and it is the most useful thing in the section. A
+      candidate never signs in, so no part of this workspace is theirs. The
+      panel says so rather than lighting something to avoid an awkward blank.
+    */
+    surfaces: [],
+    note:
+      "A candidate never opens this product, and never makes an account. They " +
+      "get a link to apply, a call that says what it is, a coding round that " +
+      "needs no install, and an opt-out that works without a login.",
+    links: [
+      { label: "How applications arrive", href: "/product/source" },
+      { label: "What a screening call is like", href: "/product/screen" },
+      { label: "The candidate's path", href: "/how-it-works#for-candidate" },
+    ],
+  },
+];
+
+export const PERSONA_HEAD = {
+  eyebrow: "Who it's for",
+  title: "Built for the people who make hiring happen.",
+  lead:
+    "Whether you are running a desk of client roles, hiring for your own team, " +
+    "or sitting one interview a month, it is the same workspace — you just open " +
+    "different parts of it.",
+} as const;
+
+// -----------------------------------------------------------------------------
 // From application to hire
 // -----------------------------------------------------------------------------
 
