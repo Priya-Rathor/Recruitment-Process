@@ -3,11 +3,9 @@ import {
   SITE_DESCRIPTION,
   SITE_TITLE,
   buildMetadata,
-  faqJsonLd,
   organizationJsonLd,
   softwareJsonLd,
 } from "@/lib/marketing/seo";
-import { HOME_FAQS } from "@/lib/marketing/home";
 import { Hero } from "./_components/home/Hero";
 import { Problem } from "./_components/home/Problem";
 import { Solution } from "./_components/home/Solution";
@@ -127,11 +125,12 @@ export default function HomePage() {
         STRUCTURED DATA, and every block describes something this page actually
         renders.
 
-        The FAQ block is built from HOME_FAQS — the same array the FAQ section
-        below displays — so the markup and the page cannot disagree. Structured
-        data claiming questions a visitor cannot see is what a manual action is
-        issued for, and it happens because the two are usually written in
-        different files.
+        THE FAQPage BLOCK MOVED TO /faq IN MODULE 22, and this is the reason
+        rather than an omission. That page is now the site's canonical FAQ
+        destination and carries every question this section shows plus the rest;
+        emitting FAQPage here as well would be two FAQPage entities describing
+        overlapping content, which is the duplicate schema the module was told
+        to avoid. The section below still renders, and links onward.
 
         No `offers` and no `aggregateRating`: pricing is not published and there
         are no reviews. Both can be added the day those things are true.
@@ -142,7 +141,6 @@ export default function HomePage() {
           __html: JSON.stringify([
             organizationJsonLd(),
             softwareJsonLd(),
-            faqJsonLd(HOME_FAQS),
           ]),
         }}
       />
