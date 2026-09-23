@@ -59,7 +59,7 @@ export function TrustSection() {
       */}
       <p className="sc-note">
         {SECURITY_NOTE}{" "}
-        <Link href="/#faq" className="sc-note__link">
+        <Link href="/faq" className="sc-note__link">
           Read the FAQ
         </Link>
       </p>

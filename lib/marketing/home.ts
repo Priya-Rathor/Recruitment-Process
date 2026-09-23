@@ -2941,7 +2941,7 @@ export const HOME_FOOTER_SECTIONS: {
       // under a "Company" heading because that is what it is: the page that
       // explains the one route into the product that works today.
       { label: "Contact and next steps", href: "/contact" },
-      { label: "Questions", href: "/#faq" },
+      { label: "Frequently asked questions", href: "/faq" },
     ],
   },
 ];

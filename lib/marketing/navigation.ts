@@ -276,7 +276,7 @@ export const NAVIGATION: NavEntry[] = [
           },
           {
             label: "Frequently Asked Questions",
-            href: "/#faq",
+            href: "/faq",
             description: "The awkward questions, answered plainly.",
             status: "live",
           },

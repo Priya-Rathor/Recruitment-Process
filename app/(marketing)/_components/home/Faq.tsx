@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { HOME_FAQS } from "@/lib/marketing/home";
 import { Section } from "@/components/marketing/Section";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
@@ -13,6 +15,11 @@ import { SectionHeading } from "@/components/marketing/SectionHeading";
  * The ninth answer says no certification is held. Keeping it is a deliberate
  * choice — it is the first question a procurement team asks, and answering it
  * plainly is worth more than leaving it out and being asked anyway.
+ *
+ * THE SHORT VERSION SINCE MODULE 22. /faq is the canonical FAQ destination and
+ * carries these nine plus the rest; it imports HOME_FAQS rather than restating
+ * them, so the two cannot drift. The FAQPage structured data lives there, not
+ * here — one FAQPage per site.
  */
 export function Faq() {
   return (
@@ -35,6 +42,13 @@ export function Faq() {
             </details>
           ))}
       </div>
+
+      <p className="mkt-faqmore">
+        <Link href="/faq">
+          Read every question about Scoreboad
+          <ArrowRight size={15} aria-hidden="true" />
+        </Link>
+      </p>
     </Section>
   );
 }
