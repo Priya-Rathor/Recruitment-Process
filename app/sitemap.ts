@@ -37,6 +37,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     entry("/", 1, "weekly"),
     entry("/how-it-works", 0.8, "monthly"),
+    // Product philosophy rather than a company history — it changes about as
+    // often as the positioning does, which is rarely.
+    entry("/about", 0.5, "yearly"),
+    // Higher than About: this is a page people look for when evaluating, and
+    // it changes whenever a control does.
+    entry("/security", 0.7, "monthly"),
+    // The entry point for somebody evaluating the product, so it ranks with
+    // the other conversion pages rather than with the reference ones.
+    entry("/contact", 0.7, "monthly"),
     ...CAPABILITY_GROUPS.map((group) => entry(`/product/${group.slug}`, 0.7, "monthly")),
     // Real entry points somebody may search for by name.
     entry("/signup", 0.5, "yearly"),

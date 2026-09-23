@@ -2191,3 +2191,387 @@ hidden by default.
 
 **Page state:** 20 h2s, eight deep bands against ten bright, six scroll tracks
 (~1220vh, unchanged by this module).
+
+---
+
+## 2026-09-23 — Module 15: security & trust
+
+**THE HOMEPAGE ALREADY HAD THIS SECTION.** `TrustSection` carried six verified
+guardrails (human review, candidate consent, database isolation, audit log,
+encrypted credentials, graceful degradation) — exactly §11's "4–6 cards". So
+this UPGRADED that band rather than adding a second version of the same
+argument beside it. H2 count unchanged at 20, which is the proof.
+
+**The decisive finding: `docs/SECURITY.md` and `docs/PRIVACY.md` label every
+area `IMPLEMENTED` / `PARTIAL` / `RISK` / `MISSING`.** That turns §1's "only
+represent security mechanisms that actually exist" from a judgement call into a
+lookup. Only IMPLEMENTED areas appear:
+
+  §1 Authentication · §2 Authorization & RBAC · §3 Multi-tenancy & IDOR ·
+  §8 File upload · §11 Candidate signed links · Privacy §2 Consent
+
+**Deliberately absent** because the docs mark them PARTIAL or worse: input
+validation, rate limiting, secrets handling, logging, and **data retention —
+which PRIVACY.md itself calls "the largest privacy gap"**. A test fails if any
+of them is claimed.
+
+**The signature visual is a BOUNDARY, not a flow, and that is why this is not a
+fifth scroll story.** §5's phases are the same shape as Modules 06/07/11 — a
+fourth "watch a thing travel down a chain" would say nothing new. A boundary is
+spatial: two workspaces, a seam, and a request crossing it that gets **"Not
+found"**, never "forbidden" — because a cross-tenant id returns 404 so the
+difference between the two answers cannot be used to learn which records exist.
+The neighbour workspace is dimmed and dashed rather than absent: the point is
+that it EXISTS and still cannot be reached, which one box would not say.
+
+**Best material in the codebase, from SECURITY.md §11** (candidate links):
+an HMAC over the row's own id with **nothing stored** — "a database dump
+contains no working links and there is no token column for a mistaken SELECT to
+leak"; bad signature, missing key and malformed token all fail **identically
+and in constant time**, "because distinguishing them would let someone probe
+which rows exist"; one `token_version` bump revokes every link and QR ever
+issued. And the line that is the product's whole ethic: *"a dead unsubscribe
+link is worse than an instruction to a human, because the candidate believes
+they have opted out."*
+
+Other verified specifics used: four roles enforced at **three** layers (UI, API,
+database); role transitions are DB triggers, only an Owner grants Owner, and an
+org cannot be left without one; the active-workspace cookie is a **hint**
+re-checked every request — a forged value gets the default workspace, not
+access; ~20 tenant-integrity triggers.
+
+**Honesty line added**, pointing at the FAQ rather than restating it so the two
+answers cannot drift: "No certification is held, and this section claims none."
+A test requires that sentence AND bans SOC 2 / ISO 27001 / HIPAA / PCI /
+FedRAMP / CCPA / "GDPR compliant" anywhere in the section, plus the §14 register
+(bank-level, military-grade, unhackable, 100%, guarantee).
+
+**A test also bans schema leakage** — no policy SQL, no `organization_id`, no
+"service-role", no "Supabase", no key names. The diagram is the shape of the
+rule, not the rule.
+
+`lint` clean · `typecheck` clean · `build` clean · 2026/2026 (+8). Verified:
+one h1, 20 h2s (unchanged — no duplicate section), four layer panels with zero
+dangling `aria-controls`, the boundary verdict reads "Not found", the AI chain
+badges read AI / Code / Person / Person, and all six original trust cards
+survived intact.
+
+**Page state:** 20 h2s, eight deep bands against ten bright, six scroll tracks
+(~1220vh, unchanged by this module).
+
+---
+
+## 2026-09-23 — Module 16: use cases (no customer stories exist)
+
+**§1's search was conclusive: there is no verified customer content.** The
+project's OWN SPEC says so — `docs/modules/21-public-website.md:143`: *"no
+customer logos, no testimonials, no invented pricing tiers and no security
+certifications."* No CMS, no quotes file, and `public/` holds exactly three
+files, all Scoreboad's own brand assets. So §11's alternative applies.
+
+**THE DESIGN PROBLEM, AND THE RESHAPE.** The five scenarios §4 sketches map
+onto bands this page already demonstrates at length — high-volume screening is
+the AI band, structured interviews the screening call, candidate management the
+workspace, hiring workflow the pipeline board. A section showing them again
+would be a recap of the page it sits in, on a page that is already 21 h2s long.
+
+So it is built as an **INDEX BY PROBLEM** — the one thing none of those bands
+can do for itself: let a reader who skimmed say "that one is my problem" and go
+straight to the part that answers it. Each scenario carries a link INTO this
+page (`/#ai`, `/#voice`, `/#candidates`, `/#pipeline`, `/#automation`) and OUT
+to a capability page. Navigation by situation rather than by feature — which is
+what §16's internal-linking requirement is actually for.
+
+A test asserts every `onPage` fragment is a section this page really renders
+(a link into a section that does not exist scrolls nowhere and nothing reports
+it) and that no two scenarios share a destination — two pointing at the same
+place would make the index useless as an index.
+
+**§6's scattered→orb→connected animation was NOT rebuilt.** That is the
+challenge band near the top of this page, built beat for beat in Module 04.
+A second copy would be the clearest duplication on the site. The visual is each
+scenario's own chain instead — different stages per scenario, which is the
+thing that actually differs between them. Connectors and arrowheads are drawn
+by the steps' own pseudo-elements (two rotated borders, no icon, no SVG), so a
+chain of a different length needs no other change; on a phone the arrow rotates
+135deg and the chain becomes a column.
+
+**The honesty note is full-size and centred, not small print:**
+"These are product scenarios, not customer stories. Scoreboad is early and has
+no customers to name yet — so there are no logos here, and nothing on this page
+claims otherwise." A young product saying so is more credible than a row of
+invented marks, and this page has taken that line everywhere else.
+
+Tests added: no company/quote/rating/count vocabulary anywhere; the note must
+contain both admissions; **no outcome may promise a business result** (banned:
+`\d+x`, `%`, faster, cheaper, save time/money, guarantee) — every outcome is a
+capability, which is checkable, rather than a result the product cannot
+control; and nothing may say the product chooses, picks, selects or ranks a
+candidate, with at least one outcome crediting a person explicitly.
+
+Placed directly before the FAQ and `flush` with the trust band above: what the
+product protects, then what it is for, then the awkward questions. Reader-driven
+— an index wants to be scanned, and a seventh scroll track on this page would
+be indefensible.
+
+`lint` clean · `typecheck` clean · `build` clean · 2033/2033 (+7). Verified:
+one h1, 21 h2s, five panels with zero dangling `aria-controls`, five H3s that
+are situations rather than feature names, all five on-page targets distinct and
+real, no "trusted by"/"testimonial"/"customers say" anywhere in the page.
+
+**Page state:** 21 h2s, eight deep bands against eleven bright, six scroll
+tracks (~1220vh, unchanged by this module).
+
+---
+
+## 2026-09-23 — Module 17: resources / content hub
+
+**§1's inspection: no blog, no guides, no documentation, no case studies, no
+product-tour route, no content directory, no CMS.** Ten public URLs total, and
+`navigation.ts` already marks `/blog`, `/resources/guides` and `/docs` as
+`planned`.
+
+**The easy move was an empty state. The better one was noticing the site DOES
+have real reading material — it is simply not in a blog.** A fifteen-stage
+walkthrough, six capability pages, the AI safety model, a use-case index and a
+FAQ that answers the unflattering questions are all published and all
+crawlable. Nine real destinations. So the section indexes what exists.
+
+**`/how-it-works` IS the product tour §23 asks about**, which is why it is the
+featured item rather than a placeholder. Its meta reads "15 stages · the full
+walkthrough" — a COUNTABLE FACT a reader can check, rather than a fabricated
+"5 min read". §5 bans invented dates, authors and reading times; a test bans
+`min read`, `by Firstname Lastname`, a four-digit year, and "published".
+
+**What does not exist is a SENTENCE with no links in it:** "Still to come: a
+blog, hiring guides, product documentation. None of them exist yet, so none of
+them are linked." A "coming soon" card that looks clickable is a broken link
+with better manners, and a greyed-out one still invites the click. A test
+requires all three to be named and none to contain a "/".
+
+**No filter.** §7 allows one "if enough real resources exist"; nine items in
+three groups is enough to justify headings and not enough to justify a control.
+Headings are better for a crawler, and it keeps the section **entirely
+server-rendered** — which is what §9 means by lighter than the storytelling
+bands. The only client code is the existing `Reveal`/`Stagger`.
+
+**`ResourceCard` went in `components/marketing/`**, not the home folder — §21
+asks for components a blog can reuse, and this is the one that qualifies: it
+takes a title, description, category and href and knows nothing about the
+homepage. A `/blog` index can render it over article front-matter the day one
+exists.
+
+Capability cards read `CAPABILITY_GROUPS`' own `heading` and `summary` rather
+than copying them, so a rewritten product page rewrites its card; a test pins
+the href set against the groups.
+
+Tests also ban: any link to `/blog`, `/docs`, `/resources`, `/guides`,
+`/solutions` or `/platform`; duplicate resources; and any claim about how MUCH
+content there is (`\d+ articles`, "library of", "hundreds", "weekly"), while
+requiring the lead to say the listed things are readable NOW.
+
+Dark band between two light ones, which is also §6's dark editorial surface.
+The featured visual is the brand mark on a soft radial field — no photography,
+no generated illustration.
+
+`lint` clean · `typecheck` clean · `build` clean · 2041/2041 (+8). Verified:
+one h1, 22 h2s, nine card links all real, featured → /how-it-works, zero links
+to planned routes, the coming line naming all three gaps.
+
+**Page state:** 22 h2s, nine deep bands against eleven bright, six scroll
+tracks (~1220vh, unchanged by this module).
+
+---
+
+## 2026-09-23 — Module 18: pricing
+
+**§1's inspection: there is no billing system.** No Stripe (the only match in
+the codebase is a test asserting `isProvider("stripe")` is FALSE), no
+subscriptions table, no plans, no checkout, no trial clock, no seat counting,
+no usage metering. The single "billing" mention in lib/ is a note about a voice
+provider's balance API this product deliberately does not call.
+
+**SECOND FINDING, and the real reason this section earns its place: the site
+answered the pricing question NOWHERE.** `lib/marketing/content.ts`'s `FAQS`
+has an answer — *"Pricing is not published yet. Get in touch..."* — but that
+array is **DEAD**: nothing renders it, its only reference is its own test. The
+FAQ that DOES render (`HOME_FAQS`) has no pricing question at all. A visitor
+wondering what this costs found silence.
+
+So this is not a placeholder standing in for a pricing table. It is the answer,
+in the place people look for it: *"What Scoreboad costs today. Nothing, because
+there is nothing to charge for yet."*
+
+**Everything the brief asks for that depends on pricing existing was omitted,
+not invented:** no plan cards (§5), no monthly/annual toggle (§4), no
+recommended plan (§6), no feature comparison (§8), no free tier (§13), no trial
+(§14), no enterprise tier (§15 — and no SSO/SCIM/SLA claims, which is where a
+pricing page collects them by habit).
+
+**The careful wording is "no plan limits", never "unlimited"** (§8 bans
+assuming unlimited anything). The real statement is narrower and stronger:
+there are no plan limits because there are no plans. A test bans "unlimited"
+and requires the "no plans to limit" phrasing.
+
+**No "talk to sales".** There is no contact, demo or sales route, and a button
+that opens nothing is worse than no button. The dead FAQ answer says "get in
+touch" — exactly the promise this cannot repeat, because there is nowhere to
+get in touch. CTAs are `/signup` and `/how-it-works`, both real; a test bans
+sales/demo/contact labels and asserts the primary is `/signup` with no
+buy/subscribe/checkout wording.
+
+**A stale comment of mine, corrected.** `lib/marketing/navigation.ts` justified
+keeping `/pricing` as `planned` by citing "the FAQ on the home page says
+pricing is not published" — which stopped being true when the homepage FAQ was
+rewritten. Both occurrences now cite the real reason (no billing system) and
+point at this section.
+
+Also promised in copy and pinned by test: **anyone already using the product
+will be told before anything changes for them.** That is a commitment the page
+makes, and it should survive editing.
+
+`lint` clean · `typecheck` clean · `build` clean · 2049/2049 (+8). Verified
+against the section's visible text only: no currency-and-digit anywhere (the
+earlier positive was React's Flight payload — `$7`, `$17` — not content), no
+trial or discount language, no "unlimited", both CTAs real.
+
+Entirely server-rendered: nothing here holds state, because there is no second
+billing period to toggle to. Light band, `flush` with the FAQ above — the
+awkward questions, then the most awkward one, then the ask.
+
+**Page state:** 23 h2s, nine deep bands against twelve bright, six scroll
+tracks (~1220vh, unchanged).
+
+## 2026-09-23
+
+**Module 19 — About Scoreboad.** First dedicated marketing route rather than a
+homepage section.
+
+- New: `lib/marketing/about.ts` (content), `app/(marketing)/about/page.tsx`,
+  `lib/marketing/about.test.ts` (16 assertions), `.ab-*` block in
+  `app/(marketing)/marketing.scss`.
+- Wired: `/about` into `INTERNAL_ROUTES`, `app/sitemap.ts` (0.5 / yearly), a
+  footer link under "How it works", and **`PUBLIC_PATHS` in
+  `lib/supabase/session.ts`**.
+- **No company section, no team, no timeline, no founding year.** package.json
+  has no `author`; nothing in the project records a founder, location, entity,
+  funding or milestone. The footer's `© {year}` is the CURRENT year — a
+  copyright line, not a founding date. Inventing one from that template is the
+  exact failure the page is tested against.
+- Decided: the README is stale in calling n8n the automation orchestrator
+  (retired in Module 12). Not carried forward onto the page.
+
+Two bugs worth keeping:
+
+- **Deny-by-default 307'd the new page.** `/about` rendered perfectly and every
+  anonymous visitor — including crawlers — got `/login?next=%2Fabout`. Same
+  class as the robots.txt/sitemap.xml bug already recorded in `session.ts`.
+  **Any new public route needs a `PUBLIC_PATHS` entry, and `curl` is the only
+  way this shows up** — build, lint, typecheck and the test suite were all green
+  while the page was unreachable.
+- **`<Stagger as="ol">` already wraps each child in its own `<li>`.** Passing an
+  `<li>` as the child nests them, which is invalid and makes the browser close
+  the outer one early — breaking the `counter-increment` the step numbers use.
+  Children of Stagger must be non-`li` elements.
+
+`about.test.ts` pins the "Says what it does not have" principle against the
+actual denials elsewhere on the site (`SECURITY_NOTE`, `USE_CASES_NOTE`,
+`PRICING_PANELS`), so adding a pricing table in future fails this page's test
+rather than silently making it a lie.
+
+## 2026-09-23 (second session)
+
+**Module 20 — dedicated `/security` page.** Second dedicated marketing route.
+
+- New: `lib/marketing/security.ts`, `lib/marketing/security.test.ts` (16
+  assertions), `app/(marketing)/security/page.tsx`,
+  `app/(marketing)/_components/security/{SecurityOrb,ArchitectureStack}.tsx`,
+  `.sec-*` block in `marketing.scss`.
+- Wired: `PUBLIC_PATHS`, `INTERNAL_ROUTES`, sitemap (0.7/monthly), nav entry
+  "Security & Trust" repointed `/#trust` → `/security`, footer link likewise.
+  The homepage trust section STAYS — the page links back to it. Summary and
+  long form, not a duplicate.
+
+**§2 classification source: `docs/SECURITY.md`**, which labels every area
+IMPLEMENTED / PARTIAL / MISSING / RISK / UNKNOWN with file references. Only
+IMPLEMENTED areas are claimed, and each mechanism was also read in the source —
+a status line in a doc is not by itself a verified control.
+
+Deliberately NOT claimed, and named on the page as absent: certifications
+(none), third-party audit/pentest (none), CSP (deliberately absent — reason is
+in `next.config.ts`), MFA, malware scanning, security contact address (none
+exists), published privacy policy (none — `app/settings/privacy` is an
+in-product screen). **No blanket "encrypted at rest and in transit" claim** —
+Supabase/Vercel provide it but this project has verified neither; the only
+encryption claim is the integration credential store, whose AES-GCM cipher is
+in our own source.
+
+Worth keeping:
+
+- **The five security headers the page claims are real** — verified with
+  `curl -I`, not read off next.config.ts.
+- `security.test.ts` checks scheme names as WHOLE ENTRIES, not keywords: the
+  page names SOC 2 / ISO 27001 / HIPAA in order to deny them, so a bare keyword
+  ban would have failed on the most useful sentence on the page and the
+  pressure would be to delete it.
+- The absence test asserts the gaps are still *present*. Every other guard
+  stops something being added; that one stops the credibility being tidied away.
+- Nav labels must be **more than one word** — `navigation.test.ts` enforces
+  descriptive anchor text. Shortening "Security & Trust" to "Security" failed it.
+- Hero animation lives entirely inside `prefers-reduced-motion: no-preference`,
+  so the default render IS the finished diagram. Animating *into* the correct
+  picture gives the readers who most need a static page an unfinished one.
+
+Deviation reported: §25 asked for a sticky desktop side rail; built as a sticky
+contents STRIP instead. Full-bleed alternating dark/light bands are the design
+system, and a side rail would either wear the wrong band's colours or narrow
+every section to a column — including the architecture diagram that needs the
+width. Two sticky offsets written together: navbar 0.75rem, strip 4.75rem,
+architecture pin 8.5rem.
+
+## 2026-09-23 (third session)
+
+**Module 21 — `/contact`.** Third dedicated marketing route.
+
+- New: `lib/marketing/contact.ts` (copy + pure `validateContact()`),
+  `lib/marketing/contact.test.ts` (29 assertions),
+  `app/(marketing)/contact/page.tsx`,
+  `app/(marketing)/_components/contact/{ContactOrb,ContactForm}.tsx`,
+  `.ct-*` block in `marketing.scss`, new token `--mkt-error-ink`.
+- Wired: `PUBLIC_PATHS`, `INTERNAL_ROUTES`, sitemap (0.7/monthly), footer
+  ("Contact and next steps"). No nav change — no Contact entry existed.
+
+**§1 found no contact backend and no way to build one without inventing a
+destination.** No contact/demo page, no lead table, no scheduling integration,
+no Calendly, no published address. **The email adapter cannot be reused**: it is
+tenant-scoped (credentials in `organization_integrations`, read only via the
+service-role client filtered by `organization_id`) and fails closed — a
+marketing visitor has no organization, so there is no row to read a credential
+from, and there is no deployment-wide fallback SMTP by design.
+
+So: **no API route was created** (§10 forbids a fake endpoint), the form never
+claims delivery, and `/signup` is the single primary CTA — which Module 18 had
+already decided for the whole site in `PRICING_CTA`: *"a button that opens
+nothing is worse than no button."*
+
+Design decision worth keeping: **the "this does not send" notice sits ABOVE the
+fields, not after submit.** A visitor who writes five fields and only then
+learns nothing was sent has been wasted. The form is otherwise complete —
+labels, autocomplete, inline validation on blur-then-keystroke, `aria-invalid`,
+focus moved to the first error — and its submit reaches a `not-sent` state that
+offers to copy the draft so the writing is not lost. `validateContact()` is pure
+and lives in `lib/`, the same shape as `validateAnswers()`, so a future server
+route calls the identical rule.
+
+Two bugs fixed while building:
+
+- **`--color-error` is mode-dependent.** The contact form is a WHITE panel
+  inside a DARK band, so the app's error token would have resolved to its
+  dark-mode rose (#ff9aa8) on white — a pale pink validation message, on half
+  the machines, on a form nobody tests in light mode because the band looks
+  dark. Added `--mkt-error-ink: #b4304a` (6.06:1 on white, 5.75:1 on the light
+  ground) to the pinned marketing palette.
+- **A live region that is itself `hidden` when its content changes announces
+  unreliably.** Restructured so the `aria-live` element is permanent and empty
+  and only its contents appear. Do NOT give it `display: contents` — that value
+  can drop an element from the accessibility tree, which is the same failure.

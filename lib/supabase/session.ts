@@ -87,6 +87,29 @@ const PUBLIC_PATHS = [
   "/product",
   "/how-it-works",
   /*
+    The About page. Deny-by-default caught this one too: the route rendered
+    perfectly and every anonymous visitor got a 307 to /login, which is the
+    same bug the crawler files had below and just as invisible from the code.
+
+    THE NEAR MISS, checked as the block above demands: no private route begins
+    with "/about", so freeing the subtree frees nothing else. publicPaths.test
+    pins that.
+  */
+  "/about",
+  /*
+    The Security page. Same reasoning and the same near-miss check as /about:
+    no private route begins with "/security" — the in-product screen is
+    /settings/security, which does not share this prefix. publicPaths.test
+    pins both directions.
+  */
+  "/security",
+  /*
+    The Contact page. Near miss checked as this block requires: no private
+    route begins with "/contact" — there is no /contacts list in this product,
+    and if one is ever added this entry has to be revisited before it ships.
+  */
+  "/contact",
+  /*
     THE CRAWLER FILES, and they were a REAL BUG rather than a precaution.
 
     `app/robots.ts` and `app/sitemap.ts` generate /robots.txt and /sitemap.xml,

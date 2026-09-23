@@ -25,7 +25,10 @@ import { Analytics } from "./_components/home/Analytics";
 import { WhoItsFor } from "./_components/home/WhoItsFor";
 import { BrandStatement } from "./_components/home/BrandStatement";
 import { TrustSection } from "./_components/home/TrustSection";
+import { HiringUseCases } from "./_components/home/HiringUseCases";
+import { Resources } from "./_components/home/Resources";
 import { Faq } from "./_components/home/Faq";
+import { Pricing } from "./_components/home/Pricing";
 import { FinalCta } from "./_components/home/FinalCta";
 
 /*
@@ -79,8 +82,11 @@ export const metadata: Metadata = {
  *  15. Who it's for                       four perspectives, one nav rail
  *  16. People x Intelligence x Opportunity  a beat
  *  17. Built for modern hiring teams      why trust it with candidate data
- *  18. FAQ                                the awkward questions
- *  19. Build your next team               the ask
+ *  18. Use cases                          an index by problem, not a logo wall
+ *  19. Resources                          what there actually is to read
+ *  20. FAQ                                the awkward questions
+ *  21. Pricing                            what it costs, which is nothing yet
+ *  22. Build your next team               the ask
  *
  * STEPS 2 AND 3 WERE THE MISSING FIRST HALF OF THE ARGUMENT. The page used to
  * open with the hero's promise and go straight to a list of capabilities — the
@@ -158,7 +164,10 @@ export default function HomePage() {
       <WhoItsFor />
       <BrandStatement />
       <TrustSection />
+      <HiringUseCases />
+      <Resources />
       <Faq />
+      <Pricing />
       <FinalCta />
     </>
   );

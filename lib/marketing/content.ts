@@ -472,6 +472,9 @@ export function getGroup(slug: string): CapabilityGroup | undefined {
 /** Every internal path the site links to. The content test uses this. */
 export const INTERNAL_ROUTES: string[] = [
   "/",
+  "/about",
+  "/security",
+  "/contact",
   "/how-it-works",
   "/login",
   "/signup",

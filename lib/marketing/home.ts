@@ -2045,6 +2045,473 @@ export const PERSONA_HEAD = {
 } as const;
 
 // -----------------------------------------------------------------------------
+// Security — four layers, and only the ones marked IMPLEMENTED
+// -----------------------------------------------------------------------------
+
+/**
+ * THE RULE THAT DECIDED WHAT IS IN THIS SECTION.
+ *
+ * docs/SECURITY.md and docs/PRIVACY.md label every area with a status:
+ * `IMPLEMENTED`, `PARTIAL`, `RISK` or `MISSING`. That turns "only represent
+ * security mechanisms that actually exist" from a judgement into a lookup.
+ *
+ * Only `IMPLEMENTED` sections appear here:
+ *
+ *   §1  Authentication            IMPLEMENTED
+ *   §2  Authorization & RBAC      IMPLEMENTED
+ *   §3  Multi-tenancy & IDOR      IMPLEMENTED
+ *   §8  File upload security      IMPLEMENTED
+ *   §11 Candidate signed links    IMPLEMENTED
+ *   Privacy §2 Consent            IMPLEMENTED
+ *
+ * DELIBERATELY ABSENT, because the docs mark them PARTIAL or worse: input
+ * validation, rate limiting, secrets handling, logging, and data retention —
+ * which PRIVACY.md calls "the largest privacy gap". None of those are claimed,
+ * hinted at, or implied by a nearby sentence.
+ *
+ * NO CERTIFICATIONS. None are held, the homepage FAQ already says so in as many
+ * words, and there is a test asserting no page names one without denying it.
+ */
+export const SECURITY_LAYERS: {
+  key: string;
+  num: string;
+  label: string;
+  /** The one-line claim. */
+  claim: string;
+  /** The specifics, each independently checkable in the codebase. */
+  points: string[];
+}[] = [
+  {
+    key: "auth",
+    num: "01",
+    label: "Authentication",
+    claim: "A request is somebody, or it is nothing.",
+    points: [
+      "Sessions are HTTP-only cookies, refreshed at the edge on every request.",
+      "Every route handler resolves the tenant from that session — the five that do not are public by design, and each is authorised by a signed token or an HMAC signature instead.",
+      "Candidate-facing links need no account at all, which is why they are signed rather than guarded.",
+    ],
+  },
+  {
+    key: "roles",
+    num: "02",
+    label: "Authorization",
+    claim: "Hiding a control is cosmetic, so the rule lives in three places.",
+    points: [
+      "Four roles, enforced in the interface, in the API and in the database — not one of the three on its own.",
+      "Role changes are database triggers rather than application code: only an Owner may grant or revoke Owner, and an organisation cannot be left without one.",
+      "Every change is logged with both the old value and the new one.",
+    ],
+  },
+  {
+    key: "isolation",
+    num: "03",
+    label: "Isolation",
+    claim: "A workspace cannot see another one, even if it asks precisely.",
+    points: [
+      "The tenant comes from the session. The active-workspace cookie is only a hint, re-checked against real memberships on every request — a forged value gets the default workspace, not access.",
+      "An id belonging to another workspace returns not found rather than forbidden, so nobody can use the difference to work out which records exist.",
+      "Around twenty database triggers stop a correctly-owned row from pointing at another workspace's parent.",
+    ],
+  },
+  {
+    key: "links",
+    num: "04",
+    label: "Candidate links",
+    claim: "The links sent to candidates store no secret at all.",
+    points: [
+      "Each one is a signature over a single row id, with nothing written down — so a database copy contains no working links, and there is no token column to leak.",
+      "A bad signature, a missing key and a malformed link all fail identically and in constant time, because telling them apart would let somebody probe which records exist.",
+      "One version bump revokes every link and QR code a form has ever issued, still without storing a secret.",
+    ],
+  },
+];
+
+/**
+ * The boundary diagram's contents. Records a workspace holds, and the two
+ * neighbours either side of the isolation seam.
+ *
+ * Labels are the application's real top-level surfaces.
+ */
+export const SECURITY_RECORDS = ["Jobs", "Candidates", "Applications", "Interviews"];
+
+/**
+ * The human-in-the-loop chain (§9), and every step is a real constraint:
+ * `AiResult` is a result type rather than an exception, AI output is validated
+ * before it is offered, nothing is written to a trusted table by a model, and
+ * the verdict is recorded against a named person.
+ */
+export const SECURITY_CHAIN: { label: string; note: string; by: "ai" | "code" | "human" }[] = [
+  { label: "AI output", note: "A structured result, never a free-text answer", by: "ai" },
+  { label: "Validated", note: "Shape and figures checked before anyone sees it", by: "code" },
+  { label: "Reviewed", note: "On a screen, beside what it was derived from", by: "human" },
+  { label: "Decision", note: "Recorded against the person who made it", by: "human" },
+];
+
+export const SECURITY_HEAD = {
+  eyebrow: "Security and trust",
+  title: "Built with trust at every step of the hiring workflow.",
+  lead:
+    "Hiring decisions affect people's livelihoods, so the guardrails are part of " +
+    "the architecture rather than a policy page. Everything below is something " +
+    "the product does today — not a roadmap, and not a badge.",
+} as const;
+
+/**
+ * The closing honesty line.
+ *
+ * The homepage FAQ already answers the certification question directly; this
+ * points at it rather than restating it, so the two cannot drift apart.
+ */
+export const SECURITY_NOTE =
+  "No certification is held, and this section claims none. The awkward version of that answer is in the FAQ below.";
+
+// -----------------------------------------------------------------------------
+// Use cases — an index by problem
+// -----------------------------------------------------------------------------
+
+/**
+ * THERE ARE NO CUSTOMERS, AND THE PROJECT ALREADY SAID SO.
+ *
+ * docs/modules/21-public-website.md is explicit: "no customer logos, no
+ * testimonials, no invented pricing tiers and no security certifications". The
+ * only image assets in public/ are Scoreboad's own three brand files. There is
+ * no CMS, no quotes file and nothing to quote from.
+ *
+ * So this is §11's alternative — product scenarios — and it is built as an
+ * INDEX rather than as a fifth retelling.
+ *
+ * WHY AN INDEX. The five scenarios the brief sketches map onto workflows this
+ * page has already demonstrated at length: high-volume screening is the AI
+ * band, structured interviews are the screening-call band, candidate
+ * management is the workspace band, and the hiring workflow is the pipeline
+ * board. A section that showed them again would be a recap of the page it sits
+ * in, on a page that is already long.
+ *
+ * What it does instead is the thing none of those bands can do for themselves:
+ * let somebody who skimmed say "that one is my problem" and go straight to the
+ * part that answers it. Navigation by situation rather than by feature — which
+ * is also exactly what §16's internal-linking requirement is for.
+ *
+ * `onPage` is an id that exists on this page; `page` is a real capability
+ * route. Both are asserted in the tests.
+ */
+export const USE_CASES: {
+  key: string;
+  /** The selector's label. */
+  tab: string;
+  /** The H3 — a situation, not a feature name. */
+  title: string;
+  /** What is actually hard about it. No invented statistics. */
+  challenge: string;
+  /** The real stages this scenario runs through, in product terms. */
+  chain: string[];
+  /** What the product leaves you with. A capability, never a business result. */
+  outcome: string;
+  onPage: { label: string; href: string };
+  page: { label: string; href: string };
+}[] = [
+  {
+    key: "volume",
+    tab: "High-volume screening",
+    title: "High-volume candidate screening",
+    challenge:
+      "Two hundred applications against one role, and the reading is the same " +
+      "work every time — extract the facts, check them against the requirement, " +
+      "decide who is worth a call.",
+    chain: ["Application", "Resume parsed", "Requirements checked", "Match score", "Review"],
+    outcome:
+      "The reading is done and the reasons are on the record. A person still " +
+      "decides who moves.",
+    onPage: { label: "See how screening works", href: "/#ai" },
+    page: { label: "AI resume intelligence", href: "/product/understand" },
+  },
+  {
+    key: "interviews",
+    tab: "Structured interviews",
+    title: "Interviews that can be compared",
+    challenge:
+      "Two interviewers, two sets of notes, two different shapes. Comparing " +
+      "them afterwards is guesswork, and the round that mattered is the one " +
+      "nobody wrote down properly.",
+    chain: ["Round scheduled", "Brief generated", "Feedback captured", "Evaluation", "Verdict"],
+    outcome:
+      "Feedback in one shape per round, on the application, beside everything " +
+      "else known about the person.",
+    onPage: { label: "See the screening call", href: "/#voice" },
+    page: { label: "Interviews and evaluation", href: "/product/decide" },
+  },
+  {
+    key: "records",
+    tab: "Candidate records",
+    title: "One record per person, not per application",
+    challenge:
+      "The same person applies twice, six months apart. Without a single " +
+      "record, the second application starts from nothing and the first " +
+      "conversation may as well not have happened.",
+    chain: ["Candidate", "Resumes", "Applications", "Screening", "Activity"],
+    outcome:
+      "One record carrying every application, every resume and an append-only " +
+      "history of what changed and who changed it.",
+    onPage: { label: "See the candidate workspace", href: "/#candidates" },
+    page: { label: "Jobs and candidates", href: "/product/source" },
+  },
+  {
+    key: "pipeline",
+    tab: "Stalled pipelines",
+    title: "Knowing what has stopped moving",
+    challenge:
+      "Nothing is obviously wrong, and three people have been sitting in the " +
+      "same stage for a fortnight. The board looks busy either way.",
+    chain: ["Stage target", "Days in stage", "At risk", "Breached", "Someone acts"],
+    outcome:
+      "Every card aged against the target you set for its stage, so a stall is " +
+      "a number on a column rather than something you notice late.",
+    onPage: { label: "See the hiring pipeline", href: "/#pipeline" },
+    page: { label: "The hiring pipeline", href: "/product/decide" },
+  },
+  {
+    key: "repeatable",
+    tab: "Repeatable process",
+    title: "A process that survives the team growing",
+    challenge:
+      "What two people held in their heads stops working at five. The steps " +
+      "are still the steps; they are just no longer in anybody's head.",
+    chain: ["Job stages", "Screening questions", "Rules", "Approval", "Audit log"],
+    outcome:
+      "The process written down where it runs — per-job stages and questions, " +
+      "rules that can wait for a person, and a log of everything that happened.",
+    onPage: { label: "See recruitment automation", href: "/#automation" },
+    page: { label: "Analytics and automation", href: "/product/operate" },
+  },
+];
+
+export const USE_CASES_HEAD = {
+  eyebrow: "Use cases",
+  title: "See Scoreboad in action across the hiring workflow.",
+  lead:
+    "From the first application to the final decision, Scoreboad connects the " +
+    "people, information and workflows involved in hiring. Pick the situation " +
+    "that sounds like yours.",
+} as const;
+
+/**
+ * The honest note where a logo wall would be.
+ *
+ * Not an apology, and not hidden in small print: a young product saying so is
+ * more credible than a row of invented marks, and the page has taken that line
+ * everywhere else.
+ */
+export const USE_CASES_NOTE =
+  "These are product scenarios, not customer stories. Scoreboad is early and has no customers to name yet — so there are no logos here, and nothing on this page claims otherwise.";
+
+// -----------------------------------------------------------------------------
+// Resources — what the site actually has to read
+// -----------------------------------------------------------------------------
+
+/**
+ * WHAT §1's INSPECTION FOUND: no blog, no guides, no documentation, no case
+ * studies, no product-tour route, no content directory and no CMS. The site
+ * has TEN public URLs, and lib/marketing/navigation.ts already marks /blog,
+ * /resources/guides and /docs as `planned`.
+ *
+ * SO THE HONEST VERSION OF THIS SECTION IS NOT AN EMPTY STATE.
+ *
+ * It would have been easy to render "resources coming soon" and move on. But
+ * the site does have real reading material — it simply is not in a blog. The
+ * fifteen-stage walkthrough, six capability pages, the AI safety model and a
+ * FAQ that answers the awkward questions are all published, all crawlable and
+ * all genuinely useful to somebody evaluating the product.
+ *
+ * So this section indexes what exists, and says plainly what does not. The
+ * "coming" list carries NO links, because §1's rule is that a route which does
+ * not exist does not get one — not even a disabled-looking one.
+ *
+ * `/how-it-works` IS the product tour §23 asks about, which is why it is the
+ * featured item rather than a placeholder.
+ */
+export type Resource = {
+  title: string;
+  description: string;
+  href: string;
+  /** The category shown on the card. */
+  kind: string;
+};
+
+/**
+ * The featured item. Real, published, and the closest thing the site has to a
+ * guided tour — fifteen stages from a client requirement to somebody's first
+ * day, with every stage linking to the capability behind it.
+ */
+export const RESOURCE_FEATURED: Resource & { meta: string } = {
+  kind: "Product tour",
+  title: "How Scoreboad works, end to end",
+  description:
+    "Fifteen stages from a client requirement to somebody's first day — what " +
+    "happens at each one, which screen it happens on, and exactly where AI " +
+    "assists and where a person decides.",
+  meta: "15 stages · the full walkthrough",
+  href: "/how-it-works",
+};
+
+/**
+ * The capability pages. Titles are CAPABILITY_GROUPS' own headings, which are
+ * already editorial sentences rather than feature names — so the cards read
+ * like a contents page rather than a nav menu, and they cannot drift from the
+ * pages they point at.
+ */
+export const RESOURCE_GROUPS: { heading: string; note: string; items: Resource[] }[] = [
+  {
+    heading: "Capability guides",
+    note: "One page per part of the hiring process, written as what it does rather than what it is called.",
+    items: CAPABILITY_GROUPS.map((group) => ({
+      kind: group.tab,
+      title: group.heading,
+      description: group.summary,
+      href: `/product/${group.slug}`,
+    })),
+  },
+  {
+    heading: "Answers",
+    note: "The questions a careful buyer asks before they trust a product with candidate data.",
+    items: [
+      {
+        kind: "AI safety",
+        title: "Where the model stops",
+        description:
+          "The fixed pipeline every AI feature runs through — raw data, AI, a structured output, validation, human review, and only then a business action.",
+        href: "/how-it-works#ai-safety",
+      },
+      {
+        kind: "Use cases",
+        title: "Which hiring problem is yours",
+        description:
+          "Five situations, each pointing at the part of the product that answers it. Product scenarios rather than customer stories, and it says so.",
+        href: "/#use-cases",
+      },
+      {
+        kind: "FAQ",
+        title: "The awkward questions, answered",
+        description:
+          "What the product does not do yet, what it does not hold, and what it costs — including the answers that are not flattering.",
+        href: "/#faq",
+      },
+    ],
+  },
+];
+
+/**
+ * What does not exist yet.
+ *
+ * NAMED WITHOUT LINKS, on purpose. A "coming soon" card that looks clickable
+ * is a broken link with better manners, and a greyed-out one still invites the
+ * click. Stating them as a sentence is honest and costs nothing.
+ *
+ * lib/marketing/navigation.ts already carries each of these as `planned`, so
+ * the day one is written the navbar and this list turn on from the same edit.
+ */
+export const RESOURCES_COMING = ["a blog", "hiring guides", "product documentation"];
+
+export const RESOURCES_HEAD = {
+  eyebrow: "Resources",
+  title: "Resources for better hiring.",
+  lead:
+    "Practical product resources and hiring insights for teams building a more " +
+    "connected recruitment workflow. Everything listed here is published and " +
+    "readable now.",
+} as const;
+
+// -----------------------------------------------------------------------------
+// Pricing — the honest version, because there is no other kind available
+// -----------------------------------------------------------------------------
+
+/**
+ * WHAT §1's INSPECTION FOUND: there is no billing system.
+ *
+ * No Stripe (the only match in the codebase is a test asserting
+ * `isProvider("stripe")` is FALSE), no subscriptions table, no plans, no
+ * checkout, no trial clock, no seat counting and no usage metering. The one
+ * "billing" mention in lib/ is a note about a voice provider's balance API
+ * that this product deliberately does not call.
+ *
+ * So every part of the brief that depends on pricing existing is omitted
+ * rather than invented: no plan cards, no monthly/annual toggle, no
+ * recommended plan, no feature comparison, no trial length, no free-tier
+ * limits and no enterprise tier. Each of those would have been a number or a
+ * promise with nothing behind it.
+ *
+ * AND THERE WAS A SECOND FINDING, which is really what this section is for.
+ * lib/marketing/content.ts carries a FAQ answer — "Pricing is not published
+ * yet" — but that array is DEAD: nothing renders it, and its only reference is
+ * its own test. HOME_FAQS, which does render, has no pricing question at all.
+ * So a visitor asking what this costs currently finds nothing anywhere on the
+ * site.
+ *
+ * That is the gap this section closes. It is not a placeholder standing in for
+ * a pricing table; it is the answer, in the place somebody looks for it.
+ */
+export const PRICING_HEAD = {
+  eyebrow: "Pricing",
+  title: "What Scoreboad costs today.",
+  lead:
+    "Nothing, because there is nothing to charge for yet. There is no billing " +
+    "in the product — no plans, no card, no trial running down — and that is " +
+    "worth saying plainly rather than leaving you to hunt for a price list that " +
+    "does not exist.",
+} as const;
+
+/**
+ * The two honest panels.
+ *
+ * `points` are each independently true today. "No plan limits" is carefully
+ * NOT "unlimited" — §8 bans assuming unlimited anything, and the real
+ * statement is narrower and stronger: there are no plan limits because there
+ * are no plans.
+ */
+export const PRICING_PANELS: {
+  key: string;
+  label: string;
+  title: string;
+  points: string[];
+}[] = [
+  {
+    key: "today",
+    label: "Today",
+    title: "An account costs nothing, and takes no card",
+    points: [
+      "There is no payment step, because there is nothing in the product that could take a payment.",
+      "No trial is running, so nothing expires and nothing needs cancelling.",
+      "No plan limits either — not because they are generous, but because there are no plans to limit anything.",
+      "Everything described on this page is in the product now. What is not built yet is said so on the page that describes it.",
+    ],
+  },
+  {
+    key: "later",
+    label: "When there is a price",
+    title: "It will be published here, in numbers",
+    points: [
+      "Pricing is unpublished because it is undecided, not because it is being withheld until you ask.",
+      "When it exists it will appear on this page with the figures on it, not as a form that promises a quote.",
+      "Anyone already using the product will be told before anything changes for them.",
+    ],
+  },
+];
+
+/**
+ * The one honest CTA pair.
+ *
+ * /signup is real. There is deliberately NO "talk to sales" or "request a
+ * demo": no contact route exists, and a button that opens nothing is worse
+ * than no button. The dead FAQ answer says "get in touch" — which is exactly
+ * the kind of promise this cannot repeat, because there is nowhere to get in
+ * touch.
+ */
+export const PRICING_CTA = {
+  primary: { label: "Create an account", href: "/signup" },
+  secondary: { label: "See what is in the product", href: "/how-it-works" },
+} as const;
+
+// -----------------------------------------------------------------------------
 // From application to hire
 // -----------------------------------------------------------------------------
 
@@ -2459,7 +2926,10 @@ export const HOME_FOOTER_SECTIONS: {
     links: [
       { label: "The full flow", href: "/how-it-works" },
       { label: "AI safety model", href: "/how-it-works#ai-safety" },
-      { label: "Trust and security", href: "/#trust" },
+      { label: "Trust and security", href: "/security" },
+      // Added with the About page. A route nothing links to is a route nobody
+      // finds, and a sitemap entry is not a link.
+      { label: "About Scoreboad", href: "/about" },
     ],
   },
   {
@@ -2467,6 +2937,10 @@ export const HOME_FOOTER_SECTIONS: {
     links: [
       { label: "Sign in", href: "/login" },
       { label: "Create an account", href: "/signup" },
+      // Added with the Contact page. It sits under "Get started" rather than
+      // under a "Company" heading because that is what it is: the page that
+      // explains the one route into the product that works today.
+      { label: "Contact and next steps", href: "/contact" },
       { label: "Questions", href: "/#faq" },
     ],
   },

@@ -46,6 +46,20 @@ import {
   ANALYTICS_BEATS,
   PERSONA_HEAD,
   PERSONA_VIEWS,
+  SECURITY_CHAIN,
+  PRICING_CTA,
+  PRICING_HEAD,
+  PRICING_PANELS,
+  RESOURCES_COMING,
+  RESOURCES_HEAD,
+  RESOURCE_FEATURED,
+  RESOURCE_GROUPS,
+  USE_CASES,
+  USE_CASES_HEAD,
+  USE_CASES_NOTE,
+  SECURITY_HEAD,
+  SECURITY_LAYERS,
+  SECURITY_NOTE,
   ANALYTICS_CALLOUTS,
   ANALYTICS_CLOSING,
   ANALYTICS_FUNNEL,
@@ -218,6 +232,21 @@ const ALL_COPY: string[] = [
   PERSONA_HEAD.title,
   PERSONA_HEAD.lead,
   ...PERSONA_VIEWS.map((p) => p.note),
+  SECURITY_HEAD.title,
+  SECURITY_HEAD.lead,
+  SECURITY_NOTE,
+  ...SECURITY_LAYERS.flatMap((l) => [l.claim, ...l.points]),
+  USE_CASES_HEAD.title,
+  USE_CASES_HEAD.lead,
+  USE_CASES_NOTE,
+  ...USE_CASES.flatMap((u) => [u.title, u.challenge, u.outcome]),
+  RESOURCES_HEAD.title,
+  RESOURCES_HEAD.lead,
+  RESOURCE_FEATURED.title,
+  RESOURCE_FEATURED.description,
+  PRICING_HEAD.title,
+  PRICING_HEAD.lead,
+  ...PRICING_PANELS.flatMap((p) => [p.title, ...p.points]),
 ];
 
 /** The FAQ's own strings, so the certification check can treat them as pairs. */
@@ -1679,6 +1708,455 @@ describe("the personas are the ones the product and the site already have", () =
     expect(/trusted by|customers|teams like yours|\d+\+? companies/i.test(copy), copy).toBe(
       false
     );
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Security and trust
+// -----------------------------------------------------------------------------
+
+describe("the security section claims only what is implemented", () => {
+  it("names no certification it does not hold", () => {
+    /*
+      §15's list, and the one failure mode that would matter most. The FAQ
+      already answers the certification question directly; this section must
+      not quietly contradict it with a badge or an adjective.
+    */
+    const copy = [
+      SECURITY_HEAD.title,
+      SECURITY_HEAD.lead,
+      SECURITY_NOTE,
+      ...SECURITY_LAYERS.flatMap((l) => [l.claim, ...l.points]),
+      ...SECURITY_CHAIN.flatMap((c) => [c.label, c.note]),
+    ].join(" ");
+
+    expect(
+      /SOC\s*2|ISO\s*27001|HIPAA|PCI[- ]?DSS|FedRAMP|CCPA|GDPR[- ]?compliant/i.test(copy),
+      copy
+    ).toBe(false);
+
+    // And the section says so outright rather than merely omitting it.
+    expect(SECURITY_NOTE).toMatch(/no certification is held/i);
+  });
+
+  it("uses no absolute or unfalsifiable security claim", () => {
+    /*
+      §14's banned register. "Bank-level", "military-grade" and "100% secure"
+      are all unfalsifiable, and a product whose own docs carry a risk list
+      has no business using any of them.
+    */
+    const copy = [
+      SECURITY_HEAD.title,
+      SECURITY_HEAD.lead,
+      ...SECURITY_LAYERS.flatMap((l) => [l.claim, ...l.points]),
+    ].join(" ");
+
+    expect(
+      /bank[- ]level|military[- ]grade|enterprise[- ]grade|unhackable|100%|fully secure|guarantee/i.test(
+        copy
+      ),
+      copy
+    ).toBe(false);
+  });
+
+  it("claims nothing the docs mark PARTIAL or worse", () => {
+    /*
+      THE RULE THAT DECIDED THE SECTION'S CONTENTS. docs/SECURITY.md and
+      docs/PRIVACY.md label every area IMPLEMENTED / PARTIAL / RISK / MISSING.
+      Only the IMPLEMENTED ones may appear.
+
+      Deliberately absent: input validation, rate limiting, secrets handling,
+      logging, and data retention — which PRIVACY.md calls "the largest privacy
+      gap". This fails if any of them is claimed as a feature.
+    */
+    const copy = [
+      SECURITY_HEAD.lead,
+      ...SECURITY_LAYERS.flatMap((l) => [l.claim, ...l.points]),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    for (const unclaimed of [
+      "rate limit",
+      "data retention",
+      "retention polic",
+      "malware",
+      "penetration test",
+      "intrusion",
+      "structured logging",
+    ]) {
+      expect(copy.includes(unclaimed), `"${unclaimed}" is not IMPLEMENTED`).toBe(false);
+    }
+  });
+
+  it("says not found rather than forbidden", () => {
+    /*
+      The detail the boundary visual exists for: a cross-tenant id returns 404,
+      so the difference between the two answers cannot be used to learn which
+      records exist. Describing it as "denied" would describe a weaker product.
+    */
+    const isolation = SECURITY_LAYERS.find((l) => l.key === "isolation")!;
+    const text = isolation.points.join(" ");
+    expect(text).toMatch(/not found/i);
+    expect(text).toMatch(/rather than forbidden/i);
+  });
+
+  it("never states that candidate links store a secret", () => {
+    const links = SECURITY_LAYERS.find((l) => l.key === "links")!;
+    expect(links.points.join(" ")).toMatch(/nothing written down|no working links/i);
+  });
+
+  it("ends the AI chain on a person", () => {
+    // §9. A chain whose last step is the model would be the one thing this
+    // whole site is built to deny.
+    expect(SECURITY_CHAIN.at(-1)!.by).toBe("human");
+    expect(SECURITY_CHAIN[0].by).toBe("ai");
+    // And at least one step must be neither — validation is code's.
+    expect(SECURITY_CHAIN.some((step) => step.by === "code")).toBe(true);
+  });
+
+  it("gives every layer a number and at least two checkable points", () => {
+    expect(SECURITY_LAYERS.map((l) => l.num)).toEqual(["01", "02", "03", "04"]);
+    for (const layer of SECURITY_LAYERS) {
+      expect(layer.points.length, layer.label).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("exposes no schema, key or identifier", () => {
+    /*
+      §12 and §25. The diagram is the shape of the rule, not the rule: no
+      policy SQL, no table names, no environment variables, no ids.
+    */
+    const copy = [
+      ...SECURITY_LAYERS.flatMap((l) => [l.claim, ...l.points]),
+      ...SECURITY_CHAIN.map((c) => c.note),
+    ].join(" ");
+
+    expect(
+      /create policy|row level security|organization_id|service[- ]role|supabase|SUPABASE_|api key|select \*/i.test(
+        copy
+      ),
+      copy
+    ).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Use cases
+// -----------------------------------------------------------------------------
+
+describe("the use-case index invents no proof", () => {
+  it("names no company, quote, rating or count", () => {
+    /*
+      §25, and the rule this whole site has followed. There are no customers —
+      docs/modules/21-public-website.md says so — so there is nothing to quote
+      and nobody to name. This fails on the whole vocabulary of fabricated
+      proof, not just on the obvious phrases.
+    */
+    const copy = [
+      USE_CASES_HEAD.title,
+      USE_CASES_HEAD.lead,
+      USE_CASES_NOTE,
+      ...USE_CASES.flatMap((u) => [u.title, u.challenge, u.outcome]),
+    ].join(" ");
+
+    expect(
+      /trusted by|customers? (say|report|achieve)|\d+\+? (teams|companies|customers)|case stud|testimonial|rated|stars?\b|award/i.test(
+        copy
+      ),
+      copy
+    ).toBe(false);
+  });
+
+  it("states plainly that these are scenarios, not customers", () => {
+    // Not hidden in small print. A young product saying so is more credible
+    // than a row of invented marks.
+    expect(USE_CASES_NOTE).toMatch(/not customer stories/i);
+    expect(USE_CASES_NOTE).toMatch(/no customers to name/i);
+  });
+
+  it("promises no business outcome", () => {
+    /*
+      §12: every outcome must be a capability the product delivers, never a
+      result it cannot control. "You end up with feedback in one shape" is
+      checkable; "you hire 3x faster" is not.
+    */
+    for (const item of USE_CASES) {
+      expect(
+        /\d+\s*x\b|\d+%|faster|cheaper|save[sd]? (time|money)|guarantee/i.test(item.outcome),
+        `${item.tab}: ${item.outcome}`
+      ).toBe(false);
+    }
+  });
+
+  it("never says the product picks anybody", () => {
+    // §13. The site's central promise, applied to the one section whose job is
+    // to say what the product is good for.
+    const copy = USE_CASES.flatMap((u) => [u.challenge, u.outcome]).join(" ");
+    expect(/\b(choose|chooses|picks|selects|ranks)\b.{0,20}\bcandidate/i.test(copy), copy).toBe(
+      false
+    );
+    // And at least one outcome must credit a person explicitly.
+    expect(USE_CASES.some((u) => /a person|somebody|someone/i.test(u.outcome))).toBe(true);
+  });
+
+  it("links every scenario into this page and out to a real route", () => {
+    /*
+      THE INDEX'S WHOLE VALUE. `onPage` must be a fragment this page actually
+      renders — a link into a section that does not exist scrolls nowhere and
+      is worse than no link, because nothing reports it.
+    */
+    const sections = new Set([
+      "ai",
+      "voice",
+      "candidates",
+      "pipeline",
+      "applications",
+      "automation",
+      "integrations",
+      "analytics",
+      "platform",
+      "problem",
+      "who-its-for",
+      "trust",
+      "faq",
+    ]);
+    const known = new Set(INTERNAL_ROUTES);
+
+    for (const item of USE_CASES) {
+      const fragment = item.onPage.href.split("#")[1];
+      expect(fragment, `${item.tab} needs an on-page target`).toBeDefined();
+      expect(sections.has(fragment!), `#${fragment} is not a section on this page`).toBe(true);
+
+      expect(known.has(item.page.href.split("#")[0] || "/"), item.page.href).toBe(true);
+
+      // Descriptive anchor text, per §16.
+      for (const label of [item.onPage.label, item.page.label]) {
+        expect(/^(learn more|read more|click here|here)$/i.test(label), label).toBe(false);
+      }
+    }
+  });
+
+  it("gives each scenario a distinct destination pair", () => {
+    // Two scenarios pointing at the same place would make the index useless
+    // as an index — the reader picks and lands where they already were.
+    const onPage = USE_CASES.map((u) => u.onPage.href);
+    expect(new Set(onPage).size).toBe(onPage.length);
+  });
+
+  it("titles each scenario as a situation, not a feature name", () => {
+    /*
+      The section is indexed by PROBLEM. A title that is just the feature's
+      name would make it a fifth copy of the capability grid rather than a way
+      in for somebody who does not yet know what the feature is called.
+    */
+    for (const item of USE_CASES) {
+      expect(item.title.trim().split(/\s+/).length, item.title).toBeGreaterThanOrEqual(3);
+      expect(item.challenge.length, item.tab).toBeGreaterThan(80);
+    }
+    expect(USE_CASES).toHaveLength(5);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Resources
+// -----------------------------------------------------------------------------
+
+describe("the resource hub lists only things that exist", () => {
+  /** Every resource on the page, featured and grouped. */
+  const all = [RESOURCE_FEATURED, ...RESOURCE_GROUPS.flatMap((g) => g.items)];
+
+  it("points every card at a real route or a real fragment", () => {
+    /*
+      THE WHOLE POINT OF THE MODULE. There is no blog, no guides directory and
+      no docs — navigation.ts marks all three `planned`. A resource hub that
+      linked to them would be three 404s in the most link-dense section on the
+      site.
+    */
+    const known = new Set(INTERNAL_ROUTES);
+    const fragments = new Set(["ai-safety", "use-cases", "faq", "resources", "trust"]);
+
+    for (const item of all) {
+      const [path, fragment] = item.href.split("#");
+      expect(known.has(path || "/"), `${item.title} → ${item.href}`).toBe(true);
+      if (fragment) {
+        expect(fragments.has(fragment), `#${fragment} is not a real anchor`).toBe(true);
+      }
+    }
+  });
+
+  it("links to no route that is only planned", () => {
+    const hrefs = all.map((item) => item.href).join(" ");
+    for (const planned of ["/blog", "/docs", "/resources", "/guides", "/solutions", "/platform"]) {
+      expect(hrefs.includes(planned), `${planned} does not exist`).toBe(false);
+    }
+  });
+
+  it("names what is missing without linking it", () => {
+    /*
+      A "coming soon" card that looks clickable is a broken link with better
+      manners, and a greyed-out one still invites the click. The gap is a
+      sentence instead — and it must actually name the three things a reader
+      came looking for.
+    */
+    expect(RESOURCES_COMING.length).toBeGreaterThanOrEqual(3);
+    const text = RESOURCES_COMING.join(" ");
+    expect(text).toMatch(/blog/i);
+    expect(text).toMatch(/guide/i);
+    expect(text).toMatch(/documentation/i);
+    // And none of them may be a URL.
+    for (const item of RESOURCES_COMING) {
+      expect(item.includes("/"), item).toBe(false);
+    }
+  });
+
+  it("invents no date, author or reading time", () => {
+    /*
+      §5's explicit list. The featured item's meta is a countable fact about
+      the page it links to — fifteen stages — which a reader can check, rather
+      than a fabricated "5 min read".
+    */
+    const copy = [
+      RESOURCE_FEATURED.meta,
+      ...all.map((item) => `${item.title} ${item.description}`),
+    ].join(" ");
+
+    expect(/\bmin read\b|\bby [A-Z][a-z]+ [A-Z]|\b(19|20)\d\d\b|published/i.test(copy), copy).toBe(
+      false
+    );
+    expect(RESOURCE_FEATURED.meta).toMatch(/15 stages/);
+  });
+
+  it("features the walkthrough, because that is the product tour", () => {
+    // §23: no /product-tour route exists, and /how-it-works is genuinely the
+    // guided tour. Featuring a placeholder instead would have been worse.
+    expect(RESOURCE_FEATURED.href).toBe("/how-it-works");
+    expect(RESOURCE_FEATURED.kind).toBe("Product tour");
+  });
+
+  it("keeps the capability cards in step with the pages they point at", () => {
+    /*
+      Titles and descriptions are CAPABILITY_GROUPS' own heading and summary,
+      read rather than copied — so a rewritten product page rewrites its card.
+      This checks the set, which is the part that could drift.
+    */
+    const guides = RESOURCE_GROUPS.find((g) => g.heading === "Capability guides")!;
+    expect(guides.items.map((i) => i.href).sort()).toEqual(
+      CAPABILITY_GROUPS.map((g) => `/product/${g.slug}`).sort()
+    );
+    for (const item of guides.items) {
+      expect(item.description.length, item.title).toBeGreaterThan(40);
+    }
+  });
+
+  it("lists no resource twice", () => {
+    const hrefs = all.map((item) => item.href);
+    expect(new Set(hrefs).size, `duplicates in:\n${hrefs.join("\n")}`).toBe(hrefs.length);
+  });
+
+  it("claims nothing about how much content there is", () => {
+    const copy = `${RESOURCES_HEAD.title} ${RESOURCES_HEAD.lead}`;
+    expect(/\d+\+? (articles|guides|resources|posts)|library of|hundreds|weekly/i.test(copy), copy).toBe(
+      false
+    );
+    // And it must say the listed things are readable NOW, not promised.
+    expect(RESOURCES_HEAD.lead).toMatch(/published and\s+readable now/i);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Pricing
+// -----------------------------------------------------------------------------
+
+describe("the pricing section invents no pricing", () => {
+  const copy = [
+    PRICING_HEAD.title,
+    PRICING_HEAD.lead,
+    ...PRICING_PANELS.flatMap((p) => [p.title, ...p.points]),
+  ].join(" ");
+
+  it("states no figure, currency or period", () => {
+    /*
+      THE WHOLE POINT. There is no billing system — no Stripe, no
+      subscriptions, no plans, no checkout — so any number here would be
+      invented. That includes a "from" price, a seat rate and a currency
+      symbol with nothing after it.
+    */
+    expect(/[$£€₹]\s*\d|\d+\s*(per|\/)\s*(month|year|seat|user)|\bper seat\b/i.test(copy), copy).toBe(
+      false
+    );
+  });
+
+  it("promises no trial, discount or free tier", () => {
+    /*
+      §13 and §14. "Free" is the subtle one: there IS no charge today, but
+      calling it a free PLAN would describe a tier that does not exist and
+      that somebody could later be moved off.
+    */
+    expect(
+      /\d+[- ]day (free )?trial|save \d+%|\d+ months? free|free (plan|tier|forever)|money[- ]back/i.test(
+        copy
+      ),
+      copy
+    ).toBe(false);
+  });
+
+  it("claims nothing is unlimited", () => {
+    // §8 bans assuming unlimited candidates, seats, interviews or AI calls.
+    // The real statement is narrower and stronger: no plan limits, because
+    // there are no plans.
+    expect(/\bunlimited\b/i.test(copy), copy).toBe(false);
+    expect(copy).toMatch(/no plans to limit|there are no plans/i);
+  });
+
+  it("names no enterprise capability the product lacks", () => {
+    // §15's list. None of these exist, and a pricing page is where they get
+    // claimed by habit.
+    expect(/\bSSO\b|\bSCIM\b|dedicated support|custom SLA|private deployment|dedicated infrastructure/i.test(copy), copy).toBe(
+      false
+    );
+  });
+
+  it("offers no route that does not exist", () => {
+    /*
+      §11. There is no contact, demo or sales route — a "talk to sales" button
+      would open nothing. The dead FAQ answer in content.ts says "get in
+      touch", which is exactly the promise this must not repeat.
+    */
+    const known = new Set(INTERNAL_ROUTES);
+    for (const cta of [PRICING_CTA.primary, PRICING_CTA.secondary]) {
+      expect(known.has(cta.href.split("#")[0] || "/"), cta.href).toBe(true);
+    }
+    const labels = `${PRICING_CTA.primary.label} ${PRICING_CTA.secondary.label}`;
+    expect(/talk to sales|request a demo|contact (us|sales)|book a call/i.test(labels), labels).toBe(
+      false
+    );
+  });
+
+  it("implies no checkout", () => {
+    // §11: clicking must not look like it charges anybody. /signup creates an
+    // account, and nothing in the product can take a payment.
+    expect(PRICING_CTA.primary.href).toBe("/signup");
+    expect(/buy|purchase|subscribe|checkout|pay/i.test(PRICING_CTA.primary.label)).toBe(false);
+  });
+
+  it("answers the question rather than deferring it", () => {
+    /*
+      The reason this section exists. content.ts's FAQS has a pricing answer
+      that NOTHING renders, and HOME_FAQS has no pricing question — so the
+      site answered this nowhere. A section that only said "contact us" would
+      have left the gap open.
+    */
+    expect(PRICING_HEAD.lead).toMatch(/nothing to charge for yet|no billing/i);
+    expect(PRICING_HEAD.title).toMatch(/cost/i);
+  });
+
+  it("says why there is no price, and what happens when there is", () => {
+    expect(PRICING_PANELS).toHaveLength(2);
+    const later = PRICING_PANELS.find((p) => p.key === "later")!;
+    expect(later.points.join(" ")).toMatch(/undecided|not because it is being withheld/i);
+    // And existing users must be told before anything changes.
+    expect(later.points.join(" ")).toMatch(/told before anything changes/i);
   });
 });
 

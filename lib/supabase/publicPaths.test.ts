@@ -27,6 +27,9 @@ describe("isPublicPath", () => {
     const tokenAuthorised = ["/unsubscribe", "/coding", "/apply"];
     const marketing = [
       "/",
+      "/about",
+      "/security",
+      "/contact",
       "/how-it-works",
       "/product",
       "/product/source",
@@ -128,6 +131,21 @@ describe("isPublicPath", () => {
       // /products appeared, these are the guards.
       expect(isPublicPath("/production")).toBe(false);
       expect(isPublicPath("/how-it-works-internal")).toBe(false);
+      // Nothing private begins with "/about" today; this is the guard for the
+      // day something does.
+      expect(isPublicPath("/aboutus")).toBe(false);
+      /*
+        THE ONE THAT MATTERS ON THIS PAIR. The public marketing page is
+        /security; the in-product admin screen is /settings/security. They do
+        not share a prefix, so the public entry cannot free the private screen —
+        but they are one careless edit apart, so it is asserted rather than
+        assumed.
+      */
+      expect(isPublicPath("/settings/security")).toBe(false);
+      expect(isPublicPath("/securitys")).toBe(false);
+      // No /contacts route exists today. This is the guard for the day a
+      // private one is added and nobody rereads the allowlist.
+      expect(isPublicPath("/contacts")).toBe(false);
     });
 
     it("cannot be escaped by appending a segment to a public leaf", () => {

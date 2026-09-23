@@ -34,9 +34,15 @@
 //     That is making existing content reachable, not inventing a page.
 //
 // Solutions, Integrations and Pricing have no destinations of any kind, so they
-// are declared and not rendered. Pricing in particular must NOT be faked: the
-// FAQ on the home page says pricing is not published, and a Pricing link would
-// contradict the page it sits on.
+// are declared and not rendered. Pricing in particular must NOT be faked:
+// there is no billing system in the product at all — no plans, no checkout, no
+// trial — so a /pricing route would be a page with nothing on it.
+//
+// UPDATED: this note used to say "the FAQ on the home page says pricing is not
+// published". That stopped being true when the homepage FAQ was rewritten —
+// the answer survives only in lib/marketing/content.ts's FAQS, which nothing
+// renders. The homepage now answers the question directly in its pricing
+// section instead, which is where a reader looks for it.
 // =============================================================================
 
 export type NavStatus = "live" | "planned";
@@ -257,13 +263,15 @@ export const NAVIGATION: NavEntry[] = [
           {
             /*
               CARRIED OVER FROM THE FLAT NAV THIS REPLACED, which had a "Trust"
-              link. The section is real and rendered on the home page, and
-              dropping it in a reorganisation would have quietly removed the
-              only nav route to the security copy.
+              link. It pointed at the homepage section for as long as that was
+              the only security copy on the site; Module 20 gave it a dedicated
+              page, so it points there now. The homepage section stays, and the
+              page links back to it — a summary and its long form, not a
+              duplicate.
             */
             label: "Security & Trust",
-            href: "/#trust",
-            description: "Tenant isolation, consent, and what is not certified.",
+            href: "/security",
+            description: "Access control, isolation, AI review — and what is not certified.",
             status: "live",
           },
           {
@@ -282,8 +290,9 @@ export const NAVIGATION: NavEntry[] = [
 
   /*
     PRICING — declared, not rendered, and the one item that would be actively
-    dishonest to ship. The home page's FAQ says pricing is not published yet,
-    so a Pricing link in the bar above it would contradict the page it sits on.
+    dishonest to ship. There is no billing system: no plans, no checkout, no
+    trial. The homepage's pricing section says so outright, so a Pricing link
+    in the bar would promise a price list the site does not have.
   */
   { kind: "link", label: "Pricing", href: "/pricing", status: "planned" },
 ];

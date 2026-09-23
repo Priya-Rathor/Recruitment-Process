@@ -119,6 +119,21 @@
   --mkt-amber-ink: #8a5f00;
   --mkt-mint-ink: #3f716e;         // 5.53:1 on white — mint AS TEXT
   --mkt-lavender-ink: #716d9e;     // 4.79:1 on white — lavender AS TEXT
+  /*
+    THE ERROR HUE AS TEXT — 6.06:1 on white, 5.75:1 on the light ground.
+
+    Added with the contact form, and NOT `var(--color-error)`, which is the
+    trap this whole token block exists for: the app's error token flips with
+    `prefers-color-scheme` to a pale rose (#ff9aa8) that is designed for a
+    near-black ground. The contact form is a WHITE panel inside a DARK band, so
+    that token would have resolved to the dark-mode value on a white surface —
+    a pale pink validation message, on half the machines that opened it, and
+    only on a form nobody tests in light mode because the band around it looks
+    dark.
+
+    The marketing palette is pinned on purpose; its error colour has to be too.
+  */
+  --mkt-error-ink: #b4304a;
 
   /*
     ON A FILLED ACCENT THE INK IS NAVY, NOT WHITE.
@@ -2155,6 +2170,906 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+  }
+
+  // ===========================================================================
+  // PRICING — two panels, no table
+  //
+  // There is no billing system, so there are no plan cards and no toggle. What
+  // this needs to be is legible and calm: somebody is reading it to find out
+  // whether they are about to be charged.
+  // ===========================================================================
+  .pr { margin-top: clamp(2rem, 4vw, 3rem); }
+
+  .pr__panels {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1rem, 2.5vw, 2rem);
+    align-items: stretch;
+  }
+
+  .pr-panel {
+    padding: clamp(1.125rem, 2.5vw, 1.75rem);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+  }
+
+  /*
+    THE "TODAY" PANEL CARRIES THE ACCENT, and that is the closest thing this
+    section has to a highlighted plan. It is not a recommendation — there is
+    nothing to recommend between — it simply marks which of the two is true
+    now, which is the one a reader needs.
+  */
+  .pr-panel[data-key="today"] {
+    border-color: var(--color-primary);
+    background: linear-gradient(180deg, var(--color-primary-tint), var(--mkt-white) 42%);
+  }
+
+  .pr-panel__label {
+    margin: 0;
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .pr-panel[data-key="today"] .pr-panel__label { color: var(--mkt-accent-ink); }
+
+  .pr-panel__title {
+    margin: 0.375rem 0 1rem;
+    font-family: var(--font-heading);
+    font-size: clamp(1.0625rem, 2vw, 1.375rem);
+    font-weight: var(--weight-semibold);
+    line-height: 1.3;
+    color: var(--mkt-ink);
+  }
+
+  .pr-panel__points {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+
+    li {
+      display: grid;
+      grid-template-columns: 1rem minmax(0, 1fr);
+      gap: 0.5rem;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--mkt-ink-muted);
+    }
+
+    svg {
+      margin-top: 0.25rem;
+      color: var(--mkt-mint-ink);   // 5.53:1 on white
+    }
+  }
+
+  /*
+    The mark, sitting on the seam between the two panels. Quiet, once, and
+    nowhere near a number — §10 warns it must not compete with the prices, and
+    a logo floating behind a paragraph about money reads as spin.
+  */
+  .pr__mark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-light-border);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+    pointer-events: none;
+  }
+
+  .pr__cta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: clamp(1.75rem, 3vw, 2.5rem);
+  }
+
+  // ===========================================================================
+  // RESOURCES — the content hub
+  // ===========================================================================
+
+  /*
+    ---- THE FEATURED RESOURCE -----------------------------------------------
+
+    Asymmetric on purpose (§19): the art column is fixed and the body takes
+    the rest, so the card does not read as two equal halves. The whole thing
+    is one link.
+  */
+  .rs-hero {
+    display: grid;
+    grid-template-columns: 13rem minmax(0, 1fr);
+    gap: clamp(1rem, 3vw, 2.5rem);
+    align-items: center;
+    margin-top: clamp(2rem, 4vw, 3rem);
+    padding: clamp(1.25rem, 3vw, 2rem);
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius-lg);
+    background: var(--mkt-dark-2);
+    text-decoration: none;
+    transition:
+      transform 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover {
+      transform: translateY(-3px);
+      border-color: var(--mkt-dark-border-strong);
+      box-shadow: var(--mkt-glow-accent);
+    }
+  }
+
+  /*
+    The editorial visual: the brand mark on a soft field. No photography and
+    no generated illustration — both are ruled out, and neither would say
+    anything a reader needs.
+  */
+  .rs-hero__art {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1.3;
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-dark);
+    overflow: hidden;
+  }
+
+  .rs-hero__glow {
+    position: absolute;
+    inset: -20%;
+    background: radial-gradient(
+      44% 44% at 50% 46%,
+      rgba(139, 158, 255, 0.35),
+      rgba(198, 184, 255, 0.14) 52%,
+      transparent 74%
+    );
+    filter: blur(26px);
+  }
+
+  .rs-hero__body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4375rem;
+    min-width: 0;
+  }
+
+  .rs-hero__kind {
+    padding: 0.1875rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-accent-on-dark);   // 9.72:1 on the ground
+  }
+
+  .rs-hero__title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.25rem, 2.6vw, 1.875rem);
+    font-weight: var(--weight-bold);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--mkt-on-dark);
+  }
+
+  .rs-hero__desc {
+    max-width: 44rem;
+    font-size: var(--text-body-lg);
+    line-height: 1.6;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  /*
+    A COUNTABLE FACT, not an invented reading time. Fabricated dates, authors
+    and "5 min read" are all banned, and the honest substitute is something
+    the page can be checked against.
+  */
+  .rs-hero__meta {
+    font-size: var(--text-caption);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .rs-hero__more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+    font-size: var(--text-label);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-accent-on-dark);
+
+    svg { transition: transform var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+  }
+
+  .rs-hero:hover .rs-hero__more svg { transform: translateX(3px); }
+
+  // ---- The groups -----------------------------------------------------------
+  .rs-group { margin-top: clamp(2rem, 4vw, 3rem); }
+
+  .rs-group__head {
+    max-width: 44rem;
+    margin-bottom: 1rem;
+  }
+
+  .rs-group__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: clamp(1rem, 1.8vw, 1.25rem);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .rs-group__note {
+    margin: 0.25rem 0 0;
+    font-size: var(--text-body);
+    line-height: 1.6;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .rs-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.875rem;
+  }
+
+  // ---- The card -------------------------------------------------------------
+  .rs-card { height: 100%; }
+
+  /*
+    THE WHOLE CARD IS THE LINK. `display: flex` on the anchor rather than a
+    stretched pseudo-element, so focus lands on something the reader can see
+    and the focus ring wraps the card rather than a sliver of text.
+  */
+  .rs-card__link {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1rem 1.0625rem;
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-dark-2);
+    text-decoration: none;
+    transition:
+      transform 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      background 260ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover {
+      transform: translateY(-3px);
+      border-color: var(--mkt-dark-border-strong);
+      background: var(--mkt-dark-3);
+    }
+  }
+
+  .rs-card__kind {
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .rs-card__title {
+    margin: 0.4375rem 0 0.375rem;
+    font-family: var(--font-heading);
+    font-size: 15px;
+    font-weight: var(--weight-semibold);
+    line-height: 1.35;
+    color: var(--mkt-on-dark);
+  }
+
+  .rs-card__desc {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--mkt-on-dark-muted);
+    // Long capability summaries would otherwise make one card twice the height
+    // of its neighbours; the full text is on the page it links to.
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .rs-card__more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: auto;
+    padding-top: 0.875rem;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-accent-on-dark);
+
+    svg { transition: transform var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+  }
+
+  .rs-card__link:hover .rs-card__more svg { transform: translateX(3px); }
+
+  /*
+    What does not exist yet. Deliberately not styled as a card, a badge or a
+    disabled control — it is a sentence, because a "coming soon" tile that
+    looks clickable is a broken link with better manners.
+  */
+  .rs-coming {
+    margin: clamp(1.75rem, 3vw, 2.5rem) auto 0;
+    max-width: 46rem;
+    text-align: center;
+    font-size: var(--text-body);
+    line-height: 1.6;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  // ===========================================================================
+  // USE CASES — an index by problem
+  // ===========================================================================
+  .uc { margin-top: clamp(2rem, 4vw, 3rem); }
+
+  .uc__tabscroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-block: 3px;
+
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  .uc-tabs {
+    display: flex;
+    gap: 0.25rem;
+    min-width: max-content;
+    padding: 0.3125rem;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    border: 1px solid var(--mkt-light-border);
+  }
+
+  .uc-tab {
+    min-height: 2.5rem;
+    padding-inline: 0.9375rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: none;
+    font-family: var(--font-body);
+    font-size: var(--text-label);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink-muted);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover { color: var(--mkt-ink); }
+
+    // `aria-selected` is the styling hook — one fact, two renderings.
+    &[aria-selected="true"] {
+      background: var(--mkt-white);
+      border-color: var(--mkt-light-border-strong);
+      color: var(--mkt-ink);
+      font-weight: var(--weight-semibold);
+      box-shadow: var(--mkt-glow-card);
+    }
+  }
+
+  .uc-panel {
+    margin-top: clamp(1.25rem, 3vw, 1.75rem);
+    padding: clamp(1rem, 2.5vw, 1.5rem);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+    // The five differ by a line or two of challenge copy; a floor stops the
+    // note below jumping when the reader switches scenario.
+    min-height: 21rem;
+
+    &:not([hidden]) {
+      animation: mkt-enter 300ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  .uc-panel__head { max-width: 46rem; }
+
+  .uc-panel__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: clamp(1.125rem, 2.2vw, 1.5rem);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .uc-panel__challenge {
+    margin: 0.4375rem 0 0;
+    font-size: var(--text-body-lg);
+    line-height: 1.65;
+    color: var(--mkt-ink-muted);
+  }
+
+  /*
+    ---- THE CHAIN -----------------------------------------------------------
+
+    The scenario's real stages, with the connector drawn by each step's own
+    pseudo-element rather than by separate elements — so a chain of a different
+    length needs no other change, and nothing can fall out of step with the
+    steps it joins.
+  */
+  .uc-chain {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0;
+    margin: clamp(1.25rem, 3vw, 1.75rem) 0;
+    padding: 0;
+  }
+
+  .uc-chain__step {
+    position: relative;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--mkt-light-border-strong);
+    border-radius: 999px;
+    background: var(--mkt-light);
+    font-size: 12.5px;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink);
+    white-space: nowrap;
+
+    & + & { margin-left: 1.625rem; }
+
+    // The connector into this step, reaching back into the gap before it.
+    & + &::before {
+      content: "";
+      position: absolute;
+      left: -1.375rem;
+      top: 50%;
+      width: 1.125rem;
+      height: 1px;
+      background: var(--mkt-light-border-strong);
+    }
+
+    // The arrowhead. Two borders rotated — no icon, no SVG, and it inherits
+    // the line's colour by construction.
+    & + &::after {
+      content: "";
+      position: absolute;
+      left: -0.5rem;
+      top: calc(50% - 2.5px);
+      width: 5px;
+      height: 5px;
+      border-top: 1px solid var(--mkt-light-border-strong);
+      border-right: 1px solid var(--mkt-light-border-strong);
+      transform: rotate(45deg);
+    }
+
+    // The last step is the outcome of the chain, so it carries the accent.
+    &:last-child {
+      border-color: var(--color-primary);
+      background: var(--color-primary-tint);
+      color: var(--mkt-accent-ink);   // 6.03:1 — the accent AS TEXT
+      font-weight: var(--weight-semibold);
+    }
+  }
+
+  .uc-panel__outcome {
+    margin: 0;
+    padding: 0.875rem 1rem;
+    border-left: 3px solid var(--mkt-mint);
+    border-radius: 0 var(--mkt-radius-sm) var(--mkt-radius-sm) 0;
+    background: var(--mkt-light);
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--mkt-ink-muted);
+    max-width: 52rem;
+  }
+
+  .uc-panel__outlabel {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-mint-ink);   // 5.53:1 on white
+  }
+
+  .uc-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.125rem 0 0;
+  }
+
+  .uc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    border: 1px solid var(--mkt-light-border-strong);
+    border-radius: 999px;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+    text-decoration: none;
+    transition:
+      background var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover {
+      background: var(--mkt-light);
+      border-color: var(--color-primary);
+    }
+
+    // The outbound one carries the accent, so the two directions are
+    // distinguishable by more than an arrow's rotation.
+    &--out {
+      border-color: transparent;
+      background: var(--color-primary-tint);
+      color: var(--mkt-accent-ink);
+    }
+
+    svg { transition: transform var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)); }
+    &:hover svg { transform: translateX(2px); }
+    &:hover svg:first-child { transform: translateY(2px); }
+  }
+
+  /*
+    The honest note where a logo wall would be. Centred and full size rather
+    than tucked into small print — it is a statement, not a disclaimer.
+  */
+  .uc-note {
+    margin: clamp(1.5rem, 3vw, 2rem) auto 0;
+    max-width: 44rem;
+    text-align: center;
+    font-size: var(--text-body);
+    line-height: 1.6;
+    color: var(--mkt-ink-muted);
+  }
+
+  // ===========================================================================
+  // SECURITY — the boundary, and the four layers holding it
+  // ===========================================================================
+  .sc { margin-top: clamp(2rem, 4vw, 3rem); }
+
+  /*
+    ---- THE BOUNDARY --------------------------------------------------------
+
+    Two workspaces and the seam between them. The second is dimmed rather than
+    absent: the point is that it EXISTS and still cannot be reached, which a
+    single box would not say.
+  */
+  .sc-map {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: clamp(0.75rem, 2vw, 1.5rem);
+    padding: clamp(0.875rem, 2vw, 1.25rem);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+  }
+
+  .sc-map__side {
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--mkt-light-border-strong);
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-light);
+
+    // The neighbour. Dimmed and dashed — present, and not yours.
+    &.is-other {
+      opacity: 0.5;
+      border-style: dashed;
+    }
+  }
+
+  .sc-map__name {
+    margin: 0 0 0.5rem;
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .sc-map__records {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3125rem;
+
+    li {
+      padding: 0.1875rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid var(--mkt-light-border-strong);
+      background: var(--mkt-white);
+      font-size: 11px;
+      color: var(--mkt-ink);
+    }
+  }
+
+  .sc-map__seam {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-width: 6.5rem;
+  }
+
+  .sc-map__seamline {
+    flex: 1 1 auto;
+    width: 1px;
+    min-height: 0.75rem;
+    background: linear-gradient(180deg, transparent, var(--mkt-light-border-strong), transparent);
+  }
+
+  /*
+    THE ANSWER, AND THE WORD MATTERS. A cross-tenant id returns not found
+    rather than forbidden, because the difference between the two would tell
+    somebody which records exist. Saying "denied" here would describe a
+    different, weaker product.
+  */
+  .sc-map__verdict {
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-light-border-strong);
+    background: var(--mkt-white);
+    font-size: 11.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+    white-space: nowrap;
+  }
+
+  .sc-map__seamnote {
+    font-size: 10px;
+    color: var(--mkt-ink-muted);
+    white-space: nowrap;
+  }
+
+  // ---- The layer selector ---------------------------------------------------
+  .sc__tabscroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    margin-top: clamp(1.25rem, 3vw, 1.75rem);
+    padding-block: 3px;
+
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  .sc-tabs {
+    display: flex;
+    gap: 0.25rem;
+    min-width: max-content;
+    padding: 0.3125rem;
+    border-radius: 999px;
+    background: var(--mkt-light-2);
+    border: 1px solid var(--mkt-light-border);
+  }
+
+  .sc-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375rem;
+    min-height: 2.5rem;
+    padding-inline: 0.875rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: none;
+    font-family: var(--font-body);
+    font-size: var(--text-label);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink-muted);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      border-color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover { color: var(--mkt-ink); }
+
+    // `aria-selected` is the styling hook — one fact, two renderings.
+    &[aria-selected="true"] {
+      background: var(--mkt-white);
+      border-color: var(--mkt-light-border-strong);
+      color: var(--mkt-ink);
+      font-weight: var(--weight-semibold);
+      box-shadow: var(--mkt-glow-card);
+    }
+  }
+
+  .sc-tab__num {
+    font-family: var(--font-heading);
+    font-size: 10.5px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.04em;
+    color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
+  }
+
+  .sc-panel {
+    margin-top: clamp(1rem, 2.5vw, 1.5rem);
+    // The four differ by a line; a floor stops the cards below shifting when
+    // the reader switches layer.
+    min-height: 10.5rem;
+
+    &:not([hidden]) {
+      animation: mkt-enter 300ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+    }
+
+    &:focus-visible {
+      outline: none;
+      border-radius: var(--mkt-radius-sm);
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  .sc-panel__claim {
+    margin: 0 0 0.75rem;
+    font-family: var(--font-heading);
+    font-size: clamp(1rem, 1.8vw, 1.25rem);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .sc-panel__points {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 58rem;
+
+    li {
+      position: relative;
+      padding-left: 1rem;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--mkt-ink-muted);
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.5625rem;
+        width: 4px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--color-primary);
+      }
+    }
+  }
+
+  // ---- The human-in-the-loop chain ------------------------------------------
+  .sc-chain {
+    margin-top: clamp(1.5rem, 3vw, 2rem);
+    padding: clamp(0.875rem, 2vw, 1.125rem);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    background: var(--mkt-light);
+  }
+
+  .sc-chain__head {
+    margin: 0 0 0.75rem;
+    font-size: 10.5px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .sc-chain__steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .sc-step {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0.625rem 0.6875rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-light-border);
+    background: var(--mkt-white);
+  }
+
+  /*
+    WHO DID IT, IN WORDS. Two of these four are not the model, and that fact
+    must survive a reader who cannot separate the tints.
+  */
+  .sc-step__by {
+    align-self: flex-start;
+    padding: 1px 0.375rem;
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .sc-step[data-by="ai"] .sc-step__by {
+    background: var(--color-primary-tint);
+    color: var(--mkt-accent-ink);
+  }
+
+  .sc-step[data-by="code"] .sc-step__by {
+    background: rgba(198, 184, 255, 0.28);
+    color: var(--mkt-lavender-ink);   // 4.79:1 on white
+  }
+
+  .sc-step[data-by="human"] .sc-step__by {
+    background: rgba(127, 231, 196, 0.26);
+    color: var(--mkt-mint-ink);       // 5.53:1 on white
+  }
+
+  .sc-step__label {
+    font-size: 12.5px;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .sc-step__note {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--mkt-ink-muted);
+  }
+
+  .sc-cards { margin-top: clamp(2rem, 4vw, 3rem); }
+
+  .sc-note {
+    margin: clamp(1.25rem, 3vw, 1.75rem) 0 0;
+    text-align: center;
+    font-size: var(--text-body);
+    color: var(--mkt-ink-muted);
+  }
+
+  .sc-note__link {
+    margin-left: 0.25rem;
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-accent-ink);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover { border-bottom-color: currentcolor; }
   }
 
   // ===========================================================================
@@ -7179,6 +8094,104 @@
     order, top to bottom, they simply are not gated on scroll. Gating them
     would mean a phone reader scrolling 260vh to see six paragraphs.
   */
+  @media (max-width: 1000px) {
+    .rs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /*
+    The two panels stack, and the mark comes off. Centred on the seam it would
+    land on top of the first panel's text once they are one above the other,
+    and a logo over a sentence about money is exactly the wrong thing to
+    obscure.
+  */
+  @media (max-width: 840px) {
+    .pr__panels { grid-template-columns: minmax(0, 1fr); }
+    .pr__mark { display: none; }
+
+    .pr__cta .mkt-btn {
+      // Full-width taps, matching the hero's behaviour at this width.
+      flex: 1 1 100%;
+    }
+  }
+
+  /*
+    The featured card stacks, and the art keeps a fixed height rather than an
+    aspect ratio — full-width at 1.3:1 would be a third of a phone screen of
+    brand mark before any words.
+  */
+  @media (max-width: 720px) {
+    .rs-hero { grid-template-columns: minmax(0, 1fr); }
+
+    .rs-hero__art {
+      aspect-ratio: auto;
+      height: 7.5rem;
+    }
+
+    .rs-grid { grid-template-columns: minmax(0, 1fr); }
+
+    .rs-card__desc { -webkit-line-clamp: 3; }
+  }
+
+  /*
+    THE CHAIN STACKS. Five pills in a row need width they do not have on a
+    phone; wrapped, the horizontal connector would point at nothing, so the
+    arrow turns downward and the steps become a column.
+  */
+  @media (max-width: 720px) {
+    .uc-chain { flex-direction: column; align-items: flex-start; gap: 1.5rem 0; }
+
+    .uc-chain__step {
+      white-space: normal;
+
+      & + & { margin-left: 0; }
+
+      & + &::before {
+        left: 1.25rem;
+        top: -1.125rem;
+        width: 1px;
+        height: 0.875rem;
+      }
+
+      & + &::after {
+        left: calc(1.25rem - 2px);
+        top: -0.5rem;
+        transform: rotate(135deg);
+      }
+    }
+
+    .uc-panel { min-height: 0; }
+  }
+
+  /*
+    THE BOUNDARY TURNS VERTICAL. Two workspaces side by side need width they do
+    not have on a phone; stacked, the seam runs horizontally between them and
+    says the same thing.
+  */
+  @media (max-width: 860px) {
+    .sc-map { grid-template-columns: minmax(0, 1fr); }
+
+    .sc-map__seam {
+      flex-direction: row;
+      min-width: 0;
+      padding-block: 0.25rem;
+    }
+
+    .sc-map__seamline {
+      width: auto;
+      height: 1px;
+      min-height: 0;
+      background: linear-gradient(90deg, transparent, var(--mkt-light-border-strong), transparent);
+    }
+
+    .sc-chain__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .sc-panel { min-height: 0; }
+  }
+
+  @media (max-width: 560px) {
+    .sc-chain__steps { grid-template-columns: minmax(0, 1fr); }
+  }
+
   @media (max-width: 900px) {
     // The rail goes above the panel: on one column the workspace should be
     // seen before the description of who is using it.
@@ -8132,6 +9145,39 @@
       all rendered regardless of beat, so nothing here was ever revealed BY
       the animation.
     */
+    // Resources is hover transitions only — nothing is revealed by animation,
+    // so there is nothing to force open.
+    .rs-hero,
+    .rs-hero:hover,
+    .rs-card__link,
+    .rs-card__link:hover,
+    .rs-hero:hover .rs-hero__more svg,
+    .rs-card__link:hover .rs-card__more svg {
+      transform: none;
+      transition: none;
+    }
+
+    // The use-case index has only the panel fade and two hover transitions.
+    .uc-panel:not([hidden]) { animation: none; }
+
+    .uc-tab,
+    .uc-link,
+    .uc-link svg {
+      transition: none;
+    }
+
+    /*
+      The security section was never scroll-driven either: only the panel-swap
+      fade and two hover transitions come off. The boundary, the four layers'
+      text and the chain are all static.
+    */
+    .sc-panel:not([hidden]) { animation: none; }
+
+    .sc-tab,
+    .sc-note__link {
+      transition: none;
+    }
+
     /*
       The persona switch has nothing scroll-linked — it was never scroll-driven
       — so this is only the panel-swap fade and the rail's dim transition.
@@ -9004,6 +10050,12 @@
   .an-close__link:focus-visible,
   .pv-tab:focus-visible,
   .pv-link:focus-visible,
+  .sc-tab:focus-visible,
+  .sc-note__link:focus-visible,
+  .uc-tab:focus-visible,
+  .uc-link:focus-visible,
+  .rs-hero:focus-visible,
+  .rs-card__link:focus-visible,
   .mkt-nav__link:focus-visible,
   .mkt-mega__link:focus-visible,
   .mkt-sheet__row:focus-visible,
@@ -9226,6 +10278,2156 @@
 
     [aria-current="page"] {
       color: var(--mkt-on-dark);
+    }
+  }
+
+  // ===========================================================================
+  // ABOUT PAGE — Module 19
+  //
+  // The site's first band composition that is NOT the homepage, and it reuses
+  // the homepage's vocabulary wholesale: .mkt-band for the ground, .mkt-shell
+  // for the measure, SectionHeading for every heading group. Nothing here is a
+  // second way of doing something that already had one.
+  //
+  // NO SCROLL TRACK. The homepage already carries six sticky stories; this page
+  // is four screens of prose and a diagram, and pinning any of it would add
+  // height to a page whose job is to be read quickly and left.
+  // ===========================================================================
+
+  // ---- Hero -----------------------------------------------------------------
+  .ab-hero__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(2rem, 5vw, 4.5rem);
+  }
+
+  .ab-hero__copy {
+    min-width: 0;
+  }
+
+  .ab-hero__title {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h1);
+    font-weight: var(--weight-bold);
+    line-height: var(--mkt-leading-tight);
+    letter-spacing: -0.03em;
+    color: var(--mkt-on-dark);
+    margin: 0;
+  }
+
+  .ab-hero__lead {
+    margin: var(--mkt-space-6) 0 0;
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-lead);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  /*
+    ---- THE ORB --------------------------------------------------------------
+
+    Six real product surfaces arranged around the brand mark: the page's claim
+    is that hiring works better connected, and this is that sentence as a
+    picture. Every label is a surface the product actually has.
+
+    THE GEOMETRY IS ONE CUSTOM PROPERTY. `--r` is the ring's radius, and each
+    chip sits at `rotate(a) translateY(-r) rotate(-a)` — the counter-rotation is
+    what keeps the text upright while the position goes round. Changing the size
+    at a breakpoint is therefore one line, not six.
+  */
+  .ab-orb {
+    --r: clamp(6.5rem, 13vw, 9.25rem);
+
+    position: relative;
+    flex: none;
+    inline-size: calc(var(--r) * 2 + 9rem);
+    block-size: calc(var(--r) * 2 + 4rem);
+  }
+
+  // The ring the chips sit on, drawn rather than implied.
+  .ab-orb::before {
+    content: "";
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: calc(var(--r) * 2);
+    block-size: calc(var(--r) * 2);
+    transform: translate(-50%, -50%);
+    border: 1px dashed var(--mkt-dark-border-strong);
+    border-radius: 50%;
+  }
+
+  .ab-orb__glow {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: calc(var(--r) * 2.1);
+    block-size: calc(var(--r) * 2.1);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(139, 158, 255, 0.24) 0%,
+      rgba(139, 158, 255, 0.06) 45%,
+      transparent 70%
+    );
+  }
+
+  .ab-orb__mark {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+    inline-size: 6.5rem;
+    block-size: 6.5rem;
+    border-radius: 50%;
+    background: var(--mkt-glass-strong);
+    border: 1px solid var(--mkt-glass-border);
+    box-shadow: var(--mkt-glow-accent);
+  }
+
+  .ab-orb__ring {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ab-orb__ring li {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--a))
+      translateY(calc(var(--r) * -1))
+      rotate(calc(var(--a) * -1));
+    white-space: nowrap;
+    padding: 0.3125rem 0.6875rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-glass);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // Six slots, 60 degrees apart, the first at twelve o'clock.
+  @for $i from 0 through 5 {
+    .ab-orb__ring li[data-slot="#{$i}"] {
+      --a: #{$i * 60}deg;
+    }
+  }
+
+  // ---- Mission ---------------------------------------------------------------
+  .ab-mission {
+    max-width: var(--mkt-max-prose);
+  }
+
+  .ab-mission__body {
+    font-size: var(--mkt-body-lg);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink-muted);
+    margin: 0;
+  }
+
+  /*
+    The pull quote. A LEFT RULE RATHER THAN QUOTATION MARKS, because it is the
+    page's own sentence and not something anybody said — a quotation mark here
+    would imply a speaker the page has deliberately not invented.
+  */
+  .ab-mission__pull {
+    margin: var(--mkt-space-8) 0 0;
+    padding-inline-start: var(--mkt-space-6);
+    border-inline-start: 2px solid var(--mkt-accent);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h3);
+    font-weight: var(--weight-semibold);
+    line-height: var(--mkt-leading-snug);
+    letter-spacing: -0.015em;
+    color: var(--mkt-ink);
+  }
+
+  // ---- AI and people ---------------------------------------------------------
+  .ab-split__body {
+    max-width: var(--mkt-max-prose);
+    margin: 0;
+    font-size: var(--mkt-body-lg);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .ab-split__cols {
+    margin-block-start: clamp(1.75rem, 3vw, 2.5rem);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .ab-col {
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-glass);
+  }
+
+  /*
+    THE TWO COLUMNS ARE TINTED DIFFERENTLY ON PURPOSE, and the human side is
+    the brighter of the two. It is the page's argument in the one place a
+    reader takes in before reading: the machine column is the quieter one.
+
+    The tint is never the only signal — each column is titled in words.
+  */
+  .ab-col[data-side="human"] {
+    border-color: var(--mkt-dark-border-strong);
+    background: var(--mkt-glass-strong);
+  }
+
+  .ab-col__title {
+    margin: 0 0 var(--mkt-space-4);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .ab-col[data-side="ai"] .ab-col__title {
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .ab-col__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--mkt-space-3);
+  }
+
+  .ab-col__list li {
+    position: relative;
+    padding-inline-start: var(--mkt-space-6);
+    font-size: var(--mkt-body);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .ab-col__list li::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-start: 0.5625rem;
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background: var(--mkt-accent);
+  }
+
+  // ---- Principles -------------------------------------------------------------
+  .ab-principles {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .ab-principle {
+    height: 100%;
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+
+    h3 {
+      margin: 0 0 var(--mkt-space-3);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      letter-spacing: -0.01em;
+      color: var(--mkt-ink);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  // ---- The journey -------------------------------------------------------------
+  /*
+    Seven steps, numbered by a CSS counter rather than by hand: the numbers are
+    a rendering of the list's order, so they cannot fall out of step with it
+    when a step is added or moved. The <ol> is already the semantics; this only
+    makes the order visible.
+  */
+  .ab-journey {
+    counter-reset: ab-step;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .ab-journey > li {
+    counter-increment: ab-step;
+  }
+
+  .ab-step {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mkt-space-2);
+    padding: var(--mkt-space-6) var(--mkt-space-4) var(--mkt-space-4);
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-light-border);
+    background: var(--mkt-white);
+  }
+
+  .ab-step::before {
+    content: counter(ab-step);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.04em;
+    color: var(--mkt-accent-ink);
+  }
+
+  .ab-step__label {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--mkt-ink);
+  }
+
+  .ab-step__note {
+    font-size: var(--mkt-small);
+    line-height: var(--mkt-leading-snug);
+    color: var(--mkt-ink-muted);
+  }
+
+  // ---- Close --------------------------------------------------------------------
+  .ab-cta__buttons {
+    margin-block-start: clamp(1.75rem, 3vw, 2.5rem);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--mkt-space-4);
+  }
+
+  // ---- Narrow ---------------------------------------------------------------------
+  /*
+    THE ORB DOES NOT SURVIVE A PHONE, and shrinking it is the wrong fix: six
+    chips on a circle small enough to fit 320px would overlap whatever the
+    radius. So below 900px the ring stops being a ring — the chips become a
+    plain wrapped row under the copy, which says the same thing in the same
+    words and is the arrangement a small screen wanted anyway.
+  */
+  @media (max-width: 900px) {
+    .ab-hero__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ab-orb {
+      inline-size: 100%;
+      block-size: auto;
+    }
+
+    .ab-orb::before,
+    .ab-orb__glow,
+    .ab-orb__mark {
+      display: none;
+    }
+
+    .ab-orb__ring {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--mkt-space-2);
+    }
+
+    .ab-orb__ring li {
+      position: static;
+      transform: none;
+    }
+
+    .ab-split__cols,
+    .ab-principles {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .ab-journey {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ab-cta__buttons .mkt-btn {
+      inline-size: 100%;
+      justify-content: center;
+    }
+  }
+
+  // ===========================================================================
+  // SECURITY PAGE — Module 20
+  //
+  // ONE STICKY SECTION ON THE WHOLE PAGE (the architecture stack), per §26.
+  // Everything else is read top to bottom.
+  //
+  // THE ANIMATION RULE FOR THIS PAGE, and it is the opposite of the usual one:
+  // no element's VISIBLE state depends on an animation. Every keyframe lives
+  // inside `prefers-reduced-motion: no-preference`, so the default rendering —
+  // reduced motion, no JavaScript, a crawler, a print — is the finished
+  // diagram. Animating INTO the correct picture would mean the readers who most
+  // need a static page get an unfinished one.
+  // ===========================================================================
+
+  // ---- Hero -----------------------------------------------------------------
+  .sec-hero__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(2rem, 5vw, 4rem);
+  }
+
+  .sec-hero__copy { min-width: 0; }
+
+  .sec-hero__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h1);
+    font-weight: var(--weight-bold);
+    line-height: var(--mkt-leading-tight);
+    letter-spacing: -0.03em;
+    color: var(--mkt-on-dark);
+  }
+
+  .sec-hero__lead {
+    margin: var(--mkt-space-6) 0 0;
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-lead);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  /*
+    The diagram's text equivalent. A real ordered list, visible to everyone —
+    the drawing beside it is aria-hidden, so this is what a screen reader and a
+    crawler actually receive.
+  */
+  .sec-hero__flow {
+    list-style: none;
+    margin: var(--mkt-space-8) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--mkt-space-3);
+    counter-reset: sec-flow;
+
+    li {
+      counter-increment: sec-flow;
+      position: relative;
+      padding-inline-start: var(--mkt-space-8);
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+    }
+
+    li::before {
+      content: counter(sec-flow);
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: 0;
+      inline-size: 1.5rem;
+      block-size: 1.5rem;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 1px solid var(--mkt-dark-border-strong);
+      font-size: var(--mkt-caption);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-accent-on-dark);
+    }
+  }
+
+  .sec-hero__flowlabel {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .sec-hero__flownote {
+    font-size: var(--mkt-small);
+    line-height: var(--mkt-leading-snug);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  // ---- The hero diagram -------------------------------------------------------
+  .sec-orb {
+    position: relative;
+    flex: none;
+    inline-size: clamp(17rem, 30vw, 23rem);
+    block-size: clamp(20rem, 34vw, 26rem);
+    display: grid;
+    grid-template-rows: auto auto 1fr auto auto;
+    justify-items: center;
+    align-content: center;
+    gap: var(--mkt-space-3);
+  }
+
+  .sec-orb__glow {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 17rem;
+    block-size: 17rem;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(139, 158, 255, 0.2) 0%,
+      rgba(139, 158, 255, 0.05) 48%,
+      transparent 72%
+    );
+  }
+
+  .sec-orb__feed {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--mkt-space-2);
+  }
+
+  .sec-orb__card {
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-glass);
+    font-size: var(--mkt-caption);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  /*
+    THE BOUNDARY. A ring rather than a padlock: the claim being drawn is that
+    data arrives along a known path into a workspace, which is a statement about
+    flow. A padlock would be a statement about threat, and this product makes no
+    claim about repelling one.
+  */
+  .sec-orb__ring {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 13.5rem;
+    block-size: 13.5rem;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--mkt-dark-border-strong);
+    border-radius: 50%;
+  }
+
+  .sec-orb__core {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    justify-items: center;
+    gap: 0.1875rem;
+    padding: var(--mkt-space-6) var(--mkt-space-8);
+    border-radius: var(--mkt-radius-lg);
+    border: 1px solid var(--mkt-glass-border);
+    background: var(--mkt-glass-strong);
+    box-shadow: var(--mkt-glow-accent);
+  }
+
+  .sec-orb__corelabel {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .sec-orb__corenote {
+    font-size: var(--mkt-caption);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .sec-orb__check {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    background: var(--mkt-dark);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-mint);
+  }
+
+  .sec-orb__out {
+    position: relative;
+    z-index: 1;
+    padding: 0.3125rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    background: var(--mkt-glass-strong);
+    font-size: var(--mkt-small);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark);
+  }
+
+  // ---- §25 · Contents strip ----------------------------------------------------
+  /*
+    Sticks BELOW the floating navbar (which sits at 0.75rem) and above the one
+    pinned section further down, whose own offset clears this. Two sticky
+    elements on one page is two too many unless their offsets are written
+    together, so they are.
+  */
+  .sec-toc {
+    position: sticky;
+    top: 4.75rem;
+    z-index: 40;
+    padding-block: var(--mkt-space-3);
+    background: rgba(10, 17, 40, 0.86);
+    backdrop-filter: blur(10px);
+    border-block-end: 1px solid var(--mkt-dark-border);
+  }
+
+  .sec-toc__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: var(--mkt-space-2);
+    // A phone gets a swipeable strip rather than four wrapped rows. The page
+    // itself never scrolls sideways; this one element does, on purpose.
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar { display: none; }
+
+    a {
+      display: inline-block;
+      white-space: nowrap;
+      padding: 0.3125rem 0.6875rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: var(--mkt-small);
+      color: var(--mkt-on-dark-muted);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--mkt-on-dark);
+        border-color: var(--mkt-dark-border-strong);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: var(--mkt-focus-ring);
+      }
+    }
+  }
+
+  // ---- §5 · Overview -------------------------------------------------------------
+  .sec-pillars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .sec-pillar {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mkt-space-2);
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+
+    h3 {
+      margin: 0;
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+  }
+
+  .sec-pillar__icon {
+    display: grid;
+    place-items: center;
+    inline-size: 2.25rem;
+    block-size: 2.25rem;
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-light);
+    border: 1px solid var(--mkt-light-border);
+    color: var(--mkt-accent-ink);
+  }
+
+  .sec-pillar__q {
+    margin: 0;
+    font-size: var(--mkt-small);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-accent-ink);
+  }
+
+  .sec-pillar__body {
+    margin: 0;
+    font-size: var(--mkt-body);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink-muted);
+  }
+
+  // ---- §6 · Architecture ------------------------------------------------------------
+  .sec-arch {
+    position: relative;
+    // Eight steps. Shorter per step than the homepage's stories because each
+    // one here is a short paragraph rather than a scene that has to assemble.
+    height: 320vh;
+    margin-block-start: clamp(1.75rem, 3vw, 2.5rem);
+  }
+
+  .sec-arch__runway {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .sec-arch__mark {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+  }
+
+  @for $i from 0 through 7 {
+    .sec-arch__mark:nth-child(#{$i + 1}) {
+      top: calc(#{$i} * 100% / 8);
+    }
+  }
+
+  .sec-arch__pin {
+    position: sticky;
+    // Clears the floating navbar AND the contents strip above it.
+    top: 8.5rem;
+  }
+
+  .sec-arch__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 4vw, 3rem);
+    align-items: center;
+  }
+
+  .sec-stack {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .sec-stack__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mkt-space-4);
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-glass);
+    transition: border-color 0.3s ease, background 0.3s ease, transform 0.3s ease;
+  }
+
+  .sec-stack__row[data-state="on"] {
+    border-color: var(--mkt-accent);
+    background: var(--mkt-glass-strong);
+    transform: translateX(0.375rem);
+  }
+
+  .sec-stack__row[data-state="done"] {
+    border-color: var(--mkt-dark-border-strong);
+  }
+
+  .sec-stack__label {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .sec-stack__row[data-state="on"] .sec-stack__label { color: var(--mkt-on-dark); }
+
+  /*
+    The layer, in words. Which of four layers performs a step is the most useful
+    thing in this diagram; carried in colour alone it would be lost for anyone
+    who cannot separate two blues — on the page whose subject is being precise.
+  */
+  .sec-stack__layer {
+    flex: none;
+    padding: 0.125rem 0.4375rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border);
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .sec-stack__row[data-layer="database"] .sec-stack__layer { color: var(--mkt-mint); }
+  .sec-stack__row[data-layer="human"] .sec-stack__layer { color: var(--mkt-lavender); }
+  .sec-stack__row[data-layer="edge"] .sec-stack__layer,
+  .sec-stack__row[data-layer="server"] .sec-stack__layer { color: var(--mkt-accent-on-dark); }
+
+  .sec-arch__title {
+    margin: 0 0 var(--mkt-space-3);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h3);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.02em;
+    color: var(--mkt-on-dark);
+  }
+
+  .sec-arch__detail {
+    margin: 0;
+    max-width: 34rem;
+    font-size: var(--mkt-body-lg);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---- §7 · Access control -------------------------------------------------------------
+  .sec-access__layers {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .sec-access__layer {
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+
+    h3 {
+      margin: var(--mkt-space-2) 0 var(--mkt-space-3);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  .sec-access__num {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.06em;
+    color: var(--mkt-accent-ink);
+  }
+
+  .sec-roles {
+    margin-block-start: var(--mkt-space-4);
+    padding: var(--mkt-space-6);
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-light-border);
+    background: var(--mkt-light);
+  }
+
+  .sec-roles__title {
+    margin: 0 0 var(--mkt-space-3);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .sec-roles__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mkt-space-2);
+
+    li {
+      padding: 0.25rem 0.6875rem;
+      border-radius: 999px;
+      border: 1px solid var(--mkt-light-border-strong);
+      background: var(--mkt-white);
+      font-size: var(--mkt-small);
+      font-weight: var(--weight-medium);
+      color: var(--mkt-ink);
+    }
+  }
+
+  // ---- §8 · Isolation ---------------------------------------------------------------------
+  .sec-iso__pair {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(2rem, 6vw, 4.5rem);
+  }
+
+  .sec-iso__box {
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-dark-border-strong);
+    background: var(--mkt-glass);
+  }
+
+  .sec-iso__name {
+    margin: 0 0 var(--mkt-space-3);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .sec-iso__records {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.375rem;
+
+    li {
+      padding: 0.375rem 0.625rem;
+      border-radius: var(--mkt-radius-sm);
+      border: 1px solid var(--mkt-dark-border);
+      font-size: var(--mkt-small);
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  /*
+    THE SEAM. A dashed rule down the gap with its label on it — the boundary is
+    the subject of this diagram, so it is drawn rather than implied by the space
+    between two boxes.
+  */
+  .sec-iso__seam {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 50%;
+    display: grid;
+    place-items: center;
+    border-inline-start: 1px dashed var(--mkt-accent);
+  }
+
+  .sec-iso__seamlabel {
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: var(--mkt-dark);
+    border: 1px solid var(--mkt-dark-border-strong);
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .sec-iso__points {
+    list-style: none;
+    margin: clamp(1.75rem, 3vw, 2.5rem) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+
+    h3 {
+      margin: 0 0 var(--mkt-space-2);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-on-dark);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  // ---- §9 · Data handling ---------------------------------------------------------------
+  .sec-data {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .sec-datacard {
+    height: 100%;
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+
+    h3 {
+      margin: 0 0 var(--mkt-space-3);
+      display: flex;
+      align-items: center;
+      gap: var(--mkt-space-2);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: var(--mkt-space-3);
+    }
+
+    li {
+      position: relative;
+      padding-inline-start: var(--mkt-space-6);
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-ink-muted);
+    }
+
+    li::before {
+      content: "";
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: 0.5625rem;
+      inline-size: 6px;
+      block-size: 6px;
+      border-radius: 50%;
+      background: var(--mkt-accent);
+    }
+  }
+
+  .sec-datacard__icon {
+    display: grid;
+    place-items: center;
+    inline-size: 1.875rem;
+    block-size: 1.875rem;
+    border-radius: var(--mkt-radius-sm);
+    background: var(--mkt-light);
+    border: 1px solid var(--mkt-light-border);
+    color: var(--mkt-accent-ink);
+  }
+
+  // ---- §10 + §11 · AI and human review -----------------------------------------------------
+  .sec-chain {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: var(--mkt-space-3);
+  }
+
+  .sec-chain__step {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: var(--mkt-space-4);
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-glass);
+  }
+
+  // The human steps are the brighter ones. The page's argument, in the one
+  // place a reader takes in before reading — and every step is also labelled.
+  .sec-chain__step[data-by="human"] {
+    border-color: var(--mkt-dark-border-strong);
+    background: var(--mkt-glass-strong);
+  }
+
+  .sec-chain__num {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-bold);
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .sec-chain__label {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .sec-chain__note {
+    font-size: var(--mkt-small);
+    line-height: var(--mkt-leading-snug);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .sec-chain__by {
+    margin-block-start: var(--mkt-space-2);
+    align-self: flex-start;
+    padding: 0.125rem 0.4375rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border);
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .sec-chain__step[data-by="human"] .sec-chain__by { color: var(--mkt-lavender); }
+  .sec-chain__step[data-by="code"] .sec-chain__by { color: var(--mkt-mint); }
+
+  .sec-ai__bounds {
+    list-style: none;
+    margin: clamp(1.75rem, 3vw, 2.5rem) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+
+    h3 {
+      margin: 0 0 var(--mkt-space-2);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-on-dark);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  /*
+    The disclaimer, and it is styled as a statement rather than as fine print.
+    §10 forbids four specific claims; this is the page saying which of them it
+    is not making, so burying it in 12px grey would defeat the purpose.
+  */
+  .sec-ai__note {
+    margin: var(--mkt-space-8) 0 0;
+    padding-inline-start: var(--mkt-space-6);
+    border-inline-start: 2px solid var(--mkt-accent);
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-body-lg);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---- §15 · Auditability ---------------------------------------------------------------
+  .sec-audit__record {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+    margin: 0;
+
+    > div {
+      padding: var(--mkt-space-4);
+      border-radius: var(--mkt-radius-sm);
+      border: 1px solid var(--mkt-light-border);
+      background: var(--mkt-white);
+    }
+
+    dt {
+      font-family: var(--font-heading);
+      font-size: var(--mkt-caption);
+      font-weight: var(--weight-bold);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--mkt-accent-ink);
+    }
+
+    dd {
+      margin: var(--mkt-space-2) 0 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-snug);
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  .sec-audit__points {
+    list-style: none;
+    margin: var(--mkt-space-6) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--mkt-space-3);
+    max-width: var(--mkt-max-prose);
+
+    li {
+      position: relative;
+      padding-inline-start: var(--mkt-space-6);
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-ink-muted);
+    }
+
+    li::before {
+      content: "";
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: 0.5625rem;
+      inline-size: 6px;
+      block-size: 6px;
+      border-radius: 50%;
+      background: var(--mkt-accent);
+    }
+  }
+
+  .sec-audit__note,
+  .sec-privacy__note {
+    margin: var(--mkt-space-6) 0 0;
+    padding-inline-start: var(--mkt-space-6);
+    border-inline-start: 2px solid var(--mkt-light-border-strong);
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-body);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink-muted);
+  }
+
+  // ---- §16 · Privacy ---------------------------------------------------------------------
+  .sec-privacy {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .sec-privacycard {
+    height: 100%;
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+
+    h3 {
+      margin: 0 0 var(--mkt-space-2);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  // ---- §17 · Principles ----------------------------------------------------------------------
+  .sec-principles {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .sec-principle {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mkt-space-2);
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-glass);
+
+    h3 {
+      margin: 0;
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-on-dark);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  .sec-principle__icon {
+    display: grid;
+    place-items: center;
+    inline-size: 2.125rem;
+    block-size: 2.125rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-dark-border-strong);
+    background: var(--mkt-glass-strong);
+    color: var(--mkt-accent-on-dark);
+  }
+
+  // ---- §18 · What is not here -------------------------------------------------------------------
+  /*
+    THE ABSENCES ARE NOT STYLED AS WARNINGS. No amber, no alert icon, no
+    strikethrough. They are ordinary cards with a quiet marker, because the
+    page's position is that publishing them is normal practice rather than a
+    confession — and dressing them as failures would make the next person
+    reluctant to add the next one.
+  */
+  .sec-absent {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .sec-absentcard {
+    height: 100%;
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    border-radius: var(--mkt-radius);
+    border: 1px dashed var(--mkt-light-border-strong);
+    background: var(--mkt-light);
+
+    h3 {
+      margin: 0 0 var(--mkt-space-2);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  .sec-docs {
+    margin-block-start: clamp(1.75rem, 3vw, 2.5rem);
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-light-border);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+  }
+
+  .sec-docs__title {
+    margin: 0 0 var(--mkt-space-4);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .sec-docs__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--mkt-space-4);
+
+    li {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-weight: var(--weight-medium);
+      color: var(--mkt-accent-ink);
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+    }
+
+    span {
+      font-size: var(--mkt-small);
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  // ---- Close ---------------------------------------------------------------------------------
+  .sec-cta__buttons {
+    margin-block-start: clamp(1.75rem, 3vw, 2.5rem);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--mkt-space-4);
+  }
+
+  // ---- §4 · The hero animation ------------------------------------------------------------------
+  /*
+    EVERY KEYFRAME IS INSIDE THIS QUERY. The rules above already draw the
+    finished diagram, so reduced motion, a failed script and a print all get the
+    complete picture; this only adds the arrival.
+  */
+  @media (prefers-reduced-motion: no-preference) {
+    .sec-orb__card {
+      animation: sec-arrive 0.6s ease-out backwards;
+      animation-delay: calc(var(--i) * 0.12s);
+    }
+
+    .sec-orb__ring {
+      animation: sec-form 0.8s ease-out 0.45s backwards;
+    }
+
+    .sec-orb__check {
+      animation: sec-rise 0.5s ease-out 0.95s backwards;
+    }
+
+    .sec-orb__out {
+      animation: sec-rise 0.5s ease-out 1.15s backwards;
+    }
+
+    /*
+      The glow breathes, slowly, and ONLY here. It is the single continuous
+      animation on the page and it moves opacity alone — no layout, no paint of
+      anything else.
+    */
+    .sec-orb__glow {
+      animation: sec-breathe 7s ease-in-out 1.5s infinite;
+    }
+  }
+
+  @keyframes sec-arrive {
+    from { opacity: 0; transform: translateY(-0.75rem); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes sec-form {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.82); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  @keyframes sec-rise {
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes sec-breathe {
+    0%, 100% { opacity: 0.75; }
+    50%      { opacity: 1; }
+  }
+
+  // ---- Narrow ---------------------------------------------------------------------------------
+  @media (max-width: 1000px) {
+    .sec-access__layers,
+    .sec-iso__points,
+    .sec-ai__bounds,
+    .sec-privacy,
+    .sec-principles,
+    .sec-absent {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .sec-audit__record {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 900px) {
+    .sec-hero__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sec-orb {
+      inline-size: 100%;
+      justify-self: center;
+    }
+
+    /*
+      THE ARCHITECTURE STOPS BEING A SCROLL STORY, exactly as the homepage's
+      stories do at this width. The track collapses, the pin releases and all
+      eight panels show at once — which is also what a reader gets with no
+      JavaScript, so this is the layout that has to be correct on its own.
+    */
+    .sec-arch {
+      height: auto;
+    }
+
+    .sec-arch__runway { display: none; }
+
+    .sec-arch__pin {
+      position: static;
+    }
+
+    .sec-arch__grid {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .sec-arch__panel[hidden] {
+      display: block;
+    }
+
+    .sec-arch__copy {
+      display: grid;
+      gap: var(--mkt-space-6);
+    }
+
+    .sec-stack__row[data-state="on"] {
+      transform: none;
+    }
+
+    .sec-iso__pair {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--mkt-space-8);
+    }
+
+    /* The seam turns horizontal when the boxes stack. */
+    .sec-iso__seam {
+      inset-block: auto;
+      inset-inline: 0;
+      top: 50%;
+      border-inline-start: 0;
+      border-block-start: 1px dashed var(--mkt-accent);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .sec-access__layers,
+    .sec-iso__points,
+    .sec-ai__bounds,
+    .sec-privacy,
+    .sec-principles,
+    .sec-absent,
+    .sec-data,
+    .sec-audit__record {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sec-cta__buttons .mkt-btn {
+      inline-size: 100%;
+      justify-content: center;
+    }
+  }
+
+  // ===========================================================================
+  // CONTACT PAGE — Module 21
+  //
+  // A BRIGHT FORM PANEL ON A DARK BAND (§6, §26). The form is the only
+  // interactive thing on the page, so it gets the one light surface in the
+  // hero and everything else recedes — which is also why the orb beside it is
+  // quiet rather than the usual centrepiece.
+  //
+  // NO CONTINUOUS ANIMATION. The orb resolves once on arrival and stops, and
+  // every keyframe is inside `prefers-reduced-motion: no-preference`, so the
+  // default render is the finished picture.
+  // ===========================================================================
+
+  // ---- Hero -----------------------------------------------------------------
+  .ct-hero__grid {
+    display: grid;
+    // The form column is fixed-ish and the copy takes the rest: a form that
+    // grows with the viewport just makes long input lines nobody can scan.
+    grid-template-columns: minmax(0, 1fr) minmax(0, 27rem);
+    align-items: start;
+    gap: clamp(2rem, 5vw, 4rem);
+  }
+
+  .ct-hero__copy { min-width: 0; }
+
+  .ct-hero__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h1);
+    font-weight: var(--weight-bold);
+    line-height: var(--mkt-leading-tight);
+    letter-spacing: -0.03em;
+    color: var(--mkt-on-dark);
+  }
+
+  .ct-hero__lead {
+    margin: var(--mkt-space-6) 0 0;
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-lead);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .ct-hero__actions {
+    margin-block-start: var(--mkt-space-8);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mkt-space-4);
+  }
+
+  .ct-hero__flow {
+    list-style: none;
+    margin: var(--mkt-space-8) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--mkt-space-3);
+    counter-reset: ct-flow;
+
+    li {
+      counter-increment: ct-flow;
+      position: relative;
+      padding-inline-start: var(--mkt-space-8);
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+    }
+
+    li::before {
+      content: counter(ct-flow);
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: 0;
+      inline-size: 1.5rem;
+      block-size: 1.5rem;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 1px solid var(--mkt-dark-border-strong);
+      font-size: var(--mkt-caption);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-accent-on-dark);
+    }
+  }
+
+  .ct-hero__flowlabel {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark);
+  }
+
+  .ct-hero__flownote {
+    font-size: var(--mkt-small);
+    line-height: var(--mkt-leading-snug);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  // ---- The orb ----------------------------------------------------------------
+  .ct-orb {
+    position: relative;
+    margin-block-start: clamp(2rem, 4vw, 3rem);
+    padding: var(--mkt-space-8) var(--mkt-space-6);
+    border-radius: var(--mkt-radius-lg);
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-glass);
+    display: grid;
+    justify-items: center;
+    gap: var(--mkt-space-6);
+  }
+
+  .ct-orb__glow {
+    position: absolute;
+    inset-block-start: 40%;
+    inset-inline-start: 50%;
+    inline-size: 13rem;
+    block-size: 13rem;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(139, 158, 255, 0.18) 0%,
+      rgba(139, 158, 255, 0.05) 46%,
+      transparent 70%
+    );
+  }
+
+  .ct-orb__frame {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+  }
+
+  .ct-orb__beat {
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+  }
+
+  .ct-orb__beatlabel {
+    padding: 0.3125rem 0.875rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border-strong);
+    background: var(--mkt-glass-strong);
+    font-size: var(--mkt-small);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+    color: var(--mkt-on-dark);
+  }
+
+  // The middle beat is Scoreboad itself — the only one that carries the glow.
+  .ct-orb__beat:nth-child(2) .ct-orb__beatlabel {
+    border-color: var(--mkt-accent);
+    box-shadow: var(--mkt-glow-accent);
+  }
+
+  .ct-orb__link {
+    display: block;
+    color: var(--mkt-accent);
+  }
+
+  .ct-orb__nodes {
+    position: relative;
+    z-index: 1;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--mkt-space-2);
+
+    li {
+      padding: 0.1875rem 0.625rem;
+      border-radius: 999px;
+      border: 1px solid var(--mkt-dark-border);
+      font-size: var(--mkt-caption);
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  // ---- The form panel -------------------------------------------------------------
+  .ct-hero__form {
+    position: relative;
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    border-radius: var(--mkt-radius-lg);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    box-shadow: var(--mkt-glow-product-light);
+  }
+
+  .ct-formhead {
+    margin: 0 0 var(--mkt-space-4);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h3);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.02em;
+    // Explicit, because this heading sits on a WHITE panel inside a DARK band
+    // and would otherwise inherit the band's light-on-dark colour.
+    color: var(--mkt-ink);
+  }
+
+  /*
+    §10's notice, and it is styled to be read rather than skipped. Not an amber
+    warning box — it is a statement of fact about the form, and dressing it as
+    an error would suggest something had gone wrong.
+  */
+  .ct-notice {
+    margin-block-end: var(--mkt-space-6);
+    padding: var(--mkt-space-4);
+    border-radius: var(--mkt-radius-sm);
+    border: 1px dashed var(--mkt-light-border-strong);
+    background: var(--mkt-light);
+  }
+
+  .ct-notice__title {
+    margin: 0 0 var(--mkt-space-2);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .ct-notice__body {
+    margin: 0;
+    font-size: var(--mkt-small);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink-muted);
+  }
+
+  .ct-form {
+    fieldset {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      display: grid;
+      gap: var(--mkt-space-4);
+    }
+
+    // The whole group dims while the check runs, so it reads as one state
+    // rather than as five inputs that happen to be disabled.
+    fieldset:disabled {
+      opacity: 0.6;
+    }
+  }
+
+  .ct-field {
+    display: grid;
+    gap: 0.3125rem;
+  }
+
+  .ct-field__label {
+    font-size: var(--mkt-small);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink);
+  }
+
+  .ct-field__optional {
+    font-weight: var(--weight-medium);
+    color: var(--mkt-ink-muted);
+  }
+
+  .ct-field__hint {
+    margin: 0;
+    font-size: var(--mkt-caption);
+    line-height: var(--mkt-leading-snug);
+    color: var(--mkt-ink-muted);
+  }
+
+  .ct-input {
+    inline-size: 100%;
+    padding: 0.5625rem 0.75rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-light-border-strong);
+    background: var(--mkt-white);
+    font-family: inherit;
+    font-size: var(--mkt-body);
+    color: var(--mkt-ink);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+
+    &::placeholder { color: var(--mkt-ink-muted); }
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--mkt-accent);
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+
+    /*
+      THE INVALID STATE IS A BORDER PLUS A MESSAGE, never a colour alone, and
+      it keys off `aria-invalid` so the visual state and the state a screen
+      reader is told cannot drift apart.
+    */
+    &[aria-invalid="true"] {
+      border-color: var(--mkt-error-ink);
+    }
+  }
+
+  .ct-input--area {
+    resize: vertical;
+    min-block-size: 7rem;
+    line-height: var(--mkt-leading-normal);
+  }
+
+  .ct-field__error {
+    margin: 0;
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-error-ink);
+  }
+
+  .ct-form__privacy {
+    margin: var(--mkt-space-4) 0 0;
+    font-size: var(--mkt-caption);
+    line-height: var(--mkt-leading-snug);
+    color: var(--mkt-ink-muted);
+  }
+
+  .ct-submit {
+    margin-block-start: var(--mkt-space-4);
+    inline-size: 100%;
+    justify-content: center;
+  }
+
+  /*
+    The live region itself carries NO styling and no box: it is always in the
+    DOM so announcements are reliable, and an empty bordered panel sitting under
+    every untouched form would be a visible artefact of an accessibility
+    decision. The box below is the content, which only exists once there is an
+    outcome.
+  */
+  /*
+    A PLAIN BLOCK, deliberately — NOT `display: contents`. That value has a
+    history of dropping the element from the accessibility tree, which on a live
+    region is precisely the failure this wrapper exists to prevent. Empty, it
+    has no border, padding or background, so it occupies nothing and shows
+    nothing until there is an outcome to put in it.
+  */
+  .ct-outcome-live {
+    margin: 0;
+    padding: 0;
+  }
+
+  /*
+    The outcome. Bordered rather than tinted green — there is nothing to
+    celebrate, and a success colour on a message that says "not sent" would
+    contradict the words next to it.
+  */
+  .ct-outcome {
+    margin-block-start: var(--mkt-space-4);
+    padding: var(--mkt-space-4);
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-light-border-strong);
+    background: var(--mkt-light);
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  .ct-outcome__title {
+    margin: 0 0 var(--mkt-space-2);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .ct-outcome__body {
+    margin: 0;
+    font-size: var(--mkt-small);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink-muted);
+  }
+
+  .ct-outcome__actions {
+    margin-block-start: var(--mkt-space-4);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mkt-space-2);
+  }
+
+  .ct-copy {
+    gap: 0.375rem;
+  }
+
+  // ---- §14 · What happens next ------------------------------------------------------
+  .ct-next {
+    counter-reset: ct-step;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .ct-step {
+    height: 100%;
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+
+    h3 {
+      margin: var(--mkt-space-2) 0 var(--mkt-space-2);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-ink-muted);
+    }
+  }
+
+  .ct-step__num {
+    font-family: var(--font-heading);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.06em;
+    color: var(--mkt-accent-ink);
+  }
+
+  // ---- §13 · Product ------------------------------------------------------------------
+  .ct-product {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+  }
+
+  .ct-productcard {
+    display: block;
+    height: 100%;
+    padding: clamp(1.125rem, 2.2vw, 1.5rem);
+    background: var(--mkt-white);
+    border: 1px solid var(--mkt-light-border);
+    border-radius: var(--mkt-radius);
+    box-shadow: var(--mkt-glow-card);
+    text-decoration: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+
+    h3 {
+      margin: 0 0 var(--mkt-space-2);
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-family: var(--font-heading);
+      font-size: var(--mkt-body-lg);
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-ink-muted);
+    }
+
+    svg { transition: transform 0.2s ease; }
+
+    &:hover {
+      border-color: var(--mkt-accent);
+      box-shadow: var(--mkt-glow-card-hover);
+
+      svg { transform: translateX(3px); }
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  // ---- §21 · Trust -----------------------------------------------------------------------
+  .ct-trust {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mkt-space-4);
+
+    li {
+      padding: clamp(1.125rem, 2.2vw, 1.5rem);
+      border-radius: var(--mkt-radius);
+      border: 1px solid var(--mkt-dark-border);
+      background: var(--mkt-glass);
+      font-size: var(--mkt-body);
+      line-height: var(--mkt-leading-normal);
+      color: var(--mkt-on-dark-muted);
+    }
+  }
+
+  .ct-trust__more {
+    margin: var(--mkt-space-6) 0 0;
+
+    a {
+      font-weight: var(--weight-medium);
+      color: var(--mkt-accent-on-dark);
+      text-decoration: none;
+
+      &:hover { text-decoration: underline; text-underline-offset: 3px; }
+    }
+  }
+
+  // ---- §15, §16 · Motion -------------------------------------------------------------------
+  /*
+    ALL OF IT IS OPTIONAL. The rules above draw the finished orb; these only add
+    the arrival, and they run once. Nothing on this page animates continuously —
+    a contact form is a place to concentrate.
+  */
+  @media (prefers-reduced-motion: no-preference) {
+    .ct-orb__beat {
+      animation: ct-rise 0.5s ease-out backwards;
+      animation-delay: calc(var(--i) * 0.14s);
+    }
+
+    .ct-orb__nodes li {
+      animation: ct-rise 0.45s ease-out backwards;
+      animation-delay: calc(0.5s + (var(--i) * 0.08s));
+    }
+
+    .mkt-btn svg { transition: transform 0.2s ease; }
+    .mkt-btn:hover svg { transform: translateX(3px); }
+  }
+
+  @keyframes ct-rise {
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  // ---- Narrow -------------------------------------------------------------------------------
+  @media (max-width: 1000px) {
+    .ct-next,
+    .ct-product,
+    .ct-trust {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /*
+    §25 — ONE COLUMN, AND THE FORM IS NOT SQUEEZED INTO A SPLIT. The brief is
+    explicit about that, and the order below the hero copy puts the form before
+    the orb: on a phone the visual is the thing you scroll past, not the thing
+    you came for.
+  */
+  @media (max-width: 900px) {
+    .ct-hero__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ct-hero__form { order: 2; }
+    .ct-orb { order: 3; }
+  }
+
+  @media (max-width: 620px) {
+    .ct-next,
+    .ct-product,
+    .ct-trust {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ct-hero__actions .mkt-btn {
+      inline-size: 100%;
+      justify-content: center;
+    }
+
+    // Comfortable to tap, and 16px stops iOS zooming the viewport on focus —
+    // which is the real cause of "the page jumps when I tap the field".
+    .ct-input {
+      font-size: 1rem;
+      padding: 0.6875rem 0.8125rem;
     }
   }
 }
