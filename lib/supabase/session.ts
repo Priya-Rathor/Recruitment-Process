@@ -115,6 +115,16 @@ const PUBLIC_PATHS = [
   */
   "/faq",
   /*
+    The legal pages. THE NEAR MISS HERE IS A REAL ONE and is why this block
+    insists on the check: the in-product admin screen is /settings/privacy,
+    which does NOT share a prefix with "/privacy" — matches() frees an entry
+    and its own subtree only, so "/privacy" cannot reach it. Asserted both ways
+    in publicPaths.test.ts rather than left to reading.
+  */
+  "/privacy",
+  "/terms",
+  "/cookies",
+  /*
     THE CRAWLER FILES, and they were a REAL BUG rather than a precaution.
 
     `app/robots.ts` and `app/sitemap.ts` generate /robots.txt and /sitemap.xml,

@@ -238,12 +238,16 @@ describe("the absences stay on the page", () => {
     }
   });
 
-  it("still says there is no published privacy policy", () => {
-    // §16 forbids creating a fake policy route, so the page says the gap out
-    // loud instead. If a real /privacy page is ever added, this test is the
-    // reminder to replace the sentence with a link.
-    expect(SECURITY_PRIVACY.note).toMatch(/no published privacy policy/i);
-    expect(INTERNAL_ROUTES).not.toContain("/privacy");
+  it("points at the privacy page now that one exists", () => {
+    /*
+      THIS TEST DID ITS JOB. It used to assert the opposite — that the page
+      said there was no published policy — with a comment saying it was the
+      reminder to swap the sentence for a link the day one existed. Module 25
+      wrote the policy, this failed, and the sentence was replaced.
+    */
+    expect(INTERNAL_ROUTES).toContain("/privacy");
+    expect(SECURITY_PRIVACY.note).toMatch(/privacy page/i);
+    expect(SECURITY_PRIVACY.link?.href).toBe("/privacy");
   });
 });
 

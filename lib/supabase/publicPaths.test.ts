@@ -31,6 +31,9 @@ describe("isPublicPath", () => {
       "/security",
       "/contact",
       "/faq",
+      "/privacy",
+      "/terms",
+      "/cookies",
       "/how-it-works",
       "/product",
       "/product/source",
@@ -148,6 +151,14 @@ describe("isPublicPath", () => {
       // private one is added and nobody rereads the allowlist.
       expect(isPublicPath("/contacts")).toBe(false);
       expect(isPublicPath("/faqs")).toBe(false);
+      /*
+        THE PAIR THAT MATTERS. The public policy is /privacy; the in-product
+        admin screen is /settings/privacy. Making the policy public must not
+        make the settings screen public, and the two are one careless edit
+        apart.
+      */
+      expect(isPublicPath("/settings/privacy")).toBe(false);
+      expect(isPublicPath("/privacy-settings")).toBe(false);
     });
 
     it("cannot be escaped by appending a segment to a public leaf", () => {

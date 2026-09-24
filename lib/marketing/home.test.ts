@@ -146,7 +146,21 @@ describe("the landing page's internal links", () => {
       nothing scrolls nowhere and looks like a dead link to the reader, which is
       worse than an obvious 404 because nothing reports it.
     */
-    const rendered = new Set(["product", "ai", "trust", "faq", "ai-safety", "main"]);
+    const rendered = new Set([
+      "product",
+      "ai",
+      "trust",
+      "faq",
+      "ai-safety",
+      "main",
+      // Added with the Module 23 footer. Each was checked against the id the
+      // component actually sets: #platform is on <PlatformOverview>,
+      // #integrations on <Integrations>, #pricing on <Pricing>. They are all
+      // on the landing page, so `/#platform` resolves from any page.
+      "platform",
+      "integrations",
+      "pricing",
+    ]);
 
     for (const link of HOME_FOOTER_SECTIONS.flatMap((s) => s.links)) {
       const [, fragment] = link.href.split("#");

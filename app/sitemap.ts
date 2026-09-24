@@ -49,6 +49,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // The FAQ answers the questions people search for by name, and it changes
     // whenever the product gains or loses an answer.
     entry("/faq", 0.7, "monthly"),
+    /*
+      §24 — INCLUDED, at a low priority. These are public, useful and the kind
+      of page people look for by name before signing up, so excluding them
+      would be hiding them rather than managing crawl budget. Low priority and
+      a yearly cadence says what they are: reference, not a landing page.
+    */
+    entry("/privacy", 0.3, "yearly"),
+    entry("/terms", 0.3, "yearly"),
+    entry("/cookies", 0.3, "yearly"),
     ...CAPABILITY_GROUPS.map((group) => entry(`/product/${group.slug}`, 0.7, "monthly")),
     // Real entry points somebody may search for by name.
     entry("/signup", 0.5, "yearly"),

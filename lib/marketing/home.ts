@@ -2912,41 +2912,15 @@ export const HOME_FAQS: { q: string; a: string }[] = [
   the navigation module would have created two places to change one link.
 */
 
-export const HOME_FOOTER_SECTIONS: {
-  title: string;
-  links: { label: string; href: string }[];
-}[] = [
-  {
-    title: "Product",
-    links: CAPABILITY_GROUPS.map((group) => ({
-      label: group.tab,
-      href: `/product/${group.slug}`,
-    })),
-  },
-  {
-    title: "How it works",
-    links: [
-      { label: "The full flow", href: "/how-it-works" },
-      { label: "AI safety model", href: "/how-it-works#ai-safety" },
-      { label: "Trust and security", href: "/security" },
-      // Added with the About page. A route nothing links to is a route nobody
-      // finds, and a sitemap entry is not a link.
-      { label: "About Scoreboad", href: "/about" },
-    ],
-  },
-  {
-    title: "Get started",
-    links: [
-      { label: "Sign in", href: "/login" },
-      { label: "Create an account", href: "/signup" },
-      // Added with the Contact page. It sits under "Get started" rather than
-      // under a "Company" heading because that is what it is: the page that
-      // explains the one route into the product that works today.
-      { label: "Contact and next steps", href: "/contact" },
-      { label: "Frequently asked questions", href: "/faq" },
-    ],
-  },
-];
+/**
+ * The footer's columns.
+ *
+ * MOVED TO lib/marketing/footer.ts IN MODULE 23, where the route audit that
+ * justifies each link lives beside it. Re-exported under the old name because
+ * home.test.ts's shared-chrome assertions are written against it and are worth
+ * keeping pointed at whatever the footer actually renders.
+ */
+export { FOOTER_SECTIONS as HOME_FOOTER_SECTIONS } from "./footer";
 
 /** The brand phrase. Rendered with the × as separate, dimmed glyphs. */
 export const BRAND_STATEMENT = ["People", "Intelligence", "Opportunity"] as const;

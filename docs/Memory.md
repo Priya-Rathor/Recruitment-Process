@@ -2624,3 +2624,164 @@ candidate between stages?" (no, deliberate), "Is there a free trial?",
 "Can I talk to someone?", certification. The test checks these per-item — a
 question may contain the loose phrase as long as its answer denies it, which is
 why a bare keyword ban would have deleted the most useful answers.
+
+## 2026-09-24
+
+**Module 23 — global footer + final SEO link architecture.**
+
+- New: `lib/marketing/footer.ts` (route audit + columns),
+  `lib/marketing/footer.test.ts` (15 assertions),
+  `app/(marketing)/_components/footer/{FooterNav,FooterOrb}.tsx`.
+- Rewrote `MarketingFooter.tsx`; replaced the `.mkt-foot*` SCSS block.
+- `HOME_FOOTER_SECTIONS` in home.ts is now a **re-export** of
+  `FOOTER_SECTIONS`, so Module 01's shared-chrome tests keep their contract
+  without a second copy of the data.
+- Deleted **73 lines of dead `.mkt-footer` CSS** (no component referenced it)
+  and a stale `.mkt-foot__col a:focus-visible` selector.
+
+**Route audit — the whole public surface is:** `/`, `/about`, `/contact`,
+`/faq`, `/how-it-works`, `/security`, `/signup`, `/login`, `/product/{6}`.
+The brief named ~18 more (/platform, /solutions, /pricing, /demo, /blog,
+/docs, /careers, /privacy, /terms, socials…). **None exists**, so none is
+linked. Verified every one of the 17 footer destinations with `curl`: all 200,
+no redirects.
+
+Decisions worth keeping:
+
+- **NO CTA BAND IN THE FOOTER.** §5 asked for one; §28 says not to duplicate.
+  The homepage, /about, /security and /faq *each* already close on a full
+  `mkt-band--cta` with the same two actions — 4 of 9 page types. A second one
+  would be the same ask twice in a row, weaker for being generic. The footer
+  carries **one compact action** in the brand block instead, which serves the
+  pages that have no closing CTA (/how-it-works, /product/*, /contact).
+- **No social row** — there is no verified Scoreboad account anywhere. The only
+  "linkedin" strings in the codebase are a CANDIDATE profile field on an
+  application form, i.e. somebody else's account.
+- **No Privacy/Terms/Cookie links** — those pages do not exist;
+  `app/settings/privacy` is an in-product admin screen behind auth.
+- **Product anchor text replaced.** The column used to render the tab words
+  ("Source", "Understand", "Decide") — good tabs, useless links. Now each
+  carries what the page covers, taken from that page's own heading. The test
+  fails if a group falls back to its tab.
+- **Mobile accordion via `useSyncExternalStore` on a media query.** Forcing a
+  closed `<details>` open with CSS is engine-dependent (old: UA `display:none`;
+  new: `content-visibility` on `::details-content`), and rendering the links
+  twice duplicates every href. The **server snapshot is `true`**, so the HTML
+  ships fully expanded — no-JS and crawlers get everything; collapsing is the
+  enhancement. Breakpoint 900px is duplicated in FooterNav and the SCSS; they
+  must move together.
+
+Bug worth remembering: **`pathLength` is an SVG attribute, not a CSS
+property.** Setting it in the stylesheet silently does nothing, which made the
+line-draw animation a no-op that still "looked fine" because the static
+diagram was correct. It belongs on the `<path>` element.
+
+Orphan check now lives in `footer.test.ts`: every route in `INTERNAL_ROUTES`
+must be reachable from the footer or the navbar.
+
+## 2026-09-24 (second session)
+
+**Module 24 — error states, 404, SEO-safe error handling.**
+
+- New: `app/not-found.tsx` (global 404), `app/(marketing)/error.tsx` (branded
+  public boundary), `app/global-error.tsx` (last resort),
+  `lib/marketing/errors.ts` + `errors.test.ts` (10 assertions), `.nf-*` SCSS.
+- Modified: `app/error.tsx` — see the retry bug below.
+
+**Reused, not rebuilt:** `components/ui/states.tsx` already has `EmptyState`,
+`ErrorState`, `Skeleton`, `SkeletonRows`, `SkeletonTiles`, `FormError`, and
+`components/states.tsx` re-exports them for 21 modules. §11/§13 were already
+satisfied — no empty/loading state was changed.
+
+**Three findings worth keeping:**
+
+1. **`reset` → `retry`.** Next 16.3 made `retry` stable and its own docs say to
+   prefer it: `reset()` re-renders the same children WITHOUT re-fetching, so on
+   any data-backed screen the app's "Retry" button ran straight back into the
+   identical error. It was a no-op on every such page. Fixed in `app/error.tsx`.
+
+2. **`not-found.tsx` cannot export `metadata` in this version** — only the
+   experimental `global-not-found.tsx` can. So the 404 inherits the root
+   layout's marketing title. Rendering a `<title>` in the tree was TRIED and
+   REVERTED: React 19 hoists it, but Next's metadata system had already emitted
+   one, giving **two `<title>` elements** with the generic one first — wrong
+   title *and* invalid markup. Not worth an experimental flag in the
+   `next.config.ts` that carries the production security headers, on a page Next
+   already marks `noindex`.
+
+3. **DENY-BY-DEFAULT SWALLOWS THE 404 FOR UNMATCHED TOP-LEVEL PATHS.**
+   `/pricing`, `/blog`, `/demo`, `/nope` → **307 to /login**, not 404, because
+   the proxy allowlist redirects anything not public. Anything under a public
+   prefix (`/about/xx`, `/product/xx`, `/faq/xx`, …) correctly returns 404 and
+   renders the page. Same class as the robots.txt/sitemap.xml bug already
+   recorded in `session.ts`. **NOT fixed here — the brief forbade touching
+   authentication.** Crawlers get a redirect-to-login instead of a 404 for dead
+   top-level URLs, so those URLs never drop out of the index.
+
+**Verified on a running server:** 404 status correct, Next auto-injects
+`<meta name="robots" content="noindex">`, **no canonical emitted** (so 404s are
+not canonicalised to the homepage), exactly one H1, nav landmark present, all
+recovery links real, and no stack trace / env var / Supabase host / filesystem
+path anywhere in the rendered output.
+
+`global-error.tsx` imports **nothing but React** — no stylesheet, no font, no
+Logo. `var(--mkt-dark)` resolves to nothing if globals.scss is what failed, so
+every value is a literal on purpose (#0a1128 ground, #8b9eff fill, #0a1128 ink
+on the fill — never white, 2.49:1).
+
+## 2026-09-24 (third session)
+
+**Module 25 — legal pages: /privacy, /terms, /cookies.**
+
+- New: `lib/marketing/legal.ts` + `legal.test.ts` (15 assertions),
+  `app/(marketing)/{privacy,terms,cookies}/page.tsx`,
+  `app/(marketing)/_components/legal/{LegalDocument,LegalToc}.tsx`, `.lg-*` SCSS.
+- Wired: `PUBLIC_PATHS`, `INTERNAL_ROUTES`, sitemap (0.3/yearly), and a legal
+  row in the footer's bottom bar (`FOOTER_LEGAL`).
+
+**§1 audit — the decisive findings:**
+
+- **No tracking of any kind.** No analytics, tag manager, pixel, session
+  recorder or error tracker; no `next/script` anywhere. grep for every common
+  provider returns nothing.
+- **Two cookies, both strictly necessary** (Supabase session + the httpOnly
+  `active_organization_id` hint). **An anonymous visit to the public site sets
+  NO cookie at all** — verified with `curl -I`.
+- localStorage is used in exactly one place: per-viewer column preferences in
+  the signed-in app.
+
+→ **No consent banner, deliberately.** §13/§14 permit one only where tracking
+exists. A prompt for cookies that are never set would be theatre. The
+`/cookies` page exists anyway, to say that plainly.
+
+**Content came from `docs/PRIVACY.md`**, which carries per-area
+IMPLEMENTED/PARTIAL/MISSING/UNKNOWN labels against file references — the same
+convention as SECURITY.md. Only verified behaviour is described.
+
+**Honest disclosures published rather than buried:**
+- Retention settings exist but are **never executed** — nothing is deleted on a
+  schedule (docs/PRIVACY.md's P0). Saying otherwise would be a promise the
+  software does not keep.
+- Automatic resume shortlisting runs with no human in the loop (a reversible
+  flag, never a rejection), and there is **no candidate notice and no stated
+  human-review route** for it.
+- The consent disclosure is spoken by the voice agent, so a dropped call cannot
+  distinguish "disclosed and accepted" from "never disclosed".
+
+**9 placeholders**, rendered as amber `<mark>` elements with an `is-sr-only`
+"Unfinished:" prefix, derived programmatically by `legalPlaceholders()` so the
+checklist cannot drift from the pages. Test asserts each is upper-case and that
+the subjects (entity, governing law, residency, sub-processors, roles,
+liability, effective date) are all covered.
+
+**Two Module 20/23 guards fired exactly as designed and were inverted:**
+- `security.test.ts` asserted "there is no published privacy policy" with a
+  comment saying it was the reminder to swap the sentence for a link the day one
+  existed. It failed; the sentence is now a link to `/privacy`.
+- `footer.test.ts` asserted no legal link existed. Now asserts every legal link
+  resolves, and `FOOTER_LEGAL` is in the orphan-reachability set.
+
+**Near miss checked and pinned:** `/privacy` (public policy) vs
+`/settings/privacy` (in-product admin screen) do NOT share a prefix —
+`matches()` frees an entry and its own subtree only. Verified: `/settings/privacy`
+still 307s.

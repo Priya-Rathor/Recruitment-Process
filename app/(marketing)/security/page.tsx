@@ -378,7 +378,10 @@ export default function SecurityPage() {
         </Stagger>
 
         <Reveal>
-          <p className="sec-privacy__note">{SECURITY_PRIVACY.note}</p>
+          <p className="sec-privacy__note">
+            {SECURITY_PRIVACY.note}{" "}
+            <Link href={SECURITY_PRIVACY.link.href}>{SECURITY_PRIVACY.link.label}</Link>
+          </p>
         </Reveal>
       </Section>
 

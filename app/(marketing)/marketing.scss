@@ -1105,79 +1105,6 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Footer
-  // ---------------------------------------------------------------------------
-  .mkt-footer {
-    background: var(--mkt-dark);
-    color: var(--mkt-on-dark-muted);
-    border-top: 1px solid var(--mkt-dark-border);
-    padding-block: clamp(3rem, 6vw, 4.5rem) var(--space-8);
-  }
-
-  .mkt-footer__top {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) repeat(auto-fit, minmax(9rem, 1fr));
-    gap: var(--space-8);
-  }
-
-  @media (max-width: 48rem) {
-    .mkt-footer__top {
-      grid-template-columns: 1fr 1fr;
-    }
-  }
-
-  .mkt-footer__tagline {
-    margin-top: var(--space-4);
-    font-size: var(--text-body);
-    line-height: 1.6;
-    color: var(--mkt-on-dark-faint);
-    max-width: 22rem;
-  }
-
-  .mkt-footer__col {
-    h3 {
-      font-family: var(--font-body);
-      font-size: var(--text-caption);
-      font-weight: var(--weight-semibold);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--mkt-on-dark-faint);
-    }
-
-    ul {
-      margin: var(--space-4) 0 0;
-      padding: 0;
-      list-style: none;
-      display: grid;
-      gap: var(--space-3);
-    }
-
-    a {
-      color: var(--mkt-on-dark-muted);
-      text-decoration: none;
-      font-size: var(--text-body);
-
-      &:hover {
-        color: var(--mkt-on-dark);
-        text-decoration: underline;
-      }
-    }
-  }
-
-  .mkt-footer__bottom {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-4);
-    align-items: center;
-    justify-content: space-between;
-    margin-top: clamp(2.5rem, 5vw, 3.5rem);
-    padding-top: var(--space-6);
-    border-top: 1px solid var(--mkt-dark-border);
-    font-size: var(--text-caption);
-    color: var(--mkt-on-dark-faint);
-  }
-
-  // ---------------------------------------------------------------------------
   // Product page specifics
   // ---------------------------------------------------------------------------
   .mkt-crumb {
@@ -9863,70 +9790,212 @@
 // =============================================================================
 .mkt {
   .mkt-foot {
+    position: relative;
     background: var(--mkt-dark);
     color: var(--mkt-on-dark-muted);
-    padding-block: clamp(3rem, 6vw, 4.5rem) 2rem;
+    padding-block: clamp(3.5rem, 7vw, 5.5rem) 2rem;
     border-top: 1px solid var(--mkt-dark-border);
+    // The converging lines and the orb glow are drawn inside; nothing may
+    // escape the footer and put a scrollbar on the page.
+    overflow: hidden;
+  }
+
+  /*
+    A single soft wash across the top edge, so the footer reads as the page
+    settling rather than as a slab appearing. One gradient, no image.
+  */
+  .mkt-foot__wash {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 0;
+    block-size: 14rem;
+    pointer-events: none;
+    background: radial-gradient(
+      70% 100% at 22% 0%,
+      rgba(139, 158, 255, 0.10) 0%,
+      transparent 70%
+    );
   }
 
   .mkt-foot__top {
+    position: relative;
     display: grid;
-    grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
-    gap: clamp(1.5rem, 4vw, 3rem);
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 2fr);
+    gap: clamp(2rem, 5vw, 4rem);
   }
 
   .mkt-foot__brand {
-    max-width: 22rem;
+    max-width: 24rem;
+    min-width: 0;
   }
 
   .mkt-foot__desc {
-    font-size: var(--text-label);
-    line-height: 1.55;
+    margin: var(--mkt-space-4) 0 0;
+    font-size: var(--mkt-small);
+    line-height: var(--mkt-leading-normal);
     color: var(--mkt-on-dark-muted);
-    margin: 1rem 0 0;
   }
 
-  .mkt-foot__coltitle {
+  /*
+    ONE ACTION, AT BUTTON SIZE RATHER THAN CTA SIZE. The reasoning is in the
+    component: four of this site's page types already close on a full CTA band,
+    so a second one here would be the same ask twice in a row.
+  */
+  .mkt-foot__cta {
+    margin-block-start: var(--mkt-space-6);
+  }
+
+  // ---- The convergence visual ----------------------------------------------
+  .ft-orb {
+    position: relative;
+    margin-block-start: clamp(2rem, 4vw, 2.75rem);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--mkt-space-3);
+    min-block-size: 8.5rem;
+  }
+
+  .ft-orb__stages {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+
+    li {
+      font-size: 10px;
+      font-weight: var(--weight-medium);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      color: var(--mkt-on-dark-faint);
+    }
+  }
+
+  .ft-orb__lines {
+    inline-size: 100%;
+    block-size: 8.5rem;
+    // The stroke colour comes from here, so the paths can use currentColor and
+    // the whole bundle is one value to change.
+    color: var(--mkt-accent);
+    opacity: 0.4;
+  }
+
+  .ft-orb__line {
+    // Drawn by default. The stylesheet's motion block turns this into a draw-on
+    // animation where motion is welcome; without it the diagram is simply
+    // finished, which is the correct still image.
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .ft-orb__mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 3.75rem;
+    block-size: 3.75rem;
+    border-radius: 50%;
+    border: 1px solid var(--mkt-glass-border);
+    background: var(--mkt-glass-strong);
+  }
+
+  .ft-orb__glow {
+    position: absolute;
+    inset: -45%;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(139, 158, 255, 0.28) 0%,
+      rgba(139, 158, 255, 0.07) 45%,
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+
+  // ---- Navigation -------------------------------------------------------------
+  .ft-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(1.25rem, 3vw, 2.5rem);
+  }
+
+  .ft-col { min-width: 0; }
+
+  .ft-group {
+    min-width: 0;
+  }
+
+  .ft-group__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mkt-space-3);
+    list-style: none;
+
+    &::-webkit-details-marker { display: none; }
+
+    &:focus-visible {
+      outline: none;
+      border-radius: var(--mkt-radius-sm);
+      box-shadow: var(--mkt-focus-ring);
+    }
+  }
+
+  .ft-group__title {
+    margin: 0;
     font-family: var(--font-heading);
     font-size: 11px;
     font-weight: var(--weight-bold);
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--mkt-on-dark);
-    margin: 0 0 0.875rem;
   }
 
-  .mkt-foot__col ul {
+  .ft-group__links {
     list-style: none;
-    margin: 0;
+    margin: var(--mkt-space-4) 0 0;
     padding: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-  }
 
-  .mkt-foot__col a {
-    font-size: var(--text-label);
-    color: var(--mkt-on-dark-muted);
-    text-decoration: none;
+    a {
+      display: inline-block;
+      font-size: var(--mkt-small);
+      line-height: var(--mkt-leading-snug);
+      color: var(--mkt-on-dark-muted);
+      text-decoration: none;
+      transition: color 0.18s ease, transform 0.18s ease;
 
-    &:hover {
-      color: var(--mkt-accent-on-dark);
-      text-decoration: underline;
-      text-underline-offset: 3px;
+      &:hover {
+        color: var(--mkt-accent-on-dark);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      &:focus-visible {
+        outline: none;
+        border-radius: var(--mkt-radius-sm);
+        box-shadow: var(--mkt-focus-ring);
+      }
     }
   }
 
+  // ---- The bottom line ------------------------------------------------------------
   .mkt-foot__bottom {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    margin-top: clamp(2.5rem, 5vw, 3.5rem);
-    padding-top: 1.25rem;
+    margin-block-start: clamp(2.5rem, 5vw, 3.5rem);
+    padding-block-start: 1.25rem;
     border-top: 1px solid var(--mkt-dark-border);
-    font-size: var(--text-caption);
+    font-size: var(--mkt-caption);
     color: var(--mkt-on-dark-faint);
   }
 
@@ -9934,20 +10003,125 @@
     color: var(--mkt-on-dark-faint);
   }
 
-  @media (max-width: 860px) {
-    .mkt-foot__top {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+  // ---- §7 · Motion -------------------------------------------------------------------
+  /*
+    ALL OPTIONAL. The rules above already draw the finished footer; these add
+    the arrival and nothing else. There is no continuous animation down here —
+    a footer that keeps moving while somebody reads a link list is a footer
+    nobody finishes reading.
+  */
+  @media (prefers-reduced-motion: no-preference) {
+    .ft-orb__line {
+      // The paths carry pathLength="1" (an SVG attribute, set in the
+      // component), so one dash value draws all five the same way.
+      animation: ft-draw 1.1s ease-out backwards;
+      animation-delay: calc(var(--i) * 0.1s);
     }
 
-    .mkt-foot__brand {
-      grid-column: 1 / -1;
+    .ft-orb__stages li {
+      animation: ft-in 0.5s ease-out backwards;
+      animation-delay: calc(var(--i) * 0.08s);
+    }
+
+    .mkt-foot__cta svg { transition: transform 0.2s ease; }
+    .mkt-foot__cta:hover svg { transform: translateX(3px); }
+
+    .ft-group__links a:hover { transform: translateX(2px); }
+  }
+
+  @keyframes ft-draw {
+    from { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; }
+    to   { stroke-dasharray: 1; stroke-dashoffset: 0; opacity: 1; }
+  }
+
+  @keyframes ft-in {
+    from { opacity: 0; transform: translateX(-0.25rem); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  // ---- §19 · Narrow --------------------------------------------------------------------
+  @media (max-width: 1100px) {
+    .ft-nav {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--mkt-space-6) clamp(1.25rem, 3vw, 2.5rem);
+    }
+  }
+
+  /*
+    §8 — BELOW THIS WIDTH THE COLUMNS BECOME ACCORDIONS. The breakpoint is the
+    same 900px the FooterNav component matches on; if one moves, the other has
+    to move with it or the groups collapse while still laid out as columns.
+  */
+  @media (max-width: 900px) {
+    .mkt-foot__top {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--mkt-space-8);
+    }
+
+    .mkt-foot__brand { max-width: none; }
+
+    .mkt-foot__cta {
+      inline-size: 100%;
+      justify-content: center;
+    }
+
+    .ft-nav {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .ft-col {
+      border-block-start: 1px solid var(--mkt-dark-border);
+    }
+
+    .ft-col:last-child {
+      border-block-end: 1px solid var(--mkt-dark-border);
+    }
+
+    .ft-group__head {
+      // A comfortable target, and the whole row is the control rather than the
+      // few characters of the title.
+      padding-block: 0.875rem;
+      cursor: pointer;
+    }
+
+    .ft-group__links {
+      margin-block: 0 var(--mkt-space-4);
+    }
+
+    // The chevron only exists where the group can actually be toggled.
+    .ft-group__mark {
+      position: relative;
+      flex: none;
+      inline-size: 1.25rem;
+      block-size: 1.25rem;
+      transition: transform 0.25s ease;
+
+      &::before {
+        content: "";
+        position: absolute;
+        inset-block-start: 45%;
+        inset-inline-start: 50%;
+        inline-size: 6px;
+        block-size: 6px;
+        border-inline-end: 1.5px solid var(--mkt-on-dark-faint);
+        border-block-end: 1.5px solid var(--mkt-on-dark-faint);
+        transform: translate(-50%, -50%) rotate(45deg);
+      }
+    }
+
+    .ft-group[open] .ft-group__mark {
+      transform: rotate(180deg);
+    }
+
+    .ft-orb {
+      margin-inline: auto;
     }
   }
 
   @media (max-width: 480px) {
-    .mkt-foot__top {
-      grid-template-columns: minmax(0, 1fr);
-    }
+    .ft-orb__stages li { font-size: 9px; }
+    .ft-orb__lines { block-size: 7rem; }
   }
 }
 
@@ -10062,7 +10236,6 @@
   .mkt-sheet__sublink:focus-visible,
   .mkt-nav__signin:focus-visible,
   .mkt-nav__burger:focus-visible,
-  .mkt-foot__col a:focus-visible,
   .mkt-faqitem__q:focus-visible,
   .mkt-crumbs a:focus-visible {
     outline: none;
@@ -12934,5 +13107,727 @@
     .faq-search__input {
       font-size: 1rem;
     }
+  }
+
+  // ===========================================================================
+  // ERROR SURFACES — Module 24
+  //
+  // The 404 (app/not-found.tsx) and the public error boundary
+  // (app/(marketing)/error.tsx) share these rules. Both are dark, both are
+  // centred on a single obvious way out, and neither uses a warning colour:
+  // amber or red would say something went wrong with the READER'S data, and
+  // what actually happened is a URL that does not resolve.
+  // ===========================================================================
+
+  .nf {
+    position: relative;
+    min-block-size: 100svh;
+    display: grid;
+    align-items: center;
+    padding-block: clamp(3rem, 8vw, 6rem);
+    background: var(--mkt-dark);
+    color: var(--mkt-on-dark-muted);
+    // The diagram's glow is generous; nothing may escape and put a horizontal
+    // scrollbar on a page whose whole job is to be an easy exit.
+    overflow: hidden;
+  }
+
+  /*
+    The boundary version sits INSIDE the marketing layout, so it has a navbar
+    above it and a footer below. It must not also claim the whole viewport, or
+    the footer is pushed a screen out of reach.
+  */
+  .nf--error {
+    min-block-size: auto;
+  }
+
+  .nf__inner {
+    position: relative;
+  }
+
+  .nf__logo {
+    display: inline-block;
+    margin-block-end: clamp(2rem, 5vw, 3.5rem);
+
+    &:focus-visible {
+      outline: none;
+      border-radius: var(--mkt-radius-sm);
+      box-shadow: var(--mkt-focus-ring);
+    }
+  }
+
+  .nf__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(2rem, 6vw, 5rem);
+  }
+
+  .nf__copy { min-width: 0; }
+
+  .nf__copy--center {
+    text-align: center;
+    margin-inline: auto;
+    max-width: 34rem;
+  }
+
+  .nf__eyebrow {
+    margin: 0 0 var(--mkt-space-3);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mkt-accent-on-dark);
+  }
+
+  .nf__title {
+    margin: 0;
+    max-width: 16ch;
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h2);
+    font-weight: var(--weight-bold);
+    line-height: var(--mkt-leading-tight);
+    letter-spacing: -0.03em;
+    color: var(--mkt-on-dark);
+  }
+
+  .nf__copy--center .nf__title {
+    max-width: none;
+  }
+
+  .nf__lead {
+    margin: var(--mkt-space-6) 0 0;
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-lead);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .nf__copy--center .nf__lead { margin-inline: auto; }
+
+  .nf__actions {
+    margin-block-start: var(--mkt-space-8);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mkt-space-4);
+  }
+
+  .nf__actions--center { justify-content: center; }
+
+  // ---- The recovery list ----------------------------------------------------
+  .nf__recovery {
+    margin-block-start: clamp(2rem, 5vw, 3rem);
+    padding-block-start: var(--mkt-space-6);
+    border-block-start: 1px solid var(--mkt-dark-border);
+  }
+
+  .nf__recoverytitle {
+    margin: 0 0 var(--mkt-space-4);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mkt-on-dark-faint);
+  }
+
+  .nf__recovery ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mkt-space-3) var(--mkt-space-6);
+  }
+
+  .nf__recovery a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--mkt-small);
+    font-weight: var(--weight-medium);
+    color: var(--mkt-on-dark-muted);
+    text-decoration: none;
+
+    svg { transition: transform 0.2s ease; }
+
+    &:hover {
+      color: var(--mkt-accent-on-dark);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+
+      svg { transform: translateX(3px); }
+    }
+
+    &:focus-visible {
+      outline: none;
+      border-radius: var(--mkt-radius-sm);
+      box-shadow: var(--mkt-focus-ring);
+    }
+  }
+
+  // ---- §3 · The workflow diagram ---------------------------------------------
+  .nf__diagram {
+    position: relative;
+    flex: none;
+    inline-size: clamp(14rem, 26vw, 19rem);
+    block-size: clamp(14rem, 26vw, 19rem);
+    display: grid;
+    place-items: center;
+  }
+
+  .nf__glow {
+    position: absolute;
+    inset: 12%;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(139, 158, 255, 0.22) 0%,
+      rgba(139, 158, 255, 0.06) 45%,
+      transparent 70%
+    );
+  }
+
+  .nf__mark {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    inline-size: 4.25rem;
+    block-size: 4.25rem;
+    border-radius: 50%;
+    border: 1px solid var(--mkt-glass-border);
+    background: var(--mkt-glass-strong);
+    box-shadow: var(--mkt-glow-accent);
+  }
+
+  /*
+    Five stages on a ring around the mark. Same geometry as the About page's
+    orb — one radius custom property, a rotate/counter-rotate pair to keep the
+    labels upright — so there is one technique on this site for putting things
+    on a circle rather than two.
+  */
+  .nf__stages {
+    --r: clamp(5.5rem, 11vw, 7.5rem);
+
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    position: absolute;
+    inset: 0;
+  }
+
+  .nf__stage {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--a))
+      translateY(calc(var(--r) * -1))
+      rotate(calc(var(--a) * -1));
+    white-space: nowrap;
+    padding: 0.1875rem 0.5625rem;
+    border-radius: 999px;
+    border: 1px solid var(--mkt-dark-border);
+    background: var(--mkt-dark);
+    font-size: 10px;
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.04em;
+    color: var(--mkt-on-dark-muted);
+  }
+
+  @for $i from 0 through 4 {
+    .nf__stage:nth-child(#{$i + 1}) {
+      --a: #{$i * 72}deg;
+    }
+  }
+
+  /*
+    THE DETACHED ONE. Offset outward and dimmed — that is the whole idea, drawn
+    with two properties. No crack, no glitch, no warning icon: the stage has
+    lost its place in the ring, and the motion block below walks it back.
+  */
+  .nf__stage[data-detached] {
+    border-color: var(--mkt-dark-border-strong);
+    border-style: dashed;
+    color: var(--mkt-on-dark-faint);
+    --r: clamp(7.5rem, 15vw, 10rem);
+  }
+
+  // ---- §4 · Motion --------------------------------------------------------------
+  /*
+    The whole sequence runs ONCE and lands on the finished picture, and it lives
+    entirely inside this query — so reduced motion, a failed script and a print
+    all get the reconnected diagram rather than a half-assembled one.
+
+    Under a second and a half end to end. An error page that performs for two
+    seconds before letting somebody leave is a worse error page.
+  */
+  @media (prefers-reduced-motion: no-preference) {
+    .nf__mark {
+      animation: nf-in 0.45s ease-out backwards;
+    }
+
+    .nf__stage {
+      animation: nf-in 0.4s ease-out backwards;
+      animation-delay: calc(0.25s + (var(--i) * 0.07s));
+    }
+
+    /*
+      The reconnection: the detached stage starts further out and faded, then
+      settles onto the ring with the others. `--r` is not animatable across
+      keyframes, so the movement is a translate on top of the existing
+      transform chain rather than a change to the radius itself.
+    */
+    .nf__stage[data-detached] {
+      animation: nf-reconnect 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
+    }
+
+    .mkt-btn svg { transition: transform 0.2s ease; }
+    .mkt-btn:hover svg { transform: translateX(3px); }
+  }
+
+  @keyframes nf-in {
+    from { opacity: 0; transform: scale(0.94); }
+    to   { opacity: 1; }
+  }
+
+  @keyframes nf-reconnect {
+    0%   { opacity: 0.35; }
+    100% { opacity: 1; }
+  }
+
+  // ---- §16 · Narrow ----------------------------------------------------------------
+  @media (max-width: 900px) {
+    .nf__grid {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: start;
+    }
+
+    // The diagram goes UNDER the copy: on a phone the words are what gets
+    // somebody out of here, and the picture is what they scroll past.
+    .nf__diagram {
+      order: 2;
+      margin-inline: auto;
+    }
+
+    .nf__copy { order: 1; }
+  }
+
+  @media (max-width: 620px) {
+    .nf__title { font-size: var(--mkt-h3); max-width: none; }
+
+    .nf__recovery ul {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .nf__actions .mkt-btn {
+      inline-size: 100%;
+      justify-content: center;
+    }
+
+    .nf__diagram {
+      inline-size: 15rem;
+      block-size: 15rem;
+    }
+  }
+
+  // ===========================================================================
+  // LEGAL PAGES — Module 25
+  //
+  // §19: READABILITY OVER MARKETING AESTHETICS. The content column is capped at
+  // a reading measure, the body text is a step larger than the rest of the site
+  // and the line height is looser. Nothing here is centred, nothing is reversed
+  // out of a gradient, and there is no decorative background behind running
+  // text.
+  // ===========================================================================
+
+  .lg-hero__title {
+    margin: 0;
+    max-width: 18ch;
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h1);
+    font-weight: var(--weight-bold);
+    line-height: var(--mkt-leading-tight);
+    letter-spacing: -0.03em;
+    color: var(--mkt-on-dark);
+  }
+
+  .lg-hero__lead {
+    margin: var(--mkt-space-6) 0 0;
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-lead);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  .lg-hero__updated {
+    margin: var(--mkt-space-6) 0 0;
+    font-size: var(--mkt-small);
+    color: var(--mkt-on-dark-faint);
+  }
+
+  // ---- The two columns --------------------------------------------------------
+  .lg-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+    gap: clamp(1.75rem, 4vw, 3.5rem);
+    align-items: start;
+  }
+
+  // ---- §18 · Contents ----------------------------------------------------------
+  .lg-toc {
+    position: sticky;
+    // Clears the floating navbar at 0.75rem.
+    top: 5rem;
+  }
+
+  .lg-toc__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mkt-space-3);
+    list-style: none;
+
+    &::-webkit-details-marker { display: none; }
+
+    &:focus-visible {
+      outline: none;
+      border-radius: var(--mkt-radius-sm);
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  .lg-toc__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 11px;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .lg-toc__list {
+    list-style: none;
+    margin: var(--mkt-space-4) 0 0;
+    padding: 0;
+    // The document order IS the numbering, so the counter comes from the <ol>
+    // rather than from hand-typed digits that drift when a section moves.
+    counter-reset: lg-toc;
+    display: grid;
+    gap: 0.25rem;
+
+    li { counter-increment: lg-toc; }
+
+    a {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.3125rem 0;
+      font-size: var(--mkt-small);
+      line-height: var(--mkt-leading-snug);
+      color: var(--mkt-ink-muted);
+      text-decoration: none;
+
+      &::before {
+        content: counter(lg-toc);
+        flex: none;
+        inline-size: 1.25rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--mkt-light-border-strong);
+      }
+
+      &:hover {
+        color: var(--mkt-accent-ink);
+        &::before { color: var(--mkt-accent-ink); }
+      }
+
+      &:focus-visible {
+        outline: none;
+        border-radius: var(--mkt-radius-sm);
+        box-shadow: var(--mkt-focus-ring-light);
+      }
+    }
+  }
+
+  // ---- The document -------------------------------------------------------------
+  .lg-doc {
+    min-width: 0;
+    // §19's reading measure. Wider than the site's prose cap because these
+    // documents carry tables, which need room the running text does not.
+    max-width: 44rem;
+  }
+
+  /*
+    §33's notice. Bordered and full width rather than set as small print — a
+    reader who mistakes an unreviewed document for a reviewed one has been
+    misled by where it sits as much as by what it says.
+  */
+  .lg-review {
+    margin: 0 0 clamp(2rem, 4vw, 3rem);
+    padding: var(--mkt-space-4) var(--mkt-space-6);
+    border-radius: var(--mkt-radius);
+    border: 1px dashed var(--mkt-light-border-strong);
+    background: var(--mkt-white);
+    font-size: var(--mkt-small);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink-muted);
+  }
+
+  .lg-section {
+    // §18 — so an anchor jump does not park the heading under the sticky navbar.
+    scroll-margin-top: 6rem;
+
+    & + .lg-section {
+      margin-block-start: clamp(2.25rem, 4vw, 3rem);
+    }
+
+    h2 {
+      margin: 0 0 var(--mkt-space-4);
+      font-family: var(--font-heading);
+      font-size: var(--mkt-h3);
+      font-weight: var(--weight-semibold);
+      letter-spacing: -0.02em;
+      color: var(--mkt-ink);
+    }
+  }
+
+  .lg-p {
+    margin: 0 0 var(--mkt-space-4);
+    // A step up from the site's body size, and looser. These documents are read
+    // in long runs rather than skimmed.
+    font-size: var(--mkt-body-lg);
+    line-height: 1.7;
+    color: var(--mkt-ink-muted);
+  }
+
+  .lg-list {
+    list-style: none;
+    margin: 0 0 var(--mkt-space-4);
+    padding: 0;
+    display: grid;
+    gap: var(--mkt-space-3);
+
+    li {
+      position: relative;
+      padding-inline-start: var(--mkt-space-6);
+      font-size: var(--mkt-body-lg);
+      line-height: 1.7;
+      color: var(--mkt-ink-muted);
+    }
+
+    li::before {
+      content: "";
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: 0.6875rem;
+      inline-size: 6px;
+      block-size: 6px;
+      border-radius: 50%;
+      background: var(--mkt-accent);
+    }
+  }
+
+  /*
+    THE NOTES CARRY THE UNCOMFORTABLE SENTENCES — a gap, a limitation, a thing
+    not claimed. Every one of them is something a reader would rather know than
+    not, so they are set at full size with an accent rule, never as small grey
+    print at the bottom of a section.
+  */
+  .lg-note {
+    margin: 0 0 var(--mkt-space-4);
+    padding: var(--mkt-space-4) var(--mkt-space-6);
+    border-inline-start: 2px solid var(--mkt-accent);
+    border-radius: 0 var(--mkt-radius-sm) var(--mkt-radius-sm) 0;
+    background: var(--mkt-light);
+    font-size: var(--mkt-body);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink);
+  }
+
+  .lg-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    font-weight: var(--weight-medium);
+    color: var(--mkt-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+
+    &:focus-visible {
+      outline: none;
+      border-radius: var(--mkt-radius-sm);
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  /*
+    §3 / §31 — THE UNFINISHED MARKER. Deliberately loud: an unfinished legal
+    value that looks finished is the single worst outcome this module can
+    produce. Amber is used here and almost nowhere else on the site, which is
+    what makes it read as "not done" rather than as emphasis.
+
+    `--mkt-amber-ink` is the token that exists for amber AS TEXT — 5.65:1 on
+    white. The raw amber is a fill colour and is unreadable at this size.
+  */
+  .lg-todo {
+    background: rgba(245, 190, 80, 0.20);
+    color: var(--mkt-amber-ink);
+    padding: 0.0625rem 0.375rem;
+    border-radius: 4px;
+    border: 1px dashed var(--mkt-amber-ink);
+    font-size: 0.875em;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.02em;
+  }
+
+  // ---- Tables ---------------------------------------------------------------------
+  /*
+    The wrapper scrolls, not the page. A two-column table of data categories is
+    narrow enough on a laptop and too wide at 320px, and the alternative —
+    letting it push the document — is the horizontal page overflow §28 forbids.
+  */
+  .lg-tablewrap {
+    margin: 0 0 var(--mkt-space-6);
+    overflow-x: auto;
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-light-border);
+    background: var(--mkt-white);
+  }
+
+  .lg-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: var(--mkt-body);
+    min-inline-size: 30rem;
+
+    th,
+    td {
+      padding: 0.75rem 1rem;
+      text-align: start;
+      vertical-align: top;
+      line-height: var(--mkt-leading-normal);
+      border-block-end: 1px solid var(--mkt-light-border);
+    }
+
+    thead th {
+      font-family: var(--font-heading);
+      font-size: var(--mkt-caption);
+      font-weight: var(--weight-bold);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--mkt-ink-muted);
+      background: var(--mkt-light);
+    }
+
+    tbody th {
+      font-weight: var(--weight-semibold);
+      color: var(--mkt-ink);
+      inline-size: 32%;
+    }
+
+    tbody td { color: var(--mkt-ink-muted); }
+
+    tbody tr:last-child th,
+    tbody tr:last-child td {
+      border-block-end: 0;
+    }
+  }
+
+  // ---- The footer's legal row ---------------------------------------------------------
+  .mkt-foot__legal {
+    position: relative;
+    margin-block-start: clamp(2.5rem, 5vw, 3.5rem);
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--mkt-space-4);
+    }
+
+    a {
+      font-size: var(--mkt-caption);
+      color: var(--mkt-on-dark-faint);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--mkt-accent-on-dark);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      &:focus-visible {
+        outline: none;
+        border-radius: var(--mkt-radius-sm);
+        box-shadow: var(--mkt-focus-ring);
+      }
+    }
+  }
+
+  // The bottom bar follows the legal row, so it no longer needs its own top gap.
+  .mkt-foot__legal + .mkt-foot__bottom {
+    margin-block-start: var(--mkt-space-4);
+  }
+
+  // ---- §28 · Narrow ---------------------------------------------------------------------
+  @media (max-width: 900px) {
+    .lg-shell {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--mkt-space-6);
+    }
+
+    /*
+      The contents stop being a rail and become a collapsed disclosure above the
+      document. Closed by default here — unlike the footer's columns, this is
+      navigation for content directly below it, so collapsing costs nothing.
+    */
+    .lg-toc {
+      position: static;
+      padding: var(--mkt-space-4);
+      border-radius: var(--mkt-radius);
+      border: 1px solid var(--mkt-light-border);
+      background: var(--mkt-white);
+    }
+
+    .lg-toc__head { cursor: pointer; }
+
+    .lg-toc__mark {
+      position: relative;
+      flex: none;
+      inline-size: 1.25rem;
+      block-size: 1.25rem;
+      transition: transform 0.25s ease;
+
+      &::before {
+        content: "";
+        position: absolute;
+        inset-block-start: 45%;
+        inset-inline-start: 50%;
+        inline-size: 6px;
+        block-size: 6px;
+        border-inline-end: 1.5px solid var(--mkt-ink-muted);
+        border-block-end: 1.5px solid var(--mkt-ink-muted);
+        transform: translate(-50%, -50%) rotate(45deg);
+      }
+    }
+
+    .lg-toc[open] .lg-toc__mark { transform: rotate(180deg); }
+  }
+
+  @media (max-width: 620px) {
+    .lg-p,
+    .lg-list li {
+      font-size: var(--mkt-body);
+    }
+
+    .lg-note {
+      padding-inline: var(--mkt-space-4);
+    }
+
+    .lg-table { min-inline-size: 26rem; }
   }
 }

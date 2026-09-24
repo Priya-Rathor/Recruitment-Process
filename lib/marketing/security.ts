@@ -482,14 +482,16 @@ export const SECURITY_PRIVACY = {
     },
   ],
   /*
-    THE HONEST GAP, and §16 forbids inventing a route for it: there is no
-    public privacy policy page in this project, and creating a fake /privacy
-    link would be exactly the fabrication the brief rules out.
+    WAS "there is no published privacy policy page yet", which was true until
+    Module 25 wrote one. The security test asserted that sentence precisely so
+    that adding the page would fail the build rather than leave this page
+    denying something that now exists — which is what it did.
   */
   note:
-    "There is no published privacy policy page yet. Saying so is more useful " +
-    "than linking to one that does not exist — and this page will say so until " +
-    "there is.",
+    "How this information is handled end to end — what is collected, what AI " +
+    "does with it, and what is not in place yet — is set out in full on the " +
+    "privacy page.",
+  link: { label: "Read the Scoreboad privacy page", href: "/privacy" },
 } as const;
 
 /**
