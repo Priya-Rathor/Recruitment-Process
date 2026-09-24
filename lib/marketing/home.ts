@@ -2394,7 +2394,9 @@ export const RESOURCE_GROUPS: { heading: string; note: string; items: Resource[]
         title: "The awkward questions, answered",
         description:
           "What the product does not do yet, what it does not hold, and what it costs — including the answers that are not flattering.",
-        href: "/#faq",
+        // Module 22 gave the FAQ its own page; this card now points at the
+        // resource rather than at a section of the page it sits on.
+        href: "/faq",
       },
     ],
   },

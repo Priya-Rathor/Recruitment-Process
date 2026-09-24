@@ -110,6 +110,11 @@ const PUBLIC_PATHS = [
   */
   "/contact",
   /*
+    The FAQ. Near miss: no private route begins with "/faq". Checked, as this
+    block requires of every addition.
+  */
+  "/faq",
+  /*
     THE CRAWLER FILES, and they were a REAL BUG rather than a precaution.
 
     `app/robots.ts` and `app/sitemap.ts` generate /robots.txt and /sitemap.xml,

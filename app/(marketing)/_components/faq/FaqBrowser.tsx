@@ -170,7 +170,21 @@ export function FaqBrowser() {
             {visible.map((item) => (
               <details key={item.id} id={item.id} className="faq-item">
                 <summary className="faq-item__q">
-                  <span>{item.q}</span>
+                  {/*
+                    THE QUESTION IS AN <h3>, INSIDE the summary.
+
+                    Without it the page has an h1, an h2 and then thirty-one
+                    questions that are not headings at all — so a screen-reader
+                    user cannot navigate the FAQ by heading, which is the single
+                    most common way of moving through a long page of them.
+
+                    Inside rather than around: <summary> must be the first child
+                    of <details>, so a heading cannot wrap it. The spec's content
+                    model for <summary> is phrasing content "optionally
+                    intermixed with heading content", so this is the arrangement
+                    the format actually allows.
+                  */}
+                  <h3 className="faq-item__qtext">{item.q}</h3>
                   {/* CSS chevron: the native marker cannot be styled consistently. */}
                   <span className="faq-item__mark" aria-hidden="true" />
                 </summary>

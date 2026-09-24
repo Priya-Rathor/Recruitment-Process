@@ -46,6 +46,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // The entry point for somebody evaluating the product, so it ranks with
     // the other conversion pages rather than with the reference ones.
     entry("/contact", 0.7, "monthly"),
+    // The FAQ answers the questions people search for by name, and it changes
+    // whenever the product gains or loses an answer.
+    entry("/faq", 0.7, "monthly"),
     ...CAPABILITY_GROUPS.map((group) => entry(`/product/${group.slug}`, 0.7, "monthly")),
     // Real entry points somebody may search for by name.
     entry("/signup", 0.5, "yearly"),

@@ -12430,4 +12430,509 @@
       padding: 0.6875rem 0.8125rem;
     }
   }
+
+  // ===========================================================================
+  // FAQ PAGE — Module 22
+  //
+  // A STICKY RAIL BESIDE A LIST, which is the one layout on this site that
+  // genuinely wants a side rail: the rail holds controls that act on the column
+  // next to it, so it has to stay reachable while that column scrolls. (The
+  // security page's contents strip is the opposite case — links that jump
+  // somewhere, on a page of full-bleed alternating bands.)
+  //
+  // THE DISCLOSURE IS NATIVE <details>. Everything below styles it; none of it
+  // replaces it.
+  // ===========================================================================
+
+  // ---- Hero -----------------------------------------------------------------
+  .faq-hero__title {
+    margin: 0;
+    max-width: 18ch;
+    font-family: var(--font-heading);
+    font-size: var(--mkt-h1);
+    font-weight: var(--weight-bold);
+    line-height: var(--mkt-leading-tight);
+    letter-spacing: -0.03em;
+    color: var(--mkt-on-dark);
+  }
+
+  .faq-hero__lead {
+    margin: var(--mkt-space-6) 0 0;
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-lead);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // ---- The two columns --------------------------------------------------------
+  .faq-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+    gap: clamp(1.75rem, 4vw, 3.5rem);
+    align-items: start;
+  }
+
+  .faq-rail__inner {
+    position: sticky;
+    // Clears the floating navbar, which sits at 0.75rem.
+    top: 5rem;
+    display: grid;
+    gap: var(--mkt-space-4);
+  }
+
+  // ---- Search -------------------------------------------------------------------
+  .faq-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .faq-search__icon {
+    position: absolute;
+    inset-inline-start: 0.6875rem;
+    display: grid;
+    place-items: center;
+    color: var(--mkt-ink-muted);
+    pointer-events: none;
+  }
+
+  .faq-search__input {
+    inline-size: 100%;
+    padding: 0.5625rem 2.25rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid var(--mkt-light-border-strong);
+    background: var(--mkt-white);
+    font-family: inherit;
+    font-size: var(--mkt-body);
+    color: var(--mkt-ink);
+
+    &::placeholder { color: var(--mkt-ink-muted); }
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--mkt-accent);
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+
+    // Safari draws its own clear control on type=search; ours is a real button
+    // with a label, so the native one would be a second, unlabelled copy.
+    &::-webkit-search-cancel-button { display: none; }
+  }
+
+  .faq-search__clear {
+    position: absolute;
+    inset-inline-end: 0.5rem;
+    display: grid;
+    place-items: center;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--mkt-ink-muted);
+    cursor: pointer;
+
+    &:hover { color: var(--mkt-ink); }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  // ---- Categories ------------------------------------------------------------------
+  .faq-cats {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .faq-cat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mkt-space-3);
+    inline-size: 100%;
+    padding: 0.4375rem 0.6875rem;
+    border-radius: var(--mkt-radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    font-family: inherit;
+    font-size: var(--mkt-small);
+    font-weight: var(--weight-medium);
+    text-align: start;
+    color: var(--mkt-ink-muted);
+    cursor: pointer;
+    transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+
+    &:hover {
+      color: var(--mkt-ink);
+      background: var(--mkt-white);
+      border-color: var(--mkt-light-border);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+
+    /*
+      `aria-pressed` IS THE STYLING HOOK, so the state a screen reader announces
+      and the state a sighted reader sees come from one attribute and cannot
+      disagree. Used the same way on the pipeline board's column focus.
+    */
+    &[aria-pressed="true"] {
+      color: var(--mkt-accent-ink);
+      background: var(--mkt-white);
+      border-color: var(--mkt-accent);
+      box-shadow: var(--mkt-glow-card);
+    }
+  }
+
+  .faq-cat__count {
+    flex: none;
+    font-size: var(--mkt-caption);
+    font-variant-numeric: tabular-nums;
+    color: var(--mkt-ink-muted);
+  }
+
+  .faq-cat[aria-pressed="true"] .faq-cat__count { color: var(--mkt-accent-ink); }
+
+  // ---- The list -------------------------------------------------------------------------
+  .faq-count {
+    margin: 0 0 var(--mkt-space-4);
+    font-size: var(--mkt-caption);
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--mkt-ink-muted);
+  }
+
+  .faq-list {
+    display: grid;
+    gap: 0.625rem;
+  }
+
+  /*
+    A CARD PER QUESTION rather than hairlines between rows. The answers here are
+    several sentences long and often carry a chain and two links; separated only
+    by a rule, an open answer runs into the next question.
+  */
+  .faq-item {
+    border-radius: var(--mkt-radius);
+    border: 1px solid var(--mkt-light-border);
+    background: var(--mkt-white);
+    box-shadow: var(--mkt-glow-card);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover { border-color: var(--mkt-light-border-strong); }
+
+    // The open question gets the periwinkle edge and a soft glow — the design
+    // system's way of saying "this is the live one" everywhere else too.
+    &[open] {
+      border-color: var(--mkt-accent);
+      box-shadow: var(--mkt-glow-card-hover);
+    }
+  }
+
+  .faq-item__q {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mkt-space-4);
+    padding: clamp(0.875rem, 1.8vw, 1.125rem) clamp(1rem, 2vw, 1.375rem);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    line-height: var(--mkt-leading-snug);
+    color: var(--mkt-ink);
+    cursor: pointer;
+    // Removes the native disclosure triangle, which cannot be styled the same
+    // way across browsers. The chevron below replaces it.
+    list-style: none;
+
+    &::-webkit-details-marker { display: none; }
+
+    &:focus-visible {
+      outline: none;
+      border-radius: var(--mkt-radius);
+      box-shadow: var(--mkt-focus-ring-light);
+    }
+  }
+
+  /*
+    The <h3> carries no type styling of its own — the <summary> above sets the
+    family, size and weight for the whole row. The heading is there for the
+    document outline, and it must not also change how the row looks.
+  */
+  .faq-item__qtext {
+    margin: 0;
+    font: inherit;
+    color: inherit;
+  }
+
+  .faq-item__mark {
+    flex: none;
+    position: relative;
+    inline-size: 1.625rem;
+    block-size: 1.625rem;
+    border-radius: 50%;
+    border: 1px solid var(--mkt-light-border-strong);
+    background: var(--mkt-light);
+    transition: transform 0.25s ease, border-color 0.2s ease, background 0.2s ease;
+
+    // The chevron itself, drawn with two borders on a rotated square.
+    &::before {
+      content: "";
+      position: absolute;
+      inset-block-start: 45%;
+      inset-inline-start: 50%;
+      inline-size: 6px;
+      block-size: 6px;
+      border-inline-end: 1.5px solid var(--mkt-ink-muted);
+      border-block-end: 1.5px solid var(--mkt-ink-muted);
+      transform: translate(-50%, -50%) rotate(45deg);
+    }
+  }
+
+  .faq-item[open] .faq-item__mark {
+    transform: rotate(180deg);
+    border-color: var(--mkt-accent);
+    background: var(--mkt-white);
+  }
+
+  .faq-item__body {
+    padding: 0 clamp(1rem, 2vw, 1.375rem) clamp(1rem, 2vw, 1.375rem);
+  }
+
+  .faq-item__a {
+    margin: 0;
+    max-width: var(--mkt-max-prose);
+    font-size: var(--mkt-body);
+    line-height: var(--mkt-leading-normal);
+    color: var(--mkt-ink-muted);
+  }
+
+  /*
+    THE PRODUCT CHAIN. Real stage names with a separator between them — it is a
+    sequence, so it is an <ol>, and the arrows are drawn by CSS so they are
+    never read aloud as punctuation.
+  */
+  .faq-flow {
+    list-style: none;
+    margin: var(--mkt-space-4) 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+
+    li {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.1875rem 0.5625rem;
+      border-radius: 999px;
+      border: 1px solid var(--mkt-light-border-strong);
+      background: var(--mkt-light);
+      font-size: var(--mkt-caption);
+      font-weight: var(--weight-medium);
+      color: var(--mkt-ink);
+    }
+
+    li:not(:last-child)::after {
+      content: "";
+      inline-size: 5px;
+      block-size: 5px;
+      border-inline-end: 1.5px solid var(--mkt-accent);
+      border-block-start: 1.5px solid var(--mkt-accent);
+      transform: rotate(45deg);
+    }
+
+    // The last step is the outcome, so it carries the mint edge the rest of the
+    // site uses for a completed state.
+    li:last-child {
+      border-color: var(--mkt-mint-ink);
+      color: var(--mkt-mint-ink);
+    }
+  }
+
+  .faq-item__links {
+    list-style: none;
+    margin: var(--mkt-space-4) 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mkt-space-4);
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3125rem;
+      font-size: var(--mkt-small);
+      font-weight: var(--weight-medium);
+      color: var(--mkt-accent-ink);
+      text-decoration: none;
+
+      svg { transition: transform 0.2s ease; }
+
+      &:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+
+        svg { transform: translateX(3px); }
+      }
+
+      &:focus-visible {
+        outline: none;
+        border-radius: var(--mkt-radius-sm);
+        box-shadow: var(--mkt-focus-ring-light);
+      }
+    }
+  }
+
+  // ---- Empty state ------------------------------------------------------------------------
+  .faq-empty {
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    border-radius: var(--mkt-radius);
+    border: 1px dashed var(--mkt-light-border-strong);
+    background: var(--mkt-white);
+    text-align: center;
+  }
+
+  .faq-empty__title {
+    margin: 0 0 var(--mkt-space-2);
+    font-family: var(--font-heading);
+    font-size: var(--mkt-body-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .faq-empty__body {
+    margin: 0 0 var(--mkt-space-4);
+    font-size: var(--mkt-body);
+    color: var(--mkt-ink-muted);
+  }
+
+  // ---- The homepage section's link onward -----------------------------------------------------
+  .mkt-faqmore {
+    margin: var(--mkt-space-6) 0 0;
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-weight: var(--weight-medium);
+      color: var(--mkt-accent-ink);
+      text-decoration: none;
+
+      svg { transition: transform 0.2s ease; }
+
+      &:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+
+        svg { transform: translateX(3px); }
+      }
+    }
+  }
+
+  .faq-cta__buttons {
+    margin-block-start: clamp(1.75rem, 3vw, 2.5rem);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--mkt-space-4);
+  }
+
+  // ---- §9 · Motion -----------------------------------------------------------------------------
+  /*
+    ALL OPTIONAL, and the content is identical without it. The answer fades and
+    lifts a few pixels on open; nothing scales, nothing bounces and nothing
+    animates unprompted.
+
+    THE HEIGHT TRANSITION IS BEHIND @supports. Animating a <details> open used
+    to be impossible without JavaScript; `::details-content` plus
+    `interpolate-size` makes it a few lines, and where the browser does not have
+    them the panel simply appears — which is what it did before, and is fine.
+  */
+  @media (prefers-reduced-motion: no-preference) {
+    .faq-item[open] .faq-item__body {
+      animation: faq-open 0.26s ease-out;
+    }
+
+    @supports (interpolate-size: allow-keywords) {
+      .faq-item {
+        interpolate-size: allow-keywords;
+      }
+
+      .faq-item::details-content {
+        block-size: 0;
+        overflow: hidden;
+        transition: block-size 0.28s ease, content-visibility 0.28s allow-discrete;
+      }
+
+      .faq-item[open]::details-content {
+        block-size: auto;
+      }
+    }
+  }
+
+  @keyframes faq-open {
+    from { opacity: 0; transform: translateY(-0.25rem); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  // ---- §19 · Mobile --------------------------------------------------------------------------------
+  /*
+    NOT A SQUEEZED DESKTOP. The rail stops being a rail: it unsticks, sits above
+    the list, and the categories become a swipeable strip — the page itself
+    never scrolls sideways, that one element does.
+  */
+  @media (max-width: 900px) {
+    .faq-shell {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--mkt-space-6);
+    }
+
+    .faq-rail__inner {
+      position: static;
+    }
+
+    .faq-cats {
+      display: flex;
+      gap: var(--mkt-space-2);
+      overflow-x: auto;
+      scrollbar-width: none;
+      // Room for the pressed pill's glow, which a tight overflow box clips.
+      padding-block-end: 0.25rem;
+
+      &::-webkit-scrollbar { display: none; }
+    }
+
+    .faq-cat {
+      inline-size: auto;
+      flex: none;
+      white-space: nowrap;
+      border-color: var(--mkt-light-border);
+      background: var(--mkt-white);
+      // A comfortable target on a phone.
+      padding: 0.5rem 0.875rem;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .faq-item__q {
+      font-size: var(--mkt-body);
+    }
+
+    .faq-cta__buttons .mkt-btn {
+      inline-size: 100%;
+      justify-content: center;
+    }
+
+    // 16px, so iOS does not zoom the viewport when the field takes focus.
+    .faq-search__input {
+      font-size: 1rem;
+    }
+  }
 }

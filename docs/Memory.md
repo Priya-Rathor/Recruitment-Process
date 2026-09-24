@@ -2575,3 +2575,52 @@ Two bugs fixed while building:
   unreliably.** Restructured so the `aria-live` element is permanent and empty
   and only its contents appear. Do NOT give it `display: contents` — that value
   can drop an element from the accessibility tree, which is the same failure.
+
+## 2026-09-23 (fourth session)
+
+**Module 22 — `/faq`.** Fourth dedicated marketing route, and the site's
+canonical FAQ destination.
+
+- New: `lib/marketing/faq.ts`, `lib/marketing/faq.test.ts` (24 assertions),
+  `app/(marketing)/faq/page.tsx`,
+  `app/(marketing)/_components/faq/FaqBrowser.tsx`, `.faq-*` SCSS block.
+- Wired: `PUBLIC_PATHS`, `INTERNAL_ROUTES`, sitemap (0.7/monthly).
+- Repointed to `/faq`: nav "Frequently Asked Questions", footer, TrustSection,
+  and the Resources index card. All four previously pointed at `/#faq`.
+
+**31 questions across 7 categories.** The homepage's 9 are **imported from
+`HOME_FAQS`** and given a category/links via a `HOME_META` map keyed on the
+question text — not copied. A rename leaves an entry without metadata and
+`faq.test.ts` catches it. The homepage section stays as the short version and
+links onward.
+
+**The FAQPage JSON-LD MOVED off the homepage** rather than being added. Two
+FAQPage entities describing overlapping content is the duplicate schema the
+brief rules out, so there is now exactly one, on the canonical FAQ URL, built
+from the same array the page renders. Verified: all 31 schema questions appear
+in the rendered HTML.
+
+Decisions worth keeping:
+
+- **Native `<details>`/`<summary>`, reused from the homepage FAQ** rather than a
+  hand-built accordion — Enter and Space, expanded state and keyboard operation
+  all come from the browser, and Step 8's "no clickable div as a fake button" is
+  free. Multiple answers may be open at once (no `name` attribute): these
+  questions get compared, so exclusive behaviour would be wrong.
+- **The question is an `<h3>` INSIDE the `<summary>`.** Without it the page had
+  h1, h2, then 31 questions that were not headings — no heading navigation on
+  exactly the page type people navigate by heading. `<summary>` cannot be
+  wrapped in a heading (it must be the first child of `<details>`), and the
+  spec's content model for it is phrasing content "optionally intermixed with
+  heading content", so inside is the arrangement the format allows. The h3 is
+  `font: inherit` so the row looks identical.
+- **The `::details-content` height transition sits behind
+  `@supports (interpolate-size: allow-keywords)`.** Where unsupported the panel
+  just appears, which is what it did before.
+
+Questions asked *because* the answer is no: "Does Scoreboad conduct AI
+interviews?" (no — screening calls; Module 07's distinction), "Can I drag a
+candidate between stages?" (no, deliberate), "Is there a free trial?",
+"Can I talk to someone?", certification. The test checks these per-item — a
+question may contain the loose phrase as long as its answer denies it, which is
+why a bare keyword ban would have deleted the most useful answers.

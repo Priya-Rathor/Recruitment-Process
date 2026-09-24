@@ -30,6 +30,7 @@ describe("isPublicPath", () => {
       "/about",
       "/security",
       "/contact",
+      "/faq",
       "/how-it-works",
       "/product",
       "/product/source",
@@ -146,6 +147,7 @@ describe("isPublicPath", () => {
       // No /contacts route exists today. This is the guard for the day a
       // private one is added and nobody rereads the allowlist.
       expect(isPublicPath("/contacts")).toBe(false);
+      expect(isPublicPath("/faqs")).toBe(false);
     });
 
     it("cannot be escaped by appending a segment to a public leaf", () => {

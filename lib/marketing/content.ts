@@ -475,6 +475,7 @@ export const INTERNAL_ROUTES: string[] = [
   "/about",
   "/security",
   "/contact",
+  "/faq",
   "/how-it-works",
   "/login",
   "/signup",
