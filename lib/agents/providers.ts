@@ -95,3 +95,12 @@ export const supportsVoiceInterview = (provider: ProviderId) => supports(provide
 export function providersFor(type: AgentType): ProviderDefinition[] {
   return PROVIDER_IDS.map((id) => PROVIDERS[id]).filter((provider) => supports(provider.id, type));
 }
+
+/**
+ * The providers a user can actually CHOOSE for this type: documented AND with
+ * an adapter built. The create flow offers only these; a documented provider
+ * without an adapter gets a one-line "not available yet", never a card.
+ */
+export function selectableProvidersFor(type: AgentType): ProviderDefinition[] {
+  return providersFor(type).filter((provider) => provider.adapter === "built");
+}

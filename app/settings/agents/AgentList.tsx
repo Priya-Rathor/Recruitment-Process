@@ -8,6 +8,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { FormError } from "@/components/ui/states";
 import {
   AGENT_TYPE_META,
+  CHANNEL_LABELS,
   STATUS_META,
   allowedStatuses,
   type AgentStatus,
@@ -32,7 +33,7 @@ const TYPE_GROUPS: { label: string; types: AgentType[] }[] = [
   { label: "Screening", types: ["cv_screening"] },
   { label: "Communication", types: ["whatsapp_reply", "email_reply"] },
   { label: "Assessment", types: ["assessment"] },
-  { label: "Custom", types: ["universal", "custom_llm"] },
+  { label: "Custom", types: ["custom"] },
 ];
 
 /**
@@ -49,10 +50,7 @@ function executorLabel(
     return `${PROVIDERS[agent.provider].label}${connected ? "" : " (not connected)"}`;
   }
   const dependency = AGENT_TYPE_META[agent.type].dependency;
-  if (dependency.kind === "channel")
-    return dependency.integration === "whatsapp"
-      ? "WhatsApp Business"
-      : "Email";
+  if (dependency.kind === "channel") return CHANNEL_LABELS[dependency.integration];
   if (dependency.kind === "provider") return "No provider available yet";
   return "Scoreboad AI";
 }

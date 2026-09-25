@@ -1,6 +1,6 @@
 "use client";
 
-import { Field, SettingsForm } from "../SettingsForm";
+import { Field, SettingsForm } from "../../SettingsForm";
 import { MAX_ALLOWED_ATTEMPTS, MIN_ALLOWED_DELAY_MINUTES } from "@/lib/screening/retry";
 
 export function ScreeningForm({

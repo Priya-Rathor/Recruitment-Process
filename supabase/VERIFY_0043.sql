@@ -8,7 +8,7 @@
 -- PostgREST client and a rule kept only in a route handler is skipped by a
 -- request sent straight to /rest/v1. None of them is reachable from vitest.
 --
--- Every check RAISES on failure: this prints eleven PASS notices or stops at the
+-- Every check RAISES on failure: this prints twelve PASS notices or stops at the
 -- first thing that is wrong.
 -- =============================================================================
 
@@ -97,7 +97,7 @@ begin
   v_raised := false;
   begin
     insert into public.agents (organization_id, name, type, status)
-    values (k_org_a, 'x', 'custom_llm', 'active');
+    values (k_org_a, 'x', 'custom', 'active');
   exception when check_violation then v_raised := true;
   end;
   if not v_raised then raise exception 'FAIL (check 3): a custom LLM agent was made active with no runtime'; end if;
@@ -191,7 +191,7 @@ begin
   -- 9. RLS: org A's Owner cannot see or write org B; a Recruiter cannot write.
   -- ---------------------------------------------------------------------------
   insert into public.agents (organization_id, name, type)
-  values (k_org_b, 'Org B agent', 'universal') returning id into v_other;
+  values (k_org_b, 'Org B agent', 'assessment') returning id into v_other;
 
   perform set_config('request.jwt.claims', json_build_object('sub', k_auth_o)::text, true);
   set local role authenticated;
@@ -201,7 +201,7 @@ begin
 
   v_raised := false;
   begin
-    insert into public.agents (organization_id, name, type) values (k_org_b, 'x', 'universal');
+    insert into public.agents (organization_id, name, type) values (k_org_b, 'x', 'assessment');
   exception when insufficient_privilege then v_raised := true;
   end;
   if not v_raised then raise exception 'FAIL (check 9b): org A wrote an agent into org B'; end if;
@@ -220,7 +220,7 @@ begin
 
   v_raised := false;
   begin
-    insert into public.agents (organization_id, name, type) values (k_org_a, 'x', 'universal');
+    insert into public.agents (organization_id, name, type) values (k_org_a, 'x', 'assessment');
   exception when insufficient_privilege then v_raised := true;
   end;
   if not v_raised then raise exception 'FAIL (check 9e): a Recruiter created an agent'; end if;
@@ -251,6 +251,18 @@ begin
   end;
   if not v_raised then raise exception 'FAIL (check 11): a CV screening agent was made active with no runtime'; end if;
   raise notice 'PASS 11 — CV screening agents save as drafts and cannot be activated yet';
+
+  -- ---------------------------------------------------------------------------
+  -- 12. 0045: the retired Universal type is refused (merged into Custom).
+  -- ---------------------------------------------------------------------------
+  v_raised := false;
+  begin
+    execute $sql$insert into public.agents (organization_id, name, type)
+      values ('00000000-0000-4000-8000-0000000043a0', 'x', 'universal')$sql$;
+  exception when check_violation then v_raised := true;
+  end;
+  if not v_raised then raise exception 'FAIL (check 12): a Universal agent was created after 0045 retired it'; end if;
+  raise notice 'PASS 12 — eight types: Universal is retired';
 end;
 $$;
 

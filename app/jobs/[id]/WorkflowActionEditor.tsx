@@ -18,10 +18,13 @@
 //     POST /api/settings/message-templates, the same endpoint the settings page
 //     uses.
 //   - "+ New form" POSTs to /api/forms, the same endpoint the Forms page uses.
-//   - "+ New agent" POSTs to /api/settings/voice-agents, the same endpoint the
-//     Voice Agent Console uses.
+//   - NO "+ New agent". Agents are created in exactly one place, Settings →
+//     Agents; this picker only ASSIGNS an existing one to the stage (the
+//     assignment is `config.agent_id`), and links there to create one. A
+//     quick-create here was a second agent-creation path that skipped the
+//     Agent Center's type and provider choice.
 //
-// The two POST flows ask only for a NAME here, and then link to the full editor.
+// The POST flow asks only for a NAME here, and then link to the full editor.
 // That is not a cut-down duplicate: creating a form or an agent through those
 // endpoints genuinely takes only a name (the rest is defaulted and edited
 // afterwards), which is exactly what their own pages do. Reproducing the field
@@ -74,7 +77,6 @@ import {
   type ApplicationStage,
 } from "@/lib/applications/stages";
 import type {
-  AgentOption,
   FormOption,
   MemberOption,
   TemplateOption,
@@ -171,7 +173,7 @@ export function WorkflowActionEditor({
   customFields?: PlaceholderField[];
 }) {
   const router = useRouter();
-  const [creating, setCreating] = useState<"template" | "form" | "agent" | null>(null);
+  const [creating, setCreating] = useState<"template" | "form" | null>(null);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,25 +190,24 @@ export function WorkflowActionEditor({
     patch({ recipients: next });
   }
 
-  async function createSimple(kind: "form" | "agent") {
+  async function createForm() {
     const name = newName.trim();
     if (name.length === 0) {
-      setError(kind === "form" ? "Give the form a name." : "Give the agent a name.");
+      setError("Give the form a name.");
       return;
     }
 
     setBusy(true);
     setError(null);
 
-    const endpoint = kind === "form" ? "/api/forms" : "/api/settings/voice-agents";
-    const response = await fetch(endpoint, {
+    const response = await fetch("/api/forms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
 
     const payload = (await response.json().catch(() => null)) as
-      | { data?: { id?: string; name?: string; purpose?: string; status?: string }; error?: string }
+      | { data?: { id?: string; name?: string; status?: string }; error?: string }
       | null;
 
     setBusy(false);
@@ -218,24 +219,13 @@ export function WorkflowActionEditor({
 
     const created = payload.data;
 
-    if (kind === "form") {
-      const option: FormOption = {
-        id: created.id as string,
-        name: created.name ?? name,
-        status: created.status ?? "draft",
-      };
-      onOptionsChanged({ forms: [option, ...options.forms] });
-      patch({ form_id: option.id });
-    } else {
-      const option: AgentOption = {
-        id: created.id as string,
-        name: created.name ?? name,
-        purpose: created.purpose ?? "screening",
-        isDefault: false,
-      };
-      onOptionsChanged({ agents: [option, ...options.agents] });
-      patch({ agent_id: option.id });
-    }
+    const option: FormOption = {
+      id: created.id as string,
+      name: created.name ?? name,
+      status: created.status ?? "draft",
+    };
+    onOptionsChanged({ forms: [option, ...options.forms] });
+    patch({ form_id: option.id });
 
     setCreating(null);
     setNewName("");
@@ -389,10 +379,14 @@ export function WorkflowActionEditor({
           // it means "whatever this organization's default agent is", which is
           // how every screening call worked before this builder existed.
           placeholder="Organization default"
-          emptyNote="No agents configured — the organization default will dial."
-          onCreateNew={() => setCreating("agent")}
-          createLabel="New agent"
+          emptyNote="No voice agents yet — the organization default will dial."
         />
+      )}
+      {action.type === "start_screening_call" && (
+        <p className="has-text-secondary mb-3" style={{ fontSize: 12, marginTop: "-0.5rem" }}>
+          Voice agents are created and configured in{" "}
+          <Link href="/settings/agents">Settings → Agents</Link>.
+        </p>
       )}
 
       {action.type === "ai_resume_shortlist" && (
@@ -525,10 +519,10 @@ export function WorkflowActionEditor({
         </div>
       )}
 
-      {(creating === "form" || creating === "agent") && (
+      {creating === "form" && (
         <div className="mt-4" style={{ borderTop: "1px solid var(--color-border)", paddingTop: 16 }}>
           <label className="label is-small" htmlFor="new-item-name">
-            {creating === "form" ? "New form name" : "New agent name"}
+            New form name
           </label>
           <div className="is-flex" style={{ gap: "0.5rem" }}>
             <input
@@ -541,7 +535,7 @@ export function WorkflowActionEditor({
             <button
               type="button"
               className={`button is-small is-primary ${busy ? "is-loading" : ""}`}
-              onClick={() => createSimple(creating)}
+              onClick={createForm}
               disabled={busy}
             >
               Create
@@ -559,18 +553,8 @@ export function WorkflowActionEditor({
             </button>
           </div>
           <p className="has-text-secondary mt-2" style={{ fontSize: 12 }}>
-            {creating === "form" ? (
-              <>
-                Creates a draft form and selects it here. Add its questions and publish it on the{" "}
-                <Link href="/forms">Forms</Link> page — an unpublished form is skipped rather than
-                sent.
-              </>
-            ) : (
-              <>
-                Creates an agent with the default persona and selects it here. Give it its script
-                and voice in the <Link href="/settings/voice-agents">Voice Agent Console</Link>.
-              </>
-            )}
+            Creates a draft form and selects it here. Add its questions and publish it on the{" "}
+            <Link href="/forms">Forms</Link> page — an unpublished form is skipped rather than sent.
           </p>
         </div>
       )}

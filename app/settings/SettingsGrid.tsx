@@ -176,12 +176,20 @@ export function SettingsGrid({ categories }: { categories: SettingsCategory[] })
                           shell and no "back to Settings". Better to say so than
                           to let someone wonder where Settings went.
                         */}
+                        {/*
+                          The arrow means "leaves Settings", NOT "leaves
+                          Scoreboad" — a usability audit read it as an
+                          external-site icon and asked for it on Bolna and
+                          Google Calendar, which stay inside Settings
+                          (/settings/integrations). So it now SAYS what it
+                          means: a tooltip for pointer users and the same words
+                          for screen readers, instead of an unexplained glyph.
+                        */}
                         {link.external && (
-                          <ArrowUpRight
-                            size={12}
-                            aria-hidden="true"
-                            className="settings-card__external"
-                          />
+                          <span className="settings-card__external" title="Opens outside Settings">
+                            <ArrowUpRight size={12} aria-hidden="true" />
+                            <span className="is-sr-only"> (opens outside Settings)</span>
+                          </span>
                         )}
                       </span>
                       <span className="settings-card__description">{link.description}</span>

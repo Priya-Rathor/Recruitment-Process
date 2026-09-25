@@ -22,9 +22,10 @@
 // =============================================================================
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { AccountRows } from "./AccountRows";
-import { initialsFrom } from "./navItems";
+import { ACCOUNT_NAV_ITEMS, initialsFrom, isActiveHref } from "./navItems";
 
 export type AccountMenuProps = {
   userName: string | null;
@@ -74,17 +75,25 @@ export function AccountMenu({
   }, [open]);
 
   const initials = initialsFrom(userName, userEmail);
+  /*
+    Settings, Analytics and the Audit log live in this menu, not in the main
+    bar — so on those pages NOTHING in the bar was marked current and a user
+    had no "you are here". The trigger carries the active state instead, and
+    its accessible name says which section is open.
+  */
+  const pathname = usePathname();
+  const currentSection = ACCOUNT_NAV_ITEMS.find((item) => isActiveHref(pathname, item.href));
   const hasUnread = unreadCount !== null && unreadCount > 0;
 
   return (
     <div ref={containerRef} className="account-menu">
       <button
         type="button"
-        className="account-menu__trigger"
+        className={`account-menu__trigger${currentSection ? " is-active" : ""}`}
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Account menu"
+        aria-label={currentSection ? `Account menu, current section: ${currentSection.label}` : "Account menu"}
       >
         <span className="account-menu__avatar" aria-hidden="true">
           {initials}

@@ -20,7 +20,6 @@ import {
   Mail,
   MessageCircle,
   Mic,
-  Orbit,
   PhoneCall,
   Video,
   type LucideIcon,
@@ -34,8 +33,7 @@ export const AGENT_TYPES = [
   "assessment",
   "whatsapp_reply",
   "email_reply",
-  "universal",
-  "custom_llm",
+  "custom",
 ] as const;
 export type AgentType = (typeof AGENT_TYPES)[number];
 
@@ -58,9 +56,20 @@ export function isAgentStatus(value: unknown): value is AgentStatus {
  *   Integrations — there is no per-agent provider to choose.
  * - `none`: it runs on the platform's own AI provider.
  */
+/** Integrations an agent runs on without a per-agent provider choice. */
+export type ChannelIntegration = "whatsapp" | "email" | "calendar";
+
+export const CHANNEL_LABELS: Record<ChannelIntegration, string> = {
+  whatsapp: "WhatsApp Business",
+  email: "Email",
+  // The one video provider in the product: Google Meet links, created through
+  // the Google Calendar integration. Named as what the user connects.
+  calendar: "Google Meet (Google Calendar)",
+};
+
 export type AgentDependency =
   | { kind: "provider" }
-  | { kind: "channel"; integration: "whatsapp" | "email" }
+  | { kind: "channel"; integration: ChannelIntegration }
   | { kind: "none" };
 
 export type AgentTypeMeta = {
@@ -103,12 +112,13 @@ export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
     label: "Video Interview Agent",
     purpose: "AI-powered or AI-assisted video interview workflows.",
     icon: Video,
-    // A provider in principle — but none exists. Google Meet schedules a call;
-    // it cannot conduct one, so it is not offered as an executor.
-    dependency: { kind: "provider" },
+    // The video provider that exists is Google Meet, through the Google
+    // Calendar integration — checked like WhatsApp is for the WhatsApp agent.
+    // No Zoom/Teams/Daily: none is implemented, so none is offered.
+    dependency: { kind: "channel", integration: "calendar" },
     runnable: false,
     blockedReason:
-      "No video interview provider is available yet. Scheduled video interviews use Google Meet links, which can't run an agent.",
+      "Video interviews run on Google Meet links today, led by a person. An agent that joins or assists them isn't built yet.",
   },
   cv_screening: {
     label: "CV Screening Agent",
@@ -143,21 +153,14 @@ export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
     runnable: false,
     blockedReason: "The assessment engine isn't built yet. Submissions are still reviewed by a person.",
   },
-  universal: {
-    label: "Universal Agent",
-    purpose: "A reusable AI agent for supported hiring workflows.",
-    icon: Orbit,
-    dependency: { kind: "none" },
-    runnable: false,
-    blockedReason: "Attaching agents to hiring steps isn't built yet.",
-  },
-  custom_llm: {
-    label: "Custom LLM Agent",
-    purpose: "A custom LLM-powered agent with your own instructions.",
+  // Was two types (Universal, Custom LLM) until migration 0045 merged them.
+  custom: {
+    label: "Custom Agent",
+    purpose: "Your own AI agent, defined by your instructions, for supported workflows.",
     icon: Braces,
     dependency: { kind: "none" },
     runnable: false,
-    blockedReason: "Running custom agents isn't built yet.",
+    blockedReason: "Running custom agents in a workflow isn't built yet.",
   },
 };
 

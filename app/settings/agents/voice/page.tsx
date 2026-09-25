@@ -9,6 +9,8 @@ import {
 } from "@/lib/voice/queries";
 import { getAgentCostEstimate } from "@/lib/voice/cost";
 import { RestrictedPanel, SettingsShell } from "../../SettingsShell";
+import { getOrganizationSettings } from "@/lib/settings/queries";
+import { ScreeningForm } from "./ScreeningForm";
 import { VoiceAgentConsole } from "./VoiceAgentConsole";
 
 export const metadata = { title: "Voice agents" };
@@ -80,7 +82,14 @@ async function ConsoleBody({
 }) {
   // In parallel: nothing here depends on anything else here, and the catalogue
   // involves a provider round trip that must not delay the rest of the page.
-  const [{ agents, notBuilt, failed }, catalog, status, jobs, costEstimate] = await Promise.all([
+  const [
+    { agents, notBuilt, failed },
+    catalog,
+    status,
+    jobs,
+    costEstimate,
+    orgSettings,
+  ] = await Promise.all([
     listVoiceAgents({ organizationId, companyName: organizationName }),
     listAgentCatalog(organizationId),
     getStatus(organizationId),
@@ -91,9 +100,11 @@ async function ConsoleBody({
       header says so in words rather than inventing a figure. See lib/voice/cost.
     */
     getAgentCostEstimate({ organizationId }),
+    getOrganizationSettings(organizationId),
   ]);
 
-  if (failed) return <ErrorState message="Couldn't load the voice agent settings." />;
+  if (failed)
+    return <ErrorState message="Couldn't load the voice agent settings." />;
 
   if (notBuilt) {
     /*
@@ -105,10 +116,14 @@ async function ConsoleBody({
     return (
       <div className="card">
         <h2 className="title is-5">Not set up on this server yet</h2>
-        <p className="has-text-secondary" style={{ fontSize: "var(--text-body)" }}>
-          The voice agent tables haven&apos;t been created. An operator needs to apply migration{" "}
-          <code>0034_module24_voice_agent_console.sql</code>. Screening calls keep working with the
-          existing configuration in the meantime.
+        <p
+          className="has-text-secondary"
+          style={{ fontSize: "var(--text-body)" }}
+        >
+          The voice agent tables haven&apos;t been created. An operator needs to
+          apply migration <code>0034_module24_voice_agent_console.sql</code>.
+          Screening calls keep working with the existing configuration in the
+          meantime.
         </p>
       </div>
     );
@@ -116,24 +131,55 @@ async function ConsoleBody({
 
   // Only for the agent the console opens on — a switch loads the other agent's
   // own history through its own request rather than pre-fetching all of them.
-  const opening = agents.find((agent) => agent.id === requestedAgentId) ?? agents[0];
+  const opening =
+    agents.find((agent) => agent.id === requestedAgentId) ?? agents[0];
   const initialTestCall = opening
     ? await getLatestTestCall({ organizationId, agentId: opening.id })
     : null;
 
   return (
-    <VoiceAgentConsole
-      initialAgents={agents}
-      initialActiveId={opening?.id ?? null}
-      catalog={catalog}
-      connection={{
-        connected: status.status === "connected",
-        encryptionUnavailable: status.encryptionUnavailable,
-      }}
-      jobs={jobs}
-      initialTestCall={initialTestCall}
-      costEstimate={costEstimate}
-      organizationName={organizationName}
-    />
+    <>
+      <VoiceAgentConsole
+        initialAgents={agents}
+        initialActiveId={opening?.id ?? null}
+        catalog={catalog}
+        connection={{
+          connected: status.status === "connected",
+          encryptionUnavailable: status.encryptionUnavailable,
+        }}
+        jobs={jobs}
+        initialTestCall={initialTestCall}
+        costEstimate={costEstimate}
+        organizationName={organizationName}
+      />
+
+      {/*
+      CALL RULES — moved here from the retired "Screening" settings page, which
+      now redirects to #call-rules. They are part of the voice screening
+      agent's behaviour (how often it may telephone somebody, in which
+      language, whether it records), so they live with the agent, not in a
+      separate "defaults" card. ONE set per organization, not per agent: the
+      screening scheduler reads them for every call, whichever agent places it,
+      and this card says so rather than implying a per-agent setting that
+      nothing reads. Its own Save, because it is its own record.
+    */}
+      <section
+        id="call-rules"
+        className="card mt-5"
+        aria-labelledby="call-rules-title"
+      >
+        <h2 id="call-rules-title" className="title is-5 mb-1">
+          Call rules
+        </h2>
+        <p className="has-text-secondary mb-4" style={{ fontSize: 13 }}>
+          Apply to every voice screening agent in your organization.
+        </p>
+        {orgSettings.failed ? (
+          <ErrorState message="Couldn't load the call rules." />
+        ) : (
+          <ScreeningForm initial={orgSettings.settings.screening_settings} />
+        )}
+      </section>
+    </>
   );
 }

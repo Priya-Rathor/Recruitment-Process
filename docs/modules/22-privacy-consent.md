@@ -74,7 +74,7 @@ Touched: `lib/settings/queries.ts` (carries `privacy_settings`),
 `lib/activity/{events,types}.ts` (11 privacy events, `privacy` entity),
 `lib/screening/script.ts` (accepts privacy segments), `lib/screening/retry.ts`
 (`consent_declined` is terminal), `app/settings/SettingsShell.tsx` (nav),
-`app/settings/screening/ScreeningForm.tsx` (cross-link).
+`app/settings/agents/voice/ScreeningForm.tsx` (cross-link).
 
 ### Design decisions worth knowing
 

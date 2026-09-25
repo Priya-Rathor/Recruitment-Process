@@ -10,10 +10,11 @@ import { FormError } from "@/components/ui/states";
 import {
   AGENT_TYPES,
   AGENT_TYPE_META,
+  CHANNEL_LABELS,
   EXTERNALLY_MANAGED,
   type AgentType,
 } from "@/lib/agents/types";
-import { providersFor, type ProviderId } from "@/lib/agents/providers";
+import { providersFor, selectableProvidersFor, type ProviderId } from "@/lib/agents/providers";
 import type { Connection, Connections } from "@/lib/agents/registry";
 import { AgentFields, toConfiguration, type AgentDraft } from "../AgentFields";
 
@@ -187,7 +188,7 @@ function TypeStep({ selected, onChoose }: { selected: AgentType | null; onChoose
                 {meta.dependency.kind === "provider"
                   ? "Choose a provider next"
                   : meta.dependency.kind === "channel"
-                    ? `Uses your ${meta.dependency.integration === "whatsapp" ? "WhatsApp" : "email"} integration`
+                    ? `Uses your ${CHANNEL_LABELS[meta.dependency.integration]} connection`
                     : "Runs on the platform AI provider"}
               </span>
             </button>
@@ -213,16 +214,19 @@ function ProviderStep({
   onBack: () => void;
   onContinueWithout: () => void;
 }) {
-  const providers = providersFor(type);
+  const providers = selectableProvidersFor(type);
+  // Documented by the provider but with no adapter in Scoreboad: named in one
+  // line, not offered as a choice.
+  const notYet = providersFor(type).filter((provider) => provider.adapter !== "built");
 
   return (
     <div className="card">
-      <h2 className="title is-5 mb-2">Who runs this agent?</h2>
+      <h2 className="title is-5 mb-2">Choose a provider</h2>
 
       {providers.length === 0 ? (
         <>
           <p className="has-text-secondary mb-4" style={{ fontSize: 14 }}>
-            {AGENT_TYPE_META[type].blockedReason}
+            No provider for this agent is available in Scoreboad yet.
           </p>
           <div className="is-flex is-justify-content-space-between" style={{ gap: 8, flexWrap: "wrap" }}>
             <Button variant="ghost" icon={ArrowLeft} onClick={onBack}>
@@ -235,33 +239,30 @@ function ProviderStep({
         </>
       ) : (
         <>
-          <ul className="agent-types agent-types--providers mb-4" aria-label="Providers">
-            {providers.map((provider, index) => {
-              const connection = connections.providers[provider.id];
-              const unavailable = provider.adapter !== "built";
-              return (
-                <li key={provider.id}>
-                  <button
-                    type="button"
-                    className="agent-type"
-                    style={{ ["--i" as string]: index }}
-                    aria-pressed={selected === provider.id}
-                    disabled={unavailable}
-                    onClick={() => onChoose(provider.id)}
-                  >
-                    <span className="agent-type__name">{provider.label}</span>
-                    <ConnectionChip connection={connection} />
-                    <span className="agent-type__purpose">
-                      {provider.capabilities.find((capability) => capability.type === type)?.evidence}
-                    </span>
-                    {unavailable && (
-                      <span className="agent-type__note">Not available in Scoreboad yet — no adapter is built.</span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
+          <ul className="agent-types agent-types--providers mb-3" aria-label="Providers">
+            {providers.map((provider, index) => (
+              <li key={provider.id}>
+                <button
+                  type="button"
+                  className="agent-type"
+                  style={{ ["--i" as string]: index }}
+                  aria-pressed={selected === provider.id}
+                  onClick={() => onChoose(provider.id)}
+                >
+                  <span className="agent-type__name">{provider.label}</span>
+                  <ConnectionChip connection={connections.providers[provider.id]} />
+                  <span className="agent-type__purpose">
+                    {provider.capabilities.find((capability) => capability.type === type)?.evidence}
+                  </span>
+                </button>
+              </li>
+            ))}
           </ul>
+          {notYet.length > 0 && (
+            <p className="has-text-secondary mb-4" style={{ fontSize: 13 }}>
+              {notYet.map((provider) => provider.label).join(", ")}: not available in Scoreboad yet.
+            </p>
+          )}
           <Button variant="ghost" icon={ArrowLeft} onClick={onBack}>
             Back
           </Button>
@@ -297,7 +298,7 @@ function Dependency({
     label = provider === "bolna" ? "Bolna" : "Sarvam";
     connection = connections.providers[provider];
   } else if (dependency.kind === "channel") {
-    label = dependency.integration === "whatsapp" ? "WhatsApp" : "Email";
+    label = CHANNEL_LABELS[dependency.integration];
     connection = connections.channels[dependency.integration];
   } else {
     label = "AI provider";
@@ -310,7 +311,7 @@ function Dependency({
       <ConnectionChip connection={connection} />
       {connection.manageHref && (
         <Link href={connection.manageHref} className="has-text-link" style={{ fontSize: 13 }}>
-          {connection.state === "connected" ? "Manage connection" : "Connect"}
+          {connection.state === "connected" ? "Manage connection" : `Connect ${label}`}
         </Link>
       )}
       {dependency.kind === "none" && !connections.ai.configured && (

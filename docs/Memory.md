@@ -3154,3 +3154,29 @@ Lint clean · typecheck clean · 2,205 tests · build compiles.
   `config.agent_id` already is the assignment, and nothing but voice screening
   executes an agent.
 - Still unreplayed: 0043, 0044 (Docker engine off). Bundle + FRESH_START regen'd (44).
+
+## 2026-09-25 (tenth session)
+
+**Final agent architecture (8 types) + Settings page usability fixes.**
+
+- Migration **0045**: Universal merged into Custom (rows migrated, immutable
+  trigger suspended for that one UPDATE), `custom_llm` RENAMED `custom`,
+  `universal` refused by CHECK (enum values can't be dropped). Exactly 8 types,
+  test-enforced. Custom agent: instructions / output behaviour / where used —
+  no model or temperature (nothing reads them).
+- Video Interview dependency = channel `calendar` (Google Meet via Google
+  Calendar — the only video provider that exists). Create flow offers only
+  providers with a built adapter; Sarvam named in one line as not available.
+- Screening defaults RETIRED as a card: `ScreeningForm` moved to
+  `app/settings/agents/voice/` as "Call rules" (#call-rules), still one org-wide
+  record (scheduler reads it for every call). `/settings/screening` redirects.
+- Catalog 20 in 8: AI & Agents = Agents + Automations; AI provider → Integrations.
+- Removed the workflow editor's "+ New agent" quick-create (second creation
+  path) — picker assigns, links to Agents. Fixed a pre-existing broken link
+  there (`/settings/voice-agents` never existed).
+- Settings audit: card titles 13px sentence case; grid rows equal height
+  (`align-items: stretch`, reversing a documented `start`); count spacing
+  12/12; ↗ gets "Opens outside Settings" tooltip + sr text (NOT added to
+  Bolna/Calendar — they stay inside Settings); account-menu trigger + row get
+  an active state on Settings/Analytics/Audit log.
+- Bundle + FRESH_START regen'd (45). 0043–0045 still unreplayed.

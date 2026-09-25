@@ -8,7 +8,13 @@ import {
   allowedStatuses,
   isAgentType,
 } from "./types";
-import { PROVIDERS, providersFor, supportsVoiceInterview, supportsVoiceScreening } from "./providers";
+import {
+  PROVIDERS,
+  providersFor,
+  selectableProvidersFor,
+  supportsVoiceInterview,
+  supportsVoiceScreening,
+} from "./providers";
 import {
   CONFIG_FIELDS,
   countAgentUsage,
@@ -39,9 +45,10 @@ describe("agent types", () => {
       whatsapp_reply: ["WhatsApp Auto Reply Agent", "MessageCircle"],
       email_reply: ["Email Auto Reply Agent", "Mail"],
       assessment: ["Assessment Agent", "ClipboardCheck"],
-      universal: ["Universal Agent", "Orbit"],
-      custom_llm: ["Custom LLM Agent", "Braces"],
+      custom: ["Custom Agent", "Braces"],
     };
+    // Exactly eight — the product's list. A ninth needs the owner to ask for it.
+    expect(AGENT_TYPES).toHaveLength(8);
     expect([...AGENT_TYPES].sort()).toEqual(Object.keys(expected).sort());
     for (const type of AGENT_TYPES) {
       const meta = AGENT_TYPE_META[type];
@@ -61,8 +68,15 @@ describe("agent types", () => {
     const enumBody = MIGRATION.match(/create type public\.agent_type as enum \(([\s\S]*?)\);/)?.[1] ?? "";
     const values = [...enumBody.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     const added = [...MIGRATIONS_AFTER.matchAll(/alter type public\.agent_type add value if not exists '([a-z_]+)'/g)].map((m) => m[1]);
+    const renames = [...MIGRATIONS_AFTER.matchAll(/rename value '([a-z_]+)' to '([a-z_]+)'/g)];
+    // A retired value stays in a Postgres enum; a CHECK is what retires it.
+    const retired = [...MIGRATIONS_AFTER.matchAll(/check \(type <> '([a-z_]+)'\)/g)].map((m) => m[1]);
+    let live = [...values, ...added];
+    for (const [, from, to] of renames) live = live.map((value) => (value === from ? to : value));
+    live = live.filter((value) => !retired.includes(value) && value !== "whatsapp_reply");
     // Compared as sets: the list's order is the create flow's order, not the enum's.
-    expect([...values, ...added].sort()).toEqual([...AGENT_TYPES].sort());
+    // whatsapp_reply is refused by 0043 as a row but is still one of the eight.
+    expect([...live, "whatsapp_reply"].sort()).toEqual([...AGENT_TYPES].sort());
   });
 
   it("lets ACTIVE only the types the database lets be active", () => {
@@ -79,7 +93,7 @@ describe("agent types", () => {
 
   it("offers ACTIVE and PAUSED only where something runs the agent", () => {
     expect(allowedStatuses("voice_screening")).toContain("active");
-    for (const type of ["voice_interview", "video_interview", "cv_screening", "email_reply", "assessment", "universal", "custom_llm"] as const) {
+    for (const type of ["voice_interview", "video_interview", "cv_screening", "email_reply", "assessment", "custom"] as const) {
       expect(allowedStatuses(type), type).toEqual(["draft", "archived"]);
       expect(AGENT_TYPE_META[type].blockedReason, type).toBeTruthy();
     }
@@ -102,9 +116,14 @@ describe("providers — a separate axis with a real capability matrix", () => {
     expect(supportsVoiceInterview("sarvam")).toBe(true);
   });
 
-  it("marks Sarvam as documented but not built, rather than hiding or faking it", () => {
+  it("offers only providers with a built adapter", () => {
     expect(PROVIDERS.sarvam.adapter).toBe("not_built");
-    expect(PROVIDERS.bolna.adapter).toBe("built");
+    expect(selectableProvidersFor("voice_screening").map((p) => p.id)).toEqual(["bolna"]);
+    expect(selectableProvidersFor("voice_interview").map((p) => p.id)).toEqual(["bolna"]);
+  });
+
+  it("gives the video agent the one video provider that exists — Google Meet, via Calendar", () => {
+    expect(AGENT_TYPE_META.video_interview.dependency).toEqual({ kind: "channel", integration: "calendar" });
   });
 
   it("requires a provider in the database exactly where the types take one", () => {
@@ -170,17 +189,15 @@ describe("normalizeAgentInput", () => {
   });
 
   it("refuses unknown and cross-type configuration keys instead of storing them", () => {
-    const leaked = normalizeConfiguration("universal", { instructions: "ok", temperature: 0.5 });
+    const leaked = normalizeConfiguration("custom", { instructions: "ok", temperature: 0.5 });
     expect(leaked.ok).toBe(false);
     expect(normalizeConfiguration("assessment", { instructions: "ok", objective: "o" }).ok).toBe(false);
   });
 
-  it("bounds custom LLM temperature", () => {
-    expect(normalizeConfiguration("custom_llm", { instructions: "x", temperature: 0.4 })).toEqual({
-      ok: true,
-      value: { instructions: "x", temperature: 0.4 },
-    });
-    expect(normalizeConfiguration("custom_llm", { instructions: "x", temperature: 2 }).ok).toBe(false);
+  it("exposes no model or temperature on a custom agent — nothing would read them", () => {
+    const keys = CONFIG_FIELDS.custom.map((field) => field.key);
+    expect(keys).toEqual(["instructions", "output", "usage"]);
+    expect(normalizeConfiguration("custom", { instructions: "x", output: "JSON" }).ok).toBe(true);
   });
 
   it("shows no field for a credential anywhere", () => {

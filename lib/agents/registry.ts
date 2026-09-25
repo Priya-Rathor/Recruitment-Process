@@ -10,11 +10,13 @@
 // capability matrix is ./providers.ts.
 // =============================================================================
 import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
+import { getStatus as getCalendarStatus } from "@/lib/integrations/calendar";
 import { getStatus as getEmailStatus } from "@/lib/integrations/email";
 import { getStatus as getWhatsAppStatus } from "@/lib/integrations/whatsapp";
 import { isAiConfigured } from "@/lib/ai/provider";
 import type { IntegrationStatus } from "@/lib/integrations/store";
 import { PROVIDERS, type ProviderId } from "./providers";
+import type { ChannelIntegration } from "./types";
 
 export type ConnectionState = "connected" | "not_connected" | "needs_attention" | "unavailable";
 
@@ -26,7 +28,7 @@ export type Connection = {
 
 export type Connections = {
   providers: Record<ProviderId, Connection>;
-  channels: { whatsapp: Connection; email: Connection };
+  channels: Record<ChannelIntegration, Connection>;
   /** The platform AI provider, which every non-voice type runs on. */
   ai: { configured: boolean };
 };
@@ -39,10 +41,11 @@ function fromIntegration(status: IntegrationStatus, manageHref: string): Connect
 
 /** One read per integration, in parallel. A failed read is "needs attention", never "connected". */
 export async function loadConnections(organizationId: string): Promise<Connections> {
-  const [bolna, whatsapp, email] = await Promise.allSettled([
+  const [bolna, whatsapp, email, calendar] = await Promise.allSettled([
     getBolnaStatus(organizationId),
     getWhatsAppStatus(organizationId),
     getEmailStatus(organizationId),
+    getCalendarStatus(organizationId),
   ]);
 
   const settle = (
@@ -69,6 +72,7 @@ export async function loadConnections(organizationId: string): Promise<Connectio
     channels: {
       whatsapp: settle(whatsapp, "/settings/integrations#integration-whatsapp"),
       email: settle(email, "/settings/integrations#integration-email"),
+      calendar: settle(calendar, "/settings/integrations#integration-calendar"),
     },
     ai: { configured: isAiConfigured() },
   };

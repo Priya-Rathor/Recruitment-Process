@@ -1,50 +1,14 @@
-import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
-import { getOrganizationSettings } from "@/lib/settings/queries";
-import { getStatus as getBolnaStatus } from "@/lib/integrations/bolna";
-import { ErrorState } from "@/components/states";
-import { RestrictedPanel, SettingsShell } from "../SettingsShell";
-import { ScreeningForm } from "./ScreeningForm";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Screening settings" };
+// Dynamic, so this is a server redirect behind proxy.ts's auth check.
 export const dynamic = "force-dynamic";
 
-export default async function ScreeningSettingsPage() {
-  const membership = await requireMembershipOrRedirect();
-
-  return (
-    <SettingsShell
-      title="Screening"
-      description="How the AI screening call behaves."
-    >
-      {!hasRole(membership.role, ["owner", "admin"]) ? (
-        <RestrictedPanel what="screening settings" />
-      ) : (
-        <ScreeningBody organizationId={membership.organization.id} />
-      )}
-    </SettingsShell>
-  );
-}
-
-async function ScreeningBody({ organizationId }: { organizationId: string }) {
-  const [{ settings, failed }, bolna] = await Promise.all([
-    getOrganizationSettings(organizationId),
-    getBolnaStatus(organizationId),
-  ]);
-
-  if (failed) return <ErrorState message="Couldn't load these settings." />;
-
-  return (
-    <>
-      {bolna.status !== "connected" && (
-        <div className="card mb-4">
-          <p style={{ fontSize: 14 }}>
-            <strong>Bolna isn&apos;t connected</strong>, so no screening calls are being placed.
-            These settings can be saved now and will apply once it is connected.
-          </p>
-        </div>
-      )}
-
-      <ScreeningForm initial={settings.screening_settings} />
-    </>
-  );
+/**
+ * DEPRECATED ROUTE. "Screening" (later "Screening defaults") configured how the
+ * voice screening call behaves — attempts, retry delay, language, recording —
+ * which is agent behaviour. Those call rules now live on the voice screening
+ * agent's page in the Agent Center. Kept as a redirect for old links.
+ */
+export default function LegacyScreeningSettingsRoute() {
+  redirect("/settings/agents/voice#call-rules");
 }

@@ -100,7 +100,7 @@ describe("the settings catalogue", () => {
     }
   });
 
-  it("totals 21 settings in 8 categories", () => {
+  it("totals 20 settings in 8 categories", () => {
     /*
       Pinned so a regrouping cannot silently drop a link.
 
@@ -116,11 +116,14 @@ describe("the settings catalogue", () => {
       removed from Calling & scheduling) → 21 in 8 (the central Agents
       restructure: "Message auto-reply agent" left Communications — its page
       moved into the Agent Center — and "Calling & scheduling" became
-      "Integrations", "AI & automation" became "AI & Agents").
+      "Integrations", "AI & automation" became "AI & Agents") → 20 in 8
+      ("Screening defaults" retired — its call rules are voice screening
+      agent behaviour and moved onto that agent's page; AI provider moved to
+      Integrations, leaving AI & Agents as Agents + Automations).
       The grid's counter is computed from these, so this test and the visible
-      "21 settings in 8 categories" cannot disagree.
+      "20 settings in 8 categories" cannot disagree.
     */
-    expect(SETTINGS_LINKS).toHaveLength(21);
+    expect(SETTINGS_LINKS).toHaveLength(20);
     expect(SETTINGS_CATEGORIES).toHaveLength(8);
   });
 
@@ -288,7 +291,7 @@ describe("one Agent Center", () => {
     // An agent configuration page filed under Communications, Recruitment or
     // Integrations is the scattering the Agent Center replaced.
     const agentLinks = SETTINGS_LINKS.filter(
-      (link) => /agent/i.test(link.label) || /agent/i.test(link.href)
+      (link) => /agent|screening/i.test(link.label) || /agent|screening|auto-reply/i.test(link.href)
     );
     expect(agentLinks.map((link) => link.href)).toEqual(["/settings/agents"]);
   });
@@ -296,5 +299,7 @@ describe("one Agent Center", () => {
   it("keeps integrations as connections, never agent pages", () => {
     const integrations = SETTINGS_CATEGORIES.find((category) => category.label === "Integrations");
     expect(integrations?.links.every((link) => link.href.startsWith("/settings/integrations#"))).toBe(true);
+    const ai = SETTINGS_CATEGORIES.find((category) => category.label === "AI & Agents");
+    expect(ai?.links.map((link) => link.label)).toEqual(["Agents", "Automations"]);
   });
 });

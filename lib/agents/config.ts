@@ -97,18 +97,29 @@ export const CONFIG_FIELDS: Record<AgentType, ConfigField[]> = {
     },
     { ...criteria, required: true },
   ],
-  universal: [instructions("Instructions", "What the agent does.")],
-  custom_llm: [
-    instructions("System instructions", "The agent's standing instructions."),
+  /*
+    No model or temperature control: nothing runs a custom agent yet, so a
+    technical setting here would be a dial connected to nothing. The model is
+    the platform's (Settings → Integrations → AI provider) until a runtime
+    reads a per-agent one.
+  */
+  custom: [
+    instructions("Instructions", "The agent's standing instructions — its system prompt."),
     {
-      key: "temperature",
-      label: "Temperature",
-      help: "0 is the most consistent, 1 the most varied. The platform default is 0.2.",
-      kind: "number",
+      key: "output",
+      label: "Output behaviour",
+      help: "What the agent should return, and in what shape.",
+      kind: "textarea",
       required: false,
-      min: 0,
-      max: 1,
-      step: 0.1,
+      max: 2000,
+    },
+    {
+      key: "usage",
+      label: "Where it will be used",
+      help: "The hiring step or workflow this agent is for.",
+      kind: "textarea",
+      required: false,
+      max: 1000,
     },
   ],
 };
@@ -148,20 +159,14 @@ export function normalizeAgentInput(raw: unknown): NormalizeResult {
   // Provider: required exactly when the type takes one, refused otherwise.
   let provider: ProviderId | null = null;
   if (AGENT_TYPE_META[type].dependency.kind === "provider") {
-    if (type === "video_interview") {
-      if (body.provider !== undefined && body.provider !== null) {
-        return { ok: false, error: "No video interview provider is available yet." };
-      }
-    } else {
-      if (!isProviderId(body.provider)) return { ok: false, error: "Choose a provider." };
-      if (!supports(body.provider, type)) {
-        return { ok: false, error: `${PROVIDERS[body.provider].label} doesn't support this agent type.` };
-      }
-      if (PROVIDERS[body.provider].adapter !== "built") {
-        return { ok: false, error: `${PROVIDERS[body.provider].label} isn't available in Scoreboad yet.` };
-      }
-      provider = body.provider;
+    if (!isProviderId(body.provider)) return { ok: false, error: "Choose a provider." };
+    if (!supports(body.provider, type)) {
+      return { ok: false, error: `${PROVIDERS[body.provider].label} doesn't support this agent type.` };
     }
+    if (PROVIDERS[body.provider].adapter !== "built") {
+      return { ok: false, error: `${PROVIDERS[body.provider].label} isn't available in Scoreboad yet.` };
+    }
+    provider = body.provider;
   } else if (body.provider !== undefined && body.provider !== null) {
     return { ok: false, error: "This agent type doesn't use a provider." };
   }

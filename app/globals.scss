@@ -995,6 +995,7 @@ th {
 }
 
 .account-menu__trigger {
+  position: relative;
   display: flex;
   align-items: center;
   // 10px between the avatar and the org/role block.
@@ -1009,6 +1010,20 @@ th {
 
   &:hover {
     background-color: var(--color-raised);
+  }
+
+  // On a page that lives in this menu (Settings, Analytics, Audit log): the
+  // same 2px primary underline the main bar's current link carries, so "you
+  // are here" reads the same way wherever the current page lives.
+  &.is-active::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    background-color: var(--color-primary);
+    border-radius: 2px 2px 0 0;
   }
 }
 
@@ -1145,6 +1160,13 @@ th {
   }
 
   svg { color: var(--color-text-secondary); flex-shrink: 0; }
+
+  &.is-active {
+    color: var(--color-primary);
+    font-weight: var(--weight-semibold);
+
+    svg { color: var(--color-primary); }
+  }
 }
 
 .account-menu__row--danger {
@@ -5842,10 +5864,15 @@ a {
   }
 }
 
+// Even rhythm: the search's 12px above the count, 12px below it to the grid.
+// Was 16px below, which with the caption's line box read as roughly three times
+// the gap above — the count looked attached to the search and cut off from the
+// grid it describes.
 .settings-count {
   font-size: var(--text-caption);
+  line-height: 1.4;
   color: var(--color-text-secondary);
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--space-3);
 }
 
 // --- The grid ---------------------------------------------------------------
@@ -5869,17 +5896,17 @@ a {
 // genuinely empty. `justify-content: start` keeps them left-aligned rather than
 // distributed across the space.
 //
-// `align-items: start` is what stops the OTHER kind of stretching — a card
-// growing to match the tallest in its row. Heights are content-driven, which is
-// only pleasant because the content is now balanced: after the Integrations
-// split every card holds 2-3 items, so natural heights land within a line of
-// each other. That is the fix. No masonry, no dense packing, no JS measuring —
-// those compensate for imbalance rather than removing it.
+// EQUAL HEIGHTS WITHIN A ROW (`align-items: stretch`). This was `start`, on
+// the argument that balanced 2-3 item cards would land "within a line of each
+// other" — but a two-line description beside a one-line one still made every
+// row ragged, and a usability audit read the grid as unstructured. Stretching
+// is the cheap, correct fix: each card fills its row track, content stays at the
+// top. Still no masonry, no dense packing, no JS measuring.
 .settings-grid {
   display: grid;
   gap: var(--space-4);
   grid-template-columns: minmax(0, 1fr);
-  align-items: start;
+  align-items: stretch;
   justify-content: start;
 }
 
@@ -5904,12 +5931,14 @@ a {
   padding: var(--card-padding);
 }
 
+// Sentence case at label size, in full ink. It was 11px uppercase with 0.08em
+// tracking in the secondary grey — an eyebrow style doing a heading's job, and
+// hard to read at "Candidate-facing" length. It is the card's heading (an h2),
+// so it now looks like one: the weight carries the hierarchy, not the case.
 .settings-card__title {
-  font-size: 11px;
+  font-size: var(--text-label);
   font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-secondary);
+  color: var(--color-text);
   margin: 0 0 var(--space-3);
 }
 
@@ -5960,7 +5989,7 @@ a {
   color: var(--color-text);
 }
 
-.settings-card__external { color: var(--color-text-secondary); flex-shrink: 0; }
+.settings-card__external { display: inline-flex; color: var(--color-text-secondary); flex-shrink: 0; }
 
 .settings-card__description {
   display: block;

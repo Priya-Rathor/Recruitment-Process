@@ -2490,7 +2490,7 @@ serious harm).
 | "Attempts" counter | same | Against the configured cap |
 | "Call transcript" | same | After the webhook lands |
 | `/screening-calls` list | global | All calls with `CallStatusBadge` |
-| `/settings/screening` (`ScreeningForm`) | settings | Max attempts, retry delay, language, recording |
+| `/settings/agents/voice#call-rules` (`ScreeningForm`) | settings | Max attempts, retry delay, language, recording |
 
 ## 15.5 Complete User Flow
 
@@ -2573,7 +2573,7 @@ CHECK ended_at >= started_at)`
 | TC-CALL-014 | Retry | **callback_requested never auto-retried** | Set that status, wait past the delay | **No automatic retry** | | | Critical |
 | TC-CALL-015 | Retry | Terminal statuses | `completed`, `answered`, `cancelled` | No retry | | | High |
 | TC-CALL-016 | Retry | Retryable statuses | `no_answer`, `busy`, `failed` | Retry allowed after the delay | | | High |
-| TC-CALL-017 | Settings | Attempts clamped to 5 | Set 10 in `/settings/screening` | Clamped to 5 | | | High |
+| TC-CALL-017 | Settings | Attempts clamped to 5 | Set 10 in `/settings/agents/voice#call-rules` | Clamped to 5 | | | High |
 | TC-CALL-018 | Settings | Delay floored at 15 | Set 1 minute | Clamped to 15 | | | High |
 | TC-CALL-019 | Script | Question cap | Job with 20 screening questions | Only 12 asked | | | Medium |
 | TC-CALL-020 | Script | Instruction cap | 3,000-char stage prompt | Truncated at 2,000 | | | Medium |
@@ -4388,7 +4388,7 @@ credential store for six external providers.
 | Organization | `/settings/organization` | **owner/admin** |
 | Team & permissions | `/settings/users` | **everyone** |
 | Recruitment | `/settings/recruitment` | owner/admin |
-| Screening | `/settings/screening` | owner/admin |
+| Voice call rules | `/settings/agents/voice#call-rules` (old `/settings/screening` redirects) | owner/admin |
 | Pipeline | `/settings/pipeline` | owner/admin |
 | Onboarding documents | `/settings/onboarding` | owner/admin |
 | Message templates | `/settings/templates` | owner/admin |

@@ -17,6 +17,7 @@ vi.mock("@/lib/integrations/whatsapp", () => ({
     throw new Error("read failed");
   }),
 }));
+vi.mock("@/lib/integrations/calendar", () => ({ getStatus: vi.fn(async () => leaky) }));
 vi.mock("@/lib/ai/provider", () => ({ isAiConfigured: () => false }));
 
 describe("loadConnections — connection state, and nothing else", () => {
@@ -31,8 +32,7 @@ describe("loadConnections — connection state, and nothing else", () => {
 
     for (const connection of [
       ...Object.values(connections.providers),
-      connections.channels.whatsapp,
-      connections.channels.email,
+      ...Object.values(connections.channels),
     ]) {
       expect(Object.keys(connection).sort()).toEqual(["manageHref", "state"]);
     }

@@ -11,10 +11,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronsUpDown, LogOut, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { ACCOUNT_NAV_ITEMS } from "./navItems";
+import { ACCOUNT_NAV_ITEMS, isActiveHref } from "./navItems";
 
 export function AccountRows({
   unreadCount,
@@ -30,6 +30,7 @@ export function AccountRows({
   onNavigate: () => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
 
   const hasUnread = unreadCount !== null && unreadCount > 0;
@@ -90,11 +91,13 @@ export function AccountRows({
       */}
       {ACCOUNT_NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map((item) => {
         const Icon = item.icon;
+        const active = isActiveHref(pathname, item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
-            className="account-menu__row"
+            className={`account-menu__row${active ? " is-active" : ""}`}
+            aria-current={active ? "page" : undefined}
             role="menuitem"
             onClick={onNavigate}
           >

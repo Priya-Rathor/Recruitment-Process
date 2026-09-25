@@ -1,6 +1,6 @@
 # Agent Center — Module 1 (foundation)
 
-Settings → **AI & Agents** → Agents (`/settings/agents`). The ONLY place an AI
+Settings → **AI & Agents** (Agents, Automations) → Agents (`/settings/agents`). The ONLY place an AI
 agent is created or configured — the single Agents entry in Settings (a test
 fails if any other Settings link names an agent). **Agent type** (what it does) and **provider** (who runs it) are separate
 axes: `lib/agents/types.ts` and `lib/agents/providers.ts` never import each other.
@@ -9,7 +9,7 @@ axes: `lib/agents/types.ts` and `lib/agents/providers.ts` never import each othe
 
 | Piece | Where |
 | --- | --- |
-| Type registry — 9 types (CV Screening added in `0044`), names, Lucide icons, dependency, `runnable` | `lib/agents/types.ts` (client-safe) |
+| Type registry — exactly **8** types (CV Screening added in `0044`; Universal + Custom LLM merged into Custom in `0045`), names, Lucide icons, dependency, `runnable` | `lib/agents/types.ts` (client-safe) |
 | Provider capability matrix, with the docs evidence per claim | `lib/agents/providers.ts` (client-safe) |
 | Per-type config fields + the one validator | `lib/agents/config.ts` (client-safe) |
 | Connection state per provider/channel (no credentials) | `lib/agents/registry.ts` (server) |
@@ -20,8 +20,10 @@ axes: `lib/agents/types.ts` and `lib/agents/providers.ts` never import each othe
 
 ## Settings architecture — agents vs integrations
 
-An **integration** is a connection (Integrations: Bolna AI, Google Calendar;
-Communications: Email, WhatsApp Business; AI & Agents: AI provider). An
+An **integration** is a connection (Integrations: Bolna AI, Google Calendar —
+also the video provider, via Meet links — and AI provider; Communications:
+Email, WhatsApp Business). Sarvam and other video providers have no adapter, so
+they have no card and are not offered in the create flow. An
 **agent** is the AI worker that uses one, and lives only under `/settings/agents`:
 
 | Route | What |
@@ -32,8 +34,10 @@ Communications: Email, WhatsApp Business; AI & Agents: AI provider). An
 | `/settings/agents/voice` | Voice agent console (moved from `/settings/integrations/bolna`, which redirects) |
 | `/settings/agents/whatsapp` | WhatsApp Auto Reply Agent (moved from `/settings/auto-reply`, which redirects) |
 
-Screening defaults (`/settings/screening` — attempts, retry, language) stay in
-Recruitment defaults: they are call policy for every voice agent, not an agent.
+The voice screening **call rules** (attempts, retry delay, language, recording)
+are on the voice agent page (`/settings/agents/voice#call-rules`); the old
+`/settings/screening` "Screening defaults" page redirects there. One set per
+organization — the scheduler reads them for every screening call.
 The Bolna connect form's agent ID is now an optional fallback.
 
 Assignment is the existing one: an automation / stage-workflow action names an

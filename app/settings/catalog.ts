@@ -86,17 +86,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         description: "Stage SLA targets",
         roles: ["owner", "admin"],
       },
-      {
-        href: "/settings/screening",
-        /*
-          "Screening DEFAULTS": organization-wide call policy (attempts, retry
-          delay, language) that applies whichever agent places the call. Not an
-          agent — what a call says and sounds like is the agent, in Agents.
-        */
-        label: "Screening defaults",
-        description: "Call attempts, retry delay, language",
-        roles: ["owner", "admin"],
-      },
     ],
   },
   {
@@ -151,29 +140,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     Each href still carries its own card's anchor — the destinations are
     untouched, only which card lists them changed.
   */
-  {
-    /*
-      CONNECTIONS, NOT AGENTS. Was "Calling & scheduling". An integration is a
-      provider an agent uses; the agents themselves are in AI & Agents. Email and
-      WhatsApp stay under Communications, beside the templates they carry — every
-      href appears once, and the Integrations page itself lists all of them.
-    */
-    label: "Integrations",
-    links: [
-      {
-        href: "/settings/integrations#integration-bolna",
-        label: "Bolna AI",
-        description: "Voice provider for AI calling",
-        roles: ["owner", "admin"],
-      },
-      {
-        href: "/settings/integrations#integration-calendar",
-        label: "Google Calendar",
-        description: "Interview invites and Meet links",
-        roles: ["owner", "admin"],
-      },
-    ],
-  },
   {
     /*
       CHANNELS AND CONTENT TOGETHER.
@@ -237,14 +203,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
           "Create and manage AI agents for screening, interviews, communication, assessments and custom workflows.",
       },
       {
-        // AI INFRASTRUCTURE, not an agent: the model every agent and every
-        // AI feature runs on. Stays one global setting.
-        href: "/settings/integrations#integration-llm",
-        label: "AI provider",
-        description: "The model behind agents, parsing and matching",
-        roles: ["owner", "admin"],
-      },
-      {
         href: "/automations",
         label: "Automations",
         description: "Rules that trigger messages, calls, and reminders",
@@ -260,6 +218,40 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
           page: run history, approvals and the scheduler all live there already.
         */
         external: true,
+      },
+    ],
+  },
+  {
+    /*
+      CONNECTIONS, NOT AGENTS. Was "Calling & scheduling". An integration is a
+      provider an agent uses; the agents themselves are in AI & Agents, just
+      above. AI provider is here too: it is the model connection, not an agent.
+      No Sarvam or video-provider card: neither has an adapter, and a card for
+      one would be a Connect button to nothing. Email and
+      WhatsApp stay under Communications, beside the templates they carry — every
+      href appears once, and the Integrations page itself lists all of them.
+    */
+    label: "Integrations",
+    links: [
+      {
+        href: "/settings/integrations#integration-bolna",
+        label: "Bolna AI",
+        description: "Voice provider for AI calling",
+        roles: ["owner", "admin"],
+      },
+      {
+        href: "/settings/integrations#integration-calendar",
+        label: "Google Calendar",
+        description: "Interview invites and Google Meet video links",
+        roles: ["owner", "admin"],
+      },
+      {
+        // AI INFRASTRUCTURE, not an agent: the model every agent and every AI
+        // feature runs on. A connection like Bolna, so it sits with them.
+        href: "/settings/integrations#integration-llm",
+        label: "AI provider",
+        description: "The model behind agents, parsing and matching",
+        roles: ["owner", "admin"],
       },
     ],
   },
