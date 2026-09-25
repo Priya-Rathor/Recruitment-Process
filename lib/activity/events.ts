@@ -560,6 +560,34 @@ export const EVENT_CATALOGUE = {
     label: "Voice agent deleted",
     describe: (m) => `Deleted the voice agent ${text(m.agent_name, "(unnamed)")}`,
   },
+  // ---------------------------------------------------------------------------
+  // The Agent Center (migration 0043). Sensitive for the same reason: a status
+  // change here is what starts or stops an automated caller.
+  // ---------------------------------------------------------------------------
+  "agent.created": {
+    entity: "integration",
+    sensitive: true,
+    label: "Agent created",
+    describe: (m) => `Created the agent ${text(m.agent_name, "(unnamed)")} as a draft`,
+  },
+  "agent.saved": {
+    entity: "integration",
+    sensitive: true,
+    label: "Agent settings saved",
+    describe: (m) => `Saved ${text(m.agent_name, "an agent")}`,
+  },
+  "agent.status_changed": {
+    entity: "integration",
+    sensitive: true,
+    label: "Agent status changed",
+    describe: (m) => `Set ${text(m.agent_name, "an agent")} to ${text(m.status, "a new status")}`,
+  },
+  "agent.deleted": {
+    entity: "integration",
+    sensitive: true,
+    label: "Agent deleted",
+    describe: (m) => `Deleted the agent ${text(m.agent_name, "(unnamed)")}`,
+  },
   "voice_agent.test_called": {
     entity: "integration",
     sensitive: true,

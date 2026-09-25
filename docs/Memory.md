@@ -3101,3 +3101,30 @@ Lint clean · typecheck clean · 2,205 tests · build compiles.
 - "Submit application" → "Send application" in BOTH the homepage mock and the
   real candidate form, so the picture still matches the product; "Submitting…"
   → "Sending…".
+
+## 2026-09-25 (eighth session)
+
+**Agent Center — Module 1 (foundation).** Spec: `docs/modules/28-agent-center.md`.
+
+- New: `lib/agents/{types,providers,config,registry,queries}.ts` + 2 test files,
+  `lib/voice/dialing.ts`, `app/settings/agents/{page,AgentList,AgentFields}.tsx`,
+  `new/{page,CreateAgentFlow}.tsx`, `[id]/{page,AgentEditor}.tsx`,
+  `app/api/settings/agents/{route,[id]/route}.ts`, migration **0043** +
+  `VERIFY_0043.sql`, bundle regenerated (43 files).
+- Modified: `lib/integrations/bolna/index.ts` (dialling gate),
+  `lib/voice/queries.ts` (in-use delete message), console page/component
+  (`?agent=`), `SettingsShell` (`actions` slot), `catalog.ts` (+Agents, −Voice
+  agent console shortcut; still 22 in 8), `lib/activity/events.ts` (4 events),
+  `globals.scss`, DATABASE.md, KNOWN_ISSUES.md.
+- **0043 WRITTEN, NOT REPLAYED, NOT APPLIED.** Docker engine (Rancher Desktop)
+  was not running. Run `./supabase/tests/replay.sh` before applying.
+- Decisions: `agents` identity table + `voice_agents` as same-id 1:1 extension
+  (over renaming voice_agents — the 1,200-line console stays untouched);
+  WhatsApp reply stays in 0042 tables (one kill switch), listed read-only;
+  only voice_screening may be ACTIVE (DB CHECK, mirrored by `runnable`, test
+  compares); in-use delete guard is a DB trigger covering both delete paths;
+  status gates dialling (paused/archived never dial; draft DEFAULT skipped
+  because 0034 auto-defaults the first agent); Sarvam listed from its docs,
+  disabled, no adapter; fixed 0007's provider CHECK missing `'whatsapp'`.
+- Not done: layout check in a browser (no browser here); Agent Center test and
+  review steps are "coming next" states by design.

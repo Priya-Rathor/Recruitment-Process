@@ -37,10 +37,13 @@ export function SettingsShell({
   title,
   description,
   back,
+  actions,
   children,
 }: {
   title: string;
   description?: string;
+  /** The page's primary call to action, beside its title. */
+  actions?: ReactNode;
   /**
    * Where "back" goes. Defaults to the landing grid.
    *
@@ -66,13 +69,16 @@ export function SettingsShell({
       </Link>
 
       <div className="settings-page">
-        <div className="mb-5">
-          <h1 className="title is-4 mb-1">{title}</h1>
-          {description && (
-            <p className="has-text-secondary" style={{ fontSize: 13 }}>
-              {description}
-            </p>
-          )}
+        <div className="settings-page__head mb-5">
+          <div>
+            <h1 className="title is-4 mb-1">{title}</h1>
+            {description && (
+              <p className="has-text-secondary" style={{ fontSize: 13 }}>
+                {description}
+              </p>
+            )}
+          </div>
+          {actions && <div className="settings-page__actions">{actions}</div>}
         </div>
         {children}
       </div>

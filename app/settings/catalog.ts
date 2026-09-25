@@ -161,19 +161,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         description: "Interview invites and Meet links",
         roles: ["owner", "admin"],
       },
-      {
-        href: "/settings/integrations/bolna",
-        label: "Voice agent console",
-        /*
-          Sits with Bolna AI because it configures that integration — the
-          console is what the screening call says, and Bolna is what places it.
-          A SHORTCUT, not a second home: the console still lives inside the
-          integration card that owns it, and this reaches the same page directly
-          because "change what the call says" is a weekly task.
-        */
-        description: "What the screening call says and how it sounds",
-        roles: ["owner", "admin"],
-      },
     ],
   },
   {
@@ -243,6 +230,18 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         label: "AI provider",
         description: "Resume parsing, matching and drafting",
         roles: ["owner", "admin"],
+      },
+      {
+        href: "/settings/agents",
+        label: "Agents",
+        /*
+          THE ONE AGENT CENTER. Replaces the "Voice agent console" shortcut that
+          sat under Calling & scheduling: voice agents are listed here with the
+          other types, and each opens the console for its call settings. No
+          `roles` — any member may see which agents work their pipeline (RLS
+          allows the read); the page gates the controls to Owner/Admin.
+        */
+        description: "AI agents for screening, interviews and candidate replies",
       },
       {
         href: "/automations",

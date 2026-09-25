@@ -5742,6 +5742,23 @@ a {
 
 .settings-page { max-width: 900px; }
 
+// The title row. A flex row even without actions, which is identical to the
+// block it replaced; with them, the call to action sits on the title's line and
+// drops under it on a phone.
+.settings-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.settings-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 // --- Back link --------------------------------------------------------------
 //
 // The whole navigation affordance for a settings page now, so it gets a real
@@ -7075,4 +7092,241 @@ a {
   .funnel-orbit__svg {
     filter: none;
   }
+}
+
+// =============================================================================
+// AGENT CENTER — Settings → Agents.
+//
+// Operational, not decorative: panels are the ordinary card surface with the
+// soft glow, and the only motion is a short stagger on entry and a lift on
+// hover. The global reduced-motion rule above collapses both. Nothing here
+// waits for an animation — every card is clickable from its first frame.
+// =============================================================================
+.agent-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  list-style: none;
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.agent-steps__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  &[aria-current="step"] {
+    color: var(--color-text);
+    font-weight: var(--weight-semibold);
+  }
+}
+
+.agent-steps__num {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+
+  .agent-steps__item[aria-current="step"] & {
+    background: var(--color-primary);
+    border-color: transparent;
+    color: var(--color-on-accent);
+  }
+}
+
+// 4 / 2 / 1 columns.
+.agent-types {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  @media (max-width: 1024px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 560px) { grid-template-columns: minmax(0, 1fr); }
+}
+
+.agent-types--providers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @media (max-width: 560px) { grid-template-columns: minmax(0, 1fr); }
+}
+
+.agent-type {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-card);
+  box-shadow: var(--glow-soft);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: fade-in var(--transition-base) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+  transition:
+    transform var(--transition-fast) var(--ease),
+    border-color var(--transition-fast) var(--ease),
+    box-shadow var(--transition-fast) var(--ease);
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-accent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  &[aria-pressed="true"] {
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-accent);
+  }
+
+  // Unavailable: a dashed, unfilled outline — never faded text, which is the
+  // trap the marketing site's audit found 150 times.
+  &:disabled {
+    cursor: not-allowed;
+    border-style: dashed;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+.agent-type__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-base);
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+}
+
+.agent-type__name {
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-body);
+}
+
+.agent-type__purpose {
+  font-size: var(--text-label);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.agent-type__note {
+  margin-top: auto;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+// ---- The list ---------------------------------------------------------------
+.agent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.agent-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 2fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  animation: fade-in var(--transition-base) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+
+  @media (max-width: 720px) {
+    grid-template-columns: 40px minmax(0, 1fr);
+
+    .agent-row__meta,
+    .agent-row__actions { grid-column: 1 / -1; }
+  }
+}
+
+.agent-row__name {
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.agent-row__type,
+.agent-row__meta {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.agent-row__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agent-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.agent-menu {
+  position: relative;
+
+  > summary {
+    list-style: none;
+    cursor: pointer;
+
+    &::-webkit-details-marker { display: none; }
+  }
+}
+
+.agent-menu__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  background: var(--color-raised);
+  box-shadow: var(--glow-raised);
+  animation: menu-in var(--transition-fast) var(--ease);
+
+  button,
+  a {
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-label);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { background: var(--color-primary-tint); }
+    &:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  }
+
+  .is-danger { color: var(--color-error); }
 }

@@ -22,6 +22,9 @@ import { decryptSecret, encryptSecret, isEncryptionConfigured, maskSecret } from
 import { assertScriptIsCompliant, buildCallScript, type CallScript } from "@/lib/screening/script";
 import { normalizeRetryPolicy, type RetryPolicy } from "@/lib/screening/retry";
 import { formatDbError } from "@/lib/supabase/errors";
+import { isMissingRelation } from "@/lib/dashboard/metrics";
+import { decideDialingAgent, type DialingDecision } from "@/lib/voice/dialing";
+import type { AgentStatus } from "@/lib/agents/types";
 // MODULE 24. Neutral types in, provider shapes built in agentMapping.ts — see
 // the section at the foot of this file.
 import type { AgentSettings } from "@/lib/voice/settings";
@@ -380,11 +383,13 @@ export async function placeCall(
     organization that has never opened the console resolves to exactly the id it
     used before.
   */
-  const dialingAgentId = await resolveDialingAgentId(
+  const dialing = await resolveDialingAgentId(
     input.organizationId,
     agentId,
     input.voiceAgentId ?? null
   );
+  if (!dialing.ok) return { ok: false, error: dialing.reason };
+  const dialingAgentId = dialing.providerAgentId;
 
   try {
     const response = await fetch(`${BOLNA_BASE_URL}/call`, {
@@ -745,35 +750,56 @@ async function resolveDialingAgentId(
    * and the run log records which agent was used either way.
    */
   requestedAgentId: string | null = null
-): Promise<string> {
+): Promise<DialingDecision> {
   const admin = createAdminClient();
-  if (!admin) return credentialAgentId;
+  if (!admin) return { ok: true, providerAgentId: credentialAgentId };
 
-  // organization_id is filtered explicitly on both reads: this is the admin
+  // organization_id is filtered explicitly on every read: this is the admin
   // client, so RLS is off and an agent id from a rule is not proof of tenancy.
-  if (requestedAgentId) {
-    const { data: requested } = await admin
+  const readVoice = (column: "id" | "is_default", value: string | boolean) =>
+    admin
       .from("voice_agents")
-      .select("provider_agent_id")
+      .select("id, provider_agent_id")
       .eq("organization_id", organizationId)
-      .eq("id", requestedAgentId)
+      .eq(column, value)
       .maybeSingle();
 
-    const provider = (requested as { provider_agent_id: string | null } | null)?.provider_agent_id;
-    if (provider?.trim()) return provider;
+  const [requested, fallback] = await Promise.all([
+    requestedAgentId ? readVoice("id", requestedAgentId) : Promise.resolve(null),
+    readVoice("is_default", true),
+  ]);
+
+  const rows = [requested?.data, fallback?.data].filter(Boolean) as {
+    id: string;
+    provider_agent_id: string | null;
+  }[];
+
+  // MIGRATION 0043: the Agent Center's status. A missing table (0043 not yet
+  // applied) means null status, which decideDialingAgent() treats as the
+  // pre-0043 behaviour exactly. Any OTHER read failure refuses the call — an
+  // unknown status must not be read as "active" on the path that phones people.
+  const statuses = new Map<string, AgentStatus>();
+  if (rows.length > 0) {
+    const { data, error } = await admin
+      .from("agents")
+      .select("id, status")
+      .eq("organization_id", organizationId)
+      .in("id", rows.map((row) => row.id));
+    if (error && !isMissingRelation(error)) {
+      console.error(`[bolna] agent status read failed: ${formatDbError(error)}`);
+      return { ok: false, reason: "Couldn't confirm the voice agent is active. The call was not placed." };
+    }
+    for (const row of (data ?? []) as { id: string; status: AgentStatus }[]) statuses.set(row.id, row.status);
   }
 
-  const { data, error } = await admin
-    .from("voice_agents")
-    .select("provider_agent_id")
-    .eq("organization_id", organizationId)
-    .eq("is_default", true)
-    .maybeSingle();
+  const candidate = (row: { id: string; provider_agent_id: string | null } | null | undefined) =>
+    row ? { providerAgentId: row.provider_agent_id, status: statuses.get(row.id) ?? null } : null;
 
-  if (error || !data) return credentialAgentId;
-
-  const configured = (data as { provider_agent_id: string | null }).provider_agent_id;
-  return configured?.trim() ? configured : credentialAgentId;
+  return decideDialingAgent({
+    requested: candidate(requested?.data as { id: string; provider_agent_id: string | null } | null),
+    fallbackDefault: candidate(fallback?.data as { id: string; provider_agent_id: string | null } | null),
+    credentialAgentId,
+  });
 }
 
 /** How many test calls one organization may place in a rolling hour. */

@@ -40,6 +40,13 @@ CLI, written to be re-runnable (`if not exists`, `drop policy if exists`).
 `screening_calls` · `screening_reports` · `voice_agents` ·
 `voice_agent_test_calls`
 
+### Agent Center (`0043`)
+`agents` — identity for every agent type (`agent_type` × optional `provider`,
+`agent_status`). Voice screening agents extend into `voice_agents` **with the
+same id** (`voice_agents.id` → `agents.id`). WhatsApp reply agents are refused
+here and stay in `auto_reply_config` (`0042`) until the WhatsApp module merges
+them.
+
 ### Interviews & coding
 `interviews` · `interview_feedback` · `coding_sessions` · `coding_submissions`
 
@@ -149,6 +156,7 @@ cannot read the ciphertext. Reading it requires the service-role identity.
 | **Data hygiene** | `normalize_candidate_contact`, `mark_matches_stale_for_candidate` / `_for_job`, `sync_application_match_score`, `sync_job_resume_passing_score`, `touch_updated_at`. |
 | **Consent & recording** | `enforce_recording_permission`, `stamp_screening_consent`, `protect_ai_screening_original` (the AI's original draft can never be overwritten by the human correction). |
 | **Lifecycle** | `handle_new_auth_user`, `ensure_current_user_profile`, `create_organization_and_owner`, `accept_invite`, `create_onboarding_on_hire`, `seed_default_document_templates`, `complete_interview_on_feedback`, `guard_candidate_delete_with_resumes`, `freeze_submitted_coding_code`, `enforce_single_default_voice_agent`, `promote_next_default_voice_agent`. |
+| **Agent Center** (`0043`) | `guard_agent_in_use` (an agent named by any automation action cannot be deleted, from either table), `enforce_agent_immutable_columns`, `ensure_agent_for_voice_agent` (security definer — gives a console-created voice agent its identity row and refuses another tenant's id), `sync_voice_agent_name_to_agent` / `sync_agent_name_to_voice_agent`, `delete_agent_for_voice_agent`. |
 
 ---
 

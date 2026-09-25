@@ -111,7 +111,9 @@ describe("the settings catalogue", () => {
       Recruitment defaults was already at the three-item cap below)
       → 22 in 8 (0042's auto-reply agent, which took Communications to four and
       raised the per-card cap — see the test above for why that was the right
-      trade rather than filing it elsewhere).
+      trade rather than filing it elsewhere) → still 22 in 8 (0043's Agents
+      added to AI & automation; the Voice agent console shortcut it replaces
+      removed from Calling & scheduling).
       The grid's counter is computed from these, so this test and the visible
       "22 settings in 8 categories" cannot disagree.
     */
@@ -242,6 +244,11 @@ describe("role filtering", () => {
     expect(visibleLinks("recruiter").map((link) => link.href).sort()).toEqual([
       "/analytics",
       "/automations",
+      /*
+        0043. Read-only for a Recruiter: which agents call and message their
+        candidates is theirs to know; creating and pausing them is not.
+      */
+      "/settings/agents",
       /*
         Module 27. A Recruiter fills custom field VALUES in on jobs and
         applications, so the vocabulary is genuinely theirs to read; the page

@@ -27,8 +27,17 @@ export const dynamic = "force-dynamic";
  * re-checks independently — a Recruiter who types the URL gets the restricted
  * panel, not a form they cannot save.
  */
-export default async function VoiceAgentConsolePage() {
+export default async function VoiceAgentConsolePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ agent?: string | string[] }>;
+}) {
   const membership = await requireMembershipOrRedirect();
+  // The Agent Center's "Manage" link opens the console on that agent. Only a
+  // hint: it is matched against this organization's own agents below, so an id
+  // from anywhere else simply opens the first one.
+  const { agent } = await searchParams;
+  const requestedAgentId = typeof agent === "string" ? agent : null;
 
   return (
     <SettingsShell
@@ -51,6 +60,7 @@ export default async function VoiceAgentConsolePage() {
           <ConsoleBody
             organizationId={membership.organization.id}
             organizationName={membership.organization.name}
+            requestedAgentId={requestedAgentId}
           />
         </Suspense>
       )}
@@ -61,9 +71,11 @@ export default async function VoiceAgentConsolePage() {
 async function ConsoleBody({
   organizationId,
   organizationName,
+  requestedAgentId,
 }: {
   organizationId: string;
   organizationName: string;
+  requestedAgentId: string | null;
 }) {
   // In parallel: nothing here depends on anything else here, and the catalogue
   // involves a provider round trip that must not delay the rest of the page.
@@ -103,13 +115,15 @@ async function ConsoleBody({
 
   // Only for the agent the console opens on — a switch loads the other agent's
   // own history through its own request rather than pre-fetching all of them.
-  const initialTestCall = agents[0]
-    ? await getLatestTestCall({ organizationId, agentId: agents[0].id })
+  const opening = agents.find((agent) => agent.id === requestedAgentId) ?? agents[0];
+  const initialTestCall = opening
+    ? await getLatestTestCall({ organizationId, agentId: opening.id })
     : null;
 
   return (
     <VoiceAgentConsole
       initialAgents={agents}
+      initialActiveId={opening?.id ?? null}
       catalog={catalog}
       connection={{
         connected: status.status === "connected",

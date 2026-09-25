@@ -28,6 +28,7 @@ import {
   type AgentSettings,
 } from "@/lib/voice/settings";
 import type { JobScreeningOverrides, OrgCallDataContext } from "@/lib/voice/callData";
+import { AGENT_IN_USE_MESSAGE, isAgentInUseError } from "@/lib/agents/config";
 
 /** Everything about an agent that is safe to send to a browser. */
 export type VoiceAgent = {
@@ -243,6 +244,9 @@ export async function deleteVoiceAgent({
     .eq("id", agentId);
 
   if (error) {
+    // Migration 0043's guard: a workflow still names this agent. The same rule,
+    // and the same sentence, as deleting it from the Agent Center.
+    if (isAgentInUseError(error)) return { ok: false, error: AGENT_IN_USE_MESSAGE };
     console.error(`[voice] deleting agent failed: ${formatDbError(error)}`);
     return { ok: false, error: "Couldn't delete that agent." };
   }

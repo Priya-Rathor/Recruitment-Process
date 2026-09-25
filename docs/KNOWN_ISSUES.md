@@ -213,6 +213,8 @@ No timeout or memory limit around `unpdf` / `mammoth` / `word-extractor`.
 | `schedule_interview` has no trigger | The action stores and renders as a manual-trigger button, but the application-side button that opens Module 11's scheduling flow was never wired. Carried from Module 25 into Module 26. |
 | No manual-trigger runner | Manual actions are stored and skipped by the engine as designed; no route executes one on demand. |
 | Video Interview has no pass/fail branches | It records a written verdict, not a score, so `stageBranches("video_interview")` is false. The PASS message is attached to Director Round entry; the FAIL template is created for manual send. **Correctly not faked with an invented score.** |
+| Agent Center types with no runtime | Only voice screening agents can be ACTIVE (`agents_status_runnable`). Voice interview, video interview, email reply, assessment, universal and custom LLM agents save as drafts; each engine module widens the CHECK when it starts reading the status. No test step and no review step yet. |
+| Sarvam has no adapter | Listed in the capability matrix from its docs and shown disabled; `organization_integrations` accepts `'sarvam'`, nothing writes it. Its docs show no first-party outbound-call API. Needs a `lib/privacy/providers.ts` entry when an adapter is built. |
 | `provider.ts` ignores the per-org LLM key | The `llm` adapter stores and reports a per-organization key, but `lib/ai/provider.ts` still reads `OPENAI_API_KEY` from the environment. `getStatus()` reports this honestly rather than claiming "connected". |
 
 ---

@@ -110,6 +110,7 @@ type SaveState =
 
 export function VoiceAgentConsole({
   initialAgents,
+  initialActiveId,
   catalog,
   connection,
   jobs,
@@ -118,6 +119,8 @@ export function VoiceAgentConsole({
   organizationName,
 }: {
   initialAgents: VoiceAgent[];
+  /** The agent to open on — the Agent Center's Manage link. Defaults to the first. */
+  initialActiveId: string | null;
   catalog: AgentCatalog;
   connection: { connected: boolean; encryptionUnavailable: boolean };
   jobs: PreviewJobOption[];
@@ -129,7 +132,7 @@ export function VoiceAgentConsole({
   const router = useRouter();
 
   const [agents, setAgents] = useState(initialAgents);
-  const [activeId, setActiveId] = useState(initialAgents[0]?.id ?? null);
+  const [activeId, setActiveId] = useState(initialActiveId ?? initialAgents[0]?.id ?? null);
 
   const active = agents.find((agent) => agent.id === activeId) ?? null;
 
@@ -137,7 +140,7 @@ export function VoiceAgentConsole({
     agentId: activeId ?? "",
     // Only the agent the console opened on has a preloaded history; switching
     // agents starts with none and the section's own poll fills it in.
-    initialCall: activeId === initialAgents[0]?.id ? initialTestCall : null,
+    initialCall: activeId === initialActiveId ? initialTestCall : null,
   });
 
   const [draft, setDraft] = useState<AgentSettings | null>(active?.settings ?? null);
