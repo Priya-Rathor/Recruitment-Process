@@ -48,7 +48,9 @@ const KIND_LABEL: Record<string, string> = {
   approval: "Approval",
   wait: "Wait",
   action: "Action",
-  candidate: "Candidate",
+  // "Result", not "Candidate": this row is what the rule CHANGED, not a step
+  // of it, and naming it like a step made it read as an eighth instruction.
+  candidate: "Result",
 };
 
 export function AutomationStory() {
@@ -201,7 +203,13 @@ export function AutomationStory() {
         </div>
 
         <div className="fl__story">
-          <ol className="fl-beats">
+          {/*
+            A TIMELINE OF THE RUN, NOT A LEGEND FOR THE GRAPH. The beats are
+            past-tense events so they cannot be mistaken for node names: two of
+            them ("Proposed", "Approved") happen at the one Approval node, and
+            "Complete" is the finished graph rather than a node of its own.
+          */}
+          <ol className="fl-beats" aria-label="How the run unfolds">
             {FLOW_BEATS.map((item, index) => (
               <li
                 key={item.key}

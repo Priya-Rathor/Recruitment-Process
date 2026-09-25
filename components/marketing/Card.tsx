@@ -23,6 +23,8 @@ export function Card({
   /** The icon well's tint. Mint marks a trust or safety point. */
   accent = "primary",
   title,
+  /** The title's heading level. 4 when the grid sits under its own h3. */
+  level = 3,
   interactive = false,
   className = "",
 }: {
@@ -31,6 +33,7 @@ export function Card({
   icon?: LucideIcon;
   accent?: "primary" | "mint";
   title?: string;
+  level?: 3 | 4;
   interactive?: boolean;
   className?: string;
 }) {
@@ -43,6 +46,8 @@ export function Card({
   ]
     .filter(Boolean)
     .join(" ");
+
+  const Heading = level === 4 ? "h4" : "h3";
 
   return (
     <article className={classes}>
@@ -58,7 +63,7 @@ export function Card({
           <Icon size={19} strokeWidth={1.6} />
         </span>
       )}
-      {title && <h3>{title}</h3>}
+      {title && <Heading>{title}</Heading>}
       {children}
     </article>
   );

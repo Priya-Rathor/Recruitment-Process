@@ -1799,17 +1799,8 @@
     }
   }
 
-  .mkt-product__navdot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: currentColor;
-    opacity: 0.55;
-    flex-shrink: 0;
-  }
-
   .mkt-product__main {
-    padding: 18px 20px 22px;
+    padding: 18px 20px 22px 26px;  // wider on the sidebar side, so content clears its rule
     min-width: 0;
   }
 
@@ -2713,10 +2704,11 @@
     border-radius: var(--mkt-radius-sm);
     background: var(--mkt-light);
 
-    // The neighbour. Dimmed and dashed — present, and not yours.
+    // The neighbour. Unfilled and dashed — present, and not yours. Not
+    // dimmed with opacity: 0.5 took its text under AA.
     &.is-other {
-      opacity: 0.5;
       border-style: dashed;
+      background: transparent;
     }
   }
 
@@ -2879,7 +2871,9 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    max-width: 58rem;
+    // A reading measure, not a layout width: 58rem at 13.5px was ~130
+    // characters a line.
+    max-width: 68ch;
 
     li {
       position: relative;
@@ -2979,7 +2973,15 @@
     color: var(--mkt-ink-muted);
   }
 
-  .sc-cards { margin-top: clamp(2rem, 4vw, 3rem); }
+  .sc-cards__title {
+    margin: clamp(2rem, 4vw, 3rem) 0 1rem;
+    font-family: var(--font-heading);
+    font-size: clamp(1.0625rem, 1.8vw, 1.25rem);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-ink);
+  }
+
+  .sc-cards { margin-top: 0; }
 
   .sc-note {
     margin: clamp(1.25rem, 3vw, 1.75rem) 0 0;
@@ -3018,10 +3020,12 @@
     &::-webkit-scrollbar { display: none; }
   }
 
+  // `width`, not `min-width`: as a block-level flex row the pill stretched to
+  // the full container and left a bordered void right of the last tab.
   .pv-tabs {
     display: flex;
     gap: 0.25rem;
-    min-width: max-content;
+    width: max-content;
     padding: 0.3125rem;
     border-radius: 999px;
     border: 1px solid var(--mkt-dark-border);
@@ -3107,17 +3111,15 @@
     padding: 0.4375rem 0.5rem;
     border-radius: var(--mkt-radius-sm);
     font-size: 12.5px;
+    // Quieter, never hidden: the point is that the whole product is still
+    // there, not that parts of it vanish per persona. Quieter by TOKEN — the
+    // faint ink is 6.11:1; the 0.45 opacity this used to carry made it 2.3:1.
     color: var(--mkt-on-dark-faint);
-    // Dimmed, never hidden: the point is that the whole product is still
-    // there, not that parts of it vanish per persona.
-    opacity: 0.45;
     transition:
-      opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       background 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
     &[data-on="true"] {
-      opacity: 1;
       background: var(--mkt-glass);
       color: var(--mkt-on-dark);
       font-weight: var(--weight-medium);
@@ -3425,6 +3427,12 @@
     --color-primary: #515f9e;
     --color-text: #0b1020;
     --color-text-secondary: #4d5678;
+    /*
+      NOT the app's light value (#6b7495), which is 4.37:1 on the #f7f9fc chart
+      cards here — under AA. The orbital meters' notes read this token, and
+      without it they fell through to the DARK muted grey at 1.7:1.
+    */
+    --color-text-muted: var(--mkt-ink-muted);
     --color-card: #ffffff;
     --color-border: #e7eaf2;
     --color-success: #3f716e;
@@ -3450,16 +3458,27 @@
     background: var(--mkt-white);
     padding: clamp(0.875rem, 2vw, 1.25rem);
     box-shadow: var(--mkt-glow-product-light);
-    // Dimmed, never hidden: the dashboard is the section's content and must be
-    // readable to somebody who lands here or has animation off.
-    opacity: 0.55;
-    transition: opacity 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    /*
+      Quieter until lit, never hidden: the dashboard is the section's content
+      and must be readable to somebody who lands here or has animation off.
 
-    &[data-lit="true"] { opacity: 1; }
+      Quieter by GRAYSCALE, not opacity. The 0.55 opacity this had put every
+      label in the dashboard at 2.3-4.2:1. Grayscale drains the chart colour
+      but keeps each colour's luminance, so text contrast survives it.
+    */
+    color: var(--color-text);
+    filter: grayscale(1);
+    transition: filter 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &[data-lit="true"] { filter: none; }
 
     // The app's card primitive, neutralised: these components render Bulma's
     // `.card`, and inside this surface they are already on one.
     .card {
+      // Bulma colours a card from --bulma-text, which is resolved once at
+      // :root and so never sees the bridge above: the KPI figures rendered
+      // white on white (1:1). Name the colour here, where the bridge applies.
+      color: var(--color-text);
       background: transparent;
       border: 1px solid var(--mkt-light-border);
       border-radius: var(--mkt-radius-sm);
@@ -3624,10 +3643,11 @@
     text-transform: uppercase;
     transition: opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
-    &[data-state="off"] { opacity: 0.4; color: var(--mkt-ink-muted); }
-    &[data-state="done"] { opacity: 0.72; color: var(--mkt-ink-muted); }
+    // No opacity: it took these labels to 1.8:1. State is colour, weight and
+    // the number's tint, each on a token that clears AA on this band.
+    &[data-state="off"] { color: var(--mkt-ink-muted); }
+    &[data-state="done"] { color: var(--mkt-ink-muted); }
     &[data-state="on"] {
-      opacity: 1;
       color: var(--mkt-ink);
       font-weight: var(--weight-semibold);
     }
@@ -3638,6 +3658,10 @@
     font-weight: var(--weight-bold);
     color: var(--mkt-accent-ink);
   }
+
+  // Unreached: the number takes the label's quieter ink, so "not yet" is
+  // carried by more than weight alone.
+  .an-beats__item[data-state="off"] .an-beats__num { color: inherit; }
 
   .an__copy { min-height: 5rem; }
 
@@ -3660,25 +3684,6 @@
     text-align: center;
     font-size: var(--text-body-lg);
     color: var(--mkt-ink-muted);
-  }
-
-  .an-close__link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-left: 0.375rem;
-    font-weight: var(--weight-semibold);
-    color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
-    text-decoration: none;
-    // An underline that draws on hover, rather than one that disappears — the
-    // link is identifiable by weight and colour before any pointer arrives.
-    border-bottom: 1px solid transparent;
-    transition: border-color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
-
-    &:hover { border-bottom-color: currentcolor; }
-
-    svg { transition: transform var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)); }
-    &:hover svg { transform: translateX(3px); }
   }
 
   // ===========================================================================
@@ -3851,7 +3856,7 @@
     }
 
     span {
-      font-size: 10px;
+      font-size: 11px;  // was 10px — the product-shot floor is 11
       color: var(--mkt-ink-muted);
     }
   }
@@ -4049,9 +4054,13 @@
       position: absolute;
       top: 0;
       left: 1.125rem;
-      width: 1px;
+      // 2px and the faint INK, not a border tint: the line is what makes seven
+      // rows read as one sequence, so it has to be seen (1.4.11 asks 3:1 of a
+      // graphic you need in order to understand the content). At 1px in the
+      // border tint it measured about 2:1 and the rule read as a list.
+      width: 2px;
       height: 1.125rem;
-      background: var(--mkt-dark-border-strong);
+      background: var(--mkt-on-dark-faint);
       transition: background 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
     }
 
@@ -4093,24 +4102,28 @@
     width: 100%;
     min-height: 2.75rem;
     padding: 0.5rem 0.75rem;
-    border: 1px solid var(--mkt-dark-border);
+    border: 1px dashed var(--mkt-dark-border-strong);
     border-radius: var(--mkt-radius-sm);
-    background: var(--mkt-dark-3);
+    background: transparent;
     font-family: var(--font-body);
     text-align: left;
     cursor: pointer;
-    // Not-yet-joined nodes are dimmed, never hidden — the shape of the rule is
+    // Not-yet-joined nodes are quieter, never hidden — the shape of the rule is
     // the thing being explained, and a reader landing mid-section must see it.
-    opacity: 0.38;
+    // Quieter by CHROME (a dashed, unfilled outline), not opacity: 0.38 took
+    // every label to 1.8-3.3:1, and these are buttons a keyboard user lands on.
     transition:
-      opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       border-color 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       background 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
     &:hover { border-color: var(--mkt-dark-border-strong); }
   }
 
-  .fl-node[data-joined="true"] .fl-node__btn { opacity: 1; }
+  .fl-node[data-joined="true"] .fl-node__btn {
+    border-style: solid;
+    border-color: var(--mkt-dark-border);
+    background: var(--mkt-dark-3);
+  }
 
   /*
     THE APPROVAL NODE IS THE ONE THAT LOOKS DIFFERENT, and deliberately: it is
@@ -4274,10 +4287,11 @@
     text-transform: uppercase;
     transition: opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
-    &[data-state="off"] { opacity: 0.4; color: var(--mkt-on-dark-muted); }
-    &[data-state="done"] { opacity: 0.72; color: var(--mkt-on-dark-muted); }
+    // No opacity: it took these labels to 2.4:1. State is colour, weight and
+    // the number's tint, each on a token that clears AA on this band.
+    &[data-state="off"] { color: var(--mkt-on-dark-faint); }
+    &[data-state="done"] { color: var(--mkt-on-dark-muted); }
     &[data-state="on"] {
-      opacity: 1;
       color: var(--mkt-on-dark);
       font-weight: var(--weight-semibold);
     }
@@ -4288,6 +4302,10 @@
     font-weight: var(--weight-bold);
     color: var(--mkt-accent-on-dark);
   }
+
+  // Unreached: the number takes the label's quieter ink, so "not yet" is
+  // carried by more than weight alone.
+  .fl-beats__item[data-state="off"] .fl-beats__num { color: inherit; }
 
   .fl__copy { min-height: 5rem; }
 
@@ -4416,7 +4434,7 @@
 
   .ap-form__note {
     margin: 1px 0 0;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--mkt-ink-muted);
   }
 
@@ -4476,8 +4494,7 @@
 
   .ap-field__req {
     font-weight: var(--weight-regular);
-    color: var(--mkt-ink-muted);
-    opacity: 0.8;
+    color: var(--mkt-ink-muted);  // 5.46:1; the 0.8 opacity it had made it 3.6:1
   }
 
   // ---- The resume row -------------------------------------------------------
@@ -4727,10 +4744,11 @@
     text-transform: uppercase;
     transition: opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
-    &[data-state="off"] { opacity: 0.4; color: var(--mkt-ink-muted); }
-    &[data-state="done"] { opacity: 0.72; color: var(--mkt-ink-muted); }
+    // No opacity: it took these labels to 1.8:1. State is colour, weight and
+    // the number's tint, each on a token that clears AA on this band.
+    &[data-state="off"] { color: var(--mkt-ink-muted); }
+    &[data-state="done"] { color: var(--mkt-ink-muted); }
     &[data-state="on"] {
-      opacity: 1;
       color: var(--mkt-ink);
       font-weight: var(--weight-semibold);
     }
@@ -4741,6 +4759,10 @@
     font-weight: var(--weight-bold);
     color: var(--mkt-accent-ink);  // 6.03:1 — the accent AS TEXT
   }
+
+  // Unreached: the number takes the label's quieter ink, so "not yet" is
+  // carried by more than weight alone.
+  .ap-beats__item[data-state="off"] .ap-beats__num { color: inherit; }
 
   .ap__copy { min-height: 5rem; }
 
@@ -4880,7 +4902,7 @@
     border: 1px solid var(--mkt-light-border);
     padding: 0.5rem;
     transition:
-      opacity 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      background 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       border-color 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       box-shadow 280ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
@@ -4891,7 +4913,10 @@
       against the section it is in.
     */
     &[data-state="dim"] {
-      opacity: 0.45;
+      // Receded by chrome, not opacity — 0.45 put the column's own text
+      // under 3:1, which is the "unreadable" this comment rules out.
+      border-style: dashed;
+      background: var(--mkt-light);
     }
 
     &[data-state="focus"] {
@@ -4951,7 +4976,9 @@
   .pl-col__sla {
     margin: 0.125rem 0 0.5rem;
     padding-inline: 0.1875rem;
-    font-size: 9.5px;
+    // 11px, the floor for words in a product shot. It was 9.5px, which a
+    // usability audit rightly called unreadable on a phone.
+    font-size: 11px;
     color: var(--mkt-ink-muted);
   }
 
@@ -5193,7 +5220,8 @@
   .pl__exitnote {
     font-weight: var(--weight-regular);
     font-size: 11px;
-    opacity: 0.85;
+    // Regular weight is the whole difference from the line it sits in. It
+    // used to be 0.85 opacity too, which is 4.1:1 on the white board.
   }
 
   // ---- The beat rail --------------------------------------------------------
@@ -5221,10 +5249,11 @@
       opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
-    &[data-state="off"] { opacity: 0.4; color: var(--mkt-on-dark-muted); }
-    &[data-state="done"] { opacity: 0.72; color: var(--mkt-on-dark-muted); }
+    // No opacity: it took these labels to 2.4:1. State is colour, weight and
+    // the number's tint, each on a token that clears AA on this band.
+    &[data-state="off"] { color: var(--mkt-on-dark-faint); }
+    &[data-state="done"] { color: var(--mkt-on-dark-muted); }
     &[data-state="on"] {
-      opacity: 1;
       color: var(--mkt-on-dark);
       font-weight: var(--weight-semibold);
     }
@@ -5235,6 +5264,10 @@
     font-weight: var(--weight-bold);
     color: var(--mkt-accent-on-dark);
   }
+
+  // Unreached: the number takes the label's quieter ink, so "not yet" is
+  // carried by more than weight alone.
+  .pl-beats__item[data-state="off"] .pl-beats__num { color: inherit; }
 
   .pl__copy {
     // A floor, so the board above does not shift as captions of different
@@ -5491,8 +5524,7 @@
 
   .cw-time__by {
     font-size: 10.5px;
-    color: var(--mkt-ink-muted);
-    opacity: 0.75;
+    color: var(--mkt-ink-muted);  // no opacity: at 0.75 this was 3.3:1
     white-space: nowrap;
   }
 
@@ -5580,7 +5612,6 @@
     font-size: 10.5px;
     font-weight: var(--weight-bold);
     letter-spacing: 0.04em;
-    opacity: 0.8;
   }
 
   /*
@@ -5729,19 +5760,18 @@
       color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
     // Never invisible: a reader landing mid-section has to see the whole shape
-    // of the story, not just the beat they arrived on.
+    // of the story, not just the beat they arrived on. And never dimmed with
+    // opacity, which took these labels to 2.3:1 — state is colour, weight and
+    // the number's tint, each on a token that clears AA on the dark band.
     &[data-state="off"] {
-      opacity: 0.38;
-      color: var(--mkt-on-dark-muted);
+      color: var(--mkt-on-dark-faint);
     }
 
     &[data-state="done"] {
-      opacity: 0.7;
       color: var(--mkt-on-dark-muted);
     }
 
     &[data-state="on"] {
-      opacity: 1;
       color: var(--mkt-on-dark);
       font-weight: var(--weight-semibold);
     }
@@ -5754,6 +5784,10 @@
     letter-spacing: 0.04em;
     color: var(--mkt-accent-on-dark);
   }
+
+  // Unreached: the number takes the label's quieter ink, so "not yet" is
+  // carried by more than weight alone.
+  .vi-steps__item[data-state="off"] .vi-steps__num { color: inherit; }
 
   /*
     A FIXED HEIGHT ON THE COPY WELL.
@@ -5960,11 +5994,12 @@
     border: 1px solid var(--mkt-dark-border);
     background: rgba(10, 17, 40, 0.5);
     padding: 0.75rem;
-    opacity: 0.35;
-    transition: opacity 420ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+    // Not yet shown: a dashed outline, never opacity — 0.35 took the head and
+    // its "Illustrative" label to about 2:1, and that label is the disclosure.
+    border-style: dashed;
 
     &[data-shown="true"] {
-      opacity: 1;
+      border-style: solid;
     }
   }
 
@@ -6368,20 +6403,18 @@
       opacity 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       color 320ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
 
-    // Not-yet-reached: dimmed, but never invisible — a reader who lands
-    // mid-section must be able to see where the story goes.
+    // Not-yet-reached: quieter, but never invisible — a reader who lands
+    // mid-section must be able to see where the story goes. Quieter by TOKEN,
+    // not opacity: 0.4 took these labels to about 2.3:1.
     &[data-state="off"] {
-      opacity: 0.4;
-      color: var(--mkt-on-dark-muted);
+      color: var(--mkt-on-dark-faint);
     }
 
     &[data-state="done"] {
-      opacity: 0.75;
       color: var(--mkt-on-dark-muted);
     }
 
     &[data-state="on"] {
-      opacity: 1;
       color: var(--mkt-on-dark);
       font-weight: var(--weight-semibold);
     }
@@ -6392,6 +6425,10 @@
     font-weight: var(--weight-bold);
     color: var(--mkt-accent-on-dark);
   }
+
+  // Unreached: the number takes the label's quieter ink, so "not yet" is
+  // carried by more than weight alone.
+  .ai-rail__item[data-state="off"] .ai-rail__num { color: inherit; }
 
   // ---- The flow -------------------------------------------------------------
   .ai-flow {
@@ -6409,18 +6446,31 @@
     cannot compare an attribute to a variable — five pairs is the honest cost
     of not reaching for JavaScript to add a class.
 
-    DIMMED, NOT HIDDEN — 0.3 opacity, not 0. The section must still make sense
-    to somebody who lands in the middle of it, or to a crawler that renders one
-    frame and screenshots it.
+    DIMMED, NOT HIDDEN. The section must still make sense to somebody who
+    lands in the middle of it, or to a crawler that renders one frame and
+    screenshots it.
+
+    ONLY THE DECORATION IS DIMMED WITH OPACITY. The blocks used to sit at 0.3
+    too, which put every word in them at 1.2-2:1 — an accessibility audit
+    flagged 36 elements here alone. Opacity dims ink and ground together, and
+    no value low enough to read as "not yet" keeps small text at 4.5:1 (the
+    kicker needs ~0.85). So an unreached block keeps full-contrast text and
+    says "not yet" with its chrome instead: a dashed, unfilled outline that
+    becomes a solid, filled card when its stage arrives.
   */
   .ai-flow__block,
   .ai-converge,
   .ai-flow__link {
-    opacity: 0.3;
     transform: translateY(10px);
     transition:
       opacity 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      background-color 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
       transform 520ms var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .ai-converge,
+  .ai-flow__link {
+    opacity: 0.3;
   }
 
   @for $i from 0 through 4 {
@@ -6429,6 +6479,12 @@
         [data-at="#{$j}"] {
           opacity: 1;
           transform: none;
+
+          &.ai-flow__block {
+            border-style: solid;
+            border-color: var(--mkt-dark-border);
+            background-color: rgba(15, 24, 53, 0.72);
+          }
         }
       }
     }
@@ -6443,10 +6499,12 @@
     color: var(--mkt-on-dark-faint);
   }
 
+  // The UNREACHED look. The lit look is set by the stage gating above, and by
+  // the mobile and reduced-motion blocks, which show every stage lit.
   .ai-flow__block {
-    border: 1px solid var(--mkt-dark-border);
+    border: 1px dashed var(--mkt-dark-border-strong);
     border-radius: var(--mkt-radius);
-    background: rgba(15, 24, 53, 0.72);
+    background-color: transparent;
     backdrop-filter: blur(10px);
     padding: 0.875rem 1rem;
   }
@@ -6914,7 +6972,7 @@
   .mkt-showcase__tabs {
     display: flex;
     gap: 0.25rem;
-    min-width: max-content;
+    width: max-content;  // see .pv-tabs
     padding: 0.3125rem;
     border-radius: 999px;
     background: var(--mkt-light-2);
@@ -7167,7 +7225,7 @@
   .mkt-lcard--numbered {
     padding: 1.25rem 1.125rem;
 
-    h3 {
+    h3, h4 {
       margin-top: 0.625rem;
       font-size: 14.5px;
     }
@@ -7486,7 +7544,7 @@
       border-color: var(--mkt-light-border-strong);
     }
 
-    h3 {
+    h3, h4 {
       font-family: var(--font-heading);
       font-size: 15.5px;
       font-weight: var(--weight-semibold);
@@ -8159,7 +8217,7 @@
     .an__stage { grid-template-columns: minmax(0, 1fr); }
 
     // Nothing is pinned, so nothing is gated.
-    .an-surface { opacity: 1; }
+    .an-surface { filter: none; }
     .an-human { opacity: 1; transform: none; }
     .an-stream__list .an-group__name { opacity: 1; }
     .an-event[data-tilt] { transform: none; }
@@ -8284,7 +8342,11 @@
 
     // Nothing is gated when nothing is pinned: the whole rule and the whole
     // log are shown, and the seven captions read as a numbered list.
-    .fl-node__btn { opacity: 1; }
+    .fl-node__btn {
+      border-style: solid;
+      border-color: var(--mkt-dark-border);
+      background: var(--mkt-dark-3);
+    }
 
     .fl-node:not(:first-child)::before {
       background: linear-gradient(180deg, var(--mkt-accent), var(--mkt-lavender));
@@ -8665,6 +8727,8 @@
       transform: none;
     }
 
+    .vi-transcript { border-style: solid; }
+
     .vi-line {
       opacity: 1;
       transform: none;
@@ -8727,6 +8791,12 @@
       transform: none;
     }
 
+    .ai-flow__block {
+      border-style: solid;
+      border-color: var(--mkt-dark-border);
+      background-color: rgba(15, 24, 53, 0.72);
+    }
+
     // The pulse and the path-drawing are scroll-beat decorations with no beats
     // left to hang on.
     .ai-flow__pulse {
@@ -8746,11 +8816,6 @@
       // Still useful as a contents list of what follows; just not a progress
       // indicator, because nothing is progressing.
       gap: 0.25rem 0.875rem;
-    }
-
-    .ai-rail__item[data-state="off"],
-    .ai-rail__item[data-state="done"] {
-      opacity: 0.8;
     }
 
     .ai-layer__steps {
@@ -9033,6 +9098,12 @@
       transition: none;
     }
 
+    .ai-flow__block {
+      border-style: solid;
+      border-color: var(--mkt-dark-border);
+      background-color: rgba(15, 24, 53, 0.72);
+    }
+
     .ai-converge path {
       stroke-dashoffset: 0;
       transition: none;
@@ -9120,11 +9191,12 @@
 
     /*
       THE ANALYTICS SURFACE ARRIVES LIT AND SORTED. The events square up, the
-      group headings show, the dashboard is at full opacity and the human note
+      group headings show, the dashboard is in full colour and the human note
       is in place. Nothing here was revealed BY the animation — the dashboard
       was only ever dimmed — so the section is complete either way.
     */
-    .an-surface,
+    .an-surface { filter: none; transition: none; }
+
     .an-human,
     .an-group__name {
       opacity: 1;
@@ -9139,9 +9211,7 @@
 
     .an__copytext { animation: none; }
 
-    .an-beats__item,
-    .an-close__link,
-    .an-close__link svg {
+    .an-beats__item {
       transition: none;
     }
 
@@ -9168,7 +9238,12 @@
       no signal travelling a connector, no magnetism on the CTA. The graph was
       only ever DIMMED rather than hidden, so nothing is lost.
     */
-    .fl-node__btn { opacity: 1; transition: none; }
+    .fl-node__btn {
+      border-style: solid;
+      border-color: var(--mkt-dark-border);
+      background: var(--mkt-dark-3);
+      transition: none;
+    }
 
     .fl-node:not(:first-child)::before {
       background: linear-gradient(180deg, var(--mkt-accent), var(--mkt-lavender));
@@ -9305,6 +9380,8 @@
       transform: none;
       transition: none;
     }
+
+    .vi-transcript { border-style: solid; }
 
     .vi-copy__text {
       animation: none;
@@ -10221,7 +10298,6 @@
   .pl-col__head:focus-visible,
   .fl-node__btn:focus-visible,
   .ig-node:focus-visible,
-  .an-close__link:focus-visible,
   .pv-tab:focus-visible,
   .pv-link:focus-visible,
   .sc-tab:focus-visible,
@@ -10255,7 +10331,7 @@
     border-color: var(--mkt-dark-border);
     box-shadow: none;
 
-    h3 {
+    h3, h4 {
       color: var(--mkt-on-dark);
     }
 
@@ -10280,7 +10356,7 @@
     backdrop-filter: blur(14px) saturate(140%);
     box-shadow: none;
 
-    h3 {
+    h3, h4 {
       color: var(--mkt-on-dark);
     }
 

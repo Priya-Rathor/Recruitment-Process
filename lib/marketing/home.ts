@@ -680,7 +680,7 @@ export const VOICE_CALLOUTS: (HomeCard & { href: string })[] = [
     href: "/product/screen",
   },
   {
-    title: "A report a person edits",
+    title: "Reports your recruiter can correct",
     // screening_reports: ai_* columns are never updated; corrected_fields records edits.
     body:
       "Interest, notice, pay and location come back as fields. What the AI said " +
@@ -1475,7 +1475,7 @@ export const FLOW_BEATS: { key: string; num: string; label: string; copy: string
   {
     key: "trigger",
     num: "01",
-    label: "Trigger",
+    label: "Triggered",
     copy:
       "Nine things can start a rule, and this is one of them: a screening call " +
       "finishing. The voice provider calls back, so there is no signed-in user " +
@@ -1485,7 +1485,7 @@ export const FLOW_BEATS: { key: string; num: string; label: string; copy: string
   {
     key: "conditions",
     num: "02",
-    label: "Conditions",
+    label: "Matched",
     copy:
       "Conditions are checked against the application as it stands. A rule that " +
       "does not match does not run, and that is a non-event — nothing is logged " +
@@ -1494,7 +1494,7 @@ export const FLOW_BEATS: { key: string; num: string; label: string; copy: string
   {
     key: "approval",
     num: "03",
-    label: "Proposal",
+    label: "Proposed",
     copy:
       "This rule requires approval, so it does not act. It proposes, and the " +
       "run stops here. Nothing has been sent, nothing has moved, and nothing " +
@@ -1513,7 +1513,7 @@ export const FLOW_BEATS: { key: string; num: string; label: string; copy: string
   {
     key: "wait",
     num: "05",
-    label: "Wait",
+    label: "Waited",
     copy:
       "Then the wait runs, on a scheduler rather than a timer in somebody's " +
       "browser. If the application changes stage while it is pending, the wait " +
@@ -1522,7 +1522,7 @@ export const FLOW_BEATS: { key: string; num: string; label: string; copy: string
   {
     key: "actions",
     num: "06",
-    label: "Actions",
+    label: "Acted",
     copy:
       "The stage moves and the candidate gets a templated update. Both are " +
       "recorded against the application with the rule named as the actor, so " +
@@ -1594,7 +1594,7 @@ export const FLOW_CALLOUTS: (HomeCard & { href: string })[] = [
     href: "/product/decide",
   },
   {
-    title: "One clock, not many",
+    title: "One scheduler for every timed rule",
     // A single scheduled sweep drains every time-based rule.
     body:
       "Every time-based rule drains from one scheduled sweep. No timers in a " +
@@ -2095,7 +2095,8 @@ export const SECURITY_LAYERS: {
     key: "auth",
     num: "01",
     label: "Authentication",
-    claim: "A request is somebody, or it is nothing.",
+    // NOT "every request is authenticated": five routes are public by design.
+    claim: "Every request proves who sent it — a session, a signed link or a signature.",
     points: [
       "Sessions are HTTP-only cookies, refreshed at the edge on every request.",
       "Every route handler resolves the tenant from that session — the five that do not are public by design, and each is authorised by a signed token or an HMAC signature instead.",
@@ -2500,7 +2501,8 @@ export const PRICING_PANELS: {
   {
     key: "later",
     label: "When there is a price",
-    title: "It will be published here, in numbers",
+    // No "soon": pricing is undecided, and a date implied here would be a promise.
+    title: "When pricing is set, it will be published here",
     points: [
       "Pricing is unpublished because it is undecided, not because it is being withheld until you ask.",
       "When it exists it will appear on this page with the figures on it, not as a form that promises a quote.",
@@ -2777,6 +2779,12 @@ export const HUMAN_SIDE: { title: string; body: string }[] = [
  * ONLY IMPLEMENTED CAPABILITIES. No certification is claimed anywhere, and the
  * FAQ says plainly that none is held. Every line points at something real.
  */
+/**
+ * The grid's own heading. Without it the cards read as part of whichever
+ * layer tab was open above them; they are the product-wide principles.
+ */
+export const TRUST_CARDS_TITLE = "The principles that hold across the product";
+
 export const TRUST_CARDS: HomeCard[] = [
   {
     title: "Human review, by construction",
@@ -2819,7 +2827,7 @@ export const TRUST_CARDS: HomeCard[] = [
     icon: "KeyRound",
   },
   {
-    title: "Degrades instead of breaking",
+    title: "Keeps working when the AI does not",
     // AiResult is a result type, not an exception: the manual path survives.
     body:
       "If an AI provider is unavailable the manual workflow keeps running. You " +

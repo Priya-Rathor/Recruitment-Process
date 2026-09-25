@@ -7038,9 +7038,10 @@ a {
 .funnel-orbit__stage {
   color: var(--color-text);
   font-weight: var(--weight-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  // WRAPS, never truncates. Stage names are the organisation's own and an
+  // ellipsis with no tooltip hides part of one; in a narrow card even "Hired"
+  // was clipped. A two-line row is a smaller cost than a missing word.
+  overflow-wrap: anywhere;
 }
 
 .funnel-orbit__count {

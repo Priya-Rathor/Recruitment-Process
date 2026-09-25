@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ANALYTICS_CALLOUTS, ANALYTICS_CLOSING, ANALYTICS_HEAD } from "@/lib/marketing/home";
+import { ButtonLink } from "@/components/marketing/Button";
 import { Section } from "@/components/marketing/Section";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 import { Stagger } from "@/components/marketing/Reveal";
@@ -51,12 +52,17 @@ export function Analytics() {
         })}
       </Stagger>
 
+      {/*
+        The shared tertiary button, not a one-off link style: the same CTA
+        appears three times on this page, and each now uses a variant from
+        the one button system — secondary in the hero, primary alone in
+        Integrations, tertiary here where it closes a sentence.
+      */}
       <p className="an-close">
         {ANALYTICS_CLOSING}{" "}
-        <Link href="/how-it-works" className="an-close__link">
+        <ButtonLink href="/how-it-works" variant="tertiary" icon={ArrowRight}>
           Explore the platform
-          <ArrowRight size={15} aria-hidden="true" />
-        </Link>
+        </ButtonLink>
       </p>
     </Section>
   );

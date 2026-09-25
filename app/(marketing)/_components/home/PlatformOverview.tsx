@@ -139,7 +139,6 @@ export function PlatformOverview() {
                       key={item}
                       className={`mkt-product__navitem${item === view.nav ? " is-active" : ""}`}
                     >
-                      <span className="mkt-product__navdot" />
                       {item}
                     </span>
                   ))}

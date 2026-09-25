@@ -163,7 +163,7 @@ export function ApplyStory() {
               </div>
 
               <button type="button" className="ap-form__submit" disabled>
-                {beat >= 2 ? "Application received" : "Submit application"}
+                {beat >= 2 ? "Application received" : "Send application"}
               </button>
             </form>
 

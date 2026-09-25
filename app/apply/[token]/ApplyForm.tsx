@@ -207,10 +207,10 @@ export function ApplyForm({
         {submitting ? (
           <>
             <Loader2 size={16} className="apply-spin" aria-hidden="true" />
-            Submitting…
+            Sending…
           </>
         ) : (
-          "Submit application"
+          "Send application"
         )}
       </button>
 

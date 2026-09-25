@@ -67,7 +67,6 @@ export function DashboardPreview() {
                   key={item}
                   className={`mkt-product__navitem${index === 0 ? " is-active" : ""}`}
                 >
-                  <span className="mkt-product__navdot" />
                   {item}
                 </span>
               ))}

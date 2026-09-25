@@ -502,3 +502,48 @@ describe("Future Workforce — the palette holds up", () => {
     expect(contrast(onAccent as string, primary as string)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+// -----------------------------------------------------------------------------
+// Dimmed is not faded
+// -----------------------------------------------------------------------------
+
+describe("the marketing site never dims TEXT with opacity", () => {
+  const MARKETING = readFileSync(path.join(ROOT, "app/(marketing)/marketing.scss"), "utf8");
+
+  /** The body of the first rule whose selector line matches, braces balanced. */
+  function ruleBody(selector: RegExp): string {
+    const start = MARKETING.search(selector);
+    if (start < 0) throw new Error(`no rule matching ${selector}`);
+    const open = MARKETING.indexOf("{", start);
+    let depth = 0;
+    for (let i = open; i < MARKETING.length; i++) {
+      if (MARKETING[i] === "{") depth++;
+      if (MARKETING[i] === "}" && --depth === 0) return MARKETING.slice(open + 1, i);
+    }
+    throw new Error(`unbalanced rule ${selector}`);
+  }
+
+  it("keeps the inactive states of every step rail at full opacity", () => {
+    // An accessibility audit found 150+ labels at 1.2-3.6:1, every one of them
+    // an "off"/"done"/"dim" state or a not-yet-revealed block faded with
+    // opacity. Opacity dims ink and ground together; no value low enough to
+    // read as "not yet" keeps 12px text at 4.5:1. Quieter tokens or chrome do.
+    const states = [...MARKETING.matchAll(/&\[data-state="(?:off|done|dim)"\]\s*\{([^}]*)\}/g)];
+    expect(states.length).toBeGreaterThan(10);
+    for (const [rule, body] of states) {
+      expect(body, rule).not.toMatch(/\bopacity\s*:/);
+    }
+  });
+
+  it("keeps the scroll-revealed panels that carry text at full opacity", () => {
+    for (const selector of [
+      /\n  \.ai-flow__block \{/,
+      /\n  \.fl-node__btn \{/,
+      /\n  \.vi-transcript \{/,
+      /\n  \.an-surface \{/,
+      /\n  \.pv-rail__item \{/,
+    ]) {
+      expect(ruleBody(selector), String(selector)).not.toMatch(/\n    opacity\s*:/);
+    }
+  });
+});

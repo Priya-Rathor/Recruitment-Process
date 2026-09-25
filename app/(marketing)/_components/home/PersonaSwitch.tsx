@@ -115,7 +115,12 @@ export function PersonaSwitch() {
       <div className="pv__grid">
         {/* ---- The workspace, seen from here --------------------------- */}
         <div className="pv-rail" aria-hidden="true">
-          <p className="pv-rail__head">The workspace</p>
+          {/*
+            A summary, not a menu — the items are never clickable, so the
+            heading says what the lit items MEAN rather than naming the product
+            nav they resemble.
+          */}
+          <p className="pv-rail__head">Where they work in Scoreboad</p>
 
           <ul className="pv-rail__items">
             {DASHBOARD.nav.map((item) => (

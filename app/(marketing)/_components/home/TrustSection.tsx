@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SECURITY_HEAD, SECURITY_NOTE, TRUST_CARDS } from "@/lib/marketing/home";
+import { SECURITY_HEAD, SECURITY_NOTE, TRUST_CARDS, TRUST_CARDS_TITLE } from "@/lib/marketing/home";
 import { Section } from "@/components/marketing/Section";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 import { Card } from "@/components/marketing/Card";
@@ -44,9 +44,16 @@ export function TrustSection() {
         <SecurityArchitecture />
       </Reveal>
 
+      <h3 className="sc-cards__title">{TRUST_CARDS_TITLE}</h3>
       <Stagger as="ul" className="mkt-cardgrid sc-cards">
         {TRUST_CARDS.map((card) => (
-          <Card key={card.title} icon={iconFor(card.icon)} title={card.title} accent="mint">
+          <Card
+            key={card.title}
+            icon={iconFor(card.icon)}
+            title={card.title}
+            level={4}
+            accent="mint"
+          >
             <p>{card.body}</p>
           </Card>
         ))}

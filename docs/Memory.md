@@ -3026,3 +3026,78 @@ Lint clean · typecheck clean · 2,203 tests · build compiles.
 www redirect, Vercel production deployment, Search Console verification,
 Lighthouse/Core Web Vitals field data, and every browser-dependent check
 (keyboard, focus appearance, rendered overflow, console).
+
+## 2026-09-25 (fifth session)
+
+**Homepage accessibility audit (axe, WCAG 2.2 AA, 299 findings).** 151 real
+violations, 1 heading-order (already fixed in source, live site is stale), 1
+prohibited ARIA, 146 "needs review" (axe could not resolve a background through
+gradients/pseudo-elements/backdrop blur).
+
+- Modified: `app/(marketing)/marketing.scss`,
+  `app/(marketing)/_components/home/BrandStatement.tsx`, `app/theme.test.ts`.
+- **One root cause for ~140 violations: text dimmed with `opacity`.** Step-rail
+  off/done states (ai-rail, vi-steps, pl/fl/ap/an-beats, pv-rail), unrevealed
+  scroll blocks (`.ai-flow__block` 0.3, `.fl-node__btn` 0.38, `.vi-transcript`
+  0.35, `.an-surface` 0.55), plus single rules (`.ap-field__req`,
+  `.pl__exitnote`, `.cw-time__by`, `.cw-tab__num`, `.pl-col[data-state=dim]`,
+  `.sc-map__side.is-other`). Chose quieter TOKENS (on-dark-faint 6.1:1,
+  ink-muted 5.5:1) and CHROME (dashed + unfilled outline → solid + filled when
+  reached) over a higher opacity floor, because the floor that passes (~0.85)
+  no longer reads as dimmed. `.an-surface` dims with `filter: grayscale(1)`
+  instead — keeps luminance, so text contrast survives.
+- **Analytics token bridge had two holes:** no `--color-text-muted` (orbital
+  notes fell to the dark grey, 1.7:1) and Bulma `.card` colour comes from
+  `--bulma-text`, resolved at `:root`, so KPI figures were white on white.
+  Bridged muted to `--mkt-ink-muted`, NOT the app's light `#6b7495` (4.37:1 on
+  `#f7f9fc`).
+- `.mkt-statement`: dropped prohibited `aria-label` on `<p>`; an `is-sr-only`
+  comma now separates the words.
+- New guard in `theme.test.ts`: no `opacity` in any off/done/dim state rule or
+  in the base rule of the five text-bearing reveal panels.
+- Left as-is (exempt): aria-hidden `×` glyphs, decorative auras/dots/chevrons,
+  disabled contact fieldset at 0.6.
+
+**Open:** app light-mode `--color-text-muted` (#6b7495) is 4.35:1 on the app's
+light ground and 4.13:1 on sunken — fails AA; theme.test only checks dark.
+Needs a re-scan in a real browser after deploy to clear the 146 "needs review".
+
+Lint clean · typecheck clean · 2,205 tests · build compiles.
+
+## 2026-09-25 (sixth session)
+
+**Homepage usability audit (32 heuristics findings).**
+
+- Modified: `marketing.scss`, `globals.scss` (`.funnel-orbit__stage`),
+  `AutomationStory.tsx`, `PersonaSwitch.tsx`, `DashboardPreview.tsx`,
+  `PlatformOverview.tsx`, `Analytics.tsx`, `TrustSection.tsx`,
+  `components/marketing/Card.tsx` (new `level?: 3 | 4`), `lib/marketing/home.ts`.
+- Fixed: sub-11px mockup labels raised to 11px, `ap-form__note` to 12px ·
+  funnel stage names wrap instead of ellipsis (app-wide; names are org data) ·
+  automation connector 2px in faint ink (was ~2:1) · security bullets capped at
+  68ch · `.pv-tabs`/`.mkt-showcase__tabs` `width: max-content` (pill no longer
+  stretches) · product-shot gutter 20→26px · decorative nav dots removed ·
+  automation beats relabelled as past-tense run events + `aria-label`; the
+  candidate node's chip reads "Result" · persona rail head "Where they work in
+  Scoreboad" · analytics CTA uses the shared tertiary `ButtonLink` (bespoke
+  `.an-close__link` deleted) · trust grid gets its own h3, cards drop to h4.
+- Declined, with reasons given to the user: type/colour/radius/button counts
+  (1–4, system-level, no minimal fix), all-caps eyebrows (7, 17 — short labels),
+  sticky sub-nav and layout variety (19, 20 — page redesign), tabs vs sidebar
+  (27 — deliberate), card/tab redundancy (31 — content decision). 18 was
+  already fixed in source (stale deploy). 5/6/8: 11–12px kept (tile label
+  truncation trade-off; 12px is at the threshold).
+- Not browser-verified: the wrap/width/gutter changes need a visual check.
+
+## 2026-09-25 (seventh session)
+
+**Homepage copy audit (6 findings)** — `lib/marketing/home.ts`,
+`ApplyStory.tsx`, `app/apply/[token]/ApplyForm.tsx`.
+
+- Rejected two suggested rewrites as untrue: "Every request is authenticated"
+  (five routes are public by design, authorised by token/HMAC) and "pricing
+  will be published here soon" (pricing is undecided — no implied date). Wrote
+  accurate versions and left a comment on each saying why.
+- "Submit application" → "Send application" in BOTH the homepage mock and the
+  real candidate form, so the picture still matches the product; "Submitting…"
+  → "Sending…".

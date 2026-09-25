@@ -8,8 +8,12 @@ import { BRAND_STATEMENT } from "@/lib/marketing/home";
  * it; this is where a reader is allowed to stop reading for a moment.
  *
  * THE MULTIPLICATION SIGNS ARE `aria-hidden`. "People multiplication sign
- * Intelligence" is not a sentence, so the visible glyphs are decorative and the
- * accessible name on the container carries the phrase as words.
+ * Intelligence" is not a sentence, so the visible glyphs are decorative and a
+ * screen-reader-only comma stands in for each one.
+ *
+ * NOT an `aria-label` on the <p>, which is what this used to do: a paragraph
+ * has no role that takes a name, so the label is prohibited ARIA and most
+ * screen readers ignore it — leaving the three words read as one run-on.
  *
  * `×` is U+00D7, not a lowercase x. At this size the difference is the whole
  * effect.
@@ -18,16 +22,16 @@ export function BrandStatement() {
   return (
     <section className="mkt-band mkt-band--statement">
       <div className="mkt-shell">
-        <p
-          className="mkt-statement"
-          aria-label={BRAND_STATEMENT.join(", ")}
-        >
+        <p className="mkt-statement">
           {BRAND_STATEMENT.map((word, index) => (
             <span key={word} className="mkt-statement__part">
               {index > 0 && (
-                <span className="mkt-statement__x" aria-hidden="true">
-                  ×
-                </span>
+                <>
+                  <span className="is-sr-only">, </span>
+                  <span className="mkt-statement__x" aria-hidden="true">
+                    ×
+                  </span>
+                </>
               )}
               <span className="mkt-statement__word">{word}</span>
             </span>
