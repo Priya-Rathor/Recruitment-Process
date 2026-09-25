@@ -188,6 +188,16 @@ describe("isPublicPath", () => {
       It is the worst shape of bug this allowlist can produce, because the
       symptom is silence. Pinned here so it cannot come back.
     */
+    it("serves the generated social preview card to an anonymous crawler", () => {
+      /*
+        A social platform fetching the card is anonymous by definition. Before
+        Module 26 this returned a redirect to /login, so every share rendered
+        without an image even once the meta tag existed.
+      */
+      expect(isPublicPath("/opengraph-image")).toBe(true);
+      expect(isPublicPath("/opengraph-imagex")).toBe(false);
+    });
+
     it("serves robots.txt and sitemap.xml to an anonymous crawler", () => {
       expect(isPublicPath("/robots.txt")).toBe(true);
       expect(isPublicPath("/sitemap.xml")).toBe(true);

@@ -1822,7 +1822,7 @@
     margin-bottom: 14px;
   }
 
-  .mkt-product__head h3 {
+  .mkt-product__head .mkt-product__title {
     font-family: var(--font-heading);
     font-size: 17px;
     font-weight: var(--weight-semibold);
@@ -1830,7 +1830,7 @@
     margin: 0;
   }
 
-  .mkt-product__panelhead h4 {
+  .mkt-product__panelhead .mkt-product__paneltitle {
     font-size: 13.5px;
     font-weight: var(--weight-semibold);
     color: var(--mkt-ink);
@@ -13829,5 +13829,52 @@
     }
 
     .lg-table { min-inline-size: 26rem; }
+  }
+
+  // ===========================================================================
+  // MOBILE PERFORMANCE — Module 27
+  //
+  // §8 and §19: a phone should not be handed the desktop's compositing bill.
+  // ===========================================================================
+
+  /*
+    BACKDROP BLUR IS DROPPED BELOW 900px, and the design's own contract is what
+    makes that safe rather than a compromise.
+  
+    Every glass surface on this site already carries a substantial opaque fill —
+    0.72 to 0.96 alpha — and the navbar's comment says so explicitly: "the fill
+    alone is already sufficient contrast, so a browser without it loses the blur
+    and nothing else." That was written about a browser lacking support; it is
+    equally true of a phone we choose not to ask.
+  
+    WHY IT IS WORTH DOING. `backdrop-filter` forces the compositor to re-sample
+    everything behind the element every frame it moves. Two of these — the
+    navbar and the security page's contents strip — are STICKY, so they move on
+    every frame of every scroll, which is the one gesture a phone must keep
+    smooth. Nine blurred layers on a mid-range device is a real cost for an
+    effect nobody can see behind an opaque navy bar.
+  
+    The two surfaces whose fill is genuinely translucent get a denser one here,
+    so they stay legible rather than disappearing.
+  */
+  @media (max-width: 900px) {
+    .mkt-header,
+    .mkt-btn--glass,
+    .mkt-signal,
+    .ai-flow__block,
+    .mkt-nav__bar,
+    .mkt-mega__panel,
+    .mkt-nav__sheet,
+    .mkt-lcard--glass,
+    .sec-toc {
+      backdrop-filter: none;
+    }
+
+    // These two rely on the blur for their edge, so they need more fill without
+    // it. Both sit on the deep ground, so a navy wash is the right substitute.
+    .mkt-btn--glass,
+    .mkt-lcard--glass {
+      background: rgba(20, 29, 58, 0.72);
+    }
   }
 }

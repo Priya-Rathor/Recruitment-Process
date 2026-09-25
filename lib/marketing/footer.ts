@@ -44,28 +44,11 @@
 // taken from that page's own heading rather than invented for SEO.
 // =============================================================================
 
-import { CAPABILITY_GROUPS } from "@/lib/marketing/content";
+import { CAPABILITY_GROUPS, PRODUCT_SEO_TITLES } from "@/lib/marketing/content";
 
 export type FooterLink = { label: string; href: string };
 
 export type FooterSection = { title: string; links: FooterLink[] };
-
-/**
- * Descriptive anchor text for each product page, keyed by slug.
- *
- * Each is a plain description of what that page covers — checked against its
- * own `heading` in content.ts, not written to hit a keyword. The test asserts
- * every capability group has one, so a seventh group cannot be added without a
- * label and quietly inherit a slug as its link text.
- */
-const PRODUCT_LABELS: Record<string, string> = {
-  source: "Jobs and applications",
-  understand: "AI resume screening",
-  screen: "AI screening calls",
-  decide: "Hiring pipeline and evaluation",
-  close: "Offers and onboarding",
-  operate: "Analytics and automation",
-};
 
 export const FOOTER_SECTIONS: FooterSection[] = [
   {
@@ -76,7 +59,7 @@ export const FOOTER_SECTIONS: FooterSection[] = [
       matches CAPABILITY_GROUPS.
     */
     links: CAPABILITY_GROUPS.map((group) => ({
-      label: PRODUCT_LABELS[group.slug] ?? group.tab,
+      label: PRODUCT_SEO_TITLES[group.slug] ?? group.tab,
       href: `/product/${group.slug}`,
     })),
   },

@@ -187,6 +187,44 @@ describe("nothing is invented (§15, §16, §25)", () => {
   });
 });
 
+describe("call-to-action labels stay in one voice", () => {
+  /*
+    ADDED BY MODULE 28's AUDIT, which found the homepage rendering BOTH
+    "Explore the Platform" and "Explore the platform" — the same label, the same
+    destination, on the same page — plus "Get Started" against the product
+    pages' "Get started".
+
+    Casing drift is invisible in review: each label reads fine on its own, and
+    nobody sees two of them side by side. A rule is the only thing that catches
+    it.
+
+    SENTENCE CASE, because that is what fourteen of the site's fifteen pages
+    already used and what every footer and nav label uses. Proper nouns are
+    still capitalised — the check only looks at words after the first.
+  */
+  const LABELS = [
+    ...FOOTER_SECTIONS.flatMap((s) => s.links.map((l) => l.label)),
+    ...FOOTER_LEGAL.map((l) => l.label),
+    FOOTER_BRAND.action.label,
+  ];
+
+  it("writes every label in sentence case", () => {
+    const ALLOWED_CAPS = new Set(["Scoreboad", "AI", "FAQ"]);
+
+    for (const label of LABELS) {
+      const [, ...rest] = label.split(/\s+/);
+      for (const word of rest) {
+        const bare = word.replace(/[^\w]/g, "");
+        if (!bare || ALLOWED_CAPS.has(bare)) continue;
+        expect(
+          bare[0] === bare[0].toLowerCase(),
+          `"${label}" capitalises "${bare}" mid-label — sentence case, please`
+        ).toBe(true);
+      }
+    }
+  });
+});
+
 describe("the footer completes the site's link graph (§31)", () => {
   it("reaches every public marketing page from the footer or the navbar", () => {
     /*

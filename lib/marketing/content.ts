@@ -465,6 +465,29 @@ export const FAQS: { q: string; a: string }[] = [
 */
 
 /** Lookup used by the product route's generateStaticParams and page. */
+/**
+ * What each product page is ABOUT, in words a reader or a search result can use.
+ *
+ * WHY THIS EXISTS SEPARATELY FROM `tab`. The tab labels — Source, Understand,
+ * Screen, Decide, Close, Operate — are good tabs: one word each, they fit a
+ * horizontal scroller and they read as a sequence. They are poor titles and
+ * poor link text, because out of that strip they describe nothing. "Decide ·
+ * Scoreboad" is a browser tab nobody can place and a search result nobody
+ * clicks.
+ *
+ * Each label below was taken from that page's own `heading`, not written to
+ * hit a keyword. ONE MAP, used by the product page's <title>, its Open Graph
+ * title and the footer's anchor text, so the three cannot drift.
+ */
+export const PRODUCT_SEO_TITLES: Record<string, string> = {
+  source: "Jobs and applications",
+  understand: "AI resume screening",
+  screen: "AI screening calls",
+  decide: "Hiring pipeline and evaluation",
+  close: "Offers and onboarding",
+  operate: "Analytics and automation",
+};
+
 export function getGroup(slug: string): CapabilityGroup | undefined {
   return CAPABILITY_GROUPS.find((g) => g.slug === slug);
 }

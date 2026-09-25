@@ -12,10 +12,20 @@
 // 520ms, on the shared easing curve. Everything else on the site is a CSS
 // hover transition. There is deliberately no third mechanism.
 //
-// ONE OBSERVER PER ELEMENT, unobserved the moment it fires. The alternative —
-// a scroll listener recomputing offsets — runs on the main thread during the
-// exact gesture it is decorating, which is how a landing page comes to feel
-// slower than the page it replaced.
+// ONE OBSERVER FOR THE WHOLE PAGE, shared by every Reveal, with each element
+// unobserved the moment it fires.
+//
+// THIS REPLACED ONE OBSERVER PER ELEMENT, and the measurement is why: the home
+// page renders 66 Reveals, so it was constructing 66 IntersectionObservers —
+// plus five more for the scroll-story sentinels — and handing the browser 71
+// separate observation contexts to service on every scroll. One observer
+// watching 66 targets is the same work for us and a fraction of it for the
+// browser, because the options are identical for all of them and there was
+// never a reason for more than one.
+//
+// The alternative to either — a scroll listener recomputing offsets — runs on
+// the main thread during the exact gesture it is decorating, which is how a
+// landing page comes to feel slower than the page it replaced.
 //
 // NO ANIMATION LIBRARY. The brief rules out heavy dependencies for decoration,
 // and this is twelve lines of IntersectionObserver plus a CSS transition. Adding
@@ -28,6 +38,53 @@
 // =============================================================================
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+
+/*
+  THE SHARED OBSERVER.
+
+  Module scope, created lazily on the first Reveal that mounts and never torn
+  down — a page always has more of these arriving, and an observer with nothing
+  to watch costs nothing. Every Reveal uses identical options, which is exactly
+  the condition under which one observer can serve all of them.
+
+  The callbacks live in a Map keyed by the element. A WeakMap would be tidier
+  for collection, but entries are deleted the moment they fire and on unmount,
+  so nothing accumulates and a plain Map is iterable if this ever needs
+  debugging.
+*/
+const REVEAL_OPTIONS: IntersectionObserverInit = {
+  // A little before the element arrives, so the fade completes as it lands
+  // rather than starting once the reader is already looking at it.
+  rootMargin: "0px 0px -12% 0px",
+  threshold: 0.01,
+};
+
+let sharedObserver: IntersectionObserver | null = null;
+const pending = new Map<Element, () => void>();
+
+function observeOnce(node: Element, onShow: () => void): () => void {
+  sharedObserver ??= new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const fire = pending.get(entry.target);
+      if (!fire) continue;
+      // Deleted and unobserved BEFORE firing: once revealed it stays revealed,
+      // and re-animating on every scroll past is the thing that makes these
+      // feel cheap.
+      pending.delete(entry.target);
+      sharedObserver?.unobserve(entry.target);
+      fire();
+    }
+  }, REVEAL_OPTIONS);
+
+  pending.set(node, onShow);
+  sharedObserver.observe(node);
+
+  return () => {
+    pending.delete(node);
+    sharedObserver?.unobserve(node);
+  };
+}
 
 export function Reveal({
   children,
@@ -55,28 +112,14 @@ export function Reveal({
 
       Through a zero-delay timer rather than a direct call, so nothing is set
       synchronously in this effect body: that is a cascading render, and the lint
-      rule catching it is worth keeping sharp. Same shape CandidatePicker uses.
+      rule catching it is worth keeping sharp.
     */
     if (typeof IntersectionObserver === "undefined") {
       const immediate = setTimeout(() => setShown(true), 0);
       return () => clearTimeout(immediate);
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        setShown(true);
-        // Once revealed it stays revealed: re-animating on every scroll past is
-        // the thing that makes these feel cheap.
-        observer.disconnect();
-      },
-      // A little before the element arrives, so the fade completes as it lands
-      // rather than starting once the reader is already looking at it.
-      { rootMargin: "0px 0px -12% 0px", threshold: 0.01 }
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
+    return observeOnce(node, () => setShown(true));
   }, []);
 
   return (

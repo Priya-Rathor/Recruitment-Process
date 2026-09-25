@@ -68,8 +68,18 @@ export const HERO = {
     linked from it. So the label ships against the real page rather than
     against a route created to match a label.
   */
-  ctaPrimary: { label: "Get Started", href: "/signup" },
-  ctaSecondary: { label: "Explore the Platform", href: "/how-it-works" },
+  /*
+    SENTENCE CASE, normalised in Module 28's audit.
+
+    The homepage was rendering BOTH "Explore the Platform" and "Explore the
+    platform" — the same label, the same destination, on the same page — and
+    "Get Started" against the product pages' "Get started". The homepage was
+    the only surface left in Title Case; the fourteen pages built after it all
+    use sentence case, as does every label in the footer and the nav sheets.
+    One convention, and it is the majority one.
+  */
+  ctaPrimary: { label: "Get started", href: "/signup" },
+  ctaSecondary: { label: "Explore the platform", href: "/how-it-works" },
 } as const;
 
 /**

@@ -5,6 +5,7 @@ import {
   buildMetadata,
   organizationJsonLd,
   softwareJsonLd,
+  websiteJsonLd,
 } from "@/lib/marketing/seo";
 import { Hero } from "./_components/home/Hero";
 import { Problem } from "./_components/home/Problem";
@@ -140,6 +141,7 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{
           __html: JSON.stringify([
             organizationJsonLd(),
+            websiteJsonLd(),
             softwareJsonLd(),
           ]),
         }}

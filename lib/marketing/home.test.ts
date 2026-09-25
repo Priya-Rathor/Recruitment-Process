@@ -320,6 +320,47 @@ describe("the landing page makes no claim the product cannot keep", () => {
     }
   });
 
+  it("makes no BLANKET encryption claim, while allowing the one that is true", () => {
+    /*
+      ADDED IN MODULE 30's LAUNCH AUDIT, which found this file was the only
+      marketing content module without the guard. security.ts, legal.ts, faq.ts
+      and contact.ts all had one; home.ts — the largest of them, and the one on
+      the most-visited page — did not.
+
+      THE DISTINCTION IS THE WHOLE POINT, and a flat keyword ban gets it wrong.
+      Scoreboad may say that PROVIDER CREDENTIALS are encrypted at rest,
+      because that cipher is in our own source (lib/integrations/crypto.ts,
+      AES-GCM) behind a column-level REVOKE. It may NOT say that candidate data
+      or "your data" is encrypted at rest or in transit: Supabase and Vercel
+      both provide and document that, but this project has verified neither,
+      and /security says so in as many words.
+
+      So the rule is scoped: an encryption sentence is allowed only where it is
+      about credentials.
+    */
+    const ENCRYPTION = /\bencrypt(ed|ion)\b/i;
+    /*
+      "Keys", "credentials" and "the column is revoked" all name the same
+      thing — the integration credential store. Candidate data is never
+      described as a key, so this stays narrow enough to catch a blanket claim
+      while passing the sentence that is actually true.
+    */
+    const CREDENTIAL_SCOPED = /\bcredential|\bintegration|\bkeys?\b|\bcolumn is revoked/i;
+
+    for (const line of ALL_COPY) {
+      if (!ENCRYPTION.test(line)) continue;
+      expect(
+        CREDENTIAL_SCOPED.test(line),
+        `unscoped encryption claim — only the credential store is verified: "${line}"`
+      ).toBe(true);
+    }
+
+    // And the blanket forms may not appear at all, however they are phrased.
+    for (const line of ALL_COPY) {
+      expect(/\bAES[- ]?256\b|\bend[- ]to[- ]end encrypt|\bbank[- ]grade\b/i.test(line), line).toBe(false);
+    }
+  });
+
   it("names no customer, logo or testimonial", () => {
     // There are none. The hero's badge says where the product actually stands
     // instead, which is the honest substitute for a logo wall.
@@ -383,8 +424,10 @@ describe("the hero", () => {
   });
 
   it("names the primary action as the brief specifies", () => {
-    expect(HERO.ctaPrimary.label).toBe("Get Started");
-    expect(HERO.ctaSecondary.label).toBe("Explore the Platform");
+    // Sentence case since Module 28's audit: the page was rendering both
+    // "Explore the Platform" and "Explore the platform" at once.
+    expect(HERO.ctaPrimary.label).toBe("Get started");
+    expect(HERO.ctaSecondary.label).toBe("Explore the platform");
   });
 
   it("keeps the supporting copy to two sentences", () => {

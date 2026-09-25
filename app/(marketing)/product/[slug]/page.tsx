@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/marketing/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CAPABILITY_GROUPS, getGroup } from "@/lib/marketing/content";
+import { CAPABILITY_GROUPS, PRODUCT_SEO_TITLES, getGroup } from "@/lib/marketing/content";
 
 /**
  * The six product pages, from one template.
@@ -34,11 +34,19 @@ export async function generateMetadata({
   const group = getGroup(slug);
   if (!group) return {};
 
-  // The root layout's template appends "· Scoreboad" to the title; the helper
-  // builds the canonical, the Open Graph block and the Twitter card from the
-  // same three values, so the six product pages cannot drift from each other.
+  /*
+    The root layout's template appends "· Scoreboad" to the title; the helper
+    builds the canonical, the Open Graph block and the Twitter card from the
+    same values, so the six product pages cannot drift from each other.
+
+    THE TITLE IS THE DESCRIPTIVE LABEL, NOT THE TAB. `group.tab` is one word —
+    "Decide", "Operate" — which works in the tab strip it was written for and
+    is useless as a browser title or a search result. Module 26's audit found
+    all six pages titled that way. The shared map is also what the footer links
+    with, so a page's name is written once.
+  */
   return buildMetadata({
-    title: group.tab,
+    title: PRODUCT_SEO_TITLES[group.slug] ?? group.tab,
     description: group.summary,
     path: `/product/${group.slug}`,
   });

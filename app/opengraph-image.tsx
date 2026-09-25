@@ -73,7 +73,12 @@ export default async function OpengraphImage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- satori renders plain <img>; next/image does not exist in this canvas. */}
+          {/*
+            A plain <img>, not next/image: this renders in satori, which has no
+            Next runtime and no image optimiser. `alt=""` because the wordmark
+            beside it already names the brand, and an OG canvas has no
+            accessibility tree in any case.
+          */}
           <img src={markSrc} width={64} height={64} alt="" />
           <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.02em" }}>
             {SITE_NAME}

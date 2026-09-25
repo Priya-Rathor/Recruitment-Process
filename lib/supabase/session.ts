@@ -143,6 +143,16 @@ const PUBLIC_PATHS = [
   */
   "/robots.txt",
   "/sitemap.xml",
+  /*
+    The generated social preview card (app/opengraph-image.tsx), and it is the
+    SAME BUG the two entries above were added for. The route has no file
+    extension, so the proxy matcher does not exclude it the way it excludes
+    .png — deny-by-default caught it and served every social crawler a 307 to
+    /login. Measured with `curl`, not assumed.
+
+    Near miss: no private route begins with "/opengraph-image".
+  */
+  "/opengraph-image",
 ];
 
 /**

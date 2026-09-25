@@ -16,20 +16,26 @@ import { SITE_URL } from "@/lib/marketing/seo";
  * THAT DO NOT EXIST YET. A sitemap listing /pricing before /pricing is written
  * is a 404 handed to a crawler with a request to come and see it.
  *
- * `lastModified` is the deploy time rather than a per-page date. Faking a
- * freshness signal is worse than omitting one, and this is honest: at a deploy,
- * every one of these pages genuinely may have changed.
+ * NO `lastModified`, and that reverses an earlier decision here.
+ *
+ * It used to be the deploy time, argued as honest on the grounds that any page
+ * MAY have changed at a deploy. Module 26's audit rejects that: a deploy that
+ * touches one component restamps all seventeen URLs, so a page like /privacy —
+ * declared `yearly` two lines below — would claim to have changed today, every
+ * deploy, forever. That is exactly the "every page changed daily" signal a
+ * crawler learns to ignore, and once ignored the field is worse than absent
+ * because it discredits the ones that are real.
+ *
+ * There is no reliable per-page modification date in this project, so the field
+ * is omitted rather than invented. It can be added the day one exists.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
-
   const entry = (
     path: string,
     priority: number,
     changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"]
   ) => ({
     url: `${SITE_URL}${path}`,
-    lastModified: now,
     changeFrequency,
     priority,
   });
@@ -59,8 +65,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     entry("/terms", 0.3, "yearly"),
     entry("/cookies", 0.3, "yearly"),
     ...CAPABILITY_GROUPS.map((group) => entry(`/product/${group.slug}`, 0.7, "monthly")),
-    // Real entry points somebody may search for by name.
-    entry("/signup", 0.5, "yearly"),
-    entry("/login", 0.3, "yearly"),
   ];
+  /*
+    §9 — /signup AND /login ARE DELIBERATELY ABSENT, reversing an earlier call
+    that listed them as "real entry points somebody may search for by name".
+
+    A sitemap is a statement about which pages are this site's CONTENT. An
+    auth form is a control, not content: it has nothing to rank for, it carries
+    the site's generic description because it sets none of its own, and a
+    crawler that indexes it produces a result that helps nobody. Both stay
+    crawlable — robots.txt allows them and the navbar and footer link them — so
+    nothing is hidden; they are simply not put forward for indexing.
+  */
 }

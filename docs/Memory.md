@@ -2785,3 +2785,244 @@ liability, effective date) are all covered.
 `/settings/privacy` (in-product admin screen) do NOT share a prefix —
 `matches()` frees an entry and its own subtree only. Verified: `/settings/privacy`
 still 307s.
+
+## 2026-09-24 (fourth session)
+
+**Module 26 — technical SEO audit + indexing readiness.**
+
+- New: `app/opengraph-image.tsx`, `lib/marketing/seo.test.ts` (19 assertions).
+- Modified: `lib/marketing/seo.ts`, `app/sitemap.ts`, `lib/supabase/session.ts`
+  (+ its test), `lib/marketing/content.ts`, `lib/marketing/footer.ts`,
+  `app/(marketing)/product/[slug]/page.tsx`, `app/(marketing)/page.tsx`.
+
+**Audit method:** crawled all 17 public routes and diffed title / description /
+canonical / og / h1. Already passing: one H1 everywhere, unique titles, correct
+canonicals, no stray noindex, no old branding, no localhost/.vercel.app in
+metadata, alt text fine (the only public images are logos).
+
+**Four real findings, all fixed:**
+
+1. **No `og:image` on ANY page** — while `twitter:card` had been
+   `summary_large_image` since Module 03. Every share of every page rendered
+   imageless. Root cause is worth remembering: **`app/opengraph-image.tsx` is
+   merged only into pages that do NOT declare their own `openGraph` object.**
+   `buildMetadata()` declares one, which REPLACED the generated block — so
+   /login and /signup (no openGraph) carried the card and all 15 marketing
+   pages did not. Fixed by naming `images: [OG_IMAGE_PATH]` in both the
+   openGraph and twitter blocks.
+2. **`/opengraph-image` returned 307 → /login.** Deny-by-default again — the
+   route has no file extension, so the proxy matcher's `.png$` exclusion missed
+   it. Same bug class as robots.txt/sitemap.xml, already documented in
+   session.ts. Allowlisted + pinned.
+3. **Product pages titled with their tab word** — "Decide · Scoreboad",
+   "Operate · Scoreboad". Now descriptive ("AI screening calls", "Hiring
+   pipeline and evaluation") from a single `PRODUCT_SEO_TITLES` map in
+   content.ts that the footer's anchor text also reads, so title and link text
+   cannot drift.
+4. **Sitemap stamped `lastModified: now` on every URL** — so a deploy touching
+   one component restamped all 17, telling crawlers /privacy (declared
+   `yearly`) changed today, every deploy. Field dropped: no reliable per-page
+   date exists, and §11 prefers omission to invention. Also removed /login and
+   /signup — auth forms are controls, not content (still crawlable, still
+   linked).
+
+**Added:** `WebSite` JSON-LD (name + url only, **no SearchAction** — there is no
+site search endpoint; the FAQ filter is client-side and has no URL).
+
+Sitemap is now 15 content URLs, zero lastmod. The OG card is generated with
+`next/og` (ships with Next, no dependency), statically optimised, 1200×630,
+composed from the real brand mark read off disk at build time.
+
+**Not changed, deliberately:** the Module 24 finding that unmatched top-level
+paths 307 to /login instead of 404ing. Still an SEO issue (dead URLs never drop
+out of the index) and still an authentication change this module was told not
+to make.
+
+## 2026-09-25
+
+**Module 27 — performance / Core Web Vitals.**
+
+Measured first, on a real `next start` production server (Next 16 + Turbopack
+prints no bundle sizes, so payloads were measured by fetching each route and
+summing its assets, raw and gzipped).
+
+**Baseline (gzipped, homepage):** HTML 52.3K · JS 216.2K (15 chunks) · CSS
+108.9K (978K raw).
+
+**Two real findings:**
+
+1. **71 IntersectionObservers on the homepage** — 66 from `<Reveal>` (one per
+   instance) plus 5 scroll-story tracks. **Fixed:** `Reveal` now uses ONE
+   module-level shared observer with a Map of element → callback; every Reveal
+   uses identical options, which is the condition that makes sharing valid.
+   71 → 6 observers. Runtime-only: bytes unchanged (216.3K after), which is the
+   honest framing.
+2. **9 `backdrop-filter` layers, two of them on STICKY elements** (navbar, the
+   security page's contents strip) that recomposite on every scroll frame.
+   **Fixed:** dropped below 900px. Safe by the design's own contract — every
+   glass surface already carries a 0.72–0.96 opaque fill, and the navbar's
+   comment says "the fill alone is already sufficient contrast". The two
+   genuinely translucent ones (`--mkt-btn--glass`, `--mkt-lcard--glass`) get a
+   denser fill on mobile instead.
+
+**Already correct, verified not assumed:** no scroll listeners anywhere
+(sentinel/IO architecture); both infinite animations are `transform`/`opacity`
+only; global `prefers-reduced-motion` catch-all in globals.scss plus 10 targeted
+blocks; fonts self-hosted via next/font with `display: swap` and only 3 Space
+Grotesk weights; every lucide import is named (no namespace import in 118
+sites); the H1 is the LCP element and carries **zero** animation-delay; the
+63K logo PNG is served as a **2.6K WebP** at the rendered size with explicit
+width/height.
+
+**THE BIGGEST REMAINING WIN, deliberately not taken: Bulma ships on every
+marketing page.** `app/globals.scss` does `@use "bulma/sass"` and is imported by
+the ROOT layout, so all 15 marketing pages load 769K raw / **79.6K gz** of Bulma
+— 73% of their CSS — to use essentially one class (`is-sr-only`, 8 times).
+
+It cannot be removed safely: there are only two layouts in the whole app
+(root and `(marketing)`), every app route sits directly under `app/`, and
+**24 of 65 app pages don't render `AppShell`** — including /login, /signup,
+/apply/[token] and every settings page — so there is no existing component or
+layout to move the import to. The fix is to move the app's ~25 route
+directories into an `(app)` route group with its own layout. That is a
+restructure, not an optimization, and this module was told not to redesign.
+
+**No dynamic imports added, with the measurement behind it:** the simplest
+marketing page ships 188.9K gz of JS and the homepage 216.3K — so all six
+scroll stories plus the hero are **27.4K gz**. The framework baseline dominates;
+deferring the stories would risk the scroll narrative attaching late to save
+noise.
+
+## 2026-09-25 (second session)
+
+**Module 28 — final UX / accessibility / responsive QA audit.**
+
+Audited 15 public routes mechanically (no browser in this environment — stated
+plainly rather than claimed). Method: production `next start`, crawl every
+route, parse the HTML, plus static analysis of the SCSS and components.
+
+**Three real defects found and fixed:**
+
+1. **Homepage skipped h1 → h3.** The hero's synthetic dashboard mockup used
+   `<h3>Overview</h3>` and `<h4>Hiring pipeline</h4>` — chrome inside a PICTURE
+   of the product, entering the page's real document outline. A screen-reader
+   user navigating by heading landed on "Overview" as though it were a section,
+   straight after the h1 and before the first real h2. Now `<p>` with matching
+   classes: text still crawlable, outline clean.
+2. **The homepage rendered BOTH "Explore the Platform" and "Explore the
+   platform"** — same label, same destination, same page — plus "Get Started"
+   against the product pages' "Get started". The homepage (Module 03) was the
+   last surface in Title Case; the 14 pages built after it all use sentence
+   case. Normalised the three homepage labels.
+3. **No guard against casing drift.** Added one to `footer.test.ts` — labels
+   must be sentence case, with Scoreboad/AI/FAQ exempt. Casing drift is
+   invisible in review because nobody sees two variants side by side.
+
+**Verified clean, by measurement not assumption:** every internal link (17
+destinations, all 200) · every same-page AND cross-page fragment resolves · no
+private route or `href="#"` in marketing · no old branding · no email, phone or
+external URL in public copy · terminology consistent (candidate 232 vs
+applicant 2) · all 23 `outline: none` have a visible replacement, 53
+focus-visible rules · no body-level `overflow-x: hidden` masking · no hydration
+risk (the footer's `new Date()` is in a server component; every browser API sits
+in an effect or handler) · 15/15 unique titles, canonicals, og:image,
+descriptions · 404 returns 404 with noindex and one h1 · footer on every page.
+
+**Animation timings already fit the brief's bands** (micro 0.18–0.25s, standard
+0.28–0.34s, story 0.42–0.72s) — §18 says not to force numbers on a consistent
+scale, so nothing was changed.
+
+**NOT verifiable here, and reported as such:** keyboard traversal, visible focus
+appearance, touch-target sizes as rendered, horizontal overflow at 320–1920px,
+browser console/hydration warnings at runtime, Lighthouse. Two targets measured
+from CSS sit near minimums and want a real check: `.faq-search__clear` at 24px
+square (exactly WCAG 2.2 AA) and `.faq-cat` at roughly 36px tall.
+
+## 2026-09-25 (third session)
+
+**Module 29 — SEO analytics / Search Console / monitoring foundation.**
+
+- New: `docs/SEO.md` (246 lines). Modified: `AGENTS.md` (docs set index).
+- **No code changed.** No analytics added, no credentials invented.
+
+**Re-verified rather than trusted from Module 25/26:** there is **no analytics
+of any kind** — no GA/GTM/gtag/dataLayer, no Vercel Analytics or Speed Insights,
+no Plausible/PostHog/Mixpanel/Amplitude/Hotjar/Clarity/Segment, nothing in
+`package.json`, and no third-party script on any public page. Every grep hit was
+a false positive ("plausible" in a code comment, "segment" in CSS class names,
+"verification" from the product's own match/webhook features). **No Search
+Console verification** exists either — no meta tag, no `public/google*.html`.
+
+**Analytics deliberately NOT added, and the binding reason is our own legal
+page:** `/cookies` states the site sets no cookies and has no analytics, and
+promises *"If any of that is added later, this page and the privacy page change
+first, and a consent mechanism gets built at the same time — not afterwards."*
+Adding a provider in a module told not to touch legal content would have made
+that page false on the day it shipped. `docs/SEO.md` §1 records the required
+order for whoever does add one.
+
+**One new technical verification (§25, genuinely testable):** UTM parameters do
+NOT create duplicate indexable URLs — `/?utm_source=…&utm_medium=…&utm_campaign=…`
+and `/faq?utm_source=…` both still emit the clean canonical, and `og:url` is
+clean too. Campaign links are safe to hand out.
+
+Re-verified: sitemap 200, valid XML, 15/15 unique, no query strings, no
+localhost/vercel hosts, no private routes · robots references sitemap + host,
+blocks `/apply/` `/coding/` `/unsubscribe` · Open Graph + Twitter complete with
+image on all six checked pages · social card 200, 1200×630, Scoreboad branding
+only · `.env.local.example` needs no new variable (`APP_URL` already feeds
+`SITE_URL`).
+
+**Core Web Vitals: NOT measured** — no browser here, no field data without
+traffic. Documented the two ways to get real numbers rather than estimating any.
+
+`docs/SEO.md` carries the Search Console setup (DNS TXT, domain property — no
+fake token), the weekly monitoring routine, an issue-priority framework noting
+which rows are already enforced by tests, the page map of real routes only, and
+a production checklist where **only actually-verified rows are ticked**.
+
+## 2026-09-25 (fourth session)
+
+**Module 30 — final production launch audit.** End of the 30-module roadmap.
+
+- Modified: `lib/marketing/home.test.ts` (one new guard). No other code changed —
+  the audit found no production blocker in the code.
+
+**Verified, on a real production build served by `next start`:**
+
+- **Secrets clean.** Only `.env.local.example` is tracked (`.env*` gitignored);
+  no hardcoded secret in tracked source; only three `NEXT_PUBLIC_*` names, all
+  Supabase public values; **no server env name referenced from any "use client"
+  file.** Three client chunks matched a secret-name grep — all false positives:
+  admin-facing error messages naming a config VARIABLE so an administrator
+  knows what to set (`/jobs/[id]`, `/interviews/[id]`), never a value.
+- 15 public routes: 200, one H1 each, correct self-canonical, all indexable,
+  unique titles. 17 internal destinations + 31 assets crawled, zero broken.
+- No PII on public pages (email/uuid/JWT/Supabase host all clean). No old
+  branding, no "Vercel"/"Create Next App" in public output.
+- Private routes 307; `/api/*` 401. Five security headers served (no CSP —
+  documented gap with reasons in `next.config.ts`).
+- Trailing slashes 308 to the canonical form — no chain, no loop.
+- `vercel.json` is `{}` by design (the sweep is a GitHub Action, DEPLOYMENT §7).
+
+**One real gap found and closed:** `home.ts` was the ONLY marketing content
+module without an encryption-claim guard — security/legal/faq/contact all had
+one. Added a **scoped** guard to `home.test.ts`: a sentence may claim encryption
+only where it is about credentials/keys (the AES-GCM integration store, which is
+in our own source), never about candidate data. First attempt was too narrow and
+failed on the true sentence "Keys are encrypted before they are stored and the
+column is revoked" — widened rather than the copy changed.
+
+**15 legal placeholders remain and are LAUNCH BLOCKERS** — they render as
+visible amber markers on /privacy, /terms and /cookies. Entity, governing law,
+effective date, data residency, sub-processors, liability, privacy contact,
+automated-decision notice, retention enforcement. These were designed to be
+impossible to miss; they must be completed with counsel before the site is
+public.
+
+Lint clean · typecheck clean · 2,203 tests · build compiles.
+
+**Cannot be verified from here (require the user):** DNS, HTTPS certificate,
+www redirect, Vercel production deployment, Search Console verification,
+Lighthouse/Core Web Vitals field data, and every browser-dependent check
+(keyboard, focus appearance, rendered overflow, console).

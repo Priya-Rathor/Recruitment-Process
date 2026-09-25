@@ -6,7 +6,7 @@ code of every module already built, BEFORE writing anything.
 
 **Documentation set** (read the one relevant to your change before you make it):
 `docs/PRD.md` · `docs/ARCHITECTURE.md` · `docs/DATABASE.md` · `docs/API.md` ·
-`docs/SECURITY.md` · `docs/PRIVACY.md` · `docs/TESTING.md` ·
+`docs/SECURITY.md` · `docs/PRIVACY.md` · `docs/SEO.md` · `docs/TESTING.md` ·
 `docs/DEPLOYMENT.md` · `docs/PRODUCTION_READINESS.md` · `docs/KNOWN_ISSUES.md` ·
 `docs/PRODUCTION_AUDIT.md`.
 

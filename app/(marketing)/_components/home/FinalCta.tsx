@@ -25,11 +25,11 @@ export function FinalCta() {
 
         <div className="mkt-hero__ctas">
           <Link href="/signup" className="mkt-btn mkt-btn--primary">
-            Get Started
+            Get started
             <ArrowRight size={17} aria-hidden="true" />
           </Link>
           <Link href="/how-it-works" className="mkt-btn mkt-btn--glass">
-            See How It Works
+            See how it works
           </Link>
         </div>
       </div>

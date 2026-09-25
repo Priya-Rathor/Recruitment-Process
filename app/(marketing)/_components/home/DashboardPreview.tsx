@@ -75,7 +75,19 @@ export function DashboardPreview() {
 
             <div className="mkt-product__main">
               <div className="mkt-product__head">
-                <h3>Overview</h3>
+                {/*
+                  A <p>, NOT AN <h3>. This is chrome inside a PICTURE of the
+                  product, and a heading here enters the page's real document
+                  outline: a screen-reader user navigating the homepage by
+                  heading arrived at "Overview" and "Hiring pipeline" as though
+                  they were sections of the marketing page, straight after the
+                  h1 and before the first real h2 — which also skipped a level.
+
+                  The text stays in the DOM, so it is still crawlable and still
+                  describes the product. It simply stops claiming to be a
+                  section of this page.
+                */}
+                <p className="mkt-product__title">Overview</p>
                 <span className="mkt-product__range">Last 30 days</span>
               </div>
 
@@ -111,7 +123,8 @@ export function DashboardPreview() {
                 style={{ animationDelay: "740ms" }}
               >
                 <div className="mkt-product__panelhead">
-                  <h4>Hiring pipeline</h4>
+                  {/* Same reason as "Overview" above — mockup chrome, not a section. */}
+                  <p className="mkt-product__paneltitle">Hiring pipeline</p>
                   <span className="mkt-product__range">Senior Backend Engineer</span>
                 </div>
 

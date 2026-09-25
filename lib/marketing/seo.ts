@@ -46,6 +46,16 @@ export const SITE_DESCRIPTION =
   "Scoreboad helps hiring teams screen candidates, manage interviews, evaluate " +
   "applicants, and streamline recruitment with AI — all in one workspace.";
 
+/**
+ * The generated social card's route, from `app/opengraph-image.tsx`.
+ *
+ * Relative, so `metadataBase` resolves it — which means a preview deployment
+ * points at its OWN card rather than production's, exactly as the canonical
+ * does. Next appends a cache-busting hash when it emits the tag itself; this
+ * path serves the same image without one.
+ */
+export const OG_IMAGE_PATH = "/opengraph-image";
+
 export type PageSeo = {
   /** The page's own title, WITHOUT the brand suffix — the template adds it. */
   title: string;
@@ -108,11 +118,29 @@ export function buildMetadata({
       url,
       siteName: SITE_NAME,
       type: "website",
+      /*
+        THE IMAGE HAS TO BE NAMED HERE, and finding out why cost a crawl of the
+        whole site.
+
+        `app/opengraph-image.tsx` is a file convention: Next adds og:image,
+        its type, width, height and alt to any page that does NOT declare an
+        `openGraph` object of its own. Declaring one — which this helper has
+        done since Module 03 — REPLACES the generated block rather than merging
+        with it. So /login and /signup, which set no openGraph at all, carried
+        the card, and all fifteen marketing pages silently did not.
+
+        Measured rather than reasoned about: `og:image` was absent on every
+        route built through this helper and present on the two that were not.
+      */
+      images: [OG_IMAGE_PATH],
     },
     twitter: {
       card: "summary_large_image",
       title: ogTitle ?? `${title} · ${SITE_NAME}`,
       description,
+      // Same reason. A `summary_large_image` card with no image is the worst of
+      // both: the platform reserves the space and renders nothing in it.
+      images: [OG_IMAGE_PATH],
     },
     ...(noindex ? { robots: { index: false, follow: true } } : {}),
   };
@@ -139,6 +167,28 @@ export function organizationJsonLd() {
     url: `${SITE_URL}/`,
     logo: `${SITE_URL}/icon.png`,
     description: SITE_DESCRIPTION,
+  };
+}
+
+/**
+ * The site, for the home page only.
+ *
+ * NAME AND URL, AND NOTHING ELSE. Its job is to tell Google what this site is
+ * called, so a result shows "Scoreboad" rather than a guess derived from the
+ * domain or the title tag.
+ *
+ * NO `potentialAction` / SearchAction. That property declares a sitelinks
+ * search box, and it is only valid where the site has its own search endpoint
+ * a query string can be handed to. This one does not — the FAQ's filter is
+ * client-side and has no URL. Declaring it anyway is the most commonly
+ * fabricated piece of structured data on the web.
+ */
+export function websiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE_NAME,
+    url: `${SITE_URL}/`,
   };
 }
 
