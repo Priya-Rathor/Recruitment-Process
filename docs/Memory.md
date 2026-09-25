@@ -3128,3 +3128,29 @@ Lint clean · typecheck clean · 2,205 tests · build compiles.
   disabled, no adapter; fixed 0007's provider CHECK missing `'whatsapp'`.
 - Not done: layout check in a browser (no browser here); Agent Center test and
   review steps are "coming next" states by design.
+
+## 2026-09-25 (ninth session)
+
+**Central Agents settings architecture** (on top of the eighth session's Agent Center).
+
+- MOVED (git mv, old URLs now redirect): `app/settings/integrations/bolna/` →
+  `app/settings/agents/voice/`; `app/settings/auto-reply/` →
+  `app/settings/agents/whatsapp/`. API routes unchanged.
+- Catalog (21 in 8): "AI & automation" → **AI & Agents** (Agents, AI provider,
+  Automations); "Calling & scheduling" → **Integrations** (Bolna AI "Voice
+  provider for AI calling", Google Calendar); "Message auto-reply agent"
+  removed from Communications; "Screening" → "Screening defaults". New test:
+  exactly one Settings link names an agent.
+- New type `cv_screening` (migration **0044**, FileSearch), draft-only — the
+  resume shortlist reads job requirements, not agent config yet.
+- Bolna card: console button → signpost to Agents; connect form's agent ID is
+  now OPTIONAL (fallback only); dialling refuses a blank fallback with "create
+  a Voice Screening Agent" rather than sending an empty agent_id.
+- Agent list: search, status filter, type-group filter, provider label
+  (provider / channel / "Scoreboad AI"), "Used in".
+- `app/settings/layout.tsx`: robots noindex (third layer after robots.txt +
+  auth).
+- Chose NOT to add an agent_assignments table: automation actions'
+  `config.agent_id` already is the assignment, and nothing but voice screening
+  executes an agent.
+- Still unreplayed: 0043, 0044 (Docker engine off). Bundle + FRESH_START regen'd (44).

@@ -33,7 +33,7 @@ export default async function EditAgentPage({ params }: { params: Promise<{ id: 
                 Call settings — the prompt, voice, greeting and test calls — are edited in the voice
                 console, which is what the call actually uses.
               </p>
-              <Link className="button is-outlined-primary mt-3" href={`/settings/integrations/bolna?agent=${agent.id}`}>
+              <Link className="button is-outlined-primary mt-3" href={`/settings/agents/voice?agent=${agent.id}`}>
                 Open in voice console
               </Link>
             </div>

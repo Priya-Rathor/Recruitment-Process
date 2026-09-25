@@ -8,7 +8,7 @@
 -- PostgREST client and a rule kept only in a route handler is skipped by a
 -- request sent straight to /rest/v1. None of them is reachable from vitest.
 --
--- Every check RAISES on failure: this prints ten PASS notices or stops at the
+-- Every check RAISES on failure: this prints eleven PASS notices or stops at the
 -- first thing that is wrong.
 -- =============================================================================
 
@@ -237,6 +237,20 @@ begin
   insert into public.organization_integrations (organization_id, provider)
   values (k_org_a, 'whatsapp');
   raise notice 'PASS 10 — organization_integrations accepts whatsapp';
+
+  -- ---------------------------------------------------------------------------
+  -- 11. 0044's CV Screening type: a draft, with no provider, never active.
+  -- ---------------------------------------------------------------------------
+  insert into public.agents (organization_id, name, type) values (k_org_a, 'CV screen', 'cv_screening');
+
+  v_raised := false;
+  begin
+    insert into public.agents (organization_id, name, type, status)
+    values (k_org_a, 'x', 'cv_screening', 'active');
+  exception when check_violation then v_raised := true;
+  end;
+  if not v_raised then raise exception 'FAIL (check 11): a CV screening agent was made active with no runtime'; end if;
+  raise notice 'PASS 11 — CV screening agents save as drafts and cannot be activated yet';
 end;
 $$;
 

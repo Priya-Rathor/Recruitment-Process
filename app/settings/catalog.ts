@@ -88,7 +88,12 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       },
       {
         href: "/settings/screening",
-        label: "Screening",
+        /*
+          "Screening DEFAULTS": organization-wide call policy (attempts, retry
+          delay, language) that applies whichever agent places the call. Not an
+          agent — what a call says and sounds like is the agent, in Agents.
+        */
+        label: "Screening defaults",
         description: "Call attempts, retry delay, language",
         roles: ["owner", "admin"],
       },
@@ -147,12 +152,18 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     untouched, only which card lists them changed.
   */
   {
-    label: "Calling & scheduling",
+    /*
+      CONNECTIONS, NOT AGENTS. Was "Calling & scheduling". An integration is a
+      provider an agent uses; the agents themselves are in AI & Agents. Email and
+      WhatsApp stay under Communications, beside the templates they carry — every
+      href appears once, and the Integrations page itself lists all of them.
+    */
+    label: "Integrations",
     links: [
       {
         href: "/settings/integrations#integration-bolna",
         label: "Bolna AI",
-        description: "Automated screening calls",
+        description: "Voice provider for AI calling",
         roles: ["owner", "admin"],
       },
       {
@@ -196,20 +207,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         description: "Candidate messages, alongside email",
         roles: ["owner", "admin"],
       },
-      /*
-        0042. In Communications rather than under AI & automation, and the reason
-        is whose question it answers: an admin looking for "what do we say to
-        candidates, and who says it" looks here, beside the templates and the two
-        channels. Filing it with the AI settings would put the agent next to
-        resume parsing and matching — neither of which talks to anybody — and
-        away from the only three pages that do.
-      */
-      {
-        href: "/settings/auto-reply",
-        label: "Message auto-reply agent",
-        description: "Whether an AI answers candidate WhatsApp messages",
-        roles: ["owner", "admin"],
-      },
     ],
   },
   {
@@ -223,25 +220,29 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       call, move a stage or assign a recruiter. Filing it under Communications
       would describe one of its actions as if it were all of them.
     */
-    label: "AI & automation",
+    label: "AI & Agents",
     links: [
-      {
-        href: "/settings/integrations#integration-llm",
-        label: "AI provider",
-        description: "Resume parsing, matching and drafting",
-        roles: ["owner", "admin"],
-      },
       {
         href: "/settings/agents",
         label: "Agents",
         /*
-          THE ONE AGENT CENTER. Replaces the "Voice agent console" shortcut that
-          sat under Calling & scheduling: voice agents are listed here with the
-          other types, and each opens the console for its call settings. No
-          `roles` — any member may see which agents work their pipeline (RLS
+          THE ONE AGENT CENTER, and the only agent entry in Settings. It
+          replaced two: the "Voice agent console" shortcut (Calling &
+          scheduling) and "Message auto-reply agent" (Communications) — both
+          pages now live under /settings/agents and their old URLs redirect.
+          No `roles`: any member may see which agents work their pipeline (RLS
           allows the read); the page gates the controls to Owner/Admin.
         */
-        description: "AI agents for screening, interviews and candidate replies",
+        description:
+          "Create and manage AI agents for screening, interviews, communication, assessments and custom workflows.",
+      },
+      {
+        // AI INFRASTRUCTURE, not an agent: the model every agent and every
+        // AI feature runs on. Stays one global setting.
+        href: "/settings/integrations#integration-llm",
+        label: "AI provider",
+        description: "The model behind agents, parsing and matching",
+        roles: ["owner", "admin"],
       },
       {
         href: "/automations",

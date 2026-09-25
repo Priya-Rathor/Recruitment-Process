@@ -124,9 +124,9 @@ export function CreateAgentFlow({ connections }: { connections: Connections }) {
 
             {EXTERNALLY_MANAGED[type] ? (
               <p className="has-text-secondary" style={{ fontSize: 14 }}>
-                The WhatsApp agent already has its own settings — its tone, what it may answer, per-job
-                overrides and a kill switch. It is configured there, so there is only ever one place to
-                switch it off.
+                Your organization has one WhatsApp Auto Reply Agent: its tone, what it may answer, per-job
+                overrides and its kill switch are configured on its own page in Agents, so there is only
+                ever one place to switch it off. It uses the WhatsApp Business connection above.
               </p>
             ) : (
               <>
@@ -146,7 +146,7 @@ export function CreateAgentFlow({ connections }: { connections: Connections }) {
               </Button>
               {EXTERNALLY_MANAGED[type] ? (
                 <Link className="button is-primary" href={EXTERNALLY_MANAGED[type].href}>
-                  Open WhatsApp agent settings
+                  Configure WhatsApp Auto Reply Agent
                 </Link>
               ) : (
                 <Button variant="primary" loading={saving} onClick={save} disabled={!draft.name.trim()}>
@@ -335,7 +335,7 @@ function NextSteps({ agent, type }: { agent: { id: string; name: string }; type:
       </p>
       <div className="is-flex" style={{ gap: 8, flexWrap: "wrap" }}>
         {type === "voice_screening" && (
-          <Link className="button is-primary" href={`/settings/integrations/bolna?agent=${agent.id}`}>
+          <Link className="button is-primary" href={`/settings/agents/voice?agent=${agent.id}`}>
             <ExternalLink size={16} aria-hidden="true" />
             <span>Test in the voice console</span>
           </Link>

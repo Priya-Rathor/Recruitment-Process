@@ -6,10 +6,10 @@ import { SkeletonRows } from "@/components/states";
 import { getAutoReplySettings } from "@/lib/autoReply/queries";
 import { getStatus as getWhatsAppStatus } from "@/lib/integrations/whatsapp";
 import { isAiConfigured } from "@/lib/ai/provider";
-import { RestrictedPanel, SettingsShell } from "../SettingsShell";
+import { RestrictedPanel, SettingsShell } from "../../SettingsShell";
 import { AutoReplySettings } from "./AutoReplySettings";
 
-export const metadata = { title: "Message auto-reply agent" };
+export const metadata = { title: "WhatsApp Auto Reply Agent" };
 export const dynamic = "force-dynamic";
 
 export default async function AutoReplySettingsPage() {
@@ -17,7 +17,8 @@ export default async function AutoReplySettingsPage() {
 
   return (
     <SettingsShell
-      title="Message auto-reply agent"
+      title="WhatsApp Auto Reply Agent"
+      back={{ href: "/settings/agents", label: "Agents" }}
       description="An AI that reads a candidate's real application data before answering their WhatsApp message."
     >
       {/*

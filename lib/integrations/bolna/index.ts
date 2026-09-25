@@ -150,7 +150,10 @@ export async function connect({
   const trimmedKey = apiKey.trim();
   const trimmedAgent = agentId.trim();
   if (trimmedKey.length < 8) return { ok: false, error: "That API key looks too short." };
-  if (trimmedAgent.length === 0) return { ok: false, error: "An agent ID is required." };
+  // The agent id is OPTIONAL since the Agent Center: it is only the fallback
+  // for an organization with no voice agent there. An integration card holds
+  // a connection; which agent calls is decided in Settings → Agents. Blank is
+  // stored as blank, and decideDialingAgent() refuses a call that would need it.
 
   // Fails closed: we do not store a secret we cannot encrypt.
   const encrypted = await encryptSecret(JSON.stringify({ apiKey: trimmedKey, agentId: trimmedAgent }));
@@ -752,7 +755,7 @@ async function resolveDialingAgentId(
   requestedAgentId: string | null = null
 ): Promise<DialingDecision> {
   const admin = createAdminClient();
-  if (!admin) return { ok: true, providerAgentId: credentialAgentId };
+  if (!admin) return decideDialingAgent({ requested: null, fallbackDefault: null, credentialAgentId });
 
   // organization_id is filtered explicitly on every read: this is the admin
   // client, so RLS is off and an agent id from a rule is not proof of tenancy.

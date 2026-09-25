@@ -70,13 +70,14 @@ async function Loader({ organizationId, canManage }: { organizationId: string; c
     return (
       <div className="card">
         <EmptyState
-          headline="Create your first AI agent"
-          message="Build an AI agent for screening, interviews, candidate communication, assessments, or custom hiring workflows."
+          headline="No agents yet"
+          message="Create your first AI agent to automate screening, interviews, assessments, and candidate communication."
           accent="primary"
           action={
             canManage ? (
               <Link className="button is-primary" href="/settings/agents/new">
-                Create Agent
+                <Plus size={16} aria-hidden="true" />
+                <span>Create Agent</span>
               </Link>
             ) : undefined
           }

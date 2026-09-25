@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -22,6 +22,10 @@ const MIGRATION = readFileSync(
   path.join(process.cwd(), "supabase/migrations/0043_agent_center.sql"),
   "utf8"
 );
+const MIGRATIONS_AFTER = readdirSync(path.join(process.cwd(), "supabase/migrations"))
+  .filter((file) => file > "0043")
+  .map((file) => readFileSync(path.join(process.cwd(), "supabase/migrations", file), "utf8"))
+  .join("\n");
 
 describe("agent types", () => {
   it("maps every type to the specified name and icon, and nothing else", () => {
@@ -31,6 +35,7 @@ describe("agent types", () => {
       voice_screening: ["Voice Screening Agent", "PhoneCall"],
       voice_interview: ["Voice Interview Agent", "Mic"],
       video_interview: ["Video Interview Agent", "Video"],
+      cv_screening: ["CV Screening Agent", "FileSearch"],
       whatsapp_reply: ["WhatsApp Auto Reply Agent", "MessageCircle"],
       email_reply: ["Email Auto Reply Agent", "Mail"],
       assessment: ["Assessment Agent", "ClipboardCheck"],
@@ -52,10 +57,12 @@ describe("agent types", () => {
     expect(isAgentType(undefined)).toBe(false);
   });
 
-  it("matches the database enum exactly", () => {
+  it("matches the database enum exactly (0043's values plus each ADD VALUE since)", () => {
     const enumBody = MIGRATION.match(/create type public\.agent_type as enum \(([\s\S]*?)\);/)?.[1] ?? "";
     const values = [...enumBody.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
-    expect(values).toEqual([...AGENT_TYPES]);
+    const added = [...MIGRATIONS_AFTER.matchAll(/alter type public\.agent_type add value if not exists '([a-z_]+)'/g)].map((m) => m[1]);
+    // Compared as sets: the list's order is the create flow's order, not the enum's.
+    expect([...values, ...added].sort()).toEqual([...AGENT_TYPES].sort());
   });
 
   it("lets ACTIVE only the types the database lets be active", () => {
@@ -72,7 +79,7 @@ describe("agent types", () => {
 
   it("offers ACTIVE and PAUSED only where something runs the agent", () => {
     expect(allowedStatuses("voice_screening")).toContain("active");
-    for (const type of ["voice_interview", "video_interview", "email_reply", "assessment", "universal", "custom_llm"] as const) {
+    for (const type of ["voice_interview", "video_interview", "cv_screening", "email_reply", "assessment", "universal", "custom_llm"] as const) {
       expect(allowedStatuses(type), type).toEqual(["draft", "archived"]);
       expect(AGENT_TYPE_META[type].blockedReason, type).toBeTruthy();
     }
@@ -148,6 +155,14 @@ describe("normalizeAgentInput", () => {
     });
     expect(result.ok && result.value.provider).toBeNull();
     expect(normalizeAgentInput({ type: "video_interview", provider: "bolna", name: "x", configuration: { instructions: "y" } }).ok).toBe(false);
+  });
+
+  it("takes no provider for CV screening and requires its criteria", () => {
+    expect(normalizeAgentInput({ type: "cv_screening", provider: "bolna", name: "x", configuration: {} }).ok).toBe(false);
+    expect(normalizeAgentInput({ type: "cv_screening", name: "CV", configuration: { instructions: "Read it." } }).ok).toBe(false);
+    expect(
+      normalizeAgentInput({ type: "cv_screening", name: "CV", configuration: { instructions: "Read it.", criteria: "Go" } }).ok
+    ).toBe(true);
   });
 
   it("refuses the WhatsApp type — it is configured on its own page", () => {
@@ -234,6 +249,11 @@ describe("decideDialingAgent — what may telephone a person", () => {
     expect(
       decideDialingAgent({ requested: null, fallbackDefault: { providerAgentId: "d", status: "draft" }, credentialAgentId })
     ).toEqual({ ok: true, providerAgentId: credentialAgentId });
+  });
+
+  it("refuses when nothing is left but a blank fallback agent id (it is optional now)", () => {
+    const decision = decideDialingAgent({ requested: null, fallbackDefault: null, credentialAgentId: "  " });
+    expect(decision.ok === false && decision.reason).toMatch(/Settings → Agents/);
   });
 
   it("behaves exactly as before 0043 when there is no status to read", () => {

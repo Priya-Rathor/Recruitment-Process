@@ -1,0 +1,16 @@
+-- =============================================================================
+-- 0044 — the CV Screening Agent type.
+--
+-- A new agent_type value, and nothing else. CV screening agents take no
+-- provider (they run on the platform AI provider), so 0043's
+-- agents_provider_matches_type already covers them, and they cannot be ACTIVE:
+-- resume shortlisting runs today from each job's requirements and passing
+-- score, and nothing reads an agent's criteria yet. The module that wires the
+-- agent into that shortlist widens agents_status_runnable in its own migration.
+--
+-- ADD VALUE is its own migration because a new enum value cannot be USED in the
+-- transaction that adds it; nothing below this line uses it.
+--
+-- Re-runnable. Apply after 0043.
+-- =============================================================================
+alter type public.agent_type add value if not exists 'cv_screening' after 'video_interview';

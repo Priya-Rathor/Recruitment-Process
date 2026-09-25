@@ -68,5 +68,14 @@ export function decideDialingAgent({
     if (id) return { ok: true, providerAgentId: id };
   }
 
+  // The last resort is the id saved with the Bolna credentials, which is now
+  // optional. Without it there is no agent to call with at all — say so,
+  // rather than asking the provider to dial with an empty agent id.
+  if (!credentialAgentId.trim()) {
+    return {
+      ok: false,
+      reason: "No voice agent is set up. Create a Voice Screening Agent in Settings → Agents.",
+    };
+  }
   return { ok: true, providerAgentId: credentialAgentId };
 }

@@ -330,19 +330,20 @@ export function IntegrationCard({
               />
               <input
                 className="input mb-2"
-                placeholder="Agent ID"
+                placeholder="Fallback agent ID (optional)"
+                aria-label="Fallback Bolna agent ID, optional"
                 value={field("agentId")}
                 onChange={(event) => setField("agentId", event.target.value)}
               />
               {/*
-                MODULE 24. This id is now only the FALLBACK: calls use whichever
-                agent the Voice Agent Console marks as default, and drop back to
-                this one when no console agent has been synced. Said here so
-                nobody edits this field expecting it to change what the call says.
+                ONLY A FALLBACK, and optional since the Agent Center. Calls use
+                the voice agent chosen in Settings → Agents and drop back to
+                this id only when no agent there has synced. Said here so nobody
+                edits this field expecting it to change what the call says.
               */}
               <p className="has-text-secondary mb-3" style={{ fontSize: 12 }}>
-                The agent ID is a fallback. What the call actually says, sounds like and does is
-                configured in the Voice Agent Console below.
+                Leave the agent ID blank if your voice agents are set up in Settings → Agents —
+                that is where what the call says, sounds like and does is configured.
               </p>
             </>
           )}
@@ -573,26 +574,16 @@ export function IntegrationCard({
           )}
 
           {/*
-            MODULE 24. Shown whether or not the integration is connected: an admin
-            can write the greeting, the guardrails and the org call-data defaults
-            before the credentials exist, and the console says plainly that
-            nothing dials until the integration is connected.
-
-            WAS `button is-small`, which Bulma paints from HSL channels this theme
-            does not override — landing on a near-black fill that made the least
-            important control the heaviest thing on the card. Now the product's
-            standard secondary: white fill, primary border, primary text.
-
-            Rendered LAST so the connect/disconnect actions that own this card come
-            first in both reading and tab order.
+            AN INTEGRATION CARD HOLDS THE CONNECTION, NOT THE AGENTS. Voice
+            agents used to be configured from a button here; they now live in
+            Settings → Agents with every other agent type, and this link is
+            only a signpost — nothing about an agent is edited on this card.
+            Rendered last so the connect/disconnect actions keep tab order.
           */}
           {provider === "bolna" && (
-            <Link
-              className="button is-small is-outlined-primary"
-              href="/settings/integrations/bolna"
-            >
+            <Link className="button is-small is-outlined-primary" href="/settings/agents">
               <SlidersHorizontal size={13} aria-hidden="true" />
-              Voice agent console
+              Voice agents are in Agents
             </Link>
           )}
         </div>

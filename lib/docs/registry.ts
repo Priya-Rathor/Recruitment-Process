@@ -580,7 +580,7 @@ function moduleEntries(): DocPage[] {
       marker: "MODULE M30",
       file: "supplement",
       status: "implemented",
-      routes: ["/settings/integrations/bolna"],
+      routes: ["/settings/agents/voice"],
       owner: "lib/voice",
       related: ["modules/screening-calls", "modules/settings-integrations", "modules/privacy"],
     },

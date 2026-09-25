@@ -1182,7 +1182,7 @@ render time, so there is no path that presents an agent message as a human one.
 
 | Role | Expect |
 | --- | --- |
-| **Viewer** | Sees the auto-reply state in the inbox as text, no switch. `PATCH /api/settings/auto-reply` → **403**. `/settings/auto-reply` shows the restricted panel |
+| **Viewer** | Sees the auto-reply state in the inbox as text, no switch. `PATCH /api/settings/auto-reply` → **403**. `/settings/agents/whatsapp` shows the restricted panel |
 | **Recruiter** | Same — state visible, switch absent, API 403. Can still reply by hand, which is what suppresses the agent |
 | **Owner/Admin** | Configures everything |
 

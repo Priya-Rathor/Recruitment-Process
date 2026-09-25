@@ -13,9 +13,8 @@
 // There is no provider name in the copy, no API key field, no credential display,
 // and nothing here fetches from a provider. Options arrive as opaque keys with
 // scrubbed labels, and the only provider fact the page knows is whether the
-// integration is "connected". The URL says /settings/integrations/bolna — that is
-// an internal route name, and the console's spec allows exactly that while
-// requiring the page CONTENT to stay neutral.
+// integration is "connected". It lives at /settings/agents/voice, inside the
+// Agent Center; /settings/integrations/bolna redirects here.
 //
 // WHAT LIVES IN state VS WHAT LIVES IN THE DOM
 //

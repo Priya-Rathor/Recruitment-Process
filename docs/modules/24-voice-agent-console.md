@@ -1,6 +1,6 @@
 # Module 24 — Voice Agent Console
 
-One page — `/settings/integrations/bolna` — that configures what the automated
+One page — `/settings/agents/voice` — that configures what the automated
 screening call says, how it sounds, how it behaves, and what it falls back to
 when a job has not configured its own screening.
 
@@ -23,8 +23,9 @@ stay on that card, because the console must never display or accept an API key.
 ## The shape of it
 
 ```
-/settings/integrations            → Bolna card: credentials, Test connection
-     └─ "Voice agent console"     → /settings/integrations/bolna
+/settings/integrations            → Bolna card: credentials, Test connection (connection only)
+/settings/agents                  → Agent Center (every agent type)
+     └─ voice agent "Manage"      → /settings/agents/voice?agent=<id>
           ├─ 0 switcher           voice_agents rows; one is_default per org
           ├─ 1 General            name, purpose, company name, caller number   (columns)
           ├─ 2 Greeting           welcome + closing, {{field}} picker          (config jsonb)
@@ -68,7 +69,7 @@ reviewer skims a fluent rewrite.
 | `lib/ai/refineAgentPrompt.ts` | AI Edit. Proposes a revised prompt; cannot save one |
 | `lib/ai/chatAsAgent.ts` | The text rehearsal. No database handle at all |
 | `app/api/settings/voice-agents/` | List/create, save/delete, test-call, precedence preview, `prompt-edit`, `chat` |
-| `app/settings/integrations/bolna/` | The page and its client components |
+| `app/settings/agents/voice/` | The page and its client components |
 | ↳ `AgentCostHeader.tsx` | Cost line, segmented bar, legend, and the three honest empty states |
 | ↳ `PromptAiEdit.tsx` | Ask → propose → Accept/Discard |
 | ↳ `TestAgentSection.tsx` | Call and Chat tabs |

@@ -120,7 +120,7 @@ export async function listAgents(organizationId: string): Promise<ListResult> {
     ...toAgent(row),
     usedBy: rules.filter((rule) => countAgentUsage([rule], row.id) > 0).map((rule) => rule.name),
     isDefaultVoice: defaults.has(row.id),
-    manageHref: row.type === "voice_screening" ? `/settings/integrations/bolna?agent=${row.id}` : null,
+    manageHref: row.type === "voice_screening" ? `/settings/agents/voice?agent=${row.id}` : null,
   }));
 
   if (autoReply) items.push(autoReply);
@@ -167,7 +167,7 @@ async function loadWhatsAppAgent(organizationId: string): Promise<AgentListItem 
     updatedAt: row.updated_at,
     usedBy: [],
     isDefaultVoice: false,
-    manageHref: "/settings/auto-reply",
+    manageHref: "/settings/agents/whatsapp",
   };
 }
 

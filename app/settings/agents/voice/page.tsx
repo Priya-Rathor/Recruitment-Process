@@ -11,16 +11,17 @@ import { getAgentCostEstimate } from "@/lib/voice/cost";
 import { RestrictedPanel, SettingsShell } from "../../SettingsShell";
 import { VoiceAgentConsole } from "./VoiceAgentConsole";
 
-export const metadata = { title: "Voice Agent Console" };
+export const metadata = { title: "Voice agents" };
 export const dynamic = "force-dynamic";
 
 /**
- * /settings/integrations/bolna — the Voice Agent Console.
+ * /settings/agents/voice — the voice agent console, inside the Agent Center.
  *
- * The route segment is the provider's name because that is what this integration
- * is called internally, and the console's spec allows exactly that: "It's fine
- * that this page lives under /settings/integrations/bolna as a URL/internal route
- * name — the PAGE CONTENT itself stays provider-neutral in its labels."
+ * MOVED from /settings/integrations/bolna, which now redirects here. The old
+ * URL filed agent configuration under the provider that executes it; an
+ * integration is a connection, an agent is what uses it, and only the
+ * connection belongs in Integrations. The page content was already
+ * provider-neutral, so nothing on it changed but the way back.
  *
  * OWNER/ADMIN ONLY, checked here AND in every route the page calls. The Settings
  * shell hides what a role cannot open rather than greying it out, and this page
@@ -41,11 +42,11 @@ export default async function VoiceAgentConsolePage({
 
   return (
     <SettingsShell
-      title="Voice Agent Console"
-      description="What the automated screening call says, how it sounds, and how it behaves."
-      // One level up, not all the way to the grid: this page lives inside the
-      // integration that owns it, and the shell's default would skip it.
-      back={{ href: "/settings/integrations", label: "Integrations" }}
+      title="Voice agents"
+      description="What a voice screening agent says, how it sounds, and how it behaves on the call."
+      // Back to the Agent Center, which owns every agent. The Bolna integration
+      // (credentials, connection) stays in Integrations; this page is agents only.
+      back={{ href: "/settings/agents", label: "Agents" }}
     >
       {!hasRole(membership.role, ["owner", "admin"]) ? (
         <RestrictedPanel what="the voice agent" />

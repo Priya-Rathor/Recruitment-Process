@@ -1,14 +1,15 @@
 # Agent Center — Module 1 (foundation)
 
-Settings → Agents (`/settings/agents`). One place to create and manage every AI
-agent. **Agent type** (what it does) and **provider** (who runs it) are separate
+Settings → **AI & Agents** → Agents (`/settings/agents`). The ONLY place an AI
+agent is created or configured — the single Agents entry in Settings (a test
+fails if any other Settings link names an agent). **Agent type** (what it does) and **provider** (who runs it) are separate
 axes: `lib/agents/types.ts` and `lib/agents/providers.ts` never import each other.
 
 ## What is built
 
 | Piece | Where |
 | --- | --- |
-| Type registry — 8 types, names, Lucide icons, dependency, `runnable` | `lib/agents/types.ts` (client-safe) |
+| Type registry — 9 types (CV Screening added in `0044`), names, Lucide icons, dependency, `runnable` | `lib/agents/types.ts` (client-safe) |
 | Provider capability matrix, with the docs evidence per claim | `lib/agents/providers.ts` (client-safe) |
 | Per-type config fields + the one validator | `lib/agents/config.ts` (client-safe) |
 | Connection state per provider/channel (no credentials) | `lib/agents/registry.ts` (server) |
@@ -16,6 +17,29 @@ axes: `lib/agents/types.ts` and `lib/agents/providers.ts` never import each othe
 | API | `app/api/settings/agents` (GET, POST) · `[id]` (GET, PATCH, DELETE) |
 | UI | list + empty state, create flow steps 1–3, edit page |
 | Schema | `supabase/migrations/0043_agent_center.sql`, proved by `supabase/VERIFY_0043.sql` |
+
+## Settings architecture — agents vs integrations
+
+An **integration** is a connection (Integrations: Bolna AI, Google Calendar;
+Communications: Email, WhatsApp Business; AI & Agents: AI provider). An
+**agent** is the AI worker that uses one, and lives only under `/settings/agents`:
+
+| Route | What |
+| --- | --- |
+| `/settings/agents` | List — search, status and type filters, provider, where used |
+| `/settings/agents/new` | Create flow |
+| `/settings/agents/[id]` | Edit an agent |
+| `/settings/agents/voice` | Voice agent console (moved from `/settings/integrations/bolna`, which redirects) |
+| `/settings/agents/whatsapp` | WhatsApp Auto Reply Agent (moved from `/settings/auto-reply`, which redirects) |
+
+Screening defaults (`/settings/screening` — attempts, retry, language) stay in
+Recruitment defaults: they are call policy for every voice agent, not an agent.
+The Bolna connect form's agent ID is now an optional fallback.
+
+Assignment is the existing one: an automation / stage-workflow action names an
+agent (`actions[].config.agent_id`). One agent, many jobs and stages; "Used in"
+and the delete guard read it. No separate assignments table yet — nothing but
+voice screening executes an agent to assign.
 
 ## Rules the database enforces
 

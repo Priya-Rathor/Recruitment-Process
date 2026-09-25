@@ -16,6 +16,7 @@
 import {
   Braces,
   ClipboardCheck,
+  FileSearch,
   Mail,
   MessageCircle,
   Mic,
@@ -29,9 +30,10 @@ export const AGENT_TYPES = [
   "voice_screening",
   "voice_interview",
   "video_interview",
+  "cv_screening",
+  "assessment",
   "whatsapp_reply",
   "email_reply",
-  "assessment",
   "universal",
   "custom_llm",
 ] as const;
@@ -83,14 +85,14 @@ export type AgentTypeMeta = {
 export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
   voice_screening: {
     label: "Voice Screening Agent",
-    purpose: "Calls candidates and runs a first-round screen from the job's own questions.",
+    purpose: "AI-powered candidate screening calls, using each job's own questions.",
     icon: PhoneCall,
     dependency: { kind: "provider" },
     runnable: true,
   },
   voice_interview: {
     label: "Voice Interview Agent",
-    purpose: "Holds a structured interview over the phone.",
+    purpose: "AI-powered voice interview conversations.",
     icon: Mic,
     dependency: { kind: "provider" },
     runnable: false,
@@ -99,7 +101,7 @@ export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
   },
   video_interview: {
     label: "Video Interview Agent",
-    purpose: "Runs a structured interview on video.",
+    purpose: "AI-powered or AI-assisted video interview workflows.",
     icon: Video,
     // A provider in principle — but none exists. Google Meet schedules a call;
     // it cannot conduct one, so it is not offered as an executor.
@@ -108,16 +110,25 @@ export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
     blockedReason:
       "No video interview provider is available yet. Scheduled video interviews use Google Meet links, which can't run an agent.",
   },
+  cv_screening: {
+    label: "CV Screening Agent",
+    purpose: "Analyse candidate CVs against the job's requirements.",
+    icon: FileSearch,
+    dependency: { kind: "none" },
+    runnable: false,
+    blockedReason:
+      "CV screening runs today from each job's requirements and passing score. Using this agent's criteria in that screen is coming next.",
+  },
   whatsapp_reply: {
     label: "WhatsApp Auto Reply Agent",
-    purpose: "Answers candidate WhatsApp messages from their real application data.",
+    purpose: "Automatically respond to candidate WhatsApp messages, from their real application data.",
     icon: MessageCircle,
     dependency: { kind: "channel", integration: "whatsapp" },
     runnable: true,
   },
   email_reply: {
     label: "Email Auto Reply Agent",
-    purpose: "Answers candidate emails from their real application data.",
+    purpose: "Automatically respond to candidate emails.",
     icon: Mail,
     dependency: { kind: "channel", integration: "email" },
     runnable: false,
@@ -126,7 +137,7 @@ export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
   },
   assessment: {
     label: "Assessment Agent",
-    purpose: "Evaluates a candidate's written or coding assessment against your criteria.",
+    purpose: "Create and evaluate candidate assessments against your criteria.",
     icon: ClipboardCheck,
     dependency: { kind: "none" },
     runnable: false,
@@ -134,7 +145,7 @@ export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
   },
   universal: {
     label: "Universal Agent",
-    purpose: "A general-purpose agent you attach to a hiring step.",
+    purpose: "A reusable AI agent for supported hiring workflows.",
     icon: Orbit,
     dependency: { kind: "none" },
     runnable: false,
@@ -142,7 +153,7 @@ export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
   },
   custom_llm: {
     label: "Custom LLM Agent",
-    purpose: "Your own instructions, run on the platform's AI provider.",
+    purpose: "A custom LLM-powered agent with your own instructions.",
     icon: Braces,
     dependency: { kind: "none" },
     runnable: false,
@@ -161,7 +172,7 @@ export const AGENT_TYPE_META: Record<AgentType, AgentTypeMeta> = {
  * merges the two. The database refuses the type for the same reason.
  */
 export const EXTERNALLY_MANAGED: Partial<Record<AgentType, { href: string }>> = {
-  whatsapp_reply: { href: "/settings/auto-reply" },
+  whatsapp_reply: { href: "/settings/agents/whatsapp" },
 };
 
 export const STATUS_META: Record<

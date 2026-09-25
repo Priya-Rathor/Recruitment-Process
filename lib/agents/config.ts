@@ -60,6 +60,18 @@ export const CONFIG_FIELDS: Record<AgentType, ConfigField[]> = {
     { ...criteria, key: "structure", label: "Interview structure", help: "The sections of the interview, in order. One per line." },
     criteria,
   ],
+  cv_screening: [
+    instructions("Screening instructions", "How the agent reads a CV against the job."),
+    { ...criteria, label: "Screening criteria", help: "What a strong CV shows for this kind of role. One per line.", required: true },
+    {
+      key: "output",
+      label: "Output requirements",
+      help: "What the agent must return — for example strengths, gaps and what needs verifying.",
+      kind: "textarea",
+      required: false,
+      max: 2000,
+    },
+  ],
   // Configured on its own page (see EXTERNALLY_MANAGED); never stored here.
   whatsapp_reply: [],
   email_reply: [

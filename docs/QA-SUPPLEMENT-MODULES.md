@@ -677,7 +677,7 @@ Migration `0034_module24_voice_agent_console.sql`. Owning library: `lib/voice/`.
 
 ## S7.1 Purpose
 
-One page — `/settings/integrations/bolna` — that configures what the automated
+One page — `/settings/agents/voice` — that configures what the automated
 screening call says, how it sounds, how it behaves, and what it falls back to
 when a job has not configured its own screening.
 

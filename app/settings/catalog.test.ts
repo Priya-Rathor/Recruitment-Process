@@ -100,7 +100,7 @@ describe("the settings catalogue", () => {
     }
   });
 
-  it("totals 22 settings in 8 categories", () => {
+  it("totals 21 settings in 8 categories", () => {
     /*
       Pinned so a regrouping cannot silently drop a link.
 
@@ -113,11 +113,14 @@ describe("the settings catalogue", () => {
       raised the per-card cap — see the test above for why that was the right
       trade rather than filing it elsewhere) → still 22 in 8 (0043's Agents
       added to AI & automation; the Voice agent console shortcut it replaces
-      removed from Calling & scheduling).
+      removed from Calling & scheduling) → 21 in 8 (the central Agents
+      restructure: "Message auto-reply agent" left Communications — its page
+      moved into the Agent Center — and "Calling & scheduling" became
+      "Integrations", "AI & automation" became "AI & Agents").
       The grid's counter is computed from these, so this test and the visible
-      "22 settings in 8 categories" cannot disagree.
+      "21 settings in 8 categories" cannot disagree.
     */
-    expect(SETTINGS_LINKS).toHaveLength(22);
+    expect(SETTINGS_LINKS).toHaveLength(21);
     expect(SETTINGS_CATEGORIES).toHaveLength(8);
   });
 
@@ -277,5 +280,21 @@ describe("role filtering", () => {
         expect(first).toBe(visibleLinks(role)[0].href);
       }
     }
+  });
+});
+
+describe("one Agent Center", () => {
+  it("lists exactly one agent entry, and it is /settings/agents", () => {
+    // An agent configuration page filed under Communications, Recruitment or
+    // Integrations is the scattering the Agent Center replaced.
+    const agentLinks = SETTINGS_LINKS.filter(
+      (link) => /agent/i.test(link.label) || /agent/i.test(link.href)
+    );
+    expect(agentLinks.map((link) => link.href)).toEqual(["/settings/agents"]);
+  });
+
+  it("keeps integrations as connections, never agent pages", () => {
+    const integrations = SETTINGS_CATEGORIES.find((category) => category.label === "Integrations");
+    expect(integrations?.links.every((link) => link.href.startsWith("/settings/integrations#"))).toBe(true);
   });
 });

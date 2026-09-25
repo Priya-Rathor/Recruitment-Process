@@ -1,4 +1,50 @@
 -- =============================================================================
+-- FRESH_START.sql — DELETE EVERYTHING, then build the whole schema from zero.
+--
+-- NOT a migration. Run by hand in the Supabase SQL Editor, never automatically.
+-- Regenerate it from supabase/ALL_MIGRATIONS.sql whenever a migration is added.
+--
+-- DESTROYS: every row and table in `public` (jobs, candidates, applications,
+-- agents, messages, audit log — all of it) and EVERY LOGIN (auth.users). After
+-- it runs, sign up again at /signup; that recreates your user, organisation and
+-- Owner membership.
+--
+-- KEEPS: storage buckets and the FILES in them (resumes, documents). Supabase
+-- refuses direct deletes from storage tables, so empty the buckets by hand in
+-- Dashboard → Storage — resumes are candidates' personal data and should not be
+-- left orphaned.
+--
+-- ALL OR NOTHING: one transaction. If any statement fails, the database is left
+-- exactly as it was before you pressed Run.
+-- =============================================================================
+
+begin;
+
+-- 1. The whole public schema — tables, types, functions, triggers, policies.
+--    FIRST, not after the logins: deleting auth.users while public exists
+--    cascades into public.users, whose ON DELETE SET NULL then tries to UPDATE
+--    activity_events — which is append-only (0014) and refuses. Dropping the
+--    schema first also drops the triggers public attached to auth.users.
+drop schema if exists public cascade;
+create schema public;
+
+-- 2. Every login.
+delete from auth.users;
+
+-- 3. Supabase's default privileges on a fresh public schema. Without these the
+--    API roles cannot see the tables the migrations create (RLS still decides
+--    what they may do with them).
+grant usage on schema public to postgres, anon, authenticated, service_role;
+grant all on all tables in schema public to postgres, anon, authenticated, service_role;
+grant all on all routines in schema public to postgres, anon, authenticated, service_role;
+grant all on all sequences in schema public to postgres, anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to postgres, anon, authenticated, service_role;
+alter default privileges in schema public grant all on routines to postgres, anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to postgres, anon, authenticated, service_role;
+
+-- 4. Every migration, 0001 → latest, in order.
+
+-- =============================================================================
 -- ALL MIGRATIONS, concatenated in order.
 -- Generated from supabase/migrations/. Paste into the Supabase SQL Editor.
 --
@@ -11640,3 +11686,5 @@ comment on table public.agents is
 -- Re-runnable. Apply after 0043.
 -- =============================================================================
 alter type public.agent_type add value if not exists 'cv_screening' after 'video_interview';
+
+commit;
