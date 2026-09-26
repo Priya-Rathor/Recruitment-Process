@@ -37,6 +37,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/marketing/ThemeToggle";
 import { isEntryActive, liveNavigation, type NavEntry } from "@/lib/marketing/navigation";
 
 /** Computed once at module load: the data is static, so this never re-runs. */
@@ -197,8 +198,15 @@ export function MarketingHeader() {
         }}
       >
         <Link href="/" aria-label="Scoreboad — home" className="mkt-nav__brand">
+          {/*
+            Both lockups are rendered and CSS shows the one for the resolved
+            theme. Choosing in JavaScript would render the wrong one on the
+            server for every dark-theme visitor and swap it after hydration —
+            a logo that visibly changes as the page loads.
+          */}
           <span className="mkt-brand__wide">
-            <Logo variant="compact" height={26} priority />
+            <Logo variant="compact-light" height={26} priority className="mkt-logo--light-ground" />
+            <Logo variant="compact" height={26} priority className="mkt-logo--dark-ground" />
           </span>
           <span className="mkt-brand__narrow">
             <Logo variant="mark" height={26} priority />
@@ -227,6 +235,7 @@ export function MarketingHeader() {
         </nav>
 
         <div className="mkt-nav__actions">
+          <ThemeToggle />
           <Link href="/login" className="mkt-nav__signin">
             Sign In
           </Link>
@@ -438,6 +447,11 @@ function MobileSheet({ pathname, onNavigate }: { pathname: string; onNavigate: (
           );
         })}
       </nav>
+
+      <div className="mkt-sheet__theme">
+        <span className="mkt-sheet__themelabel" aria-hidden="true">Theme</span>
+        <ThemeToggle />
+      </div>
 
       <div className="mkt-nav__sheetactions">
         <Link href="/login" className="mkt-btn mkt-btn--glass" onClick={onNavigate}>

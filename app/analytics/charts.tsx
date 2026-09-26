@@ -369,9 +369,16 @@ export function FunnelChart({ bars }: { bars: FunnelBar[] }) {
                   transform="rotate(-90 100 100)"
                 >
                   {/* The hover layer, carrying the same facts the visual does. */}
+                  {/*
+                    ONE string child. Two adjacent text children make React
+                    emit a <!-- --> separator on the server, and an SVG <title>
+                    does not keep it the way HTML does — so the client saw
+                    different text and threw away the whole page's hydration.
+                  */}
                   <title>
-                    {`${bar.label}: ${bar.count}`}
-                    {bar.conversion ? ` — ${bar.conversion} from the previous stage` : ""}
+                    {`${bar.label}: ${bar.count}${
+                      bar.conversion ? ` — ${bar.conversion} from the previous stage` : ""
+                    }`}
                   </title>
                 </circle>
               )}

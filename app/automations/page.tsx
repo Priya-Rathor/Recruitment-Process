@@ -303,7 +303,8 @@ export default async function AutomationsPage() {
         <AutomationsList />
       </Suspense>
 
-      <div className="mt-5">
+      {/* Anchored: Settings → Automation → Run history lands here. */}
+      <div className="mt-5" id="recent-runs">
         <h2 className="title is-5 mb-3">Recent runs</h2>
         <div className="card">
           <Suspense fallback={<SkeletonRows rows={5} />}>

@@ -22,10 +22,20 @@ const STEPS = ["Agent type", "Provider", "Configure", "Test", "Review & create"]
 
 const EMPTY_DRAFT: AgentDraft = { name: "", description: "", configuration: {} };
 
-export function CreateAgentFlow({ connections }: { connections: Connections }) {
+/** The step a type starts at: the provider step only for types that take one. */
+const firstStepFor = (type: AgentType) => (AGENT_TYPE_META[type].dependency.kind === "provider" ? 1 : 2);
+
+export function CreateAgentFlow({
+  connections,
+  initialType = null,
+}: {
+  connections: Connections;
+  /** From ?type= (Setup → Agents): skips the type step. Back still reaches it. */
+  initialType?: AgentType | null;
+}) {
   const router = useRouter();
-  const [step, setStep] = useState(0);
-  const [type, setType] = useState<AgentType | null>(null);
+  const [step, setStep] = useState(initialType ? firstStepFor(initialType) : 0);
+  const [type, setType] = useState<AgentType | null>(initialType);
   const [provider, setProvider] = useState<ProviderId | null>(null);
   const [draft, setDraft] = useState<AgentDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
@@ -40,8 +50,7 @@ export function CreateAgentFlow({ connections }: { connections: Connections }) {
     setProvider(null);
     setDraft(EMPTY_DRAFT);
     setError(null);
-    // The provider step exists only for types that take one.
-    setStep(AGENT_TYPE_META[next].dependency.kind === "provider" ? 1 : 2);
+    setStep(firstStepFor(next));
   };
 
   const back = () => {

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/marketing/seo";
 import { Space_Grotesk, Plus_Jakarta_Sans } from "next/font/google";
+import { THEME_INIT_SCRIPT } from "@/lib/marketing/theme";
 import "./globals.scss";
 
 /**
@@ -105,7 +106,23 @@ export const viewport: Viewport = {
 // `tsc --noEmit` typechecks without first running a build to emit .next/types.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${jakarta.variable} ${grotesk.variable}`}>
+    /*
+      suppressHydrationWarning covers THIS element's own attributes only, and
+      exists for one of them: data-mkt-theme, which THEME_INIT_SCRIPT sets
+      before hydration. Without it React 19 reports the attribute as a
+      mismatch and regenerates the whole tree, which wipes the theme.
+    */
+    <html lang="en" className={`${jakarta.variable} ${grotesk.variable}`} suppressHydrationWarning>
+      <head>
+        {/*
+          The public website's theme, applied before first paint (see
+          lib/marketing/theme.ts). In the ROOT head, not the marketing layout:
+          a <script> React renders on the client is never executed and warns,
+          and the marketing layout is client-rendered on every navigation into
+          it from the app. The application ignores the attribute it sets.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );

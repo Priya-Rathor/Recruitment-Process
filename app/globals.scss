@@ -5806,15 +5806,38 @@ a {
   }
 }
 
+// --- Head: the page title and the search share one row --------------------
+.settings-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.settings-head__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  color: var(--color-text);
+  margin: 0;
+}
+
 // --- Search -----------------------------------------------------------------
 .settings-search {
   position: relative;
+  // Grows to 420px beside the title, and takes the full row when it wraps
+  // under it on a phone.
+  flex: 1 1 260px;
   max-width: 420px;
-  margin-bottom: var(--space-3);
 }
 
 .settings-search__icon {
   position: absolute;
+  // Above the input, which paints its own background over an earlier sibling.
+  z-index: 1;
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
@@ -5843,8 +5866,8 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   appearance: none;
   background: transparent;
@@ -5854,7 +5877,7 @@ a {
   cursor: pointer;
 
   &:hover {
-    background: var(--color-background);
+    background: var(--color-primary-tint);
     color: var(--color-text);
   }
 
@@ -5864,114 +5887,114 @@ a {
   }
 }
 
-// Even rhythm: the search's 12px above the count, 12px below it to the grid.
-// Was 16px below, which with the caption's line box read as roughly three times
-// the gap above — the count looked attached to the search and cut off from the
-// grid it describes.
 .settings-count {
   font-size: var(--text-caption);
   line-height: 1.4;
   color: var(--color-text-secondary);
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-4);
 }
 
 // --- The grid ---------------------------------------------------------------
 //
-// EXPLICIT COLUMN COUNTS, and equal tracks at every step.
+// EVERY CARD IS THE SAME SIZE — across rows, not only within one.
 //
-// This was `repeat(auto-fill, minmax(260px, 1fr))`. auto-fill is the right tool
-// when you do not care how many columns you get, and the wrong one here: the
-// count changed with every few pixels of window width, so the same seven cards
-// landed as 4+3, then 3+3+1, then 2+2+2+1 with no breakpoint anyone chose. Fixed
-// counts mean the last row is predictable, which is the thing being fixed.
+// Widths: explicit column counts of `minmax(0, 1fr)` tracks. Not auto-fill,
+// whose count changes every few pixels; and a zero floor, because a track's
+// implicit `auto` minimum lets one long word widen its column.
 //
-// `minmax(0, 1fr)` rather than plain `1fr`: a track's implicit minimum is
-// `auto`, so a single long unbroken word in a description can push a column
-// wider than its share and make the columns unequal. Zero as the floor removes
-// that.
+// Heights: `grid-auto-rows: 1fr`. In a grid with no fixed height, every `1fr`
+// row resolves to the SAME size — that of the tallest card in the whole grid —
+// so the Agents card's eight links set one height that every card shares, and
+// a two-link card keeps the space rather than ending short. No magic
+// min-height to re-tune whenever a link is added, no JS measuring, no masonry
+// or CSS columns. The tallest card is bounded by MAX_CARD_LINKS
+// (app/settings/catalog.ts), which catalog.test.ts enforces.
 //
-// NOTHING STRETCHES TO FILL A SHORT LAST ROW. The tracks are defined by the
-// grid, not by the items in it, so the two cards in the final row occupy two
-// tracks at the same width as every other card and leave the remaining tracks
-// genuinely empty. `justify-content: start` keeps them left-aligned rather than
-// distributed across the space.
+// The last row stays left-aligned at full column width: tracks are defined by
+// the grid, not by the items in it.
 //
-// EQUAL HEIGHTS WITHIN A ROW (`align-items: stretch`). This was `start`, on
-// the argument that balanced 2-3 item cards would land "within a line of each
-// other" — but a two-line description beside a one-line one still made every
-// row ragged, and a usability audit read the grid as unstructured. Stretching
-// is the cheap, correct fix: each card fills its row track, content stays at the
-// top. Still no masonry, no dense packing, no JS measuring.
+// ONE COLUMN IS THE EXCEPTION. With nothing beside a card there is no row to
+// align, and eight cards at the Agents card's height would be ~3,000px of a
+// phone mostly spent scrolling past empty space — so a stacked card is its
+// natural height. Equal rows start with the second column.
 .settings-grid {
   display: grid;
   gap: var(--space-4);
   grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-  justify-content: start;
 }
 
-// 2 columns from a large phone, 3 from a tablet, 4 on desktop.
-@media (min-width: 560px) {
-  .settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+// 1 column on a phone, 2 on a tablet, 4 once each card can be ~220px wide.
+// Not three: eight cards would land 3+3+2, a ragged last row, where two and
+// four both divide eight exactly.
+//
+// CONTAINER queries, not media queries: the app shell's sidebar takes a
+// different width at different viewports, so the viewport says little about
+// how wide the grid actually is. The landing column is the container.
+.settings-landing { container-type: inline-size; }
+
+@container (min-width: 520px) {
+  .settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+  }
 }
 
-@media (min-width: 860px) {
-  .settings-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-@media (min-width: 1120px) {
+@container (min-width: 940px) {
   .settings-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
-.settings-card {
-  // The design system's card, restated for clarity: white, 1px border, 12px
-  // radius, no shadow — and 24px of padding on EVERY card regardless of how many
-  // items it holds (16px on mobile, from the same token). A two-item card and a
-  // three-item card are inset identically; only their height differs.
+// The design system's card (border, radius, glow, padding) as a column, so the
+// "View all" line can be pushed to the foot and sit at one height in every card.
+//
+// `.settings-grid > .settings-card`, not `.settings-card`: Bulma gives every
+// `.card:not(:last-child)` a 24px bottom margin, which inside a grid made the
+// LAST card 24px taller than the rest — the one unequal card on the page. The
+// child selector matches Bulma's specificity and, coming later, wins.
+.settings-grid > .settings-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
   padding: var(--card-padding);
 }
 
-// Sentence case at label size, in full ink. It was 11px uppercase with 0.08em
-// tracking in the secondary grey — an eyebrow style doing a heading's job, and
-// hard to read at "Candidate-facing" length. It is the card's heading (an h2),
-// so it now looks like one: the weight carries the hierarchy, not the case.
+// Every title in the same place: first thing in the card, one line, same size.
 .settings-card__title {
-  font-size: var(--text-label);
+  font-family: var(--font-heading);
+  font-size: var(--text-section);
   font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
   color: var(--color-text);
   margin: 0 0 var(--space-3);
 }
 
-// 20px between one item's description and the next item's title.
-//
-// THE ARITHMETIC IS DELIBERATE, so nobody "corrects" this to gap: 20px and
-// doubles the rhythm: each row carries 8px of its own vertical padding (it needs
-// that padding, because the row is the hover and focus target, not just text), so
-// two adjacent rows already contribute 16px. The 4px gap makes 20px.
-//
-//     8px padding-bottom + 4px gap + 8px padding-top = 20px
 .settings-card__list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
 }
 
-.settings-card__link {
-  display: block;
-  // Negative inline margin so the hover fill bleeds to the card's padding edge
-  // instead of stopping short of it, which reads as a misaligned box.
+// Navigation links, not buttons: one line each, a fixed 34px row (a
+// comfortable pointer target without turning the card into a button stack),
+// and the hover fill bleeding to the card's padding edge.
+.settings-card__link,
+.settings-card__overview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
   margin: 0 calc(var(--space-2) * -1);
-  padding: var(--space-2);
+  padding: 6px var(--space-2);
   border-radius: var(--control-radius);
+  font-size: var(--text-body);
+  line-height: 1.35;
+  color: var(--color-text);
   text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
 
   &:hover {
     background: var(--color-primary-tint);
-
-    .settings-card__label { color: var(--color-primary); }
+    color: var(--color-primary);
   }
 
   &:focus-visible {
@@ -5980,22 +6003,58 @@ a {
   }
 }
 
-.settings-card__label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--text-body);
-  font-weight: var(--weight-medium);
-  color: var(--color-text);
+// The category's own page, at the card's foot. Marked by an arrow and weight,
+// not colour alone.
+.settings-card__overview {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
 }
 
 .settings-card__external { display: inline-flex; color: var(--color-text-secondary); flex-shrink: 0; }
 
-.settings-card__description {
+// --- Search results ---------------------------------------------------------
+.settings-results {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  max-width: 720px;
+}
+
+.settings-result {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--control-radius);
+  text-decoration: none;
+
+  &:hover { background: var(--color-primary-tint); }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+  }
+}
+
+.settings-result__path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 4px;
+  font-size: var(--text-body);
+  color: var(--color-text-secondary);
+}
+
+.settings-result__label {
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.settings-result__description {
   display: block;
   font-size: var(--text-caption);
   color: var(--color-text-secondary);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 // A matched character. Underline as well as tint, so the match is visible to a
@@ -7064,7 +7123,9 @@ a {
 
 .funnel-orbit__row {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto minmax(0, 1.1fr);
+  // The stage column never narrows below its longest word (min-content), so a
+  // name wraps at a space rather than inside a word.
+  grid-template-columns: 12px minmax(min-content, 1fr) auto minmax(0, 1.1fr);
   align-items: baseline;
   gap: var(--space-3);
   padding: 5px 0;
@@ -7087,7 +7148,12 @@ a {
   // WRAPS, never truncates. Stage names are the organisation's own and an
   // ellipsis with no tooltip hides part of one; in a narrow card even "Hired"
   // was clipped. A two-line row is a smaller cost than a missing word.
-  overflow-wrap: anywhere;
+  //
+  // Between WORDS only. `overflow-wrap: anywhere` was tried first and let the
+  // column shrink below one word, so "Video Interview" rendered as
+  // "Vid/eo/Int/ervi/ew" — the column's min-content floor (below) is what
+  // stops that, and a normal wrap breaks at the space.
+  overflow-wrap: break-word;
 }
 
 .funnel-orbit__count {

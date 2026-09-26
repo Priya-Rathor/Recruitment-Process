@@ -25,7 +25,7 @@ import { iconFor } from "./icons";
  */
 export function HiringPipeline() {
   return (
-    <Section tone="dark" id="pipeline">
+    <Section tone="dark" id="pipeline" cinematic>
       <SectionHeading
         eyebrow={PIPELINE_HEAD.eyebrow}
         title={PIPELINE_HEAD.title}

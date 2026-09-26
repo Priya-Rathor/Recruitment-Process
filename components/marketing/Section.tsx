@@ -26,6 +26,14 @@ export function Section({
    * between them is the rhythm rather than two paddings meeting.
    */
   flush = false,
+  /**
+   * Stays DEEP in the light theme. The default light theme renders every dark
+   * band light; the few that keep a navy ground are chosen moments, and this
+   * is how a page says which. On a light-designed band it does the reverse —
+   * the band is rendered deep in both themes. See the theme layer at the end
+   * of app/(marketing)/marketing.scss.
+   */
+  cinematic = false,
   id,
   className = "",
   /** Rendered instead of a plain container — for the hero's ribbons. */
@@ -34,6 +42,7 @@ export function Section({
   children: ReactNode;
   tone?: SectionTone;
   flush?: boolean;
+  cinematic?: boolean;
   id?: string;
   className?: string;
   backdrop?: ReactNode;
@@ -42,6 +51,7 @@ export function Section({
     "mkt-band",
     `mkt-band--${tone}`,
     flush ? "mkt-band--flush" : "",
+    cinematic ? "mkt-band--cinematic" : "",
     className,
   ]
     .filter(Boolean)

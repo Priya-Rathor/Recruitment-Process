@@ -3,11 +3,11 @@ import { requireMembershipOrRedirect } from "@/lib/tenant";
 import { visibleCategories } from "./catalog";
 import { SettingsGrid } from "./SettingsGrid";
 
-export const metadata = { title: "Settings" };
+export const metadata = { title: "Setup" };
 export const dynamic = "force-dynamic";
 
 /**
- * /settings — the landing grid.
+ * /settings — the Setup directory.
  *
  * This used to redirect to whichever section your role could open first, because
  * there was nothing here to land on: navigation lived in a permanent sidebar. Now
@@ -26,27 +26,24 @@ export default async function SettingsIndexPage() {
   return (
     <AppShell>
       <div className="settings-landing">
-        <div className="mb-5">
-          <h1 className="title is-4 mb-1">Settings</h1>
-          <p className="has-text-secondary" style={{ fontSize: 13 }}>
-            Configure the product without touching code.
-          </p>
-        </div>
-
         {categories.length === 0 ? (
           /*
             Reachable: /settings is not itself role-gated, and the top nav hides
             it for a Recruiter rather than blocking the URL. A plain statement
             beats a redirect loop or an empty grid.
           */
-          <div className="card">
-            <h2 className="title is-5">Nothing here for your role</h2>
-            <p className="has-text-secondary" style={{ fontSize: 14 }}>
-              There are no settings you can change. An Owner or Admin manages this product&apos;s
-              configuration.
-            </p>
-          </div>
+          <>
+            <h1 className="settings-head__title mb-4">Setup</h1>
+            <div className="card">
+              <h2 className="title is-5">Nothing here for your role</h2>
+              <p className="has-text-secondary" style={{ fontSize: 14 }}>
+                There are no settings you can change. An Owner or Admin manages this product&apos;s
+                configuration.
+              </p>
+            </div>
+          </>
         ) : (
+          // The heading lives in the grid: it shares a row with the search box.
           <SettingsGrid categories={categories} />
         )}
       </div>

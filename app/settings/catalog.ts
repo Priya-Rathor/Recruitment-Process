@@ -18,6 +18,7 @@
 // =============================================================================
 import type { OrgRole } from "@/lib/types";
 import { hasRole } from "@/lib/tenant";
+import { AGENT_TYPES, AGENT_TYPE_META, type AgentType } from "@/lib/agents/types";
 
 export type SettingsLink = {
   href: string;
@@ -40,14 +41,55 @@ export type SettingsLink = {
 export type SettingsCategory = {
   label: string;
   links: SettingsLink[];
+  /**
+   * The category's own landing page, rendered as the card's last line
+   * ("View all agents"). Pinned to the card's foot, so it sits at the same
+   * height in every card that has one.
+   */
+  overview?: SettingsLink;
 };
 
 /**
- * The categories, in the order the grid renders them.
+ * THE CARD HEIGHT CAP. The grid gives every card the height of the tallest
+ * (see `.settings-grid` in globals.scss), so one card is allowed to be tall
+ * only because every other card pays for it. Eight is the Agents card — one
+ * line per agent type — and catalog.test.ts refuses a ninth link anywhere: the
+ * answer then is an `overview` link and a shorter list, not a taller grid.
+ */
+export const MAX_CARD_LINKS = 8;
+
+/**
+ * One link per agent TYPE, derived from lib/agents/types.ts so a type added
+ * there appears here without a second list to update.
  *
- * Grouped by what somebody is trying to DO, which is why "Screening" sits with
- * the recruitment defaults rather than with Integrations: the person setting
- * retry delays is planning a hiring process, not connecting a service.
+ * Where a type has its own configuration page, the link goes there. The voice
+ * console and the WhatsApp settings are Owner/Admin pages — the same rule
+ * those pages enforce — so a Recruiter gets the Agent Center filtered to the
+ * type instead, which RLS lets every member read. Every other type is
+ * configured per agent, so its link is the Agent Center filtered to it
+ * (`?type=`), with a "create one" step when none exists yet.
+ */
+const AGENT_PAGES: Partial<Record<AgentType, string>> = {
+  voice_screening: "/settings/agents/voice",
+  whatsapp_reply: "/settings/agents/whatsapp",
+};
+
+const AGENT_LINKS: SettingsLink[] = AGENT_TYPES.map((type) => ({
+  href: AGENT_PAGES[type] ?? `/settings/agents?type=${type}`,
+  label: AGENT_TYPE_META[type].label,
+  description: AGENT_TYPE_META[type].purpose,
+  roles: AGENT_PAGES[type] ? ["owner", "admin"] : undefined,
+}));
+
+/**
+ * The categories, in the order the grid renders them — four across on desktop,
+ * so General, Recruitment, Agents and Automation make the first row.
+ *
+ * AGENTS AND AUTOMATION ARE TWO CARDS, NEVER ONE. An agent is an AI capability
+ * that does a recruitment task (screens a CV, makes a call, replies to a
+ * message); an automation is a rule that connects an event to actions. A rule
+ * may START an agent, which is exactly why merging the two read as one thing —
+ * "AI & Agents" once held both. catalog.test.ts keeps them apart.
  */
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
@@ -72,11 +114,17 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     ],
   },
   {
-    label: "Recruitment defaults",
+    /*
+      How THIS organization hires: the defaults, the stage targets, the extra
+      fields it records and what a new hire owes. Custom fields moved here from
+      "Data & activity" — they decide what is recorded on jobs and candidates,
+      which is recruitment configuration, not an activity log.
+    */
+    label: "Recruitment",
     links: [
       {
         href: "/settings/recruitment",
-        label: "Recruitment",
+        label: "Recruitment defaults",
         description: "Defaults for new applications and interviews",
         roles: ["owner", "admin"],
       },
@@ -86,32 +134,15 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         description: "Stage SLA targets",
         roles: ["owner", "admin"],
       },
-    ],
-  },
-  {
-    /*
-      Two items since Message templates moved to Communications, and that is
-      fine — the grid's balance rule is 2-3, and Privacy & security has sat at
-      two since it was created.
-
-      What is left is coherent rather than leftover: a form is what a candidate
-      fills in and a document checklist is what they owe after being hired. Both
-      are things a candidate does. The templates card is what we SAY to them,
-      which is a different job and now sits with the channels that carry it.
-    */
-    label: "Candidate-facing",
-    links: [
       {
-        href: "/settings/forms",
-        label: "Forms",
-        description: "Application forms and questionnaires",
         /*
-          RECRUITERS TOO, unlike most of this list — the reasoning moved here with
-          the entry. A form is the thing a recruiter shares to fill their own
-          pipeline, so gating it behind an Owner would make "put this role online"
-          a request rather than a task.
+          Every member may open it — Viewers are read-only inside it (Module 27
+          §6) rather than shut out, because somebody looking at a job with a
+          "Visa sponsorship" field should be able to find out what it is.
         */
-        roles: ["owner", "admin", "recruiter"],
+        href: "/settings/custom-fields",
+        label: "Custom fields",
+        description: "Extra fields on jobs, candidates and applications",
       },
       {
         href: "/settings/onboarding",
@@ -121,39 +152,65 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       },
     ],
   },
-  /*
-    TWO INTEGRATION CARDS, NOT ONE.
-
-    One card holding all six integration links was the page's only real layout
-    problem: at six items beside cards of two and three, it set the height of
-    whatever row it landed in and left a well of white space under its
-    neighbours. Splitting it fixes the CONTENT imbalance, which is why no
-    masonry or height-matching CSS is needed — every card is now 2-3 items and
-    natural heights land within a line or two of each other.
-
-    The split follows the detail page's own grouping, so somebody who knows that
-    page recognises these names. One difference worth knowing: the detail page
-    has THREE groups (Calling & scheduling / Communication / AI & automation) and
-    this grid has two, because a third card of one item would reintroduce the
-    imbalance in the opposite direction. "Communication & AI" is the merge.
-
-    Each href still carries its own card's anchor — the destinations are
-    untouched, only which card lists them changed.
-  */
   {
     /*
-      CHANNELS AND CONTENT TOGETHER.
-
-      Email lived here and Message templates lived under Candidate-facing — two
-      cards for one workflow. Connecting a channel and writing what goes through
-      it is a single task in a recruiter's head, and splitting it meant
-      remembering two places to manage one thing.
-
-      Templates lead, deliberately. It is the page people open most often and the
-      only one here they edit rather than configure once; the two channel cards
-      below it are connect-and-forget.
+      THE AGENT DIRECTORY. Every agent type, by its Scoreboad name — never the
+      provider that runs it (voice calls go through an integration; that is an
+      Integrations detail, not the agent's identity). The overview is the Agent
+      Center itself: no `roles`, because any member may see which agents work
+      their pipeline (RLS allows the read); the page gates the controls.
     */
-    label: "Communications",
+    label: "Agents",
+    links: AGENT_LINKS,
+    overview: {
+      href: "/settings/agents",
+      label: "View all agents",
+      description: "Every agent in this organization, with its status and where it is used",
+    },
+  },
+  {
+    /*
+      Rules, not agents. Every link leaves Settings for the existing automation
+      pages — no second configuration surface. /automations and its approvals
+      queue are open to every member and gate EDITING to Owner/Admin, matching
+      the top nav; creating a rule is Owner/Admin, as its page enforces.
+    */
+    label: "Automation",
+    links: [
+      {
+        href: "/automations",
+        label: "Automation rules",
+        description: "Triggers, conditions and the actions they take",
+        external: true,
+      },
+      {
+        href: "/automations/new",
+        label: "Create a rule",
+        description: "Start a new trigger-and-action rule",
+        roles: ["owner", "admin"],
+        external: true,
+      },
+      {
+        href: "/automations/approvals",
+        label: "Approvals",
+        description: "Actions waiting for a person to decide",
+        external: true,
+      },
+      {
+        href: "/automations#recent-runs",
+        label: "Run history",
+        description: "What each rule did, and when",
+        external: true,
+      },
+    ],
+  },
+  {
+    /*
+      What we SAY to candidates and what they fill in: templates, the two
+      channels that carry them, and the forms. Templates lead — the page people
+      open most and the only one here they edit rather than configure once.
+    */
+    label: "Candidate communication",
     links: [
       {
         href: "/settings/templates",
@@ -173,70 +230,34 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         description: "Candidate messages, alongside email",
         roles: ["owner", "admin"],
       },
-    ],
-  },
-  {
-    /*
-      AI provider left Communications because it is not a channel — it is the
-      model the AI Service Layer runs on, and it powers resume parsing and
-      matching, neither of which talks to anybody.
-
-      Automations sits here rather than with Communications for the reason worth
-      writing down: a rule can send a message, but it can also start a screening
-      call, move a stage or assign a recruiter. Filing it under Communications
-      would describe one of its actions as if it were all of them.
-    */
-    label: "AI & Agents",
-    links: [
       {
-        href: "/settings/agents",
-        label: "Agents",
+        href: "/settings/forms",
+        label: "Forms",
+        description: "Application forms and questionnaires",
         /*
-          THE ONE AGENT CENTER, and the only agent entry in Settings. It
-          replaced two: the "Voice agent console" shortcut (Calling &
-          scheduling) and "Message auto-reply agent" (Communications) — both
-          pages now live under /settings/agents and their old URLs redirect.
-          No `roles`: any member may see which agents work their pipeline (RLS
-          allows the read); the page gates the controls to Owner/Admin.
+          RECRUITERS TOO: a form is the thing a recruiter shares to fill their
+          own pipeline, so gating it behind an Owner would make "put this role
+          online" a request rather than a task.
         */
-        description:
-          "Create and manage AI agents for screening, interviews, communication, assessments and custom workflows.",
-      },
-      {
-        href: "/automations",
-        label: "Automations",
-        description: "Rules that trigger messages, calls, and reminders",
-        /*
-          NO `roles`, matching the page itself.
-
-          /automations uses requireMembershipOrRedirect() and gates only EDITING
-          to Owner/Admin — any member may open it and read the rules — and the top
-          nav shows it to every role. Restricting the Settings link to Owner/Admin
-          would hide a page the same person can already reach from the nav bar.
-
-          Links to the EXISTING rule list. No second automations configuration
-          page: run history, approvals and the scheduler all live there already.
-        */
-        external: true,
+        roles: ["owner", "admin", "recruiter"],
       },
     ],
   },
   {
     /*
-      CONNECTIONS, NOT AGENTS. Was "Calling & scheduling". An integration is a
-      provider an agent uses; the agents themselves are in AI & Agents, just
-      above. AI provider is here too: it is the model connection, not an agent.
-      No Sarvam or video-provider card: neither has an adapter, and a card for
-      one would be a Connect button to nothing. Email and
-      WhatsApp stay under Communications, beside the templates they carry — every
-      href appears once, and the Integrations page itself lists all of them.
+      CONNECTIONS, NOT AGENTS: the services agents and features run on.
+
+      "Voice calling", not the vendor's name. The recruiter-facing identity is
+      the agent ("Voice Screening Agent"); which company places the call is an
+      implementation detail, named only on the Integrations page itself, where
+      an admin pastes that company's API key and needs to know whose key it is.
     */
     label: "Integrations",
     links: [
       {
         href: "/settings/integrations#integration-bolna",
-        label: "Bolna AI",
-        description: "Voice provider for AI calling",
+        label: "Voice calling",
+        description: "The calling service voice agents use",
         roles: ["owner", "admin"],
       },
       {
@@ -246,8 +267,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         roles: ["owner", "admin"],
       },
       {
-        // AI INFRASTRUCTURE, not an agent: the model every agent and every AI
-        // feature runs on. A connection like Bolna, so it sits with them.
         href: "/settings/integrations#integration-llm",
         label: "AI provider",
         description: "The model behind agents, parsing and matching",
@@ -265,17 +284,10 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         roles: ["owner", "admin"],
       },
       {
+        // Retention is a form on THIS page (RetentionForm.tsx), so it is named
+        // in the description rather than listed as a second link to one form.
         href: "/settings/security",
         label: "Security & data",
-        /*
-          Data retention is NOT a separate row.
-
-          The brief allowed for one under "Data & activity" if it were distinct
-          from Privacy & consent. It is neither — retention is a form on THIS
-          page (app/settings/security/RetentionForm.tsx). A third link to the
-          same form would be the duplication the brief asked to avoid, so the
-          description names retention instead.
-        */
         description: "Data retention, what's protected, danger zone",
         roles: ["owner", "admin"],
       },
@@ -284,28 +296,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
     label: "Data & activity",
     links: [
-      {
-        /*
-          MODULE 27, AND NOT UNDER "Recruitment defaults" WHERE THE BRIEF
-          SUGGESTED IT.
-
-          That category is already at three, and the 2-3 balance rule below is
-          enforced by catalog.test.ts, not merely preferred — a fourth card there
-          fails the suite. The brief allowed for this ("or a new small entry
-          there"), and a one-item category of its own would fail the same rule
-          from the other side.
-
-          This is the better home anyway: custom fields decide WHAT this
-          organization records, which is the same subject as the log of changes to
-          it and the export of it. Every member may open the page — Viewers are
-          read-only inside it (brief §6) rather than shut out, because somebody
-          looking at a job with a "Visa sponsorship" field should be able to find
-          out what that field is.
-        */
-        href: "/settings/custom-fields",
-        label: "Custom fields",
-        description: "Extra fields on jobs, candidates and applications",
-      },
       {
         href: "/audit-log",
         label: "Audit log",
@@ -335,8 +325,8 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
  * Derived, never maintained separately — that was the drift this file exists to
  * prevent.
  */
-export const SETTINGS_LINKS: SettingsLink[] = SETTINGS_CATEGORIES.flatMap(
-  (category) => category.links
+export const SETTINGS_LINKS: SettingsLink[] = SETTINGS_CATEGORIES.flatMap((category) =>
+  category.overview ? [...category.links, category.overview] : category.links
 );
 
 /** Every settings link this role may open, ignoring categories. */
@@ -353,9 +343,11 @@ export function visibleLinks(role: OrgRole): SettingsLink[] {
  * exactly the wall of locked doors that rule exists to prevent.
  */
 export function visibleCategories(role: OrgRole): SettingsCategory[] {
+  const allowed = (link: SettingsLink) => !link.roles || hasRole(role, link.roles);
   return SETTINGS_CATEGORIES.map((category) => ({
     label: category.label,
-    links: category.links.filter((link) => !link.roles || hasRole(role, link.roles)),
+    links: category.links.filter(allowed),
+    overview: category.overview && allowed(category.overview) ? category.overview : undefined,
   })).filter((category) => category.links.length > 0);
 }
 

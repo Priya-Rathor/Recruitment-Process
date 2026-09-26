@@ -5,6 +5,7 @@ import { requireMembershipOrRedirect, hasRole } from "@/lib/tenant";
 import { SkeletonRows } from "@/components/states";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { listAgents } from "@/lib/agents/queries";
+import { AGENT_TYPE_META, createAgentHref, isAgentType, type AgentType } from "@/lib/agents/types";
 import { loadConnections } from "@/lib/agents/registry";
 import { SettingsShell } from "../SettingsShell";
 import { AgentList } from "./AgentList";
@@ -20,9 +21,18 @@ export const dynamic = "force-dynamic";
  * everyone); only Owner/Admin get the create and change controls, and the API
  * and migration 0043's policies refuse the same actions for everyone else.
  */
-export default async function AgentsPage() {
+export default async function AgentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string | string[] }>;
+}) {
   const membership = await requireMembershipOrRedirect();
   const canManage = hasRole(membership.role, ["owner", "admin"]);
+  // Setup's Agents card links each type here as ?type=. Only a view filter:
+  // anything that is not a known type is ignored, and the list is still this
+  // organization's own agents, read under RLS.
+  const { type } = await searchParams;
+  const initialType = typeof type === "string" && isAgentType(type) ? type : null;
 
   return (
     <SettingsShell
@@ -44,13 +54,21 @@ export default async function AgentsPage() {
           </div>
         }
       >
-        <Loader organizationId={membership.organization.id} canManage={canManage} />
+        <Loader organizationId={membership.organization.id} canManage={canManage} initialType={initialType} />
       </Suspense>
     </SettingsShell>
   );
 }
 
-async function Loader({ organizationId, canManage }: { organizationId: string; canManage: boolean }) {
+async function Loader({
+  organizationId,
+  canManage,
+  initialType,
+}: {
+  organizationId: string;
+  canManage: boolean;
+  initialType: AgentType | null;
+}) {
   const [result, connections] = await Promise.all([listAgents(organizationId), loadConnections(organizationId)]);
 
   if (result.state === "not_set_up") {
@@ -70,12 +88,16 @@ async function Loader({ organizationId, canManage }: { organizationId: string; c
     return (
       <div className="card">
         <EmptyState
-          headline="No agents yet"
-          message="Create your first AI agent to automate screening, interviews, assessments, and candidate communication."
+          headline={initialType ? `No ${AGENT_TYPE_META[initialType].label}s yet` : "No agents yet"}
+          message={
+            initialType
+              ? AGENT_TYPE_META[initialType].purpose
+              : "Create your first AI agent to automate screening, interviews, assessments, and candidate communication."
+          }
           accent="primary"
           action={
             canManage ? (
-              <Link className="button is-primary" href="/settings/agents/new">
+              <Link className="button is-primary" href={createAgentHref(initialType)}>
                 <Plus size={16} aria-hidden="true" />
                 <span>Create Agent</span>
               </Link>
@@ -90,9 +112,11 @@ async function Loader({ organizationId, canManage }: { organizationId: string; c
     <AgentList
       agents={result.agents}
       canManage={canManage}
+      initialType={initialType}
       providerStates={Object.fromEntries(
         Object.entries(connections.providers).map(([id, connection]) => [id, connection.state])
       )}
     />
   );
 }
+

@@ -178,6 +178,15 @@ export const EXTERNALLY_MANAGED: Partial<Record<AgentType, { href: string }>> = 
   whatsapp_reply: { href: "/settings/agents/whatsapp" },
 };
 
+/**
+ * Where "create an agent of this type" goes: the create flow opened at that
+ * type, or the type's own page when it is managed elsewhere.
+ */
+export function createAgentHref(type: AgentType | null): string {
+  if (!type) return "/settings/agents/new";
+  return EXTERNALLY_MANAGED[type]?.href ?? `/settings/agents/new?type=${type}`;
+}
+
 export const STATUS_META: Record<
   AgentStatus,
   { label: string; tone: "success" | "warning" | "neutral" | "info" }

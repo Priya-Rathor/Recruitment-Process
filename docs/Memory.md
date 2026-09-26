@@ -3180,3 +3180,25 @@ Lint clean · typecheck clean · 2,205 tests · build compiles.
   Bolna/Calendar — they stay inside Settings); account-menu trigger + row get
   an active state on Settings/Analytics/Audit log.
 - Bundle + FRESH_START regen'd (45). 0043–0045 still unreplayed.
+
+## 2026-09-26 — marketing site light/dark/system theme + Plus Jakarta Sans
+
+- Theme: `lib/marketing/theme.ts` (pure; pref/resolve + inline pre-paint script), `components/marketing/ThemeToggle.tsx` (useSyncExternalStore module store, desktop nav + mobile sheet), `<html data-mkt-theme>` set in root `app/layout.tsx` head (`suppressHydrationWarning` on `<html>`). Light is the default, not system; absent attribute = light, so SSR HTML is already right.
+- Chose per-band token remap (THEME LAYER at end of `marketing.scss`) over a second stylesheet: dark family → light values (R2), light family → dark values (R1). Derived var() tokens (focus rings) must be restated in each remap — they resolve at declaration.
+- Cinematic bands stay dark in light theme: `Section cinematic` prop (HiringPipeline, TrustSection), CTA, footer, AI story stage. Product surfaces (`.mkt-product, .an-surface, .ap-form, …`) pinned bright in both.
+- App `--color-*` tokens are pinned per marketing context (they follow the OS otherwise). Five `--color-primary` fills paired with fixed navy ink → `--color-on-accent`; test guards it.
+- Font: `--font-heading` → Jakarta inside `.mkt` only; app keeps Space Grotesk.
+- Logo: `public/brand/logo-compact-light.png` (dark "Score" wordmark), generated with installed sharp; both logos rendered, CSS hides one.
+- Fixed on the way: FunnelChart SVG `<title>` hydration mismatch (single string child); funnel legend letter-breaking (`overflow-wrap: break-word`) and stacked layout inside the narrow marketing analytics card.
+- No dependencies added. lint / tsc / 2245 tests / build green.
+- Still open from earlier sessions: commit+push of 0045 fix, prod migrations 0043–0045 on project mavibu… (after backup), Supabase Auth Site URL, www DNS record.
+
+## 2026-09-26 — Setup directory (/settings landing)
+
+- `/settings` is now "Setup": title + search on one row, 8 equal cards (General, Recruitment, Agents, Automation, Candidate communication, Integrations, Privacy & security, Data & activity), 31 links. All in `app/settings/catalog.ts` (still the single list) + `SettingsGrid.tsx`.
+- Agents card derives one link per `AGENT_TYPES` entry (+ "View all agents" overview). Voice Screening → `/settings/agents/voice`, WhatsApp → `/settings/agents/whatsapp` (both Owner/Admin, matching those pages); others → `/settings/agents?type=X`. Agent Center reads `?type=` as a view filter (validated with `isAgentType`); create flow accepts `?type=` to skip the type step. `createAgentHref()` in `lib/agents/types.ts`.
+- Automation card: `/automations`, `/automations/new`, `/automations/approvals`, `/automations#recent-runs` (id added to the page). Tests keep agent hrefs out of every card but Agents.
+- Equal size: `grid-auto-rows: 1fr` from 2 columns up (all rows = tallest card), container queries (2 cols ≥520px, 4 ≥940px). One column = natural heights (chose over 8×389px of phone scroll). `MAX_CARD_LINKS = 8` enforced by test. Trap: Bulma `.card:not(:last-child)` margin made the last grid card 24px taller — `.settings-grid > .settings-card { margin: 0 }`.
+- Search: flat results "Category › Setting", ranked (label/category substring → description → label subsequence) because Enter opens the first; ↓/↑ move, Esc clears.
+- Vendor name out of recruiter-facing agent UI: Setup link "Voice calling"; Agent list "Provider: Scoreboad voice calling". Kept on the Integrations page and the Owner/Admin create-flow provider picker (credential/provider choice needs the name).
+- Visual QA used a temporary public harness page (deleted). lint / tsc / 2248 tests / build green.

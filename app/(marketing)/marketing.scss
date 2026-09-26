@@ -151,6 +151,25 @@
   --mkt-glass-border: rgba(255, 255, 255, 0.13);
   --mkt-glass-strong: rgba(255, 255, 255, 0.09);
 
+  /*
+    Translucent DARK fills that used to be literals in component rules — the
+    nav bar, the mega menu, the mobile sheet, transcript and log wells. As
+    literals they could not follow a theme: a band remapped light would have
+    kept a navy well under text that had turned to ink. The theme layer at the
+    bottom of this file gives them light values.
+  */
+  --mkt-dark-well: rgba(10, 17, 40, 0.5);
+  --mkt-dark-panel: rgba(15, 24, 53, 0.82);
+  --mkt-dark-chrome: rgba(10, 17, 40, 0.72);
+  --mkt-dark-chrome-solid: rgba(10, 17, 40, 0.96);
+
+  /*
+    Plus Jakarta Sans for headings as well as body on the public site — one
+    family, weights 400-800 (it is a variable font, so no extra download). The
+    application keeps Space Grotesk headings; this only overrides inside .mkt.
+  */
+  --font-heading: var(--font-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
   --mkt-glow-accent: 0 16px 48px -20px rgba(139, 158, 255, 0.55);
   --mkt-glow-card: 0 1px 2px rgba(11, 16, 32, 0.05), 0 16px 36px -22px rgba(11, 16, 32, 0.15);
   --mkt-glow-card-hover: 0 2px 4px rgba(11, 16, 32, 0.06), 0 24px 52px -24px rgba(11, 16, 32, 0.22);
@@ -1390,7 +1409,7 @@
   .mkt-bandhead h2 {
     font-family: var(--font-heading);
     font-size: var(--mkt-h2);
-    font-weight: var(--weight-semibold);
+    font-weight: var(--weight-bold);
     line-height: 1.12;
     letter-spacing: -0.02em;
     color: var(--mkt-ink);
@@ -1505,7 +1524,7 @@
   .mkt-hero__h1 {
     font-family: var(--font-heading);
     font-size: var(--mkt-h1);
-    font-weight: var(--weight-bold);
+    font-weight: 800; // Jakarta ExtraBold — the one 800 on the site
     line-height: 1.04;
     letter-spacing: -0.035em;
     color: var(--mkt-on-dark);
@@ -2015,7 +2034,7 @@
     width: 13.5rem;
     padding: 0.625rem 0.75rem;
     border-radius: var(--mkt-radius-sm);
-    background: rgba(15, 24, 53, 0.82);
+    background: var(--mkt-dark-panel);
     backdrop-filter: blur(14px) saturate(150%);
     border: 1px solid var(--mkt-glass-border);
     box-shadow: var(--mkt-glow-sheet);
@@ -3059,8 +3078,9 @@
     &[aria-selected="true"] {
       background: var(--color-primary);
       border-color: transparent;
-      // Navy on periwinkle — 7.50:1. White here is 2.49:1.
-      color: var(--mkt-on-accent);
+      // The on-accent pair for the rendered theme: navy on #8b9eff (7.50:1) on
+      // a deep surface, white on #515f9e (6.03:1) on a light one.
+      color: var(--color-on-accent);
       font-weight: var(--weight-semibold);
     }
   }
@@ -3224,7 +3244,7 @@
     padding: 0.75rem 0.875rem;
     border-left: 2px solid var(--mkt-dark-border-strong);
     border-radius: 0 var(--mkt-radius-sm) var(--mkt-radius-sm) 0;
-    background: rgba(10, 17, 40, 0.5);
+    background: var(--mkt-dark-well);
     font-size: 12.5px;
     line-height: 1.55;
     color: var(--mkt-on-dark-muted);
@@ -3487,6 +3507,20 @@
     }
 
     .has-text-secondary { color: var(--color-text-secondary); }
+
+    /*
+      The funnel STACKS here, orbit above legend — the layout the chart already
+      uses below 720px (app/globals.scss). This card is half of a two-column
+      showcase, narrower than any phone the media query was written for: a
+      200px orbit beside a four-column legend overflowed into the next card
+      once stage names stopped being truncated.
+    */
+    .funnel-orbit {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: center;
+    }
+
+    .funnel-orbit__legend { width: 100%; }
   }
 
   .an-surface__bar {
@@ -3815,7 +3849,7 @@
 
       .ig-node__icon {
         background: var(--color-primary);
-        color: var(--mkt-on-accent);  // navy on periwinkle, 7.50:1
+        color: var(--color-on-accent);  // navy on #8b9eff / white on #515f9e
       }
     }
   }
@@ -4186,7 +4220,7 @@
   .fl__log {
     border: 1px solid var(--mkt-dark-border);
     border-radius: var(--mkt-radius);
-    background: rgba(10, 17, 40, 0.5);
+    background: var(--mkt-dark-well);
     padding: 0.875rem;
   }
 
@@ -4580,8 +4614,8 @@
     border: 1px solid transparent;
     border-radius: var(--control-radius);
     background: var(--color-primary);
-    // Navy on periwinkle — 7.50:1. Never white.
-    color: var(--mkt-on-accent);
+    // The theme's on-accent pair: navy on #8b9eff, white on #515f9e.
+    color: var(--color-on-accent);
     font-family: var(--font-body);
     font-size: 12.5px;
     font-weight: var(--weight-semibold);
@@ -5372,8 +5406,8 @@
     height: 2.25rem;
     border-radius: 999px;
     background: var(--color-primary);
-    // Navy on periwinkle — 7.50:1. White here is 2.49:1.
-    color: var(--mkt-on-accent);
+    // The theme's on-accent pair: navy on #8b9eff, white on #515f9e.
+    color: var(--color-on-accent);
     font-family: var(--font-heading);
     font-size: 12.5px;
     font-weight: var(--weight-bold);
@@ -5992,7 +6026,7 @@
   .vi-transcript {
     border-radius: var(--mkt-radius-sm);
     border: 1px solid var(--mkt-dark-border);
-    background: rgba(10, 17, 40, 0.5);
+    background: var(--mkt-dark-well);
     padding: 0.75rem;
     // Not yet shown: a dashed outline, never opacity — 0.35 took the head and
     // its "Illustrative" label to about 2:1, and that label is the disclosure.
@@ -6081,7 +6115,7 @@
     margin-top: 0.75rem;
     border-radius: var(--mkt-radius-sm);
     border: 1px solid var(--mkt-dark-border);
-    background: rgba(10, 17, 40, 0.5);
+    background: var(--mkt-dark-well);
     padding: 0.75rem;
     opacity: 0;
     transform: translateY(8px);
@@ -6841,9 +6875,9 @@
     &.is-primary {
       background: var(--color-primary);
       border-color: transparent;
-      // Navy on periwinkle — 7.50:1. White here is 2.49:1, and this is the
+      // The theme's on-accent pair — never a hard-coded white or navy, the
       // single most repeated mistake available in this theme.
-      color: var(--mkt-on-accent);
+      color: var(--color-on-accent);
       font-weight: var(--weight-semibold);
     }
   }
@@ -9469,7 +9503,7 @@
       alone is already sufficient contrast, so a browser without it loses the
       blur and nothing else.
     */
-    background: rgba(10, 17, 40, 0.72);
+    background: var(--mkt-dark-chrome);
     backdrop-filter: blur(14px) saturate(150%);
     border: 1px solid var(--mkt-glass-border);
     box-shadow: var(--mkt-glow-nav);
@@ -9603,7 +9637,7 @@
     max-width: calc(100vw - 6rem);
     padding: 1.25rem;
     border-radius: var(--mkt-radius);
-    background: rgba(10, 17, 40, 0.96);
+    background: var(--mkt-dark-chrome-solid);
     backdrop-filter: blur(14px) saturate(150%);
     border: 1px solid var(--mkt-glass-border);
     box-shadow: var(--mkt-glow-sheet);
@@ -9739,7 +9773,7 @@
     margin: 0.5rem auto 0;
     padding: 0.75rem;
     border-radius: var(--mkt-radius);
-    background: rgba(10, 17, 40, 0.96);
+    background: var(--mkt-dark-chrome-solid);
     backdrop-filter: blur(14px);
     border: 1px solid var(--mkt-glass-border);
     box-shadow: var(--mkt-glow-sheet);
@@ -11147,7 +11181,7 @@
     top: 4.75rem;
     z-index: 40;
     padding-block: var(--mkt-space-3);
-    background: rgba(10, 17, 40, 0.86);
+    background: var(--mkt-dark-chrome-solid);
     backdrop-filter: blur(10px);
     border-block-end: 1px solid var(--mkt-dark-border);
   }
@@ -13950,7 +13984,332 @@
     // it. Both sit on the deep ground, so a navy wash is the right substitute.
     .mkt-btn--glass,
     .mkt-lcard--glass {
-      background: rgba(20, 29, 58, 0.72);
+      background: var(--mkt-dark-panel);
     }
+  }
+}
+
+// =============================================================================
+// THEME LAYER — light (default) / dark / system, for the public website only.
+//
+// NOT A SECOND TOKEN SYSTEM. The site already has two token FAMILIES:
+//   light family — --mkt-light, --mkt-white, --mkt-ink, --mkt-ink-muted, … —
+//                  used by the components designed for bright bands;
+//   dark family  — --mkt-dark, --mkt-dark-2, --mkt-on-dark, … — used by the
+//                  components designed for deep bands.
+// A theme is a REMAP of one family onto the other family's values, applied per
+// band. No component changes: a card that reads var(--mkt-ink) renders ink on a
+// light band and white on the same band remapped dark. That is what lets every
+// existing module adapt without being rewritten.
+//
+// WHERE EACH REMAP APPLIES
+//   Light theme (default — no attribute, or data-mkt-theme="light"):
+//     the nav, the hero and every dark band that is not CINEMATIC → dark family
+//     remapped LIGHT. Cinematic bands (the pipeline, the closing CTA, and the
+//     Security band, which is light-designed and remapped DARK) stay deep: the
+//     dark moments are chosen, not the default.
+//   Dark theme (data-mkt-theme="dark"):
+//     every light band → light family remapped DARK.
+//   Both: PRODUCT MOCKUPS stay bright. A dashboard picture is the product, and
+//   the product is a light UI; it is re-pinned to the light family inside any
+//   band remapped dark.
+//
+// THE APP TOKENS (--color-*) FOLLOW THE BAND TOO. About a hundred rules here
+// read the application's tokens, which follow the OS (prefers-color-scheme).
+// Left alone they would ignore the toggle — and a light-OS visitor already got
+// a different primary button from a dark-OS one. Each context below pins them
+// to the palette of the surface it RENDERS, so the toggle is the only input.
+//
+// DERIVED TOKENS ARE RESTATED, NOT INHERITED. A custom property that contains
+// var() is resolved where it is DECLARED — --mkt-focus-ring was computed on
+// .mkt with the navy spacer baked in, so remapping --mkt-dark on a band would
+// not change it. Every derived token a remap affects is redeclared in it.
+//
+// Every text/ground pair below was computed (theme.test.ts asserts them):
+// light-rendered text ≥ 4.9:1, dark-rendered text ≥ 7.3:1.
+// =============================================================================
+
+// ---- The application palette, mirrored from app/globals.scss ----------------
+// Copies, like the an-surface bridge above: the two modes' values of the SAME
+// property names cannot reference each other. Keep in step with globals.
+@mixin mkt-app-tokens-light {
+  --color-primary: #515f9e;
+  --color-primary-hover: #3c4880;
+  --color-primary-tint: rgba(81, 95, 158, 0.08);
+  --color-text: #0b1020;
+  --color-text-secondary: #3f4859;
+  --color-border: #e4e8f0;
+  --color-card: #ffffff;
+  --color-background: #ffffff;
+  // White on #515f9e is 6.03:1. The brief's #6f82ff with white text is 3.33:1,
+  // so the brighter hue is kept for fills that carry navy ink, never white.
+  --color-on-accent: #ffffff;
+  --color-error: #b4304a;
+  --glow-soft:
+    inset 0 0 0 1px rgba(81, 95, 158, 0.06),
+    0 1px 2px rgba(10, 17, 40, 0.04),
+    0 8px 24px -12px rgba(10, 17, 40, 0.10);
+  --glow-accent: 0 0 0 1px rgba(81, 95, 158, 0.28), 0 6px 20px -8px rgba(81, 95, 158, 0.32);
+}
+
+@mixin mkt-app-tokens-dark {
+  --color-primary: #8b9eff;
+  --color-primary-hover: #a9b6ff;
+  --color-primary-tint: rgba(139, 158, 255, 0.12);
+  --color-text: #ffffff;
+  --color-text-secondary: #d4dae7;
+  --color-border: rgba(255, 255, 255, 0.10);
+  --color-card: #111c38;
+  --color-background: #0a1128;
+  --color-on-accent: #0a1128; // navy on periwinkle, 7.50:1
+  --color-error: #ff9aa8;
+  --glow-soft:
+    inset 0 0 0 1px rgba(139, 158, 255, 0.08),
+    0 2px 10px -4px rgba(4, 8, 22, 0.70),
+    0 12px 40px -20px rgba(139, 158, 255, 0.16);
+  --glow-accent: 0 0 0 1px rgba(139, 158, 255, 0.30), 0 6px 24px -8px rgba(139, 158, 255, 0.45);
+}
+
+// ---- Light family, as designed (used to re-pin product mockups) -------------
+@mixin mkt-light-family {
+  --mkt-light: #f7f9fc;
+  --mkt-white: #ffffff;
+  --mkt-light-2: #eef1f8;
+  --mkt-light-border: #e7eaf2;
+  --mkt-light-border-strong: #d6dbe9;
+  --mkt-ink: #0b1020;
+  --mkt-ink-muted: #5e6678;
+  --mkt-accent-ink: #515f9e;
+  --mkt-amber-ink: #8a5f00;
+  --mkt-mint-ink: #3f716e;
+  --mkt-lavender-ink: #716d9e;
+  --mkt-error-ink: #b4304a;
+  --mkt-glow-card: 0 1px 2px rgba(11, 16, 32, 0.05), 0 16px 36px -22px rgba(11, 16, 32, 0.15);
+  --mkt-glow-card-hover: 0 2px 4px rgba(11, 16, 32, 0.06), 0 24px 52px -24px rgba(11, 16, 32, 0.22);
+  --mkt-glow-product-light:
+    0 1px 2px rgba(11, 16, 32, 0.04),
+    0 30px 60px -30px rgba(11, 16, 32, 0.22),
+    0 0 80px -30px rgba(139, 158, 255, 0.45);
+  --mkt-focus-ring-light: 0 0 0 2px #ffffff, 0 0 0 4px #515f9e;
+}
+
+// ---- Light family remapped DARK (dark theme, and the cinematic light band) --
+@mixin mkt-light-family-on-dark {
+  --mkt-light: #0a1128;
+  --mkt-white: #111c38;
+  --mkt-light-2: #14203f;
+  --mkt-light-border: rgba(255, 255, 255, 0.10);
+  --mkt-light-border-strong: rgba(255, 255, 255, 0.16);
+  --mkt-ink: #ffffff;
+  --mkt-ink-muted: #aab3c7;        // 8.00:1 on #111c38, 7.63:1 on #14203f
+  --mkt-accent-ink: #aab7ff;       // 8.76:1 on #111c38
+  --mkt-amber-ink: #ffd08a;
+  --mkt-mint-ink: #7fe7c4;
+  --mkt-lavender-ink: #c6b8ff;
+  --mkt-error-ink: #ff9aa8;
+  --mkt-glow-card: 0 0 0 1px rgba(139, 158, 255, 0.04), 0 16px 36px -22px rgba(4, 8, 22, 0.70);
+  --mkt-glow-card-hover: 0 0 0 1px rgba(139, 158, 255, 0.10), 0 24px 52px -24px rgba(4, 8, 22, 0.80);
+  --mkt-glow-product-light:
+    0 0 0 1px rgba(255, 255, 255, 0.10),
+    0 40px 80px -34px rgba(4, 8, 22, 0.85),
+    0 0 90px -28px rgba(139, 158, 255, 0.40);
+  --mkt-focus-ring-light: 0 0 0 2px #111c38, 0 0 0 4px #aab7ff;
+}
+
+// ---- Dark family remapped LIGHT (light theme: the nav, hero, most bands) ----
+@mixin mkt-dark-family-on-light {
+  --mkt-dark: #ffffff;
+  --mkt-dark-2: #ffffff;
+  --mkt-dark-3: #eef2f8;
+  --mkt-dark-border: #e4e8f0;
+  --mkt-dark-border-strong: #d5dae5;
+  --mkt-on-dark: #0b1020;
+  --mkt-on-dark-muted: #3f4859;     // 8.19:1 on #eef2f8
+  --mkt-on-dark-faint: #5e6678;     // 5.12:1 on #eef2f8 (the brief's #687386 is 4.26)
+  --mkt-accent-on-dark: #515f9e;    // 5.37:1 on #eef2f8
+  // Raw accents double as TEXT inside dark-designed components (a mint "Live",
+  // a lavender "Wait"), so on light they take their ink step.
+  --mkt-accent: #515f9e;
+  --mkt-accent-bright: #515f9e;
+  --mkt-mint: #3f716e;              // 4.92:1 on #eef2f8
+  --mkt-lavender: #5f5b91;          // 5.51:1 on #eef2f8 (#716d9e would be 4.26)
+  --mkt-glass: rgba(11, 16, 32, 0.03);
+  --mkt-glass-border: #e4e8f0;
+  --mkt-glass-strong: rgba(11, 16, 32, 0.06);
+  --mkt-dark-well: #f3f5fa;
+  --mkt-dark-panel: rgba(255, 255, 255, 0.94);
+  --mkt-dark-chrome: rgba(255, 255, 255, 0.82);
+  --mkt-dark-chrome-solid: rgba(255, 255, 255, 0.97);
+  --mkt-glow-product:
+    0 1px 2px rgba(11, 16, 32, 0.04),
+    0 30px 60px -30px rgba(11, 16, 32, 0.22),
+    0 0 80px -30px rgba(139, 158, 255, 0.45);
+  --mkt-glow-nav: 0 1px 0 rgba(11, 16, 32, 0.04), 0 12px 32px -20px rgba(11, 16, 32, 0.18);
+  --mkt-glow-sheet: 0 24px 48px -24px rgba(11, 16, 32, 0.25);
+  --mkt-focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #515f9e;
+}
+
+// Product mockups: bright in every theme.
+$mkt-product-surfaces: ".mkt-product, .an-surface, .ap-form, .ap-in, .ap-rec, .cw";
+
+// ---- Light theme (the default) ----------------------------------------------
+html:not([data-mkt-theme="dark"]) .mkt {
+  @include mkt-app-tokens-light;
+
+  // .sec-toc is the /security page's sticky section bar: dark-designed chrome
+  // that sits between bands rather than inside one, so no band remap reaches it.
+  .mkt-nav,
+  .mkt-hero,
+  .sec-toc,
+  .mkt-band--dark:not(.mkt-band--cinematic):not(.mkt-band--cta) {
+    @include mkt-dark-family-on-light;
+    @include mkt-app-tokens-light;
+  }
+
+  // Light-designed but cinematic (Security): rendered deep.
+  .mkt-band--light.mkt-band--cinematic {
+    @include mkt-light-family-on-dark;
+    @include mkt-app-tokens-dark;
+
+    #{$mkt-product-surfaces} {
+      @include mkt-light-family;
+      @include mkt-app-tokens-light;
+    }
+  }
+
+  // Always-deep surfaces read the dark app palette.
+  .mkt-band--dark.mkt-band--cinematic,
+  .mkt-band--cta,
+  .mkt-foot,
+  .ai-story__stage {
+    @include mkt-app-tokens-dark;
+  }
+
+  // The hero's glow: the LIGHT brand ramp, softer — a hint of periwinkle and
+  // lavender behind the headline, not a navy bruise on white.
+  .mkt-hero::before {
+    background: linear-gradient(135deg, #eae6ff 0%, #d3d2fb 30%, #b3b6f5 60%, #8b9eff 100%);
+    opacity: 0.45;
+  }
+
+  // Remapped bands alternate with the light ones: white against #f7f9fc, with a
+  // hairline, so two bright sections in a row still read as two.
+  .mkt-band--dark:not(.mkt-band--cinematic):not(.mkt-band--cta) {
+    border-block: 1px solid var(--mkt-dark-border);
+  }
+
+  // The headline accent is gradient TEXT, hard-coded for navy (#aab7ff ->
+  // #dcd4ff, ~1.5:1 on white). On the light hero it takes the light chart
+  // palette's periwinkle-to-violet: 5.6:1 and 6.4:1 on white at its two ends.
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .mkt-hero__accent {
+      background: linear-gradient(100deg, #4a5ad6 0%, #5b54c9 50%, #6a4fa8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+  }
+
+  // The hero's product frame was edged by the white ring in --mkt-glow-product,
+  // which is right on navy and invisible on white. Same fix the platform
+  // showcase already uses on a light band (.mkt-product--onlight): a real
+  // hairline, because a white product on a white hero otherwise has no edge.
+  .mkt-hero .mkt-product__frame {
+    border: 1px solid var(--mkt-light-border-strong);
+  }
+
+  .mkt-logo--dark-ground { display: none; }
+}
+
+// ---- Dark theme --------------------------------------------------------------
+html[data-mkt-theme="dark"] .mkt {
+  @include mkt-app-tokens-dark;
+
+  .mkt-band--light,
+  .mkt-band--statement {
+    @include mkt-light-family-on-dark;
+    @include mkt-app-tokens-dark;
+
+    #{$mkt-product-surfaces} {
+      @include mkt-light-family;
+      @include mkt-app-tokens-light;
+    }
+  }
+
+  .mkt-logo--light-ground { display: none; }
+}
+
+// ---- The toggle ---------------------------------------------------------------
+.mkt {
+  .mkt-theme {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--mkt-dark-border);
+    border-radius: 999px;
+  }
+
+  .mkt-theme__option {
+    display: inline-grid;
+    place-items: center;
+    // 28px in the bar: the nav row was already measured at ~700px of an
+    // ~870px bar at the 901px breakpoint (see .mkt-nav__burger), and three 32px
+    // buttons would have eaten most of the rest. 28px still clears WCAG 2.5.8's
+    // 24px target; the mobile sheet gets 36px, where thumbs are the pointer.
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--mkt-on-dark-muted);
+    cursor: pointer;
+    transition:
+      background-color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1)),
+      color var(--transition-fast) var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
+
+    &:hover { color: var(--mkt-on-dark); }
+
+    &[aria-pressed="true"] {
+      background: var(--color-primary-tint);
+      color: var(--mkt-accent-on-dark);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--mkt-focus-ring);
+    }
+  }
+
+  .mkt-sheet__theme {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-2);
+    border-top: 1px solid var(--mkt-dark-border);
+  }
+
+  .mkt-sheet__theme .mkt-theme__option {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mkt-sheet__themelabel {
+    font-size: var(--text-label);
+    font-weight: var(--weight-semibold);
+    color: var(--mkt-on-dark-muted);
+  }
+
+  // A theme switch cross-fades the surfaces that change and nothing else —
+  // no transition on `all`, no full-page animation. The global reduced-motion
+  // rule collapses these to 0.01ms.
+  // Grounds only: cards and buttons keep their own transitions (the hover lift),
+  // which a transition-property here would silently replace.
+  .mkt-hero,
+  .mkt-band {
+    transition-property: background-color, color, border-color;
+    transition-duration: 200ms;
+    transition-timing-function: var(--ease, cubic-bezier(0.4, 0, 0.2, 1));
   }
 }

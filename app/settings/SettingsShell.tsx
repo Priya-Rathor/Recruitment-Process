@@ -55,7 +55,7 @@ export function SettingsShell({
   back?: { href: string; label: string };
   children: ReactNode;
 }) {
-  const target = back ?? { href: "/settings", label: "Settings" };
+  const target = back ?? { href: "/settings", label: "Setup" };
 
   return (
     <AppShell>

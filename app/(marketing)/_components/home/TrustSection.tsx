@@ -33,7 +33,7 @@ import { iconFor } from "./icons";
  */
 export function TrustSection() {
   return (
-    <Section tone="light" id="trust">
+    <Section tone="light" id="trust" cinematic>
       <SectionHeading
         eyebrow={SECURITY_HEAD.eyebrow}
         title={SECURITY_HEAD.title}

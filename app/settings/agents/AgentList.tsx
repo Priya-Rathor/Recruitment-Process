@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Search } from "lucide-react";
+import { MoreHorizontal, Search, X } from "lucide-react";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { FormError } from "@/components/ui/states";
 import {
@@ -11,10 +11,10 @@ import {
   CHANNEL_LABELS,
   STATUS_META,
   allowedStatuses,
+  createAgentHref,
   type AgentStatus,
   type AgentType,
 } from "@/lib/agents/types";
-import { PROVIDERS } from "@/lib/agents/providers";
 import type { AgentListItem } from "@/lib/agents/queries";
 import type { ConnectionState } from "@/lib/agents/registry";
 
@@ -46,8 +46,11 @@ function executorLabel(
   providerStates: Record<string, ConnectionState>,
 ): string {
   if (agent.provider) {
+    // The capability, not the vendor. Which company places the call is named
+    // on the Integrations page, where an admin connects it; here, in the list
+    // every member reads, the agent's identity stays Scoreboad's.
     const connected = providerStates[agent.provider] === "connected";
-    return `${PROVIDERS[agent.provider].label}${connected ? "" : " (not connected)"}`;
+    return `Scoreboad voice calling${connected ? "" : " (not connected)"}`;
   }
   const dependency = AGENT_TYPE_META[agent.type].dependency;
   if (dependency.kind === "channel") return CHANNEL_LABELS[dependency.integration];
@@ -58,10 +61,13 @@ function executorLabel(
 export function AgentList({
   agents,
   canManage,
+  initialType = null,
   providerStates,
 }: {
   agents: AgentListItem[];
   canManage: boolean;
+  /** From Setup's Agents card (?type=): one exact type, until cleared. */
+  initialType?: AgentType | null;
   providerStates: Record<string, ConnectionState>;
 }) {
   const router = useRouter();
@@ -71,6 +77,7 @@ export function AgentList({
   const [statusFilter, setStatusFilter] =
     useState<(typeof STATUS_FILTERS)[number]>("all");
   const [group, setGroup] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<AgentType | null>(initialType);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -81,9 +88,10 @@ export function AgentList({
       (agent) =>
         (!needle || agent.name.toLowerCase().includes(needle)) &&
         (statusFilter === "all" || agent.status === statusFilter) &&
-        (!groupTypes || groupTypes.includes(agent.type)),
+        (!groupTypes || groupTypes.includes(agent.type)) &&
+        (!typeFilter || agent.type === typeFilter),
     );
-  }, [agents, query, statusFilter, group]);
+  }, [agents, query, statusFilter, group, typeFilter]);
 
   // Only offer the type groups that have agents in them.
   const groups = TYPE_GROUPS.filter((entry) =>
@@ -164,7 +172,18 @@ export function AgentList({
               </option>
             ))}
           </select>
-          {groups.length > 1 && (
+          {typeFilter && (
+            <button
+              type="button"
+              className="button is-small is-outlined-primary"
+              onClick={() => setTypeFilter(null)}
+            >
+              <span>{AGENT_TYPE_META[typeFilter].label}</span>
+              <X size={14} aria-hidden="true" />
+              <span className="is-sr-only"> — show all agent types</span>
+            </button>
+          )}
+          {!typeFilter && groups.length > 1 && (
             <select
               className="input"
               aria-label="Filter by agent type"
@@ -192,7 +211,23 @@ export function AgentList({
           : `${visible.length} of ${agents.length} agents`}
       </p>
 
-      {visible.length === 0 && (
+      {visible.length === 0 && typeFilter && agents.every((agent) => agent.type !== typeFilter) ? (
+        <div className="card">
+          <p className="mb-3" style={{ fontSize: 14 }}>
+            No {AGENT_TYPE_META[typeFilter].label}s yet. {AGENT_TYPE_META[typeFilter].purpose}
+          </p>
+          <div className="is-flex" style={{ gap: 8, flexWrap: "wrap" }}>
+            {canManage && (
+              <Link className="button is-primary is-small" href={createAgentHref(typeFilter)}>
+                Create {AGENT_TYPE_META[typeFilter].label}
+              </Link>
+            )}
+            <button type="button" className="button is-small is-outlined-primary" onClick={() => setTypeFilter(null)}>
+              Show all agents
+            </button>
+          </div>
+        </div>
+      ) : visible.length === 0 && (
         <div className="card">
           <p className="has-text-secondary" style={{ fontSize: 14 }}>
             No agents match. Clear the search or filters to see all{" "}

@@ -1,7 +1,8 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  MAX_CARD_LINKS,
   SETTINGS_CATEGORIES,
   SETTINGS_LINKS,
   firstVisibleHref,
@@ -9,6 +10,7 @@ import {
   visibleLinks,
 } from "@/app/settings/catalog";
 import { PROVIDER_DESCRIPTORS } from "@/lib/settings/integrations";
+import { AGENT_TYPES, isAgentType } from "@/lib/agents/types";
 import type { OrgRole } from "@/lib/types";
 
 const APP = path.join(process.cwd(), "app");
@@ -27,7 +29,8 @@ function routeExists(href: string): boolean {
   // and validated separately below, because an anchor pointing at a card that no
   // longer renders is its own kind of dead link.
   // NOT named `path` — that would shadow the node:path import used just below.
-  const route = href.split("#")[0];
+  // A ?query is a view of a page, not a route either (?type= on the Agent Center).
+  const route = href.split(/[#?]/)[0];
   const segments = route.replace(/^\//, "").split("/").filter(Boolean);
 
   // A static file path first: /settings/organization -> app/settings/organization/page.tsx
@@ -65,65 +68,30 @@ describe("the settings catalogue", () => {
   });
 
   /*
-    THE GRID'S LAYOUT DEPENDS ON THIS, so it is a test rather than a hope.
-
-    Card heights are content-driven — no masonry, no forced height matching — and
-    that only looks deliberate while the cards hold similar amounts. One card at
-    six items beside cards of two set its whole row's height and left a well of
-    white space; splitting it is what fixed the page.
-
-    Two or three items per card. A fourth is probably fine; a sixth is the bug
-    coming back, and this fails before anyone sees it in a browser.
+    THE GRID'S HEIGHT DEPENDS ON THIS. Every card takes the height of the
+    tallest (`grid-auto-rows: 1fr` on .settings-grid), so one long card makes
+    every card long. Eight is the Agents card, one line per agent type; a ninth
+    anywhere is the point to add an `overview` link and shorten the list.
   */
-  /*
-    RAISED FROM THREE TO FOUR BY 0042, and the trade is worth recording rather
-    than quietly widening.
-
-    The cap existed so cards in a row stay a similar height. Communications now
-    carries four — templates, email, WhatsApp and the auto-reply agent — because
-    that is one workflow: what candidates are told, through which channel, and by
-    whom. Filing the agent under "AI & automation" (which has room) would have
-    put it beside resume parsing and matching, neither of which talks to anybody,
-    and away from the only three pages that do.
-
-    Safe because `.settings-grid` uses `align-items: start` with auto row
-    heights, so a taller card does not stretch its neighbours — it just ends
-    lower. Four is the new ceiling, not an invitation: a fifth item in any card
-    is the point at which the grouping itself is wrong.
-  */
-  it("keeps every card within two to four items, so heights stay balanced", () => {
+  it("keeps every card within two to MAX_CARD_LINKS items, so no card sets a tall grid", () => {
     for (const category of SETTINGS_CATEGORIES) {
       expect(category.links.length, `${category.label} has ${category.links.length} items`)
         .toBeGreaterThanOrEqual(2);
       expect(category.links.length, `${category.label} has ${category.links.length} items`)
-        .toBeLessThanOrEqual(4);
+        .toBeLessThanOrEqual(MAX_CARD_LINKS);
     }
   });
 
-  it("totals 20 settings in 8 categories", () => {
+  it("totals 31 settings in 8 categories", () => {
     /*
-      Pinned so a regrouping cannot silently drop a link.
-
-      History: 19 in 6 → 19 in 7 (the Integrations card split, which moved links
-      without adding any) → 20 in 8 (Communication & AI split into Communications
-      and AI & automation, plus Automations added — the one genuinely new link)
-      → 21 in 8 (Module 27's Custom fields, added to Data & activity because
-      Recruitment defaults was already at the three-item cap below)
-      → 22 in 8 (0042's auto-reply agent, which took Communications to four and
-      raised the per-card cap — see the test above for why that was the right
-      trade rather than filing it elsewhere) → still 22 in 8 (0043's Agents
-      added to AI & automation; the Voice agent console shortcut it replaces
-      removed from Calling & scheduling) → 21 in 8 (the central Agents
-      restructure: "Message auto-reply agent" left Communications — its page
-      moved into the Agent Center — and "Calling & scheduling" became
-      "Integrations", "AI & automation" became "AI & Agents") → 20 in 8
-      ("Screening defaults" retired — its call rules are voice screening
-      agent behaviour and moved onto that agent's page; AI provider moved to
-      Integrations, leaving AI & Agents as Agents + Automations).
-      The grid's counter is computed from these, so this test and the visible
-      "20 settings in 8 categories" cannot disagree.
+      Pinned so a regrouping cannot silently drop a link. History, briefly:
+      19 in 6 … 20 in 8 (Agents + Automations under "AI & Agents"). The Setup
+      directory then split that card into Agents (one link per agent type, plus
+      "View all agents") and Automation (rules, create, approvals, run history),
+      folded Candidate-facing into Candidate communication and moved Custom
+      fields to Recruitment: 3 + 4 + 9 + 4 + 4 + 3 + 2 + 2 = 31.
     */
-    expect(SETTINGS_LINKS).toHaveLength(20);
+    expect(SETTINGS_LINKS).toHaveLength(31);
     expect(SETTINGS_CATEGORIES).toHaveLength(8);
   });
 
@@ -156,7 +124,7 @@ describe("the settings catalogue", () => {
     longer shows — which is exactly how an "n8n" row would come back.
   */
   it("anchors every deep link at an integration that has a card", () => {
-    const anchored = SETTINGS_LINKS.filter((link) => link.href.includes("#"));
+    const anchored = SETTINGS_LINKS.filter((link) => link.href.startsWith("/settings/integrations#"));
     expect(anchored.length).toBeGreaterThan(0);
 
     for (const link of anchored) {
@@ -180,13 +148,22 @@ describe("the settings catalogue", () => {
       layout change, which is the wrong thing for it to be sensitive to. What
       matters is that every integration is reachable, not which card lists it.
     */
-    const anchored = SETTINGS_LINKS.filter((link) => link.href.includes("#"))
+    const anchored = SETTINGS_LINKS.filter((link) => link.href.startsWith("/settings/integrations#"))
       .map((link) => link.href.split("#")[1].replace("integration-", ""))
       .sort();
 
     // Not a hardcoded five: derived from the descriptors, so adding a provider
     // makes this fail until it is offered here too.
     expect(anchored).toEqual(Object.keys(PROVIDER_DESCRIPTORS).sort());
+  });
+
+  it("anchors Run history at an element the automations page renders", () => {
+    const source = readFileSync(path.join(APP, "automations", "page.tsx"), "utf8");
+    const other = SETTINGS_LINKS.filter(
+      (link) => link.href.includes("#") && !link.href.startsWith("/settings/integrations#")
+    );
+    expect(other.map((link) => link.href)).toEqual(["/automations#recent-runs"]);
+    expect(source).toContain('id="recent-runs"');
   });
 
   it("offers no link to n8n anywhere in the grid", () => {
@@ -250,11 +227,21 @@ describe("role filtering", () => {
     expect(visibleLinks("recruiter").map((link) => link.href).sort()).toEqual([
       "/analytics",
       "/automations",
+      "/automations#recent-runs",
+      "/automations/approvals",
       /*
         0043. Read-only for a Recruiter: which agents call and message their
-        candidates is theirs to know; creating and pausing them is not.
+        candidates is theirs to know; creating and pausing them is not. The
+        voice console and WhatsApp settings are Owner/Admin pages, so those two
+        types reach a Recruiter only through the Agent Center list.
       */
       "/settings/agents",
+      "/settings/agents?type=assessment",
+      "/settings/agents?type=custom",
+      "/settings/agents?type=cv_screening",
+      "/settings/agents?type=email_reply",
+      "/settings/agents?type=video_interview",
+      "/settings/agents?type=voice_interview",
       /*
         Module 27. A Recruiter fills custom field VALUES in on jobs and
         applications, so the vocabulary is genuinely theirs to read; the page
@@ -286,20 +273,48 @@ describe("role filtering", () => {
   });
 });
 
-describe("one Agent Center", () => {
-  it("lists exactly one agent entry, and it is /settings/agents", () => {
-    // An agent configuration page filed under Communications, Recruitment or
-    // Integrations is the scattering the Agent Center replaced.
-    const agentLinks = SETTINGS_LINKS.filter(
-      (link) => /agent|screening/i.test(link.label) || /agent|screening|auto-reply/i.test(link.href)
-    );
-    expect(agentLinks.map((link) => link.href)).toEqual(["/settings/agents"]);
+describe("Agents and Automation are separate categories", () => {
+  const card = (label: string) => {
+    const found = SETTINGS_CATEGORIES.find((category) => category.label === label);
+    if (!found) throw new Error(`no ${label} card`);
+    return found;
+  };
+  const isAgentHref = (href: string) => href.startsWith("/settings/agents");
+
+  it("lists every agent type in the Agents card, once, by its product name", () => {
+    const agents = card("Agents");
+    expect(agents.links).toHaveLength(AGENT_TYPES.length);
+    expect(agents.links.every((link) => isAgentHref(link.href))).toBe(true);
+    expect(agents.overview?.href).toBe("/settings/agents");
+    for (const link of agents.links) {
+      const type = link.href.match(/\?type=(.+)$/)?.[1];
+      if (type) expect(isAgentType(type), link.href).toBe(true);
+    }
+  });
+
+  it("keeps agent pages out of every other card, and automation out of Agents", () => {
+    for (const category of SETTINGS_CATEGORIES) {
+      if (category.label === "Agents") continue;
+      for (const link of category.links) {
+        expect(isAgentHref(link.href), `${category.label} lists ${link.href}`).toBe(false);
+        expect(link.label, category.label).not.toMatch(/\bagent\b/i);
+      }
+    }
+    expect(card("Automation").links.every((link) => link.href.startsWith("/automations"))).toBe(true);
+    expect(card("Agents").links.some((link) => link.href.startsWith("/automations"))).toBe(false);
+  });
+
+  it("never names the calling vendor in the directory", () => {
+    // The agent is Scoreboad's; the provider is an Integrations-page detail.
+    // The anchor id is internal and may keep the provider key.
+    for (const link of SETTINGS_LINKS) {
+      expect(`${link.label} ${link.description}`.toLowerCase(), link.href).not.toContain("bolna");
+    }
   });
 
   it("keeps integrations as connections, never agent pages", () => {
-    const integrations = SETTINGS_CATEGORIES.find((category) => category.label === "Integrations");
-    expect(integrations?.links.every((link) => link.href.startsWith("/settings/integrations#"))).toBe(true);
-    const ai = SETTINGS_CATEGORIES.find((category) => category.label === "AI & Agents");
-    expect(ai?.links.map((link) => link.label)).toEqual(["Agents", "Automations"]);
+    expect(card("Integrations").links.every((link) => link.href.startsWith("/settings/integrations#"))).toBe(
+      true
+    );
   });
 });

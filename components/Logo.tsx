@@ -33,6 +33,14 @@ import Image from "next/image";
 const ASSETS = {
   full: { src: "/brand/logo.png", width: 489, height: 180 },
   compact: { src: "/brand/logo-compact.png", width: 499, height: 120 },
+  /*
+    The compact lockup for a LIGHT ground. Composed from the two clean parts,
+    not re-drawn: the orb is mark.png (which has no halo), and the wordmark is
+    the compact file's own letters with the white "Score" recoloured to ink.
+    The original's dark halo exists to seat the orb on navy and reads as a
+    smudge on white, so it is dropped rather than recoloured.
+  */
+  "compact-light": { src: "/brand/logo-compact-light.png", width: 499, height: 120 },
   mark: { src: "/brand/mark.png", width: 256, height: 256 },
 } as const;
 
